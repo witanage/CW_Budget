@@ -1,0 +1,799 @@
+import os
+import json
+from datetime import datetime, timedelta
+from decimal import Decimal
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash
+from flask_cors import CORS
+from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
+import mysql.connector
+from mysql.connector import Error
+import pandas as pd
+from functools import wraps
+import calendar
+
+# Flask app configuration
+app = Flask(__name__)
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
+app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+CORS(app)
+
+# Database configuration
+DB_CONFIG = {
+    'host': os.environ.get('DB_HOST', 'localhost'),
+    'database': os.environ.get('DB_NAME', 'personal_finance'),
+    'user': os.environ.get('DB_USER', 'root'),
+    'password': os.environ.get('DB_PASSWORD', ''),
+    'charset': 'utf8mb4',
+    'use_unicode': True
+}
+
+ALLOWED_EXTENSIONS = {'xlsx', 'xls', 'csv'}
+
+# Create upload folder if it doesn't exist
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def get_db_connection():
+    """Create a database connection."""
+    try:
+        connection = mysql.connector.connect(**DB_CONFIG)
+        return connection
+    except Error as e:
+        print(f"Error connecting to MySQL: {e}")
+        return None
+
+def login_required(f):
+    """Decorator to require login for routes."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            flash('Please login first.', 'warning')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Utility function to serialize Decimal for JSON
+def decimal_default(obj):
+    if isinstance(obj, Decimal):
+        return float(obj)
+    raise TypeError
+
+# Routes
+@app.route('/')
+def index():
+    """Landing page."""
+    if 'user_id' in session:
+        return redirect(url_for('dashboard'))
+    return render_template('index.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    """User registration."""
+    if request.method == 'POST':
+        data = request.get_json() if request.is_json else request.form
+        username = data.get('username')
+        email = data.get('email')
+        password = data.get('password')
+        
+        connection = get_db_connection()
+        if connection:
+            cursor = connection.cursor()
+            try:
+                # Check if user already exists
+                cursor.execute("SELECT id FROM users WHERE username = %s OR email = %s", 
+                             (username, email))
+                if cursor.fetchone():
+                    return jsonify({'error': 'Username or email already exists'}), 400
+                
+                # Create new user
+                password_hash = generate_password_hash(password)
+                cursor.execute(
+                    "INSERT INTO users (username, email, password_hash) VALUES (%s, %s, %s)",
+                    (username, email, password_hash)
+                )
+                connection.commit()
+                
+                return jsonify({'message': 'Registration successful'}), 201
+            except Error as e:
+                return jsonify({'error': str(e)}), 500
+            finally:
+                cursor.close()
+                connection.close()
+        
+        return jsonify({'error': 'Database connection failed'}), 500
+    
+    return render_template('register.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """User login."""
+    if request.method == 'POST':
+        data = request.get_json() if request.is_json else request.form
+        username = data.get('username')
+        password = data.get('password')
+        
+        connection = get_db_connection()
+        if connection:
+            cursor = connection.cursor(dictionary=True)
+            try:
+                cursor.execute("SELECT * FROM users WHERE username = %s OR email = %s", 
+                             (username, username))
+                user = cursor.fetchone()
+                
+                if user and check_password_hash(user['password_hash'], password):
+                    session['user_id'] = user['id']
+                    session['username'] = user['username']
+                    return jsonify({'message': 'Login successful'}), 200
+                else:
+                    return jsonify({'error': 'Invalid credentials'}), 401
+            except Error as e:
+                return jsonify({'error': str(e)}), 500
+            finally:
+                cursor.close()
+                connection.close()
+        
+        return jsonify({'error': 'Database connection failed'}), 500
+    
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    """User logout."""
+    session.clear()
+    flash('You have been logged out.', 'info')
+    return redirect(url_for('index'))
+
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    """Main dashboard."""
+    return render_template('dashboard.html', username=session.get('username'))
+
+@app.route('/api/dashboard-stats')
+@login_required
+def dashboard_stats():
+    """Get dashboard statistics."""
+    connection = get_db_connection()
+    if connection:
+        cursor = connection.cursor(dictionary=True)
+        try:
+            user_id = session['user_id']
+            
+            # Get current month stats
+            current_year = datetime.now().year
+            current_month = datetime.now().month
+            
+            cursor.execute("""
+                SELECT 
+                    SUM(debit) as total_income,
+                    SUM(credit) as total_expenses,
+                    MAX(balance) as current_balance
+                FROM transactions t
+                JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s
+            """, (user_id, current_year, current_month))
+            
+            current_stats = cursor.fetchone()
+            
+            # Get year-to-date stats
+            cursor.execute("""
+                SELECT 
+                    SUM(debit) as ytd_income,
+                    SUM(credit) as ytd_expenses
+                FROM transactions t
+                JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                WHERE mr.user_id = %s AND mr.year = %s
+            """, (user_id, current_year))
+            
+            ytd_stats = cursor.fetchone()
+            
+            # Get recent transactions
+            cursor.execute("""
+                SELECT 
+                    t.description,
+                    t.debit,
+                    t.credit,
+                    t.balance,
+                    t.transaction_date,
+                    c.name as category
+                FROM transactions t
+                JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                LEFT JOIN categories c ON t.category_id = c.id
+                WHERE mr.user_id = %s
+                ORDER BY t.created_at DESC
+                LIMIT 10
+            """, (user_id,))
+            
+            recent_transactions = cursor.fetchall()
+            
+            # Get monthly trend (last 12 months)
+            cursor.execute("""
+                SELECT 
+                    mr.year,
+                    mr.month,
+                    mr.month_name,
+                    SUM(t.debit) as income,
+                    SUM(t.credit) as expenses
+                FROM monthly_records mr
+                LEFT JOIN transactions t ON mr.id = t.monthly_record_id
+                WHERE mr.user_id = %s
+                GROUP BY mr.year, mr.month, mr.month_name
+                ORDER BY mr.year DESC, mr.month DESC
+                LIMIT 12
+            """, (user_id,))
+            
+            monthly_trend = cursor.fetchall()
+            
+            return jsonify({
+                'current_stats': current_stats,
+                'ytd_stats': ytd_stats,
+                'recent_transactions': recent_transactions,
+                'monthly_trend': monthly_trend
+            }, default=decimal_default)
+            
+        except Error as e:
+            return jsonify({'error': str(e)}), 500
+        finally:
+            cursor.close()
+            connection.close()
+    
+    return jsonify({'error': 'Database connection failed'}), 500
+
+@app.route('/api/transactions', methods=['GET', 'POST'])
+@login_required
+def transactions():
+    """Get or create transactions."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+    
+    cursor = connection.cursor(dictionary=True)
+    user_id = session['user_id']
+    
+    try:
+        if request.method == 'GET':
+            # Get query parameters
+            year = request.args.get('year', datetime.now().year, type=int)
+            month = request.args.get('month', datetime.now().month, type=int)
+            
+            # Get monthly record
+            cursor.execute("""
+                SELECT id FROM monthly_records 
+                WHERE user_id = %s AND year = %s AND month = %s
+            """, (user_id, year, month))
+            
+            monthly_record = cursor.fetchone()
+            
+            if monthly_record:
+                cursor.execute("""
+                    SELECT 
+                        t.*,
+                        c.name as category_name
+                    FROM transactions t
+                    LEFT JOIN categories c ON t.category_id = c.id
+                    WHERE t.monthly_record_id = %s
+                    ORDER BY t.id
+                """, (monthly_record['id'],))
+                
+                transactions = cursor.fetchall()
+                return jsonify(transactions, default=decimal_default)
+            else:
+                return jsonify([])
+        
+        else:  # POST - Create new transaction
+            data = request.get_json()
+            
+            # Get or create monthly record
+            year = data.get('year', datetime.now().year)
+            month = data.get('month', datetime.now().month)
+            month_name = calendar.month_name[month]
+            
+            cursor.execute("""
+                INSERT INTO monthly_records (user_id, year, month, month_name)
+                VALUES (%s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP
+            """, (user_id, year, month, month_name))
+            
+            cursor.execute("""
+                SELECT id FROM monthly_records 
+                WHERE user_id = %s AND year = %s AND month = %s
+            """, (user_id, year, month))
+            
+            monthly_record = cursor.fetchone()
+            
+            # Insert transaction
+            cursor.execute("""
+                INSERT INTO transactions 
+                (monthly_record_id, description, category_id, debit, credit, balance, transaction_date, notes)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                monthly_record['id'],
+                data.get('description'),
+                data.get('category_id'),
+                data.get('debit'),
+                data.get('credit'),
+                data.get('balance'),
+                data.get('transaction_date'),
+                data.get('notes')
+            ))
+            
+            connection.commit()
+            
+            return jsonify({'message': 'Transaction created successfully', 'id': cursor.lastrowid}), 201
+            
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+@app.route('/api/transactions/<int:transaction_id>', methods=['PUT', 'DELETE'])
+@login_required
+def manage_transaction(transaction_id):
+    """Update or delete a transaction."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+    
+    cursor = connection.cursor()
+    
+    try:
+        if request.method == 'PUT':
+            data = request.get_json()
+            cursor.execute("""
+                UPDATE transactions 
+                SET description = %s, category_id = %s, debit = %s, 
+                    credit = %s, balance = %s, notes = %s
+                WHERE id = %s AND monthly_record_id IN 
+                    (SELECT id FROM monthly_records WHERE user_id = %s)
+            """, (
+                data.get('description'),
+                data.get('category_id'),
+                data.get('debit'),
+                data.get('credit'),
+                data.get('balance'),
+                data.get('notes'),
+                transaction_id,
+                session['user_id']
+            ))
+            
+            connection.commit()
+            return jsonify({'message': 'Transaction updated successfully'})
+        
+        else:  # DELETE
+            cursor.execute("""
+                DELETE FROM transactions 
+                WHERE id = %s AND monthly_record_id IN 
+                    (SELECT id FROM monthly_records WHERE user_id = %s)
+            """, (transaction_id, session['user_id']))
+            
+            connection.commit()
+            return jsonify({'message': 'Transaction deleted successfully'})
+            
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+@app.route('/api/categories')
+@login_required
+def get_categories():
+    """Get all categories."""
+    connection = get_db_connection()
+    if connection:
+        cursor = connection.cursor(dictionary=True)
+        try:
+            cursor.execute("SELECT * FROM categories ORDER BY type, name")
+            categories = cursor.fetchall()
+            return jsonify(categories)
+        except Error as e:
+            return jsonify({'error': str(e)}), 500
+        finally:
+            cursor.close()
+            connection.close()
+    
+    return jsonify({'error': 'Database connection failed'}), 500
+
+@app.route('/api/recurring-transactions', methods=['GET', 'POST'])
+@login_required
+def recurring_transactions():
+    """Manage recurring transactions."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+    
+    cursor = connection.cursor(dictionary=True)
+    user_id = session['user_id']
+    
+    try:
+        if request.method == 'GET':
+            cursor.execute("""
+                SELECT rt.*, c.name as category_name
+                FROM recurring_transactions rt
+                LEFT JOIN categories c ON rt.category_id = c.id
+                WHERE rt.user_id = %s AND rt.is_active = TRUE
+            """, (user_id,))
+            
+            recurring = cursor.fetchall()
+            return jsonify(recurring, default=decimal_default)
+        
+        else:  # POST
+            data = request.get_json()
+            cursor.execute("""
+                INSERT INTO recurring_transactions 
+                (user_id, description, category_id, type, amount, day_of_month, start_date, end_date)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                user_id,
+                data.get('description'),
+                data.get('category_id'),
+                data.get('type'),
+                data.get('amount'),
+                data.get('day_of_month'),
+                data.get('start_date'),
+                data.get('end_date')
+            ))
+            
+            connection.commit()
+            return jsonify({'message': 'Recurring transaction created successfully'}), 201
+            
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+@app.route('/api/apply-recurring/<int:year>/<int:month>')
+@login_required
+def apply_recurring_transactions(year, month):
+    """Apply recurring transactions for a specific month."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+    
+    cursor = connection.cursor(dictionary=True)
+    user_id = session['user_id']
+    
+    try:
+        # Get or create monthly record
+        month_name = calendar.month_name[month]
+        cursor.execute("""
+            INSERT INTO monthly_records (user_id, year, month, month_name)
+            VALUES (%s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP
+        """, (user_id, year, month, month_name))
+        
+        cursor.execute("""
+            SELECT id FROM monthly_records 
+            WHERE user_id = %s AND year = %s AND month = %s
+        """, (user_id, year, month))
+        
+        monthly_record = cursor.fetchone()
+        
+        # Get active recurring transactions
+        cursor.execute("""
+            SELECT * FROM recurring_transactions
+            WHERE user_id = %s AND is_active = TRUE
+        """, (user_id,))
+        
+        recurring = cursor.fetchall()
+        
+        applied_count = 0
+        for rec in recurring:
+            # Check date range
+            start_date = rec['start_date']
+            end_date = rec['end_date']
+            current_date = datetime(year, month, rec['day_of_month'] or 1)
+            
+            if start_date and current_date.date() < start_date:
+                continue
+            if end_date and current_date.date() > end_date:
+                continue
+            
+            # Check if already exists
+            cursor.execute("""
+                SELECT id FROM transactions
+                WHERE monthly_record_id = %s AND description = %s
+            """, (monthly_record['id'], rec['description']))
+            
+            if not cursor.fetchone():
+                # Apply transaction
+                if rec['type'] == 'debit':
+                    debit = rec['amount']
+                    credit = None
+                else:
+                    debit = None
+                    credit = rec['amount']
+                
+                cursor.execute("""
+                    INSERT INTO transactions 
+                    (monthly_record_id, description, category_id, debit, credit, transaction_date)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (
+                    monthly_record['id'],
+                    rec['description'],
+                    rec['category_id'],
+                    debit,
+                    credit,
+                    current_date
+                ))
+                
+                applied_count += 1
+        
+        connection.commit()
+        return jsonify({'message': f'Applied {applied_count} recurring transactions'})
+        
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+@app.route('/api/import-excel', methods=['POST'])
+@login_required
+def import_excel():
+    """Import data from Excel file."""
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+    
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(filepath)
+        
+        try:
+            # Read Excel file
+            xl_file = pd.ExcelFile(filepath)
+            
+            connection = get_db_connection()
+            if not connection:
+                return jsonify({'error': 'Database connection failed'}), 500
+            
+            cursor = connection.cursor()
+            user_id = session['user_id']
+            
+            imported_months = []
+            
+            for sheet_name in xl_file.sheet_names:
+                if sheet_name == 'Calz':  # Skip calculation sheet
+                    continue
+                
+                # Parse year and month from sheet name
+                parts = sheet_name.split()
+                if len(parts) >= 2:
+                    try:
+                        year = int(parts[0])
+                        month_str = parts[1]
+                        
+                        # Convert month name to number
+                        month_map = {
+                            'Jan': 1, 'January': 1, 'Feb': 2, 'February': 2,
+                            'Mar': 3, 'March': 3, 'April': 4, 'Apr': 4,
+                            'May': 5, 'June': 6, 'Jun': 6, 'July': 7, 'Jul': 7,
+                            'Aug': 8, 'August': 8, 'Sep': 9, 'September': 9,
+                            'Oct': 10, 'October': 10, 'Nov': 11, 'November': 11,
+                            'Dec': 12, 'December': 12
+                        }
+                        
+                        month = month_map.get(month_str)
+                        if not month:
+                            continue
+                        
+                        # Read sheet data
+                        df = pd.read_excel(filepath, sheet_name=sheet_name)
+                        
+                        # Create monthly record
+                        month_name = calendar.month_name[month]
+                        cursor.execute("""
+                            INSERT INTO monthly_records (user_id, year, month, month_name)
+                            VALUES (%s, %s, %s, %s)
+                            ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP
+                        """, (user_id, year, month, month_name))
+                        
+                        cursor.execute("""
+                            SELECT id FROM monthly_records 
+                            WHERE user_id = %s AND year = %s AND month = %s
+                        """, (user_id, year, month))
+                        
+                        monthly_record_id = cursor.fetchone()[0]
+                        
+                        # Import transactions
+                        for _, row in df.iterrows():
+                            description = row.get('Description')
+                            if pd.isna(description) or description == '':
+                                continue
+                            
+                            debit = row.get('Debit') if not pd.isna(row.get('Debit')) else None
+                            credit = row.get('Credit') if not pd.isna(row.get('Credit')) else None
+                            balance = row.get('Balance') if not pd.isna(row.get('Balance')) else None
+                            
+                            # Try to match with category
+                            category_id = None
+                            cursor.execute("""
+                                SELECT id FROM categories 
+                                WHERE LOWER(name) LIKE LOWER(%s) 
+                                LIMIT 1
+                            """, (f"%{description[:10]}%",))
+                            
+                            cat_result = cursor.fetchone()
+                            if cat_result:
+                                category_id = cat_result[0]
+                            
+                            # Insert transaction
+                            cursor.execute("""
+                                INSERT INTO transactions 
+                                (monthly_record_id, description, category_id, debit, credit, balance)
+                                VALUES (%s, %s, %s, %s, %s, %s)
+                            """, (monthly_record_id, description, category_id, debit, credit, balance))
+                        
+                        imported_months.append(f"{year}-{month:02d}")
+                        
+                    except (ValueError, KeyError):
+                        continue
+            
+            connection.commit()
+            cursor.close()
+            connection.close()
+            
+            # Clean up uploaded file
+            os.remove(filepath)
+            
+            return jsonify({
+                'message': f'Successfully imported {len(imported_months)} months',
+                'imported_months': imported_months
+            }), 200
+            
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    
+    return jsonify({'error': 'Invalid file type'}), 400
+
+@app.route('/api/reports/monthly-summary')
+@login_required
+def monthly_summary_report():
+    """Get monthly summary report."""
+    connection = get_db_connection()
+    if connection:
+        cursor = connection.cursor(dictionary=True)
+        try:
+            user_id = session['user_id']
+            year = request.args.get('year', datetime.now().year, type=int)
+            
+            cursor.execute("""
+                SELECT * FROM monthly_summary 
+                WHERE user_id = %s AND year = %s
+                ORDER BY month
+            """, (user_id, year))
+            
+            summary = cursor.fetchall()
+            return jsonify(summary, default=decimal_default)
+            
+        except Error as e:
+            return jsonify({'error': str(e)}), 500
+        finally:
+            cursor.close()
+            connection.close()
+    
+    return jsonify({'error': 'Database connection failed'}), 500
+
+@app.route('/api/reports/category-breakdown')
+@login_required
+def category_breakdown_report():
+    """Get category breakdown report."""
+    connection = get_db_connection()
+    if connection:
+        cursor = connection.cursor(dictionary=True)
+        try:
+            user_id = session['user_id']
+            year = request.args.get('year', datetime.now().year, type=int)
+            month = request.args.get('month', type=int)
+            
+            if month:
+                cursor.execute("""
+                    SELECT 
+                        c.name as category,
+                        c.type,
+                        SUM(CASE WHEN c.type = 'income' THEN t.debit ELSE t.credit END) as amount
+                    FROM transactions t
+                    JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                    LEFT JOIN categories c ON t.category_id = c.id
+                    WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s
+                    GROUP BY c.id, c.name, c.type
+                    ORDER BY amount DESC
+                """, (user_id, year, month))
+            else:
+                cursor.execute("""
+                    SELECT 
+                        c.name as category,
+                        c.type,
+                        SUM(CASE WHEN c.type = 'income' THEN t.debit ELSE t.credit END) as amount
+                    FROM transactions t
+                    JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                    LEFT JOIN categories c ON t.category_id = c.id
+                    WHERE mr.user_id = %s AND mr.year = %s
+                    GROUP BY c.id, c.name, c.type
+                    ORDER BY amount DESC
+                """, (user_id, year))
+            
+            breakdown = cursor.fetchall()
+            return jsonify(breakdown, default=decimal_default)
+            
+        except Error as e:
+            return jsonify({'error': str(e)}), 500
+        finally:
+            cursor.close()
+            connection.close()
+    
+    return jsonify({'error': 'Database connection failed'}), 500
+
+@app.route('/api/budget', methods=['GET', 'POST'])
+@login_required
+def budget():
+    """Manage budget plans."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+    
+    cursor = connection.cursor(dictionary=True)
+    user_id = session['user_id']
+    
+    try:
+        if request.method == 'GET':
+            year = request.args.get('year', datetime.now().year, type=int)
+            month = request.args.get('month', datetime.now().month, type=int)
+            
+            cursor.execute("""
+                SELECT 
+                    bp.*,
+                    c.name as category_name,
+                    c.type as category_type,
+                    COALESCE(
+                        (SELECT SUM(CASE WHEN c.type = 'income' THEN t.debit ELSE t.credit END)
+                         FROM transactions t
+                         JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                         WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s
+                         AND t.category_id = bp.category_id), 0
+                    ) as actual_amount
+                FROM budget_plans bp
+                JOIN categories c ON bp.category_id = c.id
+                WHERE bp.user_id = %s AND bp.year = %s AND bp.month = %s
+            """, (user_id, year, month, user_id, year, month))
+            
+            budgets = cursor.fetchall()
+            return jsonify(budgets, default=decimal_default)
+        
+        else:  # POST
+            data = request.get_json()
+            cursor.execute("""
+                INSERT INTO budget_plans (user_id, category_id, year, month, planned_amount)
+                VALUES (%s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE planned_amount = %s
+            """, (
+                user_id,
+                data.get('category_id'),
+                data.get('year'),
+                data.get('month'),
+                data.get('planned_amount'),
+                data.get('planned_amount')
+            ))
+            
+            connection.commit()
+            return jsonify({'message': 'Budget updated successfully'}), 201
+            
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0', port=5003)

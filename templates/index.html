@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Welcome - Personal Finance Manager{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="text-center mb-5">
+                <h1 class="display-4">Personal Finance Manager</h1>
+                <p class="lead">Take control of your finances with our comprehensive tracking and analysis tools</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-chart-line fa-3x text-primary mb-3"></i>
+                    <h4 class="card-title">Track Income & Expenses</h4>
+                    <p class="card-text">Monitor your financial transactions with detailed categorization and balance tracking</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-calculator fa-3x text-success mb-3"></i>
+                    <h4 class="card-title">Budget Planning</h4>
+                    <p class="card-text">Set and manage budgets for different categories to control spending</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-chart-bar fa-3x text-info mb-3"></i>
+                    <h4 class="card-title">Visual Reports</h4>
+                    <p class="card-text">Gain insights through comprehensive charts and financial reports</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-lg-12 text-center">
+            <h3 class="mb-4">Get Started Today</h3>
+            <a href="{{ url_for('register') }}" class="btn btn-gradient btn-lg me-3">
+                <i class="fas fa-user-plus me-2"></i>Create Account
+            </a>
+            <a href="{{ url_for('login') }}" class="btn btn-outline-primary btn-lg">
+                <i class="fas fa-sign-in-alt me-2"></i>Login
+            </a>
+        </div>
+    </div>
+    
+    <div class="row mt-5">
+        <div class="col-lg-12">
+            <div class="card bg-light">
+                <div class="card-body">
+                    <h5 class="card-title">Key Features</h5>
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-check text-success me-2"></i>Import data from Excel spreadsheets</li>
+                        <li><i class="fas fa-check text-success me-2"></i>Manage recurring transactions automatically</li>
+                        <li><i class="fas fa-check text-success me-2"></i>Track multiple income sources and expense categories</li>
+                        <li><i class="fas fa-check text-success me-2"></i>Generate monthly and yearly financial reports</li>
+                        <li><i class="fas fa-check text-success me-2"></i>Secure data storage with user authentication</li>
+                        <li><i class="fas fa-check text-success me-2"></i>Mobile-responsive design for access anywhere</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
