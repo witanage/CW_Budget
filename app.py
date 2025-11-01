@@ -3,6 +3,7 @@ import json
 from datetime import datetime, timedelta
 from decimal import Decimal
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash
+from flask.json.provider import DefaultJSONProvider
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 import mysql.connector
@@ -10,8 +11,16 @@ from mysql.connector import Error
 from functools import wraps
 import calendar
 
+# Custom JSON provider to handle Decimal objects
+class DecimalJSONProvider(DefaultJSONProvider):
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            return float(obj)
+        return super().default(obj)
+
 # Flask app configuration
 app = Flask(__name__)
+app.json = DecimalJSONProvider(app)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
 CORS(app)
 
@@ -222,7 +231,7 @@ def dashboard_stats():
                 'ytd_stats': ytd_stats,
                 'recent_transactions': recent_transactions,
                 'monthly_trend': monthly_trend
-            }, default=decimal_default)
+            })
             
         except Error as e:
             return jsonify({'error': str(e)}), 500
@@ -269,7 +278,7 @@ def transactions():
                 """, (monthly_record['id'],))
                 
                 transactions = cursor.fetchall()
-                return jsonify(transactions, default=decimal_default)
+                return jsonify(transactions)
             else:
                 return jsonify([])
         
@@ -409,7 +418,7 @@ def recurring_transactions():
             """, (user_id,))
             
             recurring = cursor.fetchall()
-            return jsonify(recurring, default=decimal_default)
+            return jsonify(recurring)
         
         else:  # POST
             data = request.get_json()
@@ -583,7 +592,7 @@ def monthly_summary_report():
             """, (user_id, year))
 
             summary = cursor.fetchall()
-            return jsonify(summary, default=decimal_default)
+            return jsonify(summary)
 
         except Error as e:
             return jsonify({'error': str(e)}), 500
@@ -633,7 +642,7 @@ def category_breakdown_report():
                 """, (user_id, year))
             
             breakdown = cursor.fetchall()
-            return jsonify(breakdown, default=decimal_default)
+            return jsonify(breakdown)
             
         except Error as e:
             return jsonify({'error': str(e)}), 500
@@ -677,7 +686,7 @@ def budget():
             """, (user_id, year, month, user_id, year, month))
             
             budgets = cursor.fetchall()
-            return jsonify(budgets, default=decimal_default)
+            return jsonify(budgets)
         
         else:  # POST
             data = request.get_json()
