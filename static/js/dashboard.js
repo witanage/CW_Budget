@@ -191,7 +191,7 @@ function initializeCharts() {
                         beginAtZero: true,
                         ticks: {
                             callback: function(value) {
-                                return '$' + value.toLocaleString();
+                                return 'LKR ' + value.toLocaleString();
                             }
                         }
                     }
@@ -299,7 +299,11 @@ function saveTransaction() {
         } else {
             showToast('Transaction saved successfully', 'success');
             document.getElementById('transactionForm').reset();
-            bootstrap.Modal.getInstance(document.getElementById('transactionModal')).hide();
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('transactionModal'));
+            if (modal) {
+                modal.hide();
+            }
             loadTransactions();
             loadDashboardStats();
         }
@@ -440,7 +444,11 @@ function saveRecurring() {
         } else {
             showToast('Recurring transaction saved successfully', 'success');
             document.getElementById('recurringForm').reset();
-            bootstrap.Modal.getInstance(document.getElementById('recurringModal')).hide();
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('recurringModal'));
+            if (modal) {
+                modal.hide();
+            }
             loadRecurringTransactions();
         }
     })
@@ -592,7 +600,11 @@ function saveBudget() {
         } else {
             showToast('Budget saved successfully', 'success');
             document.getElementById('budgetForm').reset();
-            bootstrap.Modal.getInstance(document.getElementById('budgetModal')).hide();
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('budgetModal'));
+            if (modal) {
+                modal.hide();
+            }
             loadBudget();
         }
     })
@@ -658,7 +670,7 @@ function updateMonthlyReportChart(data) {
                     beginAtZero: true,
                     ticks: {
                         callback: function(value) {
-                            return '$' + value.toLocaleString();
+                            return 'LKR ' + value.toLocaleString();
                         }
                     }
                 }
@@ -709,7 +721,7 @@ function updateCategoryReportChart(data) {
                     callbacks: {
                         label: function(context) {
                             const label = context.label || '';
-                            const value = '$' + context.parsed.toLocaleString();
+                            const value = 'LKR ' + context.parsed.toLocaleString();
                             return label + ': ' + value;
                         }
                     }
