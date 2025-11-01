@@ -41,9 +41,6 @@ function setupEventListeners() {
     // Recurring form
     document.getElementById('saveRecurringBtn').addEventListener('click', saveRecurring);
     document.getElementById('applyRecurringBtn').addEventListener('click', applyRecurring);
-    
-    // Import form
-    document.getElementById('importForm').addEventListener('submit', importExcel);
 }
 
 function switchPage(page) {
@@ -453,11 +450,32 @@ function saveRecurring() {
     });
 }
 
+function deleteRecurring(id) {
+    if (confirm('Are you sure you want to delete this recurring transaction?')) {
+        fetch(`/api/recurring-transactions/${id}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                showToast(data.error, 'danger');
+            } else {
+                showToast('Recurring transaction deleted successfully', 'success');
+                loadRecurringTransactions();
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('Error deleting recurring transaction', 'danger');
+        });
+    }
+}
+
 function applyRecurring() {
     const today = new Date();
     const year = today.getFullYear();
     const month = today.getMonth() + 1;
-    
+
     if (confirm(`Apply recurring transactions for ${month}/${year}?`)) {
         showLoading();
         fetch(`/api/apply-recurring/${year}/${month}`)
@@ -698,53 +716,6 @@ function updateCategoryReportChart(data) {
                 }
             }
         }
-    });
-}
-
-function importExcel(e) {
-    e.preventDefault();
-    
-    const formData = new FormData();
-    const fileInput = document.getElementById('excelFile');
-    formData.append('file', fileInput.files[0]);
-    
-    showLoading();
-    fetch('/api/import-excel', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        hideLoading();
-        
-        const importResults = document.getElementById('importResults');
-        const importMessage = document.getElementById('importMessage');
-        
-        if (data.error) {
-            importMessage.innerHTML = `<strong>Error:</strong> ${data.error}`;
-            importResults.classList.remove('alert-info');
-            importResults.classList.add('alert-danger');
-        } else {
-            importMessage.innerHTML = `
-                <strong>Success!</strong> ${data.message}<br>
-                Imported months: ${data.imported_months.join(', ')}
-            `;
-            importResults.classList.remove('alert-danger');
-            importResults.classList.add('alert-success');
-            
-            // Clear the form
-            document.getElementById('importForm').reset();
-            
-            // Reload dashboard stats
-            loadDashboardStats();
-        }
-        
-        importResults.style.display = 'block';
-    })
-    .catch(error => {
-        hideLoading();
-        console.error('Error:', error);
-        showToast('Error importing Excel file', 'danger');
     });
 }
 
