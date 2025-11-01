@@ -3,77 +3,140 @@ let trendChart, categoryChart, monthlyReportChart, categoryReportChart, yearlyRe
 let currentCategories = [];
 
 document.addEventListener('DOMContentLoaded', function() {
-    initializeDashboard();
-    loadCategories();
-    setupEventListeners();
-    loadDashboardStats();
-    initializeCharts();
-    populateDateSelectors();
+    console.log('Dashboard initializing...');
+    try {
+        initializeDashboard();
+        setupEventListeners();
+        loadCategories();
+        populateDateSelectors();
+        initializeCharts();
+        loadDashboardStats();
+        console.log('Dashboard initialized successfully');
+    } catch (error) {
+        console.error('Error during dashboard initialization:', error);
+        alert('Error loading dashboard. Please check the browser console (F12) for details.');
+    }
 });
 
 function initializeDashboard() {
     // Set current date
-    const today = new Date();
-    document.getElementById('transDate').value = today.toISOString().split('T')[0];
+    try {
+        const today = new Date();
+        const transDateInput = document.getElementById('transDate');
+        if (transDateInput) {
+            transDateInput.value = today.toISOString().split('T')[0];
+        }
+    } catch (error) {
+        console.error('Error initializing dashboard:', error);
+    }
 }
 
 function setupEventListeners() {
+    console.log('Setting up event listeners...');
+
     // Sidebar navigation
-    document.querySelectorAll('.sidebar .nav-link').forEach(link => {
+    const navLinks = document.querySelectorAll('.sidebar .nav-link');
+    console.log('Found', navLinks.length, 'navigation links');
+    navLinks.forEach(link => {
         link.addEventListener('click', function(e) {
             e.preventDefault();
             const page = this.dataset.page;
+            console.log('Navigating to page:', page);
             switchPage(page);
         });
     });
-    
+
     // Refresh button
-    document.getElementById('refreshBtn').addEventListener('click', loadDashboardStats);
-    
+    const refreshBtn = document.getElementById('refreshBtn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', loadDashboardStats);
+    }
+
     // Transaction form
-    document.getElementById('saveTransactionBtn').addEventListener('click', saveTransaction);
-    document.getElementById('loadTransactionsBtn').addEventListener('click', loadTransactions);
-    
+    const saveTransactionBtn = document.getElementById('saveTransactionBtn');
+    if (saveTransactionBtn) {
+        saveTransactionBtn.addEventListener('click', saveTransaction);
+    }
+
+    const loadTransactionsBtn = document.getElementById('loadTransactionsBtn');
+    if (loadTransactionsBtn) {
+        loadTransactionsBtn.addEventListener('click', loadTransactions);
+    }
+
     // Budget form
-    document.getElementById('saveBudgetBtn').addEventListener('click', saveBudget);
-    document.getElementById('loadBudgetBtn').addEventListener('click', loadBudget);
-    
+    const saveBudgetBtn = document.getElementById('saveBudgetBtn');
+    if (saveBudgetBtn) {
+        saveBudgetBtn.addEventListener('click', saveBudget);
+    }
+
+    const loadBudgetBtn = document.getElementById('loadBudgetBtn');
+    if (loadBudgetBtn) {
+        loadBudgetBtn.addEventListener('click', loadBudget);
+    }
+
     // Recurring form
-    document.getElementById('saveRecurringBtn').addEventListener('click', saveRecurring);
-    document.getElementById('applyRecurringBtn').addEventListener('click', applyRecurring);
+    const saveRecurringBtn = document.getElementById('saveRecurringBtn');
+    if (saveRecurringBtn) {
+        saveRecurringBtn.addEventListener('click', saveRecurring);
+    }
+
+    const applyRecurringBtn = document.getElementById('applyRecurringBtn');
+    if (applyRecurringBtn) {
+        applyRecurringBtn.addEventListener('click', applyRecurring);
+    }
+
+    console.log('Event listeners setup complete');
 }
 
 function switchPage(page) {
-    // Hide all pages
-    document.querySelectorAll('.page-content').forEach(p => {
-        p.style.display = 'none';
-    });
-    
-    // Remove active class from all nav links
-    document.querySelectorAll('.sidebar .nav-link').forEach(link => {
-        link.classList.remove('active');
-    });
-    
-    // Show selected page
-    document.getElementById(page + 'Page').style.display = 'block';
-    
-    // Add active class to selected nav link
-    document.querySelector(`.sidebar .nav-link[data-page="${page}"]`).classList.add('active');
-    
-    // Load page-specific data
-    switch(page) {
-        case 'transactions':
-            loadTransactions();
-            break;
-        case 'budget':
-            loadBudget();
-            break;
-        case 'recurring':
-            loadRecurringTransactions();
-            break;
-        case 'reports':
-            loadReports();
-            break;
+    console.log('switchPage called with page:', page);
+
+    try {
+        // Hide all pages
+        document.querySelectorAll('.page-content').forEach(p => {
+            p.style.display = 'none';
+        });
+
+        // Remove active class from all nav links
+        document.querySelectorAll('.sidebar .nav-link').forEach(link => {
+            link.classList.remove('active');
+        });
+
+        // Show selected page
+        const pageElement = document.getElementById(page + 'Page');
+        if (pageElement) {
+            pageElement.style.display = 'block';
+            console.log('Showing page:', page + 'Page');
+        } else {
+            console.error('Page element not found:', page + 'Page');
+            showToast('Page not found: ' + page, 'danger');
+            return;
+        }
+
+        // Add active class to selected nav link
+        const activeLink = document.querySelector(`.sidebar .nav-link[data-page="${page}"]`);
+        if (activeLink) {
+            activeLink.classList.add('active');
+        }
+
+        // Load page-specific data
+        switch(page) {
+            case 'transactions':
+                loadTransactions();
+                break;
+            case 'budget':
+                loadBudget();
+                break;
+            case 'recurring':
+                loadRecurringTransactions();
+                break;
+            case 'reports':
+                loadReports();
+                break;
+        }
+    } catch (error) {
+        console.error('Error in switchPage:', error);
+        showToast('Error switching page: ' + error.message, 'danger');
     }
 }
 
