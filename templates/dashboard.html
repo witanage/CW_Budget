@@ -34,11 +34,6 @@
                             <i class="fas fa-chart-bar me-2"></i>Reports
                         </a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#" data-page="import">
-                            <i class="fas fa-file-upload me-2"></i>Import Data
-                        </a>
-                    </li>
                 </ul>
             </div>
         </nav>
@@ -330,7 +325,7 @@
                                         <a class="nav-link" data-bs-toggle="tab" href="#yearlyReport">Yearly Overview</a>
                                     </li>
                                 </ul>
-                                
+
                                 <div class="tab-content mt-3">
                                     <div class="tab-pane fade show active" id="monthlyReport">
                                         <canvas id="monthlyReportChart"></canvas>
@@ -342,34 +337,6 @@
                                         <canvas id="yearlyReportChart"></canvas>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Import Page -->
-            <div id="importPage" class="page-content" style="display:none;">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">Import Excel Data</h5>
-                    </div>
-                    <div class="card-body">
-                        <form id="importForm" enctype="multipart/form-data">
-                            <div class="mb-3">
-                                <label for="excelFile" class="form-label">Select Excel File</label>
-                                <input type="file" class="form-control" id="excelFile" name="file" accept=".xlsx,.xls" required>
-                                <div class="form-text">Upload your Excel file containing financial data.</div>
-                            </div>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-upload me-1"></i>Import Data
-                            </button>
-                        </form>
-                        
-                        <div id="importResults" class="mt-3" style="display:none;">
-                            <div class="alert alert-info">
-                                <h5>Import Results</h5>
-                                <div id="importMessage"></div>
                             </div>
                         </div>
                     </div>
