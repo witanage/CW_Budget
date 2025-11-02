@@ -181,13 +181,16 @@
         }
 
         /* Transaction row highlighting for payment methods */
-        .transaction-row-done {
-            opacity: 0.95;
+        .transaction-highlighted {
+            font-weight: 500;
         }
 
-        .transaction-row-done:hover {
-            opacity: 1 !important;
-            filter: brightness(0.95);
+        .transaction-highlighted td {
+            border-color: rgba(0,0,0,0.1) !important;
+        }
+
+        .transaction-highlighted:hover td {
+            filter: brightness(0.95) !important;
         }
 
         .payment-method-list-item {

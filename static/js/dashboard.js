@@ -36,8 +36,8 @@ function initApp() {
         // 4. Initialize charts
         initCharts();
 
-        // 5. Load dashboard data
-        loadDashboardStats();
+        // 5. Load default page (transactions)
+        switchPage('transactions');
 
         console.log('✓ Dashboard loaded successfully');
     } catch (error) {
@@ -317,6 +317,13 @@ function displayTransactions(transactions) {
         // Store transaction data
         row.dataset.transaction = JSON.stringify(t);
 
+        // Apply highlighting class if done
+        let rowClass = '';
+        if (isDone && t.payment_method_color) {
+            rowClass = `class="transaction-highlighted"`;
+            row.dataset.paymentColor = t.payment_method_color;
+        }
+
         row.innerHTML = `
             <td class="text-center">${checkboxHtml}</td>
             <td>${t.id}</td>
@@ -336,11 +343,14 @@ function displayTransactions(transactions) {
             </td>
         `;
 
-        // Apply row highlighting based on payment method (AFTER setting innerHTML)
+        // Apply background color to all cells for proper highlighting
         if (isDone && t.payment_method_color) {
-            console.log(`Highlighting transaction ${t.id} with color ${t.payment_method_color}, isDone=${isDone}`);
-            row.style.setProperty('background-color', t.payment_method_color, 'important');
-            row.classList.add('transaction-row-done');
+            console.log(`Highlighting transaction ${t.id} with color ${t.payment_method_color}`);
+            row.classList.add('transaction-highlighted');
+            const cells = row.querySelectorAll('td');
+            cells.forEach(cell => {
+                cell.style.backgroundColor = t.payment_method_color;
+            });
         }
 
         tbody.appendChild(row);
@@ -362,7 +372,6 @@ function editTransaction(id) {
     document.getElementById('transCategory').value = transaction.category_id || '';
     document.getElementById('transDebit').value = transaction.debit || '';
     document.getElementById('transCredit').value = transaction.credit || '';
-    document.getElementById('transBalance').value = transaction.balance || '';
     document.getElementById('transDate').value = transaction.transaction_date ? transaction.transaction_date.split('T')[0] : '';
     document.getElementById('transNotes').value = transaction.notes || '';
 
@@ -386,7 +395,6 @@ function saveTransaction() {
         category_id: document.getElementById('transCategory')?.value || null,
         debit: parseFloat(document.getElementById('transDebit')?.value) || null,
         credit: parseFloat(document.getElementById('transCredit')?.value) || null,
-        balance: parseFloat(document.getElementById('transBalance')?.value) || null,
         transaction_date: document.getElementById('transDate')?.value,
         notes: document.getElementById('transNotes')?.value,
         year: parseInt(year),

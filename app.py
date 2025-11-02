@@ -306,19 +306,33 @@ def transactions():
             """, (user_id, year, month))
             
             monthly_record = cursor.fetchone()
-            
+
+            # Calculate balance: get previous balance and add/subtract current transaction
+            cursor.execute("""
+                SELECT balance FROM transactions
+                WHERE monthly_record_id = %s
+                ORDER BY id DESC LIMIT 1
+            """, (monthly_record['id'],))
+
+            last_balance_row = cursor.fetchone()
+            previous_balance = last_balance_row[0] if last_balance_row and last_balance_row[0] is not None else 0
+
+            debit = data.get('debit') or 0
+            credit = data.get('credit') or 0
+            new_balance = previous_balance + debit - credit
+
             # Insert transaction
             cursor.execute("""
-                INSERT INTO transactions 
+                INSERT INTO transactions
                 (monthly_record_id, description, category_id, debit, credit, balance, transaction_date, notes)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 monthly_record['id'],
                 data.get('description'),
                 data.get('category_id'),
-                data.get('debit'),
-                data.get('credit'),
-                data.get('balance'),
+                debit if debit > 0 else None,
+                credit if credit > 0 else None,
+                new_balance,
                 data.get('transaction_date'),
                 data.get('notes')
             ))
@@ -346,23 +360,69 @@ def manage_transaction(transaction_id):
     try:
         if request.method == 'PUT':
             data = request.get_json()
+
+            # Get the monthly_record_id for this transaction
             cursor.execute("""
-                UPDATE transactions 
-                SET description = %s, category_id = %s, debit = %s, 
-                    credit = %s, balance = %s, notes = %s
-                WHERE id = %s AND monthly_record_id IN 
+                SELECT monthly_record_id FROM transactions
+                WHERE id = %s AND monthly_record_id IN
                     (SELECT id FROM monthly_records WHERE user_id = %s)
+            """, (transaction_id, session['user_id']))
+
+            result = cursor.fetchone()
+            if not result:
+                return jsonify({'error': 'Transaction not found'}), 404
+
+            monthly_record_id = result[0]
+
+            # Get previous balance (from transaction before this one)
+            cursor.execute("""
+                SELECT balance FROM transactions
+                WHERE monthly_record_id = %s AND id < %s
+                ORDER BY id DESC LIMIT 1
+            """, (monthly_record_id, transaction_id))
+
+            prev_balance_row = cursor.fetchone()
+            previous_balance = prev_balance_row[0] if prev_balance_row and prev_balance_row[0] is not None else 0
+
+            debit = data.get('debit') or 0
+            credit = data.get('credit') or 0
+            new_balance = previous_balance + debit - credit
+
+            # Update transaction
+            cursor.execute("""
+                UPDATE transactions
+                SET description = %s, category_id = %s, debit = %s,
+                    credit = %s, balance = %s, notes = %s
+                WHERE id = %s
             """, (
                 data.get('description'),
                 data.get('category_id'),
-                data.get('debit'),
-                data.get('credit'),
-                data.get('balance'),
+                debit if debit > 0 else None,
+                credit if credit > 0 else None,
+                new_balance,
                 data.get('notes'),
-                transaction_id,
-                session['user_id']
+                transaction_id
             ))
-            
+
+            # Recalculate balances for all subsequent transactions
+            cursor.execute("""
+                SELECT id, debit, credit FROM transactions
+                WHERE monthly_record_id = %s AND id > %s
+                ORDER BY id
+            """, (monthly_record_id, transaction_id))
+
+            subsequent_transactions = cursor.fetchall()
+            current_balance = new_balance
+
+            for trans in subsequent_transactions:
+                trans_id, trans_debit, trans_credit = trans
+                trans_debit = trans_debit or 0
+                trans_credit = trans_credit or 0
+                current_balance = current_balance + trans_debit - trans_credit
+                cursor.execute("""
+                    UPDATE transactions SET balance = %s WHERE id = %s
+                """, (current_balance, trans_id))
+
             connection.commit()
             return jsonify({'message': 'Transaction updated successfully'})
         
