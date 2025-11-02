@@ -284,6 +284,7 @@ function loadTransactions() {
     fetch(`/api/transactions?year=${year}&month=${month}`)
         .then(response => response.json())
         .then(data => {
+            console.log('Transactions received:', data);
             displayTransactions(data);
             hideLoading();
         })
@@ -307,8 +308,9 @@ function displayTransactions(transactions) {
     transactions.forEach(t => {
         const row = document.createElement('tr');
 
-        // Checkbox for marking done/undone
-        const checkboxHtml = t.is_done
+        // Checkbox for marking done/undone (handle both boolean and numeric values)
+        const isDone = t.is_done === true || t.is_done === 1;
+        const checkboxHtml = isDone
             ? `<input type="checkbox" class="form-check-input" checked onchange="unmarkTransaction(${t.id})" title="${t.payment_method_name || 'Done'}">`
             : `<input type="checkbox" class="form-check-input" onchange="showPaymentMethodModal(${t.id})">`;
 
@@ -335,8 +337,9 @@ function displayTransactions(transactions) {
         `;
 
         // Apply row highlighting based on payment method (AFTER setting innerHTML)
-        if (t.is_done && t.payment_method_color) {
-            row.style.backgroundColor = t.payment_method_color;
+        if (isDone && t.payment_method_color) {
+            console.log(`Highlighting transaction ${t.id} with color ${t.payment_method_color}, isDone=${isDone}`);
+            row.style.setProperty('background-color', t.payment_method_color, 'important');
             row.classList.add('transaction-row-done');
         }
 
