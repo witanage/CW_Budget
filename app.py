@@ -165,17 +165,30 @@ def dashboard_stats():
             current_year = datetime.now().year
             current_month = datetime.now().month
             
+            # Get current month income and expenses
             cursor.execute("""
-                SELECT 
+                SELECT
                     SUM(debit) as total_income,
-                    SUM(credit) as total_expenses,
-                    MAX(balance) as current_balance
+                    SUM(credit) as total_expenses
                 FROM transactions t
                 JOIN monthly_records mr ON t.monthly_record_id = mr.id
                 WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s
             """, (user_id, current_year, current_month))
-            
-            current_stats = cursor.fetchone()
+
+            current_stats = cursor.fetchone() or {'total_income': 0, 'total_expenses': 0}
+
+            # Get current balance from the last transaction
+            cursor.execute("""
+                SELECT balance
+                FROM transactions t
+                JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s
+                ORDER BY t.id DESC
+                LIMIT 1
+            """, (user_id, current_year, current_month))
+
+            last_transaction = cursor.fetchone()
+            current_stats['current_balance'] = last_transaction['balance'] if last_transaction else 0
             
             # Get year-to-date stats
             cursor.execute("""
