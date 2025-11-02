@@ -107,9 +107,6 @@ function loadPageData(pageName) {
         case 'budget':
             loadBudget();
             break;
-        case 'recurring':
-            loadRecurring();
-            break;
         case 'reports':
             loadReports();
             break;
@@ -144,17 +141,6 @@ function setupFormButtons() {
     const loadBudgetBtn = document.getElementById('loadBudgetBtn');
     if (loadBudgetBtn) {
         loadBudgetBtn.addEventListener('click', loadBudget);
-    }
-
-    // Recurring form
-    const saveRecBtn = document.getElementById('saveRecurringBtn');
-    if (saveRecBtn) {
-        saveRecBtn.addEventListener('click', saveRecurring);
-    }
-
-    const applyRecBtn = document.getElementById('applyRecurringBtn');
-    if (applyRecBtn) {
-        applyRecBtn.addEventListener('click', applyRecurring);
     }
 
     // Set today's date in transaction form
@@ -321,16 +307,13 @@ function displayTransactions(transactions) {
     transactions.forEach(t => {
         const row = document.createElement('tr');
 
-        // Apply row highlighting based on payment method
-        if (t.is_done && t.payment_method_color) {
-            row.style.backgroundColor = t.payment_method_color;
-            row.classList.add('transaction-row-done');
-        }
-
         // Checkbox for marking done/undone
         const checkboxHtml = t.is_done
             ? `<input type="checkbox" class="form-check-input" checked onchange="unmarkTransaction(${t.id})" title="${t.payment_method_name || 'Done'}">`
             : `<input type="checkbox" class="form-check-input" onchange="showPaymentMethodModal(${t.id})">`;
+
+        // Store transaction data
+        row.dataset.transaction = JSON.stringify(t);
 
         row.innerHTML = `
             <td class="text-center">${checkboxHtml}</td>
@@ -342,16 +325,56 @@ function displayTransactions(transactions) {
             <td class="fw-bold">${t.balance ? formatCurrency(t.balance) : '-'}</td>
             <td>${t.notes || '-'}</td>
             <td>
+                <button class="btn btn-sm btn-primary me-1" onclick="editTransaction(${t.id})">
+                    <i class="fas fa-edit"></i>
+                </button>
                 <button class="btn btn-sm btn-danger" onclick="deleteTransaction(${t.id})">
                     <i class="fas fa-trash"></i>
                 </button>
             </td>
         `;
+
+        // Apply row highlighting based on payment method (AFTER setting innerHTML)
+        if (t.is_done && t.payment_method_color) {
+            row.style.backgroundColor = t.payment_method_color;
+            row.classList.add('transaction-row-done');
+        }
+
         tbody.appendChild(row);
     });
 }
 
+function editTransaction(id) {
+    // Find the transaction in the table
+    const tbody = document.querySelector('#transactionsTable tbody');
+    const row = tbody.querySelector(`tr[data-transaction*='"id":${id}']`);
+
+    if (!row) return;
+
+    const transaction = JSON.parse(row.dataset.transaction);
+
+    // Populate form
+    document.getElementById('editTransactionId').value = transaction.id;
+    document.getElementById('transDescription').value = transaction.description || '';
+    document.getElementById('transCategory').value = transaction.category_id || '';
+    document.getElementById('transDebit').value = transaction.debit || '';
+    document.getElementById('transCredit').value = transaction.credit || '';
+    document.getElementById('transBalance').value = transaction.balance || '';
+    document.getElementById('transDate').value = transaction.transaction_date ? transaction.transaction_date.split('T')[0] : '';
+    document.getElementById('transNotes').value = transaction.notes || '';
+
+    // Update modal title
+    document.querySelector('#transactionModal .modal-title').textContent = 'Edit Transaction';
+
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('transactionModal'));
+    modal.show();
+}
+
 function saveTransaction() {
+    const editId = document.getElementById('editTransactionId')?.value;
+    const isEdit = editId && editId !== '';
+
     const year = document.getElementById('yearSelect')?.value || new Date().getFullYear();
     const month = document.getElementById('monthSelect')?.value || (new Date().getMonth() + 1);
 
@@ -360,14 +383,18 @@ function saveTransaction() {
         category_id: document.getElementById('transCategory')?.value || null,
         debit: parseFloat(document.getElementById('transDebit')?.value) || null,
         credit: parseFloat(document.getElementById('transCredit')?.value) || null,
+        balance: parseFloat(document.getElementById('transBalance')?.value) || null,
         transaction_date: document.getElementById('transDate')?.value,
         notes: document.getElementById('transNotes')?.value,
         year: parseInt(year),
         month: parseInt(month)
     };
 
-    fetch('/api/transactions', {
-        method: 'POST',
+    const url = isEdit ? `/api/transactions/${editId}` : '/api/transactions';
+    const method = isEdit ? 'PUT' : 'POST';
+
+    fetch(url, {
+        method: method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
     })
@@ -376,9 +403,11 @@ function saveTransaction() {
         if (result.error) {
             showToast(result.error, 'danger');
         } else {
-            showToast('Transaction saved successfully', 'success');
+            showToast(isEdit ? 'Transaction updated successfully' : 'Transaction saved successfully', 'success');
             closeModal('transactionModal');
             document.getElementById('transactionForm')?.reset();
+            document.getElementById('editTransactionId').value = '';
+            document.querySelector('#transactionModal .modal-title').textContent = 'Add Transaction';
             loadTransactions();
             loadDashboardStats();
         }
@@ -504,127 +533,6 @@ function saveBudget() {
         console.error('Error saving budget:', error);
         showToast('Error saving budget', 'danger');
     });
-}
-
-// ================================
-// RECURRING PAGE
-// ================================
-
-function loadRecurring() {
-    showLoading();
-
-    fetch('/api/recurring-transactions')
-        .then(response => response.json())
-        .then(data => {
-            displayRecurring(data);
-            hideLoading();
-        })
-        .catch(error => {
-            console.error('Error loading recurring:', error);
-            hideLoading();
-        });
-}
-
-function displayRecurring(items) {
-    const tbody = document.querySelector('#recurringTable tbody');
-    if (!tbody) return;
-
-    tbody.innerHTML = '';
-
-    if (!items || items.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center">No recurring transactions</td></tr>';
-        return;
-    }
-
-    items.forEach(r => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td>${r.description}</td>
-            <td><span class="badge bg-secondary">${r.category_name || 'Uncategorized'}</span></td>
-            <td><span class="badge ${r.type === 'debit' ? 'bg-success' : 'bg-danger'}">${r.type}</span></td>
-            <td>${formatCurrency(r.amount)}</td>
-            <td>${r.day_of_month || 'Any'}</td>
-            <td>${r.start_date ? formatDate(r.start_date) : '-'}</td>
-            <td>${r.end_date ? formatDate(r.end_date) : '-'}</td>
-            <td>
-                <button class="btn btn-sm btn-danger" onclick="deleteRecurring(${r.id})">
-                    <i class="fas fa-trash"></i>
-                </button>
-            </td>
-        `;
-        tbody.appendChild(row);
-    });
-}
-
-function saveRecurring() {
-    const data = {
-        description: document.getElementById('recDescription')?.value,
-        category_id: document.getElementById('recCategory')?.value || null,
-        type: document.getElementById('recType')?.value,
-        amount: parseFloat(document.getElementById('recAmount')?.value),
-        day_of_month: parseInt(document.getElementById('recDay')?.value) || null,
-        start_date: document.getElementById('recStart')?.value || null,
-        end_date: document.getElementById('recEnd')?.value || null
-    };
-
-    fetch('/api/recurring-transactions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-    })
-    .then(response => response.json())
-    .then(result => {
-        if (result.error) {
-            showToast(result.error, 'danger');
-        } else {
-            showToast('Recurring transaction saved', 'success');
-            closeModal('recurringModal');
-            document.getElementById('recurringForm')?.reset();
-            loadRecurring();
-        }
-    })
-    .catch(error => {
-        console.error('Error saving recurring:', error);
-        showToast('Error saving recurring transaction', 'danger');
-    });
-}
-
-function deleteRecurring(id) {
-    if (!confirm('Delete this recurring transaction?')) return;
-
-    fetch(`/api/recurring-transactions/${id}`, { method: 'DELETE' })
-        .then(response => response.json())
-        .then(result => {
-            showToast('Recurring transaction deleted', 'success');
-            loadRecurring();
-        })
-        .catch(error => {
-            console.error('Error deleting recurring:', error);
-            showToast('Error deleting recurring transaction', 'danger');
-        });
-}
-
-function applyRecurring() {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = today.getMonth() + 1;
-
-    if (!confirm(`Apply recurring transactions for ${month}/${year}?`)) return;
-
-    showLoading();
-
-    fetch(`/api/apply-recurring/${year}/${month}`)
-        .then(response => response.json())
-        .then(result => {
-            showToast(result.message, 'success');
-            loadDashboardStats();
-            hideLoading();
-        })
-        .catch(error => {
-            console.error('Error applying recurring:', error);
-            showToast('Error applying recurring transactions', 'danger');
-            hideLoading();
-        });
 }
 
 // ================================
