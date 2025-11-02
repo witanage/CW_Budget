@@ -334,6 +334,11 @@ def transactions():
             new_balance = previous_balance + debit - credit
             print(f"[DEBUG] New balance: {new_balance}")
 
+            # Use current date if no transaction_date provided
+            transaction_date = data.get('transaction_date')
+            if not transaction_date:
+                transaction_date = datetime.now().date()
+
             # Insert transaction
             insert_values = (
                 monthly_record['id'],
@@ -342,7 +347,7 @@ def transactions():
                 debit if debit > 0 else None,
                 credit if credit > 0 else None,
                 new_balance,
-                data.get('transaction_date'),
+                transaction_date,
                 data.get('notes')
             )
             print(f"[DEBUG] Inserting transaction with values: {insert_values}")

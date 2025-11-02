@@ -37,7 +37,7 @@ function initApp() {
         initCharts();
 
         // 5. Load default page (transactions)
-        switchPage('transactions');
+        navigateToPage('transactions');
 
         console.log('✓ Dashboard loaded successfully');
     } catch (error) {
@@ -520,6 +520,13 @@ function saveTransaction() {
             document.getElementById('transactionForm')?.reset();
             document.getElementById('editTransactionId').value = '';
             document.querySelector('#transactionModal .modal-title').textContent = 'Add Transaction';
+
+            // Reset date to today after form reset
+            const transDate = document.getElementById('transDate');
+            if (transDate) {
+                transDate.value = new Date().toISOString().split('T')[0];
+            }
+
             loadTransactions();
             loadDashboardStats();
         }
