@@ -488,10 +488,17 @@ function saveTransaction() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
     })
-    .then(response => response.json())
-    .then(result => {
-        if (result.error) {
-            showToast(result.error, 'danger');
+    .then(response => {
+        console.log('Response status:', response.status);
+        console.log('Response ok:', response.ok);
+        return response.json().then(result => ({ status: response.status, ok: response.ok, result }));
+    })
+    .then(({ status, ok, result }) => {
+        console.log('Response data:', result);
+        if (!ok || result.error) {
+            const errorMsg = result.error || `Server error (${status})`;
+            console.error('Save failed:', errorMsg);
+            showToast(errorMsg, 'danger');
         } else {
             showToast(isEdit ? 'Transaction updated successfully' : 'Transaction saved successfully', 'success');
             closeModal('transactionModal');
@@ -504,7 +511,7 @@ function saveTransaction() {
     })
     .catch(error => {
         console.error('Error saving transaction:', error);
-        showToast('Error saving transaction', 'danger');
+        showToast('Error saving transaction: ' + error.message, 'danger');
     });
 }
 

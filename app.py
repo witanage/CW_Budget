@@ -289,23 +289,24 @@ def transactions():
         
         else:  # POST - Create new transaction
             data = request.get_json()
-            
+            print(f"[DEBUG] Received transaction data: {data}")
+
             # Get or create monthly record
             year = data.get('year', datetime.now().year)
             month = data.get('month', datetime.now().month)
             month_name = calendar.month_name[month]
-            
+
             cursor.execute("""
                 INSERT INTO monthly_records (user_id, year, month, month_name)
                 VALUES (%s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP
             """, (user_id, year, month, month_name))
-            
+
             cursor.execute("""
-                SELECT id FROM monthly_records 
+                SELECT id FROM monthly_records
                 WHERE user_id = %s AND year = %s AND month = %s
             """, (user_id, year, month))
-            
+
             monthly_record = cursor.fetchone()
 
             # Calculate balance: get previous balance and add/subtract current transaction
@@ -320,14 +321,12 @@ def transactions():
 
             debit = data.get('debit') or 0
             credit = data.get('credit') or 0
+            print(f"[DEBUG] Debit: {debit}, Credit: {credit}, Previous balance: {previous_balance}")
             new_balance = previous_balance + debit - credit
+            print(f"[DEBUG] New balance: {new_balance}")
 
             # Insert transaction
-            cursor.execute("""
-                INSERT INTO transactions
-                (monthly_record_id, description, category_id, debit, credit, balance, transaction_date, notes)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            """, (
+            insert_values = (
                 monthly_record['id'],
                 data.get('description'),
                 data.get('category_id'),
@@ -336,11 +335,22 @@ def transactions():
                 new_balance,
                 data.get('transaction_date'),
                 data.get('notes')
-            ))
-            
+            )
+            print(f"[DEBUG] Inserting transaction with values: {insert_values}")
+
+            cursor.execute("""
+                INSERT INTO transactions
+                (monthly_record_id, description, category_id, debit, credit, balance, transaction_date, notes)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """, insert_values)
+
+            transaction_id = cursor.lastrowid
+            print(f"[DEBUG] Transaction inserted with ID: {transaction_id}")
+
             connection.commit()
-            
-            return jsonify({'message': 'Transaction created successfully', 'id': cursor.lastrowid}), 201
+            print(f"[DEBUG] Transaction committed successfully")
+
+            return jsonify({'message': 'Transaction created successfully', 'id': transaction_id}), 201
             
     except Error as e:
         return jsonify({'error': str(e)}), 500
