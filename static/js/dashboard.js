@@ -327,7 +327,7 @@ function displayTransactions(transactions) {
         row.innerHTML = `
             <td class="text-center">${checkboxHtml}</td>
             <td>${t.id}</td>
-            <td>${t.description}</td>
+            <td class="description-cell" style="cursor: pointer;" data-transaction-id="${t.id}">${t.description}</td>
             <td><span class="badge bg-secondary">${t.category_name || 'Uncategorized'}</span></td>
             <td class="text-success">${t.debit ? formatCurrency(t.debit) : '-'}</td>
             <td class="text-danger">${t.credit ? formatCurrency(t.credit) : '-'}</td>
@@ -343,13 +343,35 @@ function displayTransactions(transactions) {
             </td>
         `;
 
+        // Get the description cell
+        const descCell = row.querySelector('.description-cell');
+
+        // Check if transaction is paid (handle both boolean and numeric values)
+        const isPaid = t.is_paid === true || t.is_paid === 1;
+
         // Apply background color to all cells for proper highlighting
         if (isDone && t.payment_method_color) {
             console.log(`Highlighting transaction ${t.id} with color ${t.payment_method_color}`);
             row.classList.add('transaction-highlighted');
             const cells = row.querySelectorAll('td');
-            cells.forEach(cell => {
-                cell.style.backgroundColor = t.payment_method_color;
+            cells.forEach((cell, index) => {
+                // Apply to all cells except description (index 2)
+                if (index !== 2) {
+                    cell.style.backgroundColor = t.payment_method_color;
+                } else {
+                    // Apply to description cell only if is_paid is true
+                    if (isPaid) {
+                        cell.style.backgroundColor = t.payment_method_color;
+                    }
+                }
+            });
+        }
+
+        // Add click handler to description cell
+        if (descCell) {
+            descCell.addEventListener('click', function() {
+                const transId = parseInt(this.dataset.transactionId);
+                showPaymentMethodModal(transId, true); // true = isPaidClick
             });
         }
 
@@ -822,7 +844,7 @@ function loadPaymentMethods() {
         });
 }
 
-function showPaymentMethodModal(transactionId) {
+function showPaymentMethodModal(transactionId, isPaidClick = false) {
     currentTransactionId = transactionId;
     const modalEl = document.getElementById('paymentMethodModal');
     const listEl = document.getElementById('paymentMethodList');
@@ -840,7 +862,11 @@ function showPaymentMethodModal(transactionId) {
         `;
         item.onclick = (e) => {
             e.preventDefault();
-            markTransactionWithPaymentMethod(transactionId, method.id);
+            if (isPaidClick) {
+                markTransactionAsPaid(transactionId, method.id);
+            } else {
+                markTransactionWithPaymentMethod(transactionId, method.id);
+            }
         };
         listEl.appendChild(item);
     });
@@ -883,6 +909,28 @@ function unmarkTransaction(transactionId) {
     .catch(error => {
         console.error('Error:', error);
         showToast('Error unmarking transaction', 'danger');
+    });
+}
+
+function markTransactionAsPaid(transactionId, paymentMethodId) {
+    fetch(`/api/transactions/${transactionId}/mark-paid`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payment_method_id: paymentMethodId })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            showToast(data.error, 'danger');
+        } else {
+            showToast('Transaction marked as paid', 'success');
+            closeModal('paymentMethodModal');
+            loadTransactions();
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('Error marking transaction as paid', 'danger');
     });
 }
 

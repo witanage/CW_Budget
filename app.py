@@ -273,7 +273,8 @@ def transactions():
                         c.name as category_name,
                         pm.name as payment_method_name,
                         pm.type as payment_method_type,
-                        pm.color as payment_method_color
+                        pm.color as payment_method_color,
+                        COALESCE(t.is_paid, FALSE) as is_paid
                     FROM transactions t
                     LEFT JOIN categories c ON t.category_id = c.id
                     LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id
@@ -732,6 +733,40 @@ def mark_transaction_undone(transaction_id):
 
         connection.commit()
         return jsonify({'message': 'Transaction marked as not done'})
+
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+@app.route('/api/transactions/<int:transaction_id>/mark-paid', methods=['POST'])
+@login_required
+def mark_transaction_paid(transaction_id):
+    """Mark a transaction as paid (when description cell is clicked)."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor()
+
+    try:
+        data = request.get_json()
+        payment_method_id = data.get('payment_method_id')
+
+        cursor.execute("""
+            UPDATE transactions
+            SET is_done = TRUE,
+                is_paid = TRUE,
+                payment_method_id = %s,
+                marked_done_at = CURRENT_TIMESTAMP,
+                paid_at = CURRENT_TIMESTAMP
+            WHERE id = %s AND monthly_record_id IN
+                (SELECT id FROM monthly_records WHERE user_id = %s)
+        """, (payment_method_id, transaction_id, session['user_id']))
+
+        connection.commit()
+        return jsonify({'message': 'Transaction marked as paid'})
 
     except Error as e:
         return jsonify({'error': str(e)}), 500
