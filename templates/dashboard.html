@@ -199,7 +199,7 @@
                             <table class="table table-hover" id="transactionsTable">
                                 <thead>
                                     <tr>
-                                        <th>Done</th>
+                                        <th>Method</th>
                                         <th>ID</th>
                                         <th>Description</th>
                                         <th>Category</th>
@@ -306,7 +306,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <form id="transactionForm">
+                <form id="transactionForm" novalidate>
                     <div class="mb-3">
                         <label for="transDescription" class="form-label">Description</label>
                         <input type="text" class="form-control" id="transDescription" required>
@@ -320,11 +320,11 @@
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="transDebit" class="form-label">Debit (Income)</label>
-                            <input type="text" class="form-control" id="transDebit" placeholder="0.00" pattern="[0-9]*\.?[0-9]*">
+                            <input type="text" class="form-control" id="transDebit" placeholder="0.00" inputmode="decimal">
                         </div>
                         <div class="col-md-6 mb-3">
                             <label for="transCredit" class="form-label">Credit (Expense)</label>
-                            <input type="text" class="form-control" id="transCredit" placeholder="0.00" pattern="[0-9]*\.?[0-9]*">
+                            <input type="text" class="form-control" id="transCredit" placeholder="0.00" inputmode="decimal">
                         </div>
                     </div>
                     <div class="mb-3">

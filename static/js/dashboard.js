@@ -434,16 +434,39 @@ function saveTransaction() {
     const year = document.getElementById('yearSelect')?.value || new Date().getFullYear();
     const month = document.getElementById('monthSelect')?.value || (new Date().getMonth() + 1);
 
+    // Validate description
+    const description = document.getElementById('transDescription')?.value;
+    if (!description || description.trim() === '') {
+        showToast('Description is required', 'danger');
+        return;
+    }
+
     // Get raw values
     const debitValue = document.getElementById('transDebit')?.value;
     const creditValue = document.getElementById('transCredit')?.value;
 
-    // Parse values - handle empty strings properly
-    const debit = debitValue && debitValue.trim() !== '' ? parseFloat(debitValue) : null;
-    const credit = creditValue && creditValue.trim() !== '' ? parseFloat(creditValue) : null;
+    // Parse and validate values - handle empty strings properly
+    let debit = null;
+    let credit = null;
+
+    if (debitValue && debitValue.trim() !== '') {
+        debit = parseFloat(debitValue);
+        if (isNaN(debit) || debit < 0) {
+            showToast('Debit must be a valid positive number', 'danger');
+            return;
+        }
+    }
+
+    if (creditValue && creditValue.trim() !== '') {
+        credit = parseFloat(creditValue);
+        if (isNaN(credit) || credit < 0) {
+            showToast('Credit must be a valid positive number', 'danger');
+            return;
+        }
+    }
 
     const data = {
-        description: document.getElementById('transDescription')?.value,
+        description: description,
         category_id: document.getElementById('transCategory')?.value || null,
         debit: debit,
         credit: credit,
