@@ -10,6 +10,8 @@ let charts = {
     yearlyReport: null
 };
 let currentCategories = [];
+let paymentMethods = [];
+let currentTransactionId = null;
 
 // Initialize everything when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
@@ -28,6 +30,7 @@ function initApp() {
 
         // 3. Load initial data
         loadCategories();
+        loadPaymentMethods();
         populateDateSelectors();
 
         // 4. Initialize charts
@@ -158,6 +161,22 @@ function setupFormButtons() {
     const transDate = document.getElementById('transDate');
     if (transDate) {
         transDate.value = new Date().toISOString().split('T')[0];
+    }
+
+    // Credit card management
+    const addCardBtn = document.getElementById('addCreditCardBtn');
+    if (addCardBtn) {
+        addCardBtn.addEventListener('click', showAddCreditCardForm);
+    }
+
+    const cancelAddCardBtn = document.getElementById('cancelAddCardBtn');
+    if (cancelAddCardBtn) {
+        cancelAddCardBtn.addEventListener('click', hideAddCreditCardForm);
+    }
+
+    const creditCardForm = document.getElementById('creditCardForm');
+    if (creditCardForm) {
+        creditCardForm.addEventListener('submit', saveCreditCard);
     }
 }
 
@@ -295,13 +314,26 @@ function displayTransactions(transactions) {
     tbody.innerHTML = '';
 
     if (!transactions || transactions.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center">No transactions for this period</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center">No transactions for this period</td></tr>';
         return;
     }
 
     transactions.forEach(t => {
         const row = document.createElement('tr');
+
+        // Apply row highlighting based on payment method
+        if (t.is_done && t.payment_method_color) {
+            row.style.backgroundColor = t.payment_method_color;
+            row.classList.add('transaction-row-done');
+        }
+
+        // Checkbox for marking done/undone
+        const checkboxHtml = t.is_done
+            ? `<input type="checkbox" class="form-check-input" checked onchange="unmarkTransaction(${t.id})" title="${t.payment_method_name || 'Done'}">`
+            : `<input type="checkbox" class="form-check-input" onchange="showPaymentMethodModal(${t.id})">`;
+
         row.innerHTML = `
+            <td class="text-center">${checkboxHtml}</td>
             <td>${t.id}</td>
             <td>${t.description}</td>
             <td><span class="badge bg-secondary">${t.category_name || 'Uncategorized'}</span></td>
@@ -853,6 +885,180 @@ function closeModal(modalId) {
         }
     }
 }
+
+// ================================
+// PAYMENT METHODS
+// ================================
+
+function loadPaymentMethods() {
+    fetch('/api/payment-methods')
+        .then(response => response.json())
+        .then(methods => {
+            paymentMethods = methods;
+            console.log('✓ Loaded', methods.length, 'payment methods');
+        })
+        .catch(error => {
+            console.error('✗ Error loading payment methods:', error);
+            showToast('Error loading payment methods', 'danger');
+        });
+}
+
+function showPaymentMethodModal(transactionId) {
+    currentTransactionId = transactionId;
+    const modalEl = document.getElementById('paymentMethodModal');
+    const listEl = document.getElementById('paymentMethodList');
+
+    // Clear and populate payment methods
+    listEl.innerHTML = '';
+    paymentMethods.forEach(method => {
+        const item = document.createElement('a');
+        item.href = '#';
+        item.className = 'list-group-item list-group-item-action payment-method-list-item';
+        item.innerHTML = `
+            <span class="payment-method-color-indicator" style="background-color: ${method.color}"></span>
+            <strong>${method.name}</strong>
+            <span class="badge bg-secondary float-end">${method.type === 'cash' ? 'Cash' : 'Credit Card'}</span>
+        `;
+        item.onclick = (e) => {
+            e.preventDefault();
+            markTransactionWithPaymentMethod(transactionId, method.id);
+        };
+        listEl.appendChild(item);
+    });
+
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+}
+
+function markTransactionWithPaymentMethod(transactionId, paymentMethodId) {
+    fetch(`/api/transactions/${transactionId}/mark-done`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payment_method_id: paymentMethodId })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            showToast(data.error, 'danger');
+        } else {
+            showToast('Transaction marked as done', 'success');
+            closeModal('paymentMethodModal');
+            loadTransactions();
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('Error marking transaction', 'danger');
+    });
+}
+
+function unmarkTransaction(transactionId) {
+    fetch(`/api/transactions/${transactionId}/mark-undone`, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        showToast('Transaction unmarked', 'success');
+        loadTransactions();
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('Error unmarking transaction', 'danger');
+    });
+}
+
+function showAddCreditCardForm() {
+    document.getElementById('addCreditCardForm').style.display = 'block';
+}
+
+function hideAddCreditCardForm() {
+    document.getElementById('addCreditCardForm').style.display = 'none';
+    document.getElementById('creditCardForm').reset();
+}
+
+function saveCreditCard(e) {
+    e.preventDefault();
+
+    const cardData = {
+        name: document.getElementById('cardName').value,
+        type: 'credit_card',
+        color: document.getElementById('cardColor').value
+    };
+
+    fetch('/api/payment-methods', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cardData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            showToast(data.error, 'danger');
+        } else {
+            showToast('Credit card added successfully', 'success');
+            hideAddCreditCardForm();
+            loadPaymentMethods();
+            loadCreditCardsList();
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('Error adding credit card', 'danger');
+    });
+}
+
+function loadCreditCardsList() {
+    const listEl = document.getElementById('creditCardsList');
+    listEl.innerHTML = '';
+
+    const creditCards = paymentMethods.filter(m => m.type === 'credit_card');
+
+    if (creditCards.length === 0) {
+        listEl.innerHTML = '<p class="text-muted">No credit cards added yet.</p>';
+        return;
+    }
+
+    creditCards.forEach(card => {
+        const item = document.createElement('div');
+        item.className = 'credit-card-item';
+        item.innerHTML = `
+            <div class="credit-card-color" style="background-color: ${card.color}"></div>
+            <div class="flex-grow-1">
+                <strong>${card.name}</strong>
+            </div>
+            <button class="btn btn-sm btn-danger" onclick="deleteCreditCard(${card.id})">
+                <i class="fas fa-trash"></i>
+            </button>
+        `;
+        listEl.appendChild(item);
+    });
+}
+
+function deleteCreditCard(cardId) {
+    if (!confirm('Are you sure you want to delete this credit card?')) return;
+
+    fetch(`/api/payment-methods/${cardId}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        showToast('Credit card deleted successfully', 'success');
+        loadPaymentMethods();
+        loadCreditCardsList();
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('Error deleting credit card', 'danger');
+    });
+}
+
+// Load credit cards when the manage modal is shown
+document.addEventListener('DOMContentLoaded', function() {
+    const manageCCModal = document.getElementById('manageCreditCardsModal');
+    if (manageCCModal) {
+        manageCCModal.addEventListener('shown.bs.modal', loadCreditCardsList);
+    }
+});
 
 // Note: formatCurrency, formatDate, showLoading, hideLoading, showToast
 // are defined in base.html and available globally

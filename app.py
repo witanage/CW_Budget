@@ -268,15 +268,19 @@ def transactions():
             
             if monthly_record:
                 cursor.execute("""
-                    SELECT 
+                    SELECT
                         t.*,
-                        c.name as category_name
+                        c.name as category_name,
+                        pm.name as payment_method_name,
+                        pm.type as payment_method_type,
+                        pm.color as payment_method_color
                     FROM transactions t
                     LEFT JOIN categories c ON t.category_id = c.id
+                    LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id
                     WHERE t.monthly_record_id = %s
                     ORDER BY t.id
                 """, (monthly_record['id'],))
-                
+
                 transactions = cursor.fetchall()
                 return jsonify(transactions)
             else:
@@ -706,6 +710,136 @@ def budget():
             connection.commit()
             return jsonify({'message': 'Budget updated successfully'}), 201
             
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+@app.route('/api/payment-methods', methods=['GET', 'POST'])
+@login_required
+def payment_methods():
+    """Get or create payment methods."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor(dictionary=True)
+    user_id = session['user_id']
+
+    try:
+        if request.method == 'GET':
+            cursor.execute("""
+                SELECT * FROM payment_methods
+                WHERE user_id = %s AND is_active = TRUE
+                ORDER BY type, name
+            """, (user_id,))
+
+            methods = cursor.fetchall()
+            return jsonify(methods)
+
+        else:  # POST
+            data = request.get_json()
+            cursor.execute("""
+                INSERT INTO payment_methods (user_id, name, type, color)
+                VALUES (%s, %s, %s, %s)
+            """, (
+                user_id,
+                data.get('name'),
+                data.get('type', 'credit_card'),
+                data.get('color', '#007bff')
+            ))
+
+            connection.commit()
+            return jsonify({'message': 'Payment method added successfully', 'id': cursor.lastrowid}), 201
+
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+@app.route('/api/payment-methods/<int:method_id>', methods=['DELETE'])
+@login_required
+def delete_payment_method(method_id):
+    """Delete a payment method."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor()
+
+    try:
+        cursor.execute("""
+            UPDATE payment_methods
+            SET is_active = FALSE
+            WHERE id = %s AND user_id = %s
+        """, (method_id, session['user_id']))
+
+        connection.commit()
+        return jsonify({'message': 'Payment method deleted successfully'})
+
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+@app.route('/api/transactions/<int:transaction_id>/mark-done', methods=['POST'])
+@login_required
+def mark_transaction_done(transaction_id):
+    """Mark a transaction as done with payment method."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor()
+
+    try:
+        data = request.get_json()
+        payment_method_id = data.get('payment_method_id')
+
+        cursor.execute("""
+            UPDATE transactions
+            SET is_done = TRUE,
+                payment_method_id = %s,
+                marked_done_at = CURRENT_TIMESTAMP
+            WHERE id = %s AND monthly_record_id IN
+                (SELECT id FROM monthly_records WHERE user_id = %s)
+        """, (payment_method_id, transaction_id, session['user_id']))
+
+        connection.commit()
+        return jsonify({'message': 'Transaction marked as done'})
+
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+@app.route('/api/transactions/<int:transaction_id>/mark-undone', methods=['POST'])
+@login_required
+def mark_transaction_undone(transaction_id):
+    """Mark a transaction as not done."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor()
+
+    try:
+        cursor.execute("""
+            UPDATE transactions
+            SET is_done = FALSE,
+                payment_method_id = NULL,
+                marked_done_at = NULL
+            WHERE id = %s AND monthly_record_id IN
+                (SELECT id FROM monthly_records WHERE user_id = %s)
+        """, (transaction_id, session['user_id']))
+
+        connection.commit()
+        return jsonify({'message': 'Transaction marked as not done'})
+
     except Error as e:
         return jsonify({'error': str(e)}), 500
     finally:

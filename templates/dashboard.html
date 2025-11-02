@@ -204,6 +204,7 @@
                             <table class="table table-hover" id="transactionsTable">
                                 <thead>
                                     <tr>
+                                        <th>Done</th>
                                         <th>ID</th>
                                         <th>Description</th>
                                         <th>Category</th>
@@ -474,6 +475,82 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-primary" id="saveRecurringBtn">Save Recurring</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Payment Method Selection Modal -->
+<div class="modal fade" id="paymentMethodModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Select Payment Method</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>How did you pay for this transaction?</p>
+                <div id="paymentMethodList" class="list-group">
+                    <!-- Payment methods will be loaded here -->
+                </div>
+                <hr>
+                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#manageCreditCardsModal">
+                    <i class="fas fa-credit-card me-1"></i>Manage Credit Cards
+                </button>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Manage Credit Cards Modal -->
+<div class="modal fade" id="manageCreditCardsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Manage Credit Cards</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row mb-3">
+                    <div class="col">
+                        <h6>Your Credit Cards</h6>
+                    </div>
+                    <div class="col-auto">
+                        <button type="button" class="btn btn-sm btn-primary" id="addCreditCardBtn">
+                            <i class="fas fa-plus me-1"></i>Add Credit Card
+                        </button>
+                    </div>
+                </div>
+
+                <div id="creditCardsList" class="list-group mb-3">
+                    <!-- Credit cards will be loaded here -->
+                </div>
+
+                <!-- Add Credit Card Form (initially hidden) -->
+                <div id="addCreditCardForm" style="display:none;">
+                    <hr>
+                    <h6>Add New Credit Card</h6>
+                    <form id="creditCardForm">
+                        <div class="mb-3">
+                            <label for="cardName" class="form-label">Card Name</label>
+                            <input type="text" class="form-control" id="cardName" placeholder="e.g., Visa Gold, Master Card" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="cardColor" class="form-label">Highlight Color</label>
+                            <input type="color" class="form-control form-control-color" id="cardColor" value="#007bff">
+                        </div>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-save me-1"></i>Save Card
+                        </button>
+                        <button type="button" class="btn btn-secondary" id="cancelAddCardBtn">Cancel</button>
+                    </form>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
