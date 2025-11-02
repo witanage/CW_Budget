@@ -491,10 +491,25 @@ function saveTransaction() {
     .then(response => {
         console.log('Response status:', response.status);
         console.log('Response ok:', response.ok);
-        return response.json().then(result => ({ status: response.status, ok: response.ok, result }));
+        console.log('Response headers:', response.headers.get('content-type'));
+
+        // Get response as text first
+        return response.text().then(text => {
+            console.log('Response text (first 500 chars):', text.substring(0, 500));
+
+            // Try to parse as JSON
+            try {
+                const result = JSON.parse(text);
+                return { status: response.status, ok: response.ok, result };
+            } catch (e) {
+                console.error('Failed to parse JSON:', e);
+                console.error('Full response text:', text);
+                return { status: response.status, ok: false, result: { error: 'Server returned non-JSON response' } };
+            }
+        });
     })
     .then(({ status, ok, result }) => {
-        console.log('Response data:', result);
+        console.log('Parsed result:', result);
         if (!ok || result.error) {
             const errorMsg = result.error || `Server error (${status})`;
             console.error('Save failed:', errorMsg);
