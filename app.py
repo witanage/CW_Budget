@@ -315,7 +315,7 @@ def transactions():
             """, (monthly_record['id'],))
 
             last_balance_row = cursor.fetchone()
-            previous_balance = last_balance_row[0] if last_balance_row and last_balance_row[0] is not None else 0
+            previous_balance = last_balance_row['balance'] if last_balance_row and last_balance_row['balance'] is not None else 0
 
             debit = data.get('debit') or 0
             credit = data.get('credit') or 0
