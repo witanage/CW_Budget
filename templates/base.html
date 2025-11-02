@@ -185,10 +185,49 @@
             border-color: var(--border-color);
             background-color: var(--card-header-bg);
             color: var(--text-primary);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        /* Sticky header for transactions table */
+        #transactionsTable thead th {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.4);
+        }
+
+        /* Scrollable table container */
+        .table-responsive {
+            max-height: 600px;
+            overflow-y: auto;
         }
 
         .table td, .table th {
             border-color: var(--border-color);
+        }
+
+        /* Transaction highlighting - Dark theme friendly */
+        [data-theme="dark"] .transaction-highlighted td {
+            filter: brightness(1.3) !important;
+        }
+
+        [data-theme="light"] .transaction-highlighted td {
+            filter: brightness(0.95) !important;
+        }
+
+        /* Better text colors for dark theme */
+        [data-theme="dark"] .table .text-success {
+            color: #4ade80 !important;
+        }
+
+        [data-theme="dark"] .table .text-danger {
+            color: #f87171 !important;
+        }
+
+        [data-theme="dark"] .table .fw-bold {
+            color: #fbbf24 !important;
         }
 
         .badge {

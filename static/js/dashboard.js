@@ -650,6 +650,69 @@ function deleteTransaction(id) {
         });
 }
 
+function executeCloneMonth() {
+    const fromMonth = document.getElementById('cloneFromMonth')?.value;
+    const fromYear = document.getElementById('cloneFromYear')?.value;
+    const toMonth = document.getElementById('cloneToMonth')?.value;
+    const toYear = document.getElementById('cloneToYear')?.value;
+    const includePayments = document.getElementById('cloneWithPayments')?.checked || false;
+
+    // Validation
+    if (!fromMonth || !fromYear || !toMonth || !toYear) {
+        showToast('Please select all date fields', 'danger');
+        return;
+    }
+
+    if (fromYear === toYear && fromMonth === toMonth) {
+        showToast('Source and target months cannot be the same', 'danger');
+        return;
+    }
+
+    // Confirm action
+    const fromMonthName = document.getElementById('cloneFromMonth')?.options[document.getElementById('cloneFromMonth')?.selectedIndex]?.text;
+    const toMonthName = document.getElementById('cloneToMonth')?.options[document.getElementById('cloneToMonth')?.selectedIndex]?.text;
+
+    if (!confirm(`Clone all transactions from ${fromMonthName} ${fromYear} to ${toMonthName} ${toYear}?`)) {
+        return;
+    }
+
+    showLoading();
+
+    fetch('/api/clone-month-transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            from_year: parseInt(fromYear),
+            from_month: parseInt(fromMonth),
+            to_year: parseInt(toYear),
+            to_month: parseInt(toMonth),
+            include_payments: includePayments
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.error) {
+            showToast(data.error, 'danger');
+        } else {
+            showToast(data.message, 'success');
+            closeModal('cloneMonthModal');
+
+            // Reload transactions if viewing the target month
+            const currentMonth = document.getElementById('monthSelect')?.value;
+            const currentYear = document.getElementById('yearSelect')?.value;
+            if (currentMonth == toMonth && currentYear == toYear) {
+                loadTransactions();
+            }
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Error cloning transactions:', error);
+        showToast('Error cloning transactions', 'danger');
+    });
+}
+
 // ================================
 // BUDGET PAGE
 // ================================
@@ -965,7 +1028,7 @@ function populateDateSelectors() {
     const currentMonth = new Date().getMonth() + 1;
 
     // Month selectors
-    const monthSelects = ['monthSelect', 'budgetMonth'];
+    const monthSelects = ['monthSelect', 'budgetMonth', 'cloneFromMonth', 'cloneToMonth'];
     const months = ['January', 'February', 'March', 'April', 'May', 'June',
                     'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -984,7 +1047,7 @@ function populateDateSelectors() {
     });
 
     // Year selectors
-    const yearSelects = ['yearSelect', 'budgetYear'];
+    const yearSelects = ['yearSelect', 'budgetYear', 'cloneFromYear', 'cloneToYear'];
     yearSelects.forEach(id => {
         const select = document.getElementById(id);
         if (select) {
@@ -998,6 +1061,12 @@ function populateDateSelectors() {
             }
         }
     });
+
+    // Add event listener for clone execute button
+    const executeCloneBtn = document.getElementById('executeCloneBtn');
+    if (executeCloneBtn) {
+        executeCloneBtn.addEventListener('click', executeCloneMonth);
+    }
 }
 
 function closeModal(modalId) {

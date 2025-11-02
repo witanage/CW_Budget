@@ -907,5 +907,120 @@ def get_payment_method_totals():
         cursor.close()
         connection.close()
 
+@app.route('/api/clone-month-transactions', methods=['POST'])
+@login_required
+def clone_month_transactions():
+    """Clone all transactions from one month to another."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor(dictionary=True)
+    user_id = session['user_id']
+
+    try:
+        data = request.get_json()
+        from_year = data.get('from_year')
+        from_month = data.get('from_month')
+        to_year = data.get('to_year')
+        to_month = data.get('to_month')
+        include_payments = data.get('include_payments', False)
+
+        # Validate inputs
+        if not all([from_year, from_month, to_year, to_month]):
+            return jsonify({'error': 'All date fields are required'}), 400
+
+        if from_year == to_year and from_month == to_month:
+            return jsonify({'error': 'Source and target months cannot be the same'}), 400
+
+        # Get source monthly record
+        cursor.execute("""
+            SELECT id FROM monthly_records
+            WHERE user_id = %s AND year = %s AND month = %s
+        """, (user_id, from_year, from_month))
+
+        source_record = cursor.fetchone()
+
+        if not source_record:
+            return jsonify({'error': 'Source month has no transactions'}), 404
+
+        # Get or create target monthly record
+        month_name = calendar.month_name[to_month]
+        cursor.execute("""
+            INSERT INTO monthly_records (user_id, year, month, month_name)
+            VALUES (%s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP
+        """, (user_id, to_year, to_month, month_name))
+
+        cursor.execute("""
+            SELECT id FROM monthly_records
+            WHERE user_id = %s AND year = %s AND month = %s
+        """, (user_id, to_year, to_month))
+
+        target_record = cursor.fetchone()
+
+        # Get all transactions from source month
+        cursor.execute("""
+            SELECT description, category_id, debit, credit, notes,
+                   payment_method_id, is_done, is_paid
+            FROM transactions
+            WHERE monthly_record_id = %s
+            ORDER BY id
+        """, (source_record['id'],))
+
+        source_transactions = cursor.fetchall()
+
+        if not source_transactions:
+            return jsonify({'error': 'No transactions found in source month'}), 404
+
+        # Clone transactions
+        cloned_count = 0
+        running_balance = Decimal('0')
+
+        for trans in source_transactions:
+            debit = Decimal(str(trans['debit'])) if trans['debit'] else Decimal('0')
+            credit = Decimal(str(trans['credit'])) if trans['credit'] else Decimal('0')
+            running_balance = running_balance + debit - credit
+
+            # Set payment fields based on checkbox
+            payment_method_id = trans['payment_method_id'] if include_payments else None
+            is_done = trans['is_done'] if include_payments else False
+            is_paid = trans['is_paid'] if include_payments else False
+
+            cursor.execute("""
+                INSERT INTO transactions
+                (monthly_record_id, description, category_id, debit, credit, balance,
+                 transaction_date, notes, payment_method_id, is_done, is_paid)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                target_record['id'],
+                trans['description'],
+                trans['category_id'],
+                debit if debit > 0 else None,
+                credit if credit > 0 else None,
+                running_balance,
+                datetime.now().date(),  # Use current date for cloned transactions
+                trans['notes'],
+                payment_method_id,
+                is_done,
+                is_paid
+            ))
+
+            cloned_count += 1
+
+        connection.commit()
+
+        return jsonify({
+            'message': f'Successfully cloned {cloned_count} transactions',
+            'count': cloned_count
+        }), 200
+
+    except Error as e:
+        connection.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5003)
