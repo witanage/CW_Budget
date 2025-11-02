@@ -399,6 +399,12 @@ def manage_transaction(transaction_id):
         if request.method == 'PUT':
             data = request.get_json()
 
+            # Validate request data
+            if not data:
+                return jsonify({'error': 'No data provided'}), 400
+
+            print(f"[DEBUG] Updating transaction {transaction_id} with data: {data}")
+
             # Get the monthly_record_id for this transaction
             cursor.execute("""
                 SELECT monthly_record_id FROM transactions
@@ -408,9 +414,11 @@ def manage_transaction(transaction_id):
 
             result = cursor.fetchone()
             if not result:
+                print(f"[DEBUG] Transaction {transaction_id} not found for user {session['user_id']}")
                 return jsonify({'error': 'Transaction not found'}), 404
 
             monthly_record_id = result[0]
+            print(f"[DEBUG] Found monthly_record_id: {monthly_record_id}")
 
             # Get previous balance (from transaction before this one)
             cursor.execute("""
@@ -435,11 +443,16 @@ def manage_transaction(transaction_id):
 
             new_balance = previous_balance + debit - credit
 
+            # Handle transaction_date - use current date if not provided or empty
+            transaction_date = data.get('transaction_date')
+            if not transaction_date or transaction_date == '':
+                transaction_date = datetime.now().date()
+
             # Update transaction
             cursor.execute("""
                 UPDATE transactions
                 SET description = %s, category_id = %s, debit = %s,
-                    credit = %s, balance = %s, notes = %s
+                    credit = %s, balance = %s, transaction_date = %s, notes = %s
                 WHERE id = %s
             """, (
                 data.get('description'),
@@ -447,9 +460,12 @@ def manage_transaction(transaction_id):
                 debit if debit > 0 else None,
                 credit if credit > 0 else None,
                 new_balance,
+                transaction_date,
                 data.get('notes'),
                 transaction_id
             ))
+
+            print(f"[DEBUG] Transaction {transaction_id} updated successfully, new balance: {new_balance}")
 
             # Recalculate balances for all subsequent transactions
             cursor.execute("""
@@ -471,7 +487,10 @@ def manage_transaction(transaction_id):
                     UPDATE transactions SET balance = %s WHERE id = %s
                 """, (current_balance, trans_id))
 
+            print(f"[DEBUG] Updated {len(subsequent_transactions)} subsequent transactions")
+
             connection.commit()
+            print(f"[DEBUG] Transaction update committed successfully")
             return jsonify({'message': 'Transaction updated successfully'})
         
         else:  # DELETE
@@ -483,9 +502,15 @@ def manage_transaction(transaction_id):
             
             connection.commit()
             return jsonify({'message': 'Transaction deleted successfully'})
-            
+
     except Error as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"[ERROR] Database error in manage_transaction: {str(e)}")
+        connection.rollback()
+        return jsonify({'error': f'Database error: {str(e)}'}), 500
+    except Exception as e:
+        print(f"[ERROR] Unexpected error in manage_transaction: {str(e)}")
+        connection.rollback()
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
     finally:
         cursor.close()
         connection.close()
