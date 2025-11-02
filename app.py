@@ -292,7 +292,7 @@ def transactions():
                     LEFT JOIN categories c ON t.category_id = c.id
                     LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id
                     WHERE t.monthly_record_id = %s
-                    ORDER BY t.id
+                    ORDER BY t.id DESC
                 """, (monthly_record['id'],))
 
                 transactions = cursor.fetchall()
@@ -845,6 +845,61 @@ def mark_transaction_unpaid(transaction_id):
 
         connection.commit()
         return jsonify({'message': 'Transaction marked as unpaid'})
+
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+@app.route('/api/payment-method-totals', methods=['GET'])
+@login_required
+def get_payment_method_totals():
+    """Get totals for each payment method for the current month."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor(dictionary=True)
+    user_id = session['user_id']
+
+    try:
+        year = request.args.get('year', datetime.now().year, type=int)
+        month = request.args.get('month', datetime.now().month, type=int)
+
+        # Get monthly record
+        cursor.execute("""
+            SELECT id FROM monthly_records
+            WHERE user_id = %s AND year = %s AND month = %s
+        """, (user_id, year, month))
+
+        monthly_record = cursor.fetchone()
+
+        if not monthly_record:
+            return jsonify([])
+
+        # Get totals by payment method
+        cursor.execute("""
+            SELECT
+                pm.id,
+                pm.name,
+                pm.type,
+                pm.color,
+                COUNT(t.id) as transaction_count,
+                SUM(t.debit) as total_debit,
+                SUM(t.credit) as total_credit,
+                SUM(COALESCE(t.debit, 0) - COALESCE(t.credit, 0)) as net_amount
+            FROM payment_methods pm
+            LEFT JOIN transactions t ON pm.id = t.payment_method_id
+                AND t.monthly_record_id = %s
+                AND t.is_done = TRUE
+            WHERE pm.user_id = %s AND pm.is_active = TRUE
+            GROUP BY pm.id, pm.name, pm.type, pm.color
+            ORDER BY pm.type, pm.name
+        """, (monthly_record['id'], user_id))
+
+        totals = cursor.fetchall()
+        return jsonify(totals)
 
     except Error as e:
         return jsonify({'error': str(e)}), 500

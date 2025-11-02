@@ -144,6 +144,11 @@ function setupFormButtons() {
         loadTransBtn.addEventListener('click', loadTransactions);
     }
 
+    const viewPaymentTotalsBtn = document.getElementById('viewPaymentTotalsBtn');
+    if (viewPaymentTotalsBtn) {
+        viewPaymentTotalsBtn.addEventListener('click', loadPaymentTotals);
+    }
+
     // Budget form
     const saveBudgetBtn = document.getElementById('saveBudgetBtn');
     if (saveBudgetBtn) {
@@ -399,6 +404,98 @@ function displayTransactions(transactions) {
 
         tbody.appendChild(row);
     });
+}
+
+function loadPaymentTotals() {
+    const year = document.getElementById('yearSelect')?.value || new Date().getFullYear();
+    const month = document.getElementById('monthSelect')?.value || (new Date().getMonth() + 1);
+
+    showLoading();
+
+    fetch(`/api/payment-method-totals?year=${year}&month=${month}`)
+        .then(response => response.json())
+        .then(data => {
+            displayPaymentTotals(data);
+            hideLoading();
+        })
+        .catch(error => {
+            console.error('Error loading payment totals:', error);
+            showToast('Error loading payment totals', 'danger');
+            hideLoading();
+        });
+}
+
+function displayPaymentTotals(totals) {
+    const container = document.getElementById('paymentTotalsContent');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    if (!totals || totals.length === 0) {
+        container.innerHTML = '<div class="alert alert-warning">No payment methods found with transactions.</div>';
+        return;
+    }
+
+    let totalDebit = 0;
+    let totalCredit = 0;
+
+    const html = `
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Payment Method</th>
+                        <th>Type</th>
+                        <th>Transactions</th>
+                        <th class="text-end">Total Debit</th>
+                        <th class="text-end">Total Credit</th>
+                        <th class="text-end">Net Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${totals.map(t => {
+                        const debit = t.total_debit || 0;
+                        const credit = t.total_credit || 0;
+                        const net = t.net_amount || 0;
+                        totalDebit += debit;
+                        totalCredit += credit;
+
+                        return `
+                            <tr>
+                                <td>
+                                    <span class="payment-method-color-indicator" style="background-color: ${t.color}"></span>
+                                    <strong>${t.name}</strong>
+                                </td>
+                                <td>
+                                    <span class="badge ${t.type === 'cash' ? 'bg-success' : 'bg-info'}">
+                                        ${t.type === 'cash' ? 'Cash' : 'Credit Card'}
+                                    </span>
+                                </td>
+                                <td>${t.transaction_count || 0}</td>
+                                <td class="text-end text-success">${formatCurrency(debit)}</td>
+                                <td class="text-end text-danger">${formatCurrency(credit)}</td>
+                                <td class="text-end fw-bold ${net >= 0 ? 'text-success' : 'text-danger'}">
+                                    ${formatCurrency(net)}
+                                </td>
+                            </tr>
+                        `;
+                    }).join('')}
+                </tbody>
+                <tfoot>
+                    <tr class="table-active fw-bold">
+                        <td colspan="3">TOTAL</td>
+                        <td class="text-end text-success">${formatCurrency(totalDebit)}</td>
+                        <td class="text-end text-danger">${formatCurrency(totalCredit)}</td>
+                        <td class="text-end ${(totalDebit - totalCredit) >= 0 ? 'text-success' : 'text-danger'}">
+                            ${formatCurrency(totalDebit - totalCredit)}
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    `;
+
+    container.innerHTML = html;
 }
 
 function editTransaction(id) {

@@ -177,12 +177,12 @@
                     <div class="card-body">
                         <!-- Month/Year Selector -->
                         <div class="row mb-3">
-                            <div class="col-md-3">
+                            <div class="col-md-2">
                                 <select class="form-select" id="monthSelect">
                                     <!-- Months will be populated here -->
                                 </select>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-2">
                                 <select class="form-select" id="yearSelect">
                                     <!-- Years will be populated here -->
                                 </select>
@@ -190,6 +190,11 @@
                             <div class="col-md-3">
                                 <button class="btn btn-primary" id="loadTransactionsBtn">
                                     <i class="fas fa-search me-1"></i>Load Transactions
+                                </button>
+                            </div>
+                            <div class="col-md-3">
+                                <button class="btn btn-gradient" id="viewPaymentTotalsBtn" data-bs-toggle="modal" data-bs-target="#paymentTotalsModal">
+                                    <i class="fas fa-wallet me-1"></i>Payment Totals
                                 </button>
                             </div>
                         </div>
@@ -443,6 +448,31 @@
                         </button>
                         <button type="button" class="btn btn-secondary" id="cancelAddCardBtn">Cancel</button>
                     </form>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Payment Totals Modal -->
+<div class="modal fade" id="paymentTotalsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Payment Method Totals</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Showing totals for marked transactions only (paid/done)
+                </div>
+
+                <div id="paymentTotalsContent">
+                    <!-- Totals will be loaded here -->
                 </div>
             </div>
             <div class="modal-footer">
