@@ -121,10 +121,22 @@ function loadPageData(pageName) {
 // ================================
 
 function setupFormButtons() {
+    // Transaction form - prevent default form submission
+    const transForm = document.getElementById('transactionForm');
+    if (transForm) {
+        transForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            saveTransaction();
+        });
+    }
+
     // Transaction form
     const saveTransBtn = document.getElementById('saveTransactionBtn');
     if (saveTransBtn) {
-        saveTransBtn.addEventListener('click', saveTransaction);
+        saveTransBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            saveTransaction();
+        });
     }
 
     const loadTransBtn = document.getElementById('loadTransactionsBtn');
@@ -369,9 +381,19 @@ function displayTransactions(transactions) {
 
         // Add click handler to description cell
         if (descCell) {
+            // Store isPaid status in the cell
+            descCell.dataset.isPaid = isPaid ? '1' : '0';
+
             descCell.addEventListener('click', function() {
                 const transId = parseInt(this.dataset.transactionId);
-                showPaymentMethodModal(transId, true); // true = isPaidClick
+                const cellIsPaid = this.dataset.isPaid === '1';
+
+                // If already paid, unpay it. Otherwise, show payment modal
+                if (cellIsPaid) {
+                    markTransactionAsUnpaid(transId);
+                } else {
+                    showPaymentMethodModal(transId, true); // true = isPaidClick
+                }
             });
         }
 
@@ -412,16 +434,28 @@ function saveTransaction() {
     const year = document.getElementById('yearSelect')?.value || new Date().getFullYear();
     const month = document.getElementById('monthSelect')?.value || (new Date().getMonth() + 1);
 
+    // Get raw values
+    const debitValue = document.getElementById('transDebit')?.value;
+    const creditValue = document.getElementById('transCredit')?.value;
+
+    // Parse values - handle empty strings properly
+    const debit = debitValue && debitValue.trim() !== '' ? parseFloat(debitValue) : null;
+    const credit = creditValue && creditValue.trim() !== '' ? parseFloat(creditValue) : null;
+
     const data = {
         description: document.getElementById('transDescription')?.value,
         category_id: document.getElementById('transCategory')?.value || null,
-        debit: parseFloat(document.getElementById('transDebit')?.value) || null,
-        credit: parseFloat(document.getElementById('transCredit')?.value) || null,
+        debit: debit,
+        credit: credit,
         transaction_date: document.getElementById('transDate')?.value,
         notes: document.getElementById('transNotes')?.value,
         year: parseInt(year),
         month: parseInt(month)
     };
+
+    console.log('Saving transaction with data:', data);
+    console.log('Debit value:', debitValue, 'Parsed:', debit);
+    console.log('Credit value:', creditValue, 'Parsed:', credit);
 
     const url = isEdit ? `/api/transactions/${editId}` : '/api/transactions';
     const method = isEdit ? 'PUT' : 'POST';
@@ -931,6 +965,25 @@ function markTransactionAsPaid(transactionId, paymentMethodId) {
     .catch(error => {
         console.error('Error:', error);
         showToast('Error marking transaction as paid', 'danger');
+    });
+}
+
+function markTransactionAsUnpaid(transactionId) {
+    fetch(`/api/transactions/${transactionId}/mark-unpaid`, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            showToast(data.error, 'danger');
+        } else {
+            showToast('Transaction marked as unpaid', 'success');
+            loadTransactions();
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('Error unmarking transaction as paid', 'danger');
     });
 }
 

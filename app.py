@@ -774,5 +774,36 @@ def mark_transaction_paid(transaction_id):
         cursor.close()
         connection.close()
 
+@app.route('/api/transactions/<int:transaction_id>/mark-unpaid', methods=['POST'])
+@login_required
+def mark_transaction_unpaid(transaction_id):
+    """Unmark a transaction as paid (reverse the paid status)."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor()
+
+    try:
+        cursor.execute("""
+            UPDATE transactions
+            SET is_done = FALSE,
+                is_paid = FALSE,
+                payment_method_id = NULL,
+                marked_done_at = NULL,
+                paid_at = NULL
+            WHERE id = %s AND monthly_record_id IN
+                (SELECT id FROM monthly_records WHERE user_id = %s)
+        """, (transaction_id, session['user_id']))
+
+        connection.commit()
+        return jsonify({'message': 'Transaction marked as unpaid'})
+
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5003)
