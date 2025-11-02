@@ -317,10 +317,19 @@ def transactions():
             """, (monthly_record['id'],))
 
             last_balance_row = cursor.fetchone()
-            previous_balance = last_balance_row['balance'] if last_balance_row and last_balance_row['balance'] is not None else 0
+            previous_balance = last_balance_row['balance'] if last_balance_row and last_balance_row['balance'] is not None else Decimal('0')
 
-            debit = data.get('debit') or 0
-            credit = data.get('credit') or 0
+            # Convert to Decimal to avoid float/Decimal arithmetic errors
+            debit_value = data.get('debit')
+            credit_value = data.get('credit')
+
+            debit = Decimal(str(debit_value)) if debit_value else Decimal('0')
+            credit = Decimal(str(credit_value)) if credit_value else Decimal('0')
+
+            # Ensure previous_balance is also Decimal
+            if not isinstance(previous_balance, Decimal):
+                previous_balance = Decimal(str(previous_balance))
+
             print(f"[DEBUG] Debit: {debit}, Credit: {credit}, Previous balance: {previous_balance}")
             new_balance = previous_balance + debit - credit
             print(f"[DEBUG] New balance: {new_balance}")
@@ -393,10 +402,19 @@ def manage_transaction(transaction_id):
             """, (monthly_record_id, transaction_id))
 
             prev_balance_row = cursor.fetchone()
-            previous_balance = prev_balance_row[0] if prev_balance_row and prev_balance_row[0] is not None else 0
+            previous_balance = prev_balance_row[0] if prev_balance_row and prev_balance_row[0] is not None else Decimal('0')
 
-            debit = data.get('debit') or 0
-            credit = data.get('credit') or 0
+            # Convert to Decimal to avoid float/Decimal arithmetic errors
+            debit_value = data.get('debit')
+            credit_value = data.get('credit')
+
+            debit = Decimal(str(debit_value)) if debit_value else Decimal('0')
+            credit = Decimal(str(credit_value)) if credit_value else Decimal('0')
+
+            # Ensure previous_balance is also Decimal
+            if not isinstance(previous_balance, Decimal):
+                previous_balance = Decimal(str(previous_balance))
+
             new_balance = previous_balance + debit - credit
 
             # Update transaction
@@ -427,8 +445,9 @@ def manage_transaction(transaction_id):
 
             for trans in subsequent_transactions:
                 trans_id, trans_debit, trans_credit = trans
-                trans_debit = trans_debit or 0
-                trans_credit = trans_credit or 0
+                # Convert to Decimal for arithmetic
+                trans_debit = Decimal(str(trans_debit)) if trans_debit else Decimal('0')
+                trans_credit = Decimal(str(trans_credit)) if trans_credit else Decimal('0')
                 current_balance = current_balance + trans_debit - trans_credit
                 cursor.execute("""
                     UPDATE transactions SET balance = %s WHERE id = %s
