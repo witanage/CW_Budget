@@ -35,17 +35,7 @@
         
         <!-- Main Content -->
         <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                <h1 class="h2">Dashboard</h1>
-                <div class="btn-toolbar mb-2 mb-md-0">
-                    <div class="btn-group me-2">
-                        <button type="button" class="btn btn-sm btn-outline-secondary" id="refreshBtn">
-                            <i class="fas fa-sync-alt me-1"></i>Refresh
-                        </button>
-                    </div>
-                </div>
-            </div>
-            
+
             <!-- Overview Page -->
             <div id="overviewPage" class="page-content">
                 <!-- Stats Cards -->
@@ -187,12 +177,17 @@
                                     <!-- Years will be populated here -->
                                 </select>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-2">
                                 <button class="btn btn-primary" id="loadTransactionsBtn">
                                     <i class="fas fa-search me-1"></i>Load Transactions
                                 </button>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-2">
+                                <button class="btn btn-success" id="refreshBtn" onclick="loadTransactions()">
+                                    <i class="fas fa-sync-alt me-1"></i>Refresh
+                                </button>
+                            </div>
+                            <div class="col-md-2">
                                 <button class="btn btn-gradient" id="viewPaymentTotalsBtn" data-bs-toggle="modal" data-bs-target="#paymentTotalsModal">
                                     <i class="fas fa-wallet me-1"></i>Payment Totals
                                 </button>
