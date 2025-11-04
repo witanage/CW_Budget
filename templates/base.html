@@ -486,14 +486,14 @@
             filter: brightness(0.95) !important;
         }
 
-        /* Dark theme: Black background with light theme text colors for transaction table */
+        /* Dark theme: Black background with light text colors for transaction table */
         [data-theme="dark"] #transactionsTable {
             background-color: #000000;
         }
 
         [data-theme="dark"] #transactionsTable thead th {
             background-color: #000000 !important;
-            color: #1c1e21 !important;
+            color: #ffffff !important;
         }
 
         [data-theme="dark"] #transactionsTable tbody tr {
@@ -502,23 +502,23 @@
 
         [data-theme="dark"] #transactionsTable tbody td {
             background-color: #000000;
-            color: #1c1e21 !important;
+            color: #e0e0e0 !important;
         }
 
         [data-theme="dark"] #transactionsTable .text-success {
-            color: #28a745 !important;
+            color: #90ee90 !important;
         }
 
         [data-theme="dark"] #transactionsTable .text-danger {
-            color: #dc3545 !important;
+            color: #ff6b6b !important;
         }
 
         [data-theme="dark"] #transactionsTable .fw-bold {
-            color: #856404 !important;
+            color: #ffd700 !important;
         }
 
         [data-theme="dark"] #transactionsTable .badge {
-            color: #1c1e21 !important;
+            color: #ffffff !important;
         }
 
         /* Dark theme: Keep table hover with black background */
@@ -537,13 +537,29 @@
 
         /* Dark theme: Buttons in transaction table */
         [data-theme="dark"] #transactionsTable .btn-sm {
-            background-color: #f8f9fa;
-            color: #1c1e21;
-            border-color: #dee2e6;
+            background-color: #2a2a2a;
+            color: #e0e0e0;
+            border-color: #3a3a3a;
         }
 
         [data-theme="dark"] #transactionsTable .btn-sm:hover {
-            background-color: #e9ecef;
+            background-color: #3a3a3a;
+        }
+
+        /* Dark theme: Darker highlight colors for payment methods */
+        [data-theme="dark"] .transaction-highlighted td {
+            filter: brightness(0.6) saturate(0.8) !important;
+        }
+
+        /* Dark theme: Checkbox visibility in transaction table */
+        [data-theme="dark"] #transactionsTable .form-check-input {
+            background-color: #2a2a2a;
+            border-color: #5a5a5a;
+        }
+
+        [data-theme="dark"] #transactionsTable .form-check-input:checked {
+            background-color: #007acc;
+            border-color: #007acc;
         }
 
         .badge {
@@ -722,7 +738,7 @@
         }
 
         [data-theme="dark"] .transaction-highlighted:hover td {
-            filter: brightness(0.90) !important;
+            filter: brightness(0.55) saturate(0.8) !important;
         }
 
         /* List Groups */
