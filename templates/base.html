@@ -486,23 +486,26 @@
             filter: brightness(0.95) !important;
         }
 
-        /* Dark theme: Black background with light text colors for transaction table */
+        /* Dark theme: Softer dark colors for transaction table */
         [data-theme="dark"] #transactionsTable {
-            background-color: #000000;
+            background-color: #1e1e1e;
+            border-color: #333333;
         }
 
         [data-theme="dark"] #transactionsTable thead th {
-            background-color: #000000 !important;
+            background-color: #2a2a2a !important;
             color: #ffffff !important;
+            border-color: #333333 !important;
         }
 
         [data-theme="dark"] #transactionsTable tbody tr {
-            background-color: #000000;
+            background-color: #1e1e1e;
         }
 
         [data-theme="dark"] #transactionsTable tbody td {
-            background-color: #000000;
+            background-color: #1e1e1e;
             color: #ffffff !important;
+            border-color: #333333 !important;
         }
 
         [data-theme="dark"] #transactionsTable .text-success {
@@ -521,18 +524,18 @@
             color: #ffffff !important;
         }
 
-        /* Dark theme: Keep table hover with black background */
+        /* Dark theme: Subtle hover effect */
         [data-theme="dark"] #transactionsTable tbody tr:hover {
-            background-color: #0a0a0a !important;
+            background-color: #252525 !important;
         }
 
         [data-theme="dark"] #transactionsTable tbody tr:hover td {
-            background-color: #0a0a0a !important;
+            background-color: #252525 !important;
         }
 
         /* Dark theme: Table wrapper background */
         [data-theme="dark"] #transactionsPage .table-responsive {
-            background-color: #000000;
+            background-color: #1e1e1e;
         }
 
         /* Dark theme: Buttons in transaction table */
@@ -546,8 +549,20 @@
             background-color: #3a3a3a;
         }
 
-        /* Dark theme: Keep vibrant payment method backgrounds without filter */
-        /* Removed filter to prevent text from fading - white text on vibrant backgrounds */
+        /* Dark theme: Muted payment method highlight colors */
+        [data-theme="dark"] .transaction-highlighted td {
+            filter: brightness(0.7) saturate(0.7) !important;
+        }
+
+        /* Dark theme: Keep text white on highlighted rows */
+        [data-theme="dark"] .transaction-highlighted td,
+        [data-theme="dark"] .transaction-highlighted .text-success,
+        [data-theme="dark"] .transaction-highlighted .text-danger,
+        [data-theme="dark"] .transaction-highlighted .fw-bold,
+        [data-theme="dark"] .transaction-highlighted .badge,
+        [data-theme="dark"] .transaction-highlighted i {
+            color: #ffffff !important;
+        }
 
         /* Dark theme: Checkbox visibility in transaction table */
         [data-theme="dark"] #transactionsTable .form-check-input {
