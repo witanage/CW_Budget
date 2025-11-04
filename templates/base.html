@@ -546,19 +546,8 @@
             background-color: #3a3a3a;
         }
 
-        /* Dark theme: Darker highlight colors for payment methods */
-        [data-theme="dark"] .transaction-highlighted td {
-            filter: brightness(0.6) saturate(0.8) !important;
-        }
-
-        /* Dark theme: Ensure text stays white on highlighted rows */
-        [data-theme="dark"] .transaction-highlighted td,
-        [data-theme="dark"] .transaction-highlighted td *,
-        [data-theme="dark"] .transaction-highlighted .text-success,
-        [data-theme="dark"] .transaction-highlighted .text-danger,
-        [data-theme="dark"] .transaction-highlighted .fw-bold {
-            color: #ffffff !important;
-        }
+        /* Dark theme: Keep vibrant payment method backgrounds without filter */
+        /* Removed filter to prevent text from fading - white text on vibrant backgrounds */
 
         /* Dark theme: Checkbox visibility in transaction table */
         [data-theme="dark"] #transactionsTable .form-check-input {
