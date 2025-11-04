@@ -568,13 +568,10 @@
             border-color: #8b949e;
         }
 
-        /* Dark theme: Payment method highlights - darken and desaturate */
-        [data-theme="dark"] .transaction-highlighted td {
-            filter: brightness(0.5) saturate(0.6) !important;
-            background-blend-mode: multiply;
-        }
+        /* Dark theme: Payment method highlights - keep vibrant colors, no filter */
+        /* Removed filter to prevent text and colors from appearing faded */
 
-        /* Dark theme: Keep proper text colors on highlighted rows */
+        /* Dark theme: Ensure text colors stay vibrant on highlighted rows */
         [data-theme="dark"] .transaction-highlighted .text-success {
             color: #3fb950 !important;
         }
@@ -587,7 +584,7 @@
             color: #58a6ff !important;
         }
 
-        [data-theme="dark"] .transaction-highlighted td:not(.text-success):not(.text-danger):not(.fw-bold) {
+        [data-theme="dark"] .transaction-highlighted td {
             color: #c9d1d9 !important;
         }
 
