@@ -12,12 +12,20 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
+        /* Mobile uses same theme system */
         :root {
-            --bg-primary: #000000;
-            --bg-secondary: #0a0a0a;
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #2d2d2d;
+            --bg-tertiary: #3d3d3d;
             --text-primary: #ffffff;
-            --text-secondary: #a0a0a0;
-            --border-color: #2a2a2a;
+            --text-secondary: #cccccc;
+            --border-color: #555555;
+            --accent-color: #007acc;
+            --success-color: #28a745;
+            --warning-color: #ffc107;
+            --danger-color: #dc3545;
+            --shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            --radius: 8px;
         }
 
         body {
@@ -30,14 +38,14 @@
         }
 
         .mobile-header {
-            background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%);
+            background: linear-gradient(135deg, var(--bg-tertiary) 0%, var(--bg-secondary) 100%);
             padding: 15px;
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
             z-index: 100;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            box-shadow: var(--shadow);
         }
 
         .mobile-header h1 {
@@ -65,12 +73,17 @@
 
         .btn-add {
             width: 100%;
-            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            background: var(--accent-color);
             border: none;
             color: white;
             padding: 12px;
             font-weight: 600;
-            border-radius: 8px;
+            border-radius: var(--radius);
+            transition: all 0.3s ease;
+        }
+
+        .btn-add:hover {
+            filter: brightness(1.1);
         }
 
         .transaction-card {
@@ -124,9 +137,10 @@
 
         /* Modal styles */
         .modal-content {
-            background-color: #0a0a0a;
+            background-color: var(--bg-secondary);
             color: var(--text-primary);
             border: 1px solid var(--border-color);
+            border-radius: var(--radius);
         }
 
         .modal-header {
@@ -138,16 +152,17 @@
         }
 
         .form-control, .form-select {
-            background-color: #1a1a1a;
+            background-color: var(--bg-tertiary);
             border: 1px solid var(--border-color);
             color: var(--text-primary);
+            border-radius: var(--radius);
         }
 
         .form-control:focus, .form-select:focus {
-            background-color: #1a1a1a;
-            border-color: #3b82f6;
+            background-color: var(--bg-tertiary);
+            border-color: var(--accent-color);
             color: var(--text-primary);
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            box-shadow: 0 0 0 3px rgba(0, 122, 204, 0.2);
         }
 
         .form-label {
@@ -159,13 +174,21 @@
         }
 
         .btn-secondary {
-            background-color: #2a2a2a;
-            border-color: #3a3a3a;
+            background-color: var(--bg-tertiary);
+            border-color: var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--bg-quaternary);
         }
 
         .btn-primary {
-            background-color: #3b82f6;
-            border-color: #3b82f6;
+            background-color: var(--accent-color);
+            border-color: var(--accent-color);
+        }
+
+        .btn-primary:hover {
+            filter: brightness(1.1);
         }
 
         .no-transactions {

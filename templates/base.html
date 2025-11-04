@@ -16,58 +16,118 @@
     
     <!-- Custom CSS -->
     <style>
-        :root {
-            --primary-color: #3b82f6;
-            --primary-dark: #2563eb;
-            --secondary-color: #1e293b;
-            --success-color: #10b981;
-            --danger-color: #ef4444;
-            --warning-color: #f59e0b;
-            --info-color: #06b6d4;
-        }
-
-        /* Light Theme Variables */
-        [data-theme="light"] {
-            --bg-primary: #f1f5f9;
-            --bg-secondary: #ffffff;
-            --bg-tertiary: #e2e8f0;
-            --text-primary: #0f172a;
-            --text-secondary: #64748b;
-            --border-color: #cbd5e1;
-            --sidebar-bg: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-            --sidebar-hover: #f1f5f9;
-            --card-bg: #ffffff;
-            --card-header-bg: linear-gradient(135deg, #f8fafc, #e2e8f0);
-            --table-bg: #ffffff;
-            --table-hover: rgba(59, 130, 246, 0.08);
-            --input-bg: #ffffff;
-            --input-border: #cbd5e1;
-            --modal-bg: #ffffff;
-            --navbar-bg: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
-            --accent-gradient: linear-gradient(135deg, #3b82f6, #8b5cf6);
-            --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        }
-
-        /* Dark Theme Variables - Default - True Black */
-        [data-theme="dark"], :root {
-            --bg-primary: #000000;
-            --bg-secondary: #0a0a0a;
-            --bg-tertiary: #1a1a1a;
+        /* Dark theme (default) */
+        :root[data-theme="dark"] {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #2d2d2d;
+            --bg-tertiary: #3d3d3d;
+            --bg-quaternary: #4d4d4d;
             --text-primary: #ffffff;
-            --text-secondary: #a0a0a0;
-            --border-color: #2a2a2a;
-            --sidebar-bg: linear-gradient(180deg, #0a0a0a 0%, #000000 100%);
-            --sidebar-hover: #1a1a1a;
-            --card-bg: #0a0a0a;
-            --card-header-bg: linear-gradient(135deg, #1a1a1a, #0a0a0a);
-            --table-bg: #0a0a0a;
-            --table-hover: #1a1a1a;
-            --input-bg: #1a1a1a;
-            --input-border: #2a2a2a;
-            --modal-bg: #0a0a0a;
-            --navbar-bg: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%);
-            --accent-gradient: linear-gradient(135deg, #3b82f6, #8b5cf6);
-            --card-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.8), 0 4px 6px -2px rgba(0, 0, 0, 0.5);
+            --text-secondary: #cccccc;
+            --border-color: #555555;
+            --accent-color: #007acc;
+            --success-color: #28a745;
+            --warning-color: #ffc107;
+            --danger-color: #dc3545;
+            --shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            --radius: 8px;
+            --transition: all 0.3s ease;
+            --gradient-start: #0a0a0a;
+            --gradient-end: #1a1a1a;
+            --glass-bg: rgba(45, 45, 45, 0.7);
+            --glass-border: rgba(85, 85, 85, 0.3);
+            --code-bg: #1a1a1a;
+            --code-border: #555555;
+
+            /* Legacy compatibility */
+            --primary-color: #007acc;
+            --sidebar-bg: linear-gradient(180deg, #2d2d2d 0%, #1a1a1a 100%);
+            --sidebar-hover: #3d3d3d;
+            --card-bg: #2d2d2d;
+            --card-header-bg: linear-gradient(135deg, #3d3d3d, #2d2d2d);
+            --table-bg: #2d2d2d;
+            --table-hover: rgba(8, 102, 255, 0.08);
+            --input-bg: #3d3d3d;
+            --input-border: #555555;
+            --modal-bg: #2d2d2d;
+            --navbar-bg: linear-gradient(135deg, #3d3d3d 0%, #2d2d2d 100%);
+            --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Light theme */
+        :root[data-theme="light"] {
+            --bg-primary: #F8FAFC;
+            --bg-secondary: #D9EAFD;
+            --bg-tertiary: #BCCCDC;
+            --bg-quaternary: #9AA6B2;
+            --text-primary: #1c1e21;
+            --text-secondary: #5f6368;
+            --border-color: #BCCCDC;
+            --accent-color: #0866ff;
+            --success-color: #42b883;
+            --warning-color: #f0ad4e;
+            --danger-color: #d9534f;
+            --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            --radius: 8px;
+            --transition: all 0.3s ease;
+            --gradient-start: #D9EAFD;
+            --gradient-end: #F8FAFC;
+            --glass-bg: rgba(248, 250, 252, 0.8);
+            --glass-border: rgba(188, 204, 220, 0.4);
+            --code-bg: #f5f5f5;
+            --code-border: #ddd;
+
+            /* Legacy compatibility */
+            --primary-color: #0866ff;
+            --sidebar-bg: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+            --sidebar-hover: #D9EAFD;
+            --card-bg: #ffffff;
+            --card-header-bg: linear-gradient(135deg, #f8fafc, #D9EAFD);
+            --table-bg: #ffffff;
+            --table-hover: rgba(8, 102, 255, 0.08);
+            --input-bg: #ffffff;
+            --input-border: #BCCCDC;
+            --modal-bg: #ffffff;
+            --navbar-bg: linear-gradient(135deg, #0866ff 0%, #0645b8 100%);
+            --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Default to dark theme */
+        :root {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #2d2d2d;
+            --bg-tertiary: #3d3d3d;
+            --bg-quaternary: #4d4d4d;
+            --text-primary: #ffffff;
+            --text-secondary: #cccccc;
+            --border-color: #555555;
+            --accent-color: #007acc;
+            --success-color: #28a745;
+            --warning-color: #ffc107;
+            --danger-color: #dc3545;
+            --shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            --radius: 8px;
+            --transition: all 0.3s ease;
+            --gradient-start: #0a0a0a;
+            --gradient-end: #1a1a1a;
+            --glass-bg: rgba(45, 45, 45, 0.7);
+            --glass-border: rgba(85, 85, 85, 0.3);
+            --code-bg: #1a1a1a;
+            --code-border: #555555;
+
+            /* Legacy compatibility */
+            --primary-color: #007acc;
+            --sidebar-bg: linear-gradient(180deg, #2d2d2d 0%, #1a1a1a 100%);
+            --sidebar-hover: #3d3d3d;
+            --card-bg: #2d2d2d;
+            --card-header-bg: linear-gradient(135deg, #3d3d3d, #2d2d2d);
+            --table-bg: #2d2d2d;
+            --table-hover: rgba(8, 102, 255, 0.08);
+            --input-bg: #3d3d3d;
+            --input-border: #555555;
+            --modal-bg: #2d2d2d;
+            --navbar-bg: linear-gradient(135deg, #3d3d3d 0%, #2d2d2d 100%);
+            --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
         }
 
         body {
@@ -336,9 +396,9 @@
             background-color: var(--card-bg);
             color: var(--text-primary);
             border-bottom: 2px solid var(--border-color);
-            padding: 8px 6px !important;
-            font-size: 0.85rem;
-            font-weight: 600;
+            padding: 6px 4px !important;
+            font-size: 0.8rem;
+            font-weight: normal;
         }
 
         /* Fixed table layout for consistent column widths */
@@ -360,16 +420,21 @@
 
         /* Compact transaction table rows with fixed height */
         #transactionsTable tbody tr {
-            height: 40px;
-            max-height: 40px;
+            height: 28px;
+            max-height: 28px;
         }
 
         #transactionsTable tbody td {
-            padding: 6px 6px !important;
-            font-size: 0.875rem;
+            padding: 4px 4px !important;
+            font-size: 0.8rem;
             vertical-align: middle;
             overflow: hidden;
-            max-height: 40px;
+            max-height: 28px;
+        }
+
+        /* Remove bold from balance column */
+        #transactionsTable .fw-bold {
+            font-weight: normal !important;
         }
 
         /* Description column - allow wrapping with fixed height */
@@ -377,26 +442,55 @@
             white-space: normal;
             word-wrap: break-word;
             line-height: 1.2;
-            max-height: 40px;
+            max-height: 28px;
             overflow: hidden;
         }
 
-        /* Smaller buttons in transaction table */
+        /* Modern action icons in transaction table */
         #transactionsTable .btn-sm {
-            padding: 2px 6px;
-            font-size: 0.75rem;
+            padding: 4px 6px;
+            font-size: 0.85rem;
+            border: none;
+            background: transparent;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        #transactionsTable .btn-primary {
+            color: #0d6efd;
+        }
+
+        #transactionsTable .btn-primary:hover {
+            background-color: rgba(13, 110, 253, 0.1);
+            color: #0d6efd;
+            transform: scale(1.1);
+        }
+
+        #transactionsTable .btn-danger {
+            color: #dc3545;
+        }
+
+        #transactionsTable .btn-danger:hover {
+            background-color: rgba(220, 53, 69, 0.1);
+            color: #dc3545;
+            transform: scale(1.1);
+        }
+
+        #transactionsTable .btn-sm i {
+            font-size: 0.9rem;
         }
 
         /* Smaller badges in transaction table */
         #transactionsTable .badge {
-            padding: 2px 8px;
-            font-size: 0.7rem;
+            padding: 1px 6px;
+            font-size: 0.65rem;
         }
 
         /* Smaller checkbox in transaction table */
         #transactionsTable .form-check-input {
-            width: 16px;
-            height: 16px;
+            width: 14px;
+            height: 14px;
             margin-top: 0;
         }
 
@@ -417,27 +511,17 @@
             border-color: var(--border-color);
         }
 
-        /* Transaction highlighting - Dark theme friendly */
-        [data-theme="dark"] .transaction-highlighted td {
-            filter: brightness(1.3) !important;
+        /* Transaction highlighting - Keep original colors in both themes */
+        .transaction-highlighted td {
+            /* No filter - keep payment method colors vibrant and unchanged */
         }
 
         [data-theme="light"] .transaction-highlighted td {
             filter: brightness(0.95) !important;
         }
 
-        /* Better text colors for dark theme */
-        [data-theme="dark"] .table .text-success {
-            color: #4ade80 !important;
-        }
-
-        [data-theme="dark"] .table .text-danger {
-            color: #f87171 !important;
-        }
-
-        [data-theme="dark"] .table .fw-bold {
-            color: #fbbf24 !important;
-        }
+        /* Dark theme: Transaction table uses same styling as light theme */
+        /* No custom dark theme styling - keeps light theme appearance for consistency */
 
         .badge {
             padding: 5px 10px;
@@ -609,7 +693,12 @@
             border-color: rgba(0,0,0,0.1) !important;
         }
 
-        .transaction-highlighted:hover td {
+        /* Hover effect - slightly darker for both themes */
+        [data-theme="light"] .transaction-highlighted:hover td {
+            filter: brightness(0.95) !important;
+        }
+
+        [data-theme="dark"] .transaction-highlighted:hover td {
             filter: brightness(0.95) !important;
         }
 
