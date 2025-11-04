@@ -333,22 +333,12 @@
             position: sticky;
             top: 0;
             z-index: 10;
+            background-color: var(--card-bg);
+            color: var(--text-primary);
+            border-bottom: 2px solid var(--border-color);
             padding: 8px 6px !important;
             font-size: 0.85rem;
             font-weight: 600;
-        }
-
-        /* Dark theme table header background */
-        [data-theme="dark"] #transactionsTable thead th,
-        :root #transactionsTable thead th {
-            background-color: #0a0a0a !important;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-        }
-
-        /* Light theme table header background */
-        [data-theme="light"] #transactionsTable thead th {
-            background-color: #ffffff !important;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         /* Compact transaction table rows */
