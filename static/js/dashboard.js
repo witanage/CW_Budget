@@ -61,10 +61,10 @@ function setupNavigation() {
         });
     });
 
-    // Setup refresh button
+    // Setup refresh button - recalculate balances and reload
     const refreshBtn = document.getElementById('refreshBtn');
     if (refreshBtn) {
-        refreshBtn.addEventListener('click', () => loadDashboardStats());
+        refreshBtn.addEventListener('click', recalculateAndRefresh);
     }
 }
 
@@ -378,6 +378,41 @@ function navigateToNextMonth() {
 
     // Load transactions for the new month
     loadTransactions();
+}
+
+function recalculateAndRefresh() {
+    const year = document.getElementById('yearSelect')?.value || new Date().getFullYear();
+    const month = document.getElementById('monthSelect')?.value || (new Date().getMonth() + 1);
+
+    showLoading();
+
+    // Call recalculate balances API
+    fetch('/api/recalculate-balances', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            year: parseInt(year),
+            month: parseInt(month)
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            console.error('Recalculation error:', data.error);
+            showToast('Error recalculating balances: ' + data.error, 'danger');
+            hideLoading();
+        } else {
+            console.log('Balances recalculated:', data.message);
+            showToast(data.message, 'success');
+            // Reload transactions to show updated balances
+            loadTransactions();
+        }
+    })
+    .catch(error => {
+        console.error('Error recalculating balances:', error);
+        showToast('Error recalculating balances', 'danger');
+        hideLoading();
+    });
 }
 
 function displayTransactions(transactions) {
