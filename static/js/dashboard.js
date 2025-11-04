@@ -139,9 +139,15 @@ function setupFormButtons() {
         });
     }
 
-    const loadTransBtn = document.getElementById('loadTransactionsBtn');
-    if (loadTransBtn) {
-        loadTransBtn.addEventListener('click', loadTransactions);
+    // Month navigation buttons
+    const prevMonthBtn = document.getElementById('prevMonthBtn');
+    if (prevMonthBtn) {
+        prevMonthBtn.addEventListener('click', navigateToPreviousMonth);
+    }
+
+    const nextMonthBtn = document.getElementById('nextMonthBtn');
+    if (nextMonthBtn) {
+        nextMonthBtn.addEventListener('click', navigateToNextMonth);
     }
 
     const viewPaymentTotalsBtn = document.getElementById('viewPaymentTotalsBtn');
@@ -309,6 +315,58 @@ function loadTransactions() {
             console.error('Error loading transactions:', error);
             hideLoading();
         });
+}
+
+function navigateToPreviousMonth() {
+    const monthSelect = document.getElementById('monthSelect');
+    const yearSelect = document.getElementById('yearSelect');
+
+    if (!monthSelect || !yearSelect) return;
+
+    let currentMonth = parseInt(monthSelect.value);
+    let currentYear = parseInt(yearSelect.value);
+
+    // Go to previous month
+    currentMonth--;
+
+    // If month goes below 1, go to December of previous year
+    if (currentMonth < 1) {
+        currentMonth = 12;
+        currentYear--;
+    }
+
+    // Update selectors
+    monthSelect.value = currentMonth;
+    yearSelect.value = currentYear;
+
+    // Load transactions for the new month
+    loadTransactions();
+}
+
+function navigateToNextMonth() {
+    const monthSelect = document.getElementById('monthSelect');
+    const yearSelect = document.getElementById('yearSelect');
+
+    if (!monthSelect || !yearSelect) return;
+
+    let currentMonth = parseInt(monthSelect.value);
+    let currentYear = parseInt(yearSelect.value);
+
+    // Go to next month
+    currentMonth++;
+
+    // If month goes above 12, go to January of next year
+    if (currentMonth > 12) {
+        currentMonth = 1;
+        currentYear++;
+    }
+
+    // Update selectors
+    monthSelect.value = currentMonth;
+    yearSelect.value = currentYear;
+
+    // Load transactions for the new month
+    loadTransactions();
 }
 
 function displayTransactions(transactions) {
