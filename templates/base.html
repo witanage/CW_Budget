@@ -106,14 +106,15 @@
 
         .sidebar .nav-link:hover {
             background-color: var(--sidebar-hover);
-            color: var(--primary-color);
+            color: #ffffff;
             transform: translateX(4px);
         }
 
         .sidebar .nav-link.active {
-            background: var(--accent-gradient);
+            background-color: #2a2a2a;
             color: white;
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            border-left: 3px solid #4a4a4a;
         }
 
         .card {
@@ -160,16 +161,39 @@
         /* Reduce margins in transaction page controls */
         #transactionsPage .row.mb-3 {
             margin-bottom: 0.75rem !important;
+            align-items: center;
         }
 
         #transactionsPage .btn {
             padding: 6px 12px;
             font-size: 0.875rem;
+            height: 34px;
         }
 
         #transactionsPage .form-select {
             padding: 6px 10px;
             font-size: 0.875rem;
+            height: 34px;
+        }
+
+        /* Ensure all controls in transaction controller bar align */
+        #transactionsPage .card-body > .row:first-child .col-md-2,
+        #transactionsPage .card-body > .row:first-child .col-md-1 {
+            display: flex;
+            align-items: center;
+        }
+
+        /* Month navigation buttons */
+        #prevMonthBtn, #nextMonthBtn {
+            width: 100%;
+            background-color: #2a2a2a;
+            border-color: #3a3a3a;
+            color: #ffffff;
+        }
+
+        #prevMonthBtn:hover, #nextMonthBtn:hover {
+            background-color: #3a3a3a;
+            border-color: #4a4a4a;
         }
 
         .stat-card {
@@ -309,18 +333,52 @@
             position: sticky;
             top: 0;
             z-index: 10;
-            background-color: var(--card-bg) !important;
-            box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.4);
+            background-color: var(--card-bg);
+            color: var(--text-primary);
+            border-bottom: 2px solid var(--border-color);
             padding: 8px 6px !important;
             font-size: 0.85rem;
             font-weight: 600;
         }
 
-        /* Compact transaction table rows */
+        /* Fixed table layout for consistent column widths */
+        #transactionsTable {
+            table-layout: fixed;
+            width: 100%;
+        }
+
+        /* Fixed column widths */
+        #transactionsTable thead th:nth-child(1) { width: 50px; }   /* Method checkbox */
+        #transactionsTable thead th:nth-child(2) { width: 60px; }   /* ID */
+        #transactionsTable thead th:nth-child(3) { width: 250px; }  /* Description */
+        #transactionsTable thead th:nth-child(4) { width: 120px; }  /* Category */
+        #transactionsTable thead th:nth-child(5) { width: 100px; }  /* Debit */
+        #transactionsTable thead th:nth-child(6) { width: 100px; }  /* Credit */
+        #transactionsTable thead th:nth-child(7) { width: 110px; }  /* Balance */
+        #transactionsTable thead th:nth-child(8) { width: 150px; }  /* Notes */
+        #transactionsTable thead th:nth-child(9) { width: 120px; }  /* Actions */
+
+        /* Compact transaction table rows with fixed height */
+        #transactionsTable tbody tr {
+            height: 40px;
+            max-height: 40px;
+        }
+
         #transactionsTable tbody td {
             padding: 6px 6px !important;
             font-size: 0.875rem;
             vertical-align: middle;
+            overflow: hidden;
+            max-height: 40px;
+        }
+
+        /* Description column - allow wrapping with fixed height */
+        #transactionsTable tbody td:nth-child(3) {
+            white-space: normal;
+            word-wrap: break-word;
+            line-height: 1.2;
+            max-height: 40px;
+            overflow: hidden;
         }
 
         /* Smaller buttons in transaction table */
@@ -342,15 +400,17 @@
             margin-top: 0;
         }
 
-        /* Scrollable table container - increased height for more rows */
-        .table-responsive {
+        /* Scrollable table container - only table scrolls */
+        #transactionsPage .table-responsive {
             max-height: calc(100vh - 280px);
             overflow-y: auto;
+            overflow-x: auto;
         }
 
-        /* Ensure transaction page table uses full available height */
-        #transactionsPage .table-responsive {
-            max-height: calc(100vh - 250px);
+        /* Other pages table responsive */
+        .table-responsive {
+            overflow-y: auto;
+            overflow-x: auto;
         }
 
         .table td, .table th {
@@ -468,9 +528,49 @@
             font-weight: bold;
         }
         
+        /* Fix main content alignment */
+        main.col-md-9 {
+            padding-left: 2rem;
+            padding-right: 2rem;
+            padding-top: 1.5rem;
+        }
+
+        /* Prevent content overlap with navbar */
+        .container-fluid {
+            padding-top: 1rem;
+        }
+
+        /* Fix controller bar button alignment */
+        .card-header .row {
+            align-items: center;
+        }
+
+        .card-header .col,
+        .card-header .col-auto {
+            display: flex;
+            align-items: center;
+        }
+
+        /* Fix form controls alignment in rows */
+        .row .form-select,
+        .row .btn {
+            height: 38px;
+        }
+
+        /* Ensure consistent button sizing in button groups */
+        .btn-group .btn,
+        .row .btn {
+            vertical-align: middle;
+        }
+
         @media (max-width: 768px) {
             .sidebar {
                 min-height: auto;
+            }
+
+            main.col-md-9 {
+                padding-left: 1rem;
+                padding-right: 1rem;
             }
         }
         

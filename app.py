@@ -151,6 +151,12 @@ def dashboard():
     """Main dashboard."""
     return render_template('dashboard.html', username=session.get('username'))
 
+@app.route('/mobile')
+@login_required
+def mobile():
+    """Mobile view."""
+    return render_template('mobile.html', username=session.get('username'))
+
 @app.route('/api/dashboard-stats')
 @login_required
 def dashboard_stats():
