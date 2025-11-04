@@ -341,11 +341,44 @@
             font-weight: 600;
         }
 
-        /* Compact transaction table rows */
+        /* Fixed table layout for consistent column widths */
+        #transactionsTable {
+            table-layout: fixed;
+            width: 100%;
+        }
+
+        /* Fixed column widths */
+        #transactionsTable thead th:nth-child(1) { width: 50px; }   /* Method checkbox */
+        #transactionsTable thead th:nth-child(2) { width: 60px; }   /* ID */
+        #transactionsTable thead th:nth-child(3) { width: 250px; }  /* Description */
+        #transactionsTable thead th:nth-child(4) { width: 120px; }  /* Category */
+        #transactionsTable thead th:nth-child(5) { width: 100px; }  /* Debit */
+        #transactionsTable thead th:nth-child(6) { width: 100px; }  /* Credit */
+        #transactionsTable thead th:nth-child(7) { width: 110px; }  /* Balance */
+        #transactionsTable thead th:nth-child(8) { width: 150px; }  /* Notes */
+        #transactionsTable thead th:nth-child(9) { width: 120px; }  /* Actions */
+
+        /* Compact transaction table rows with fixed height */
+        #transactionsTable tbody tr {
+            height: 40px;
+            max-height: 40px;
+        }
+
         #transactionsTable tbody td {
             padding: 6px 6px !important;
             font-size: 0.875rem;
             vertical-align: middle;
+            overflow: hidden;
+            max-height: 40px;
+        }
+
+        /* Description column - allow wrapping with fixed height */
+        #transactionsTable tbody td:nth-child(3) {
+            white-space: normal;
+            word-wrap: break-word;
+            line-height: 1.2;
+            max-height: 40px;
+            overflow: hidden;
         }
 
         /* Smaller buttons in transaction table */
