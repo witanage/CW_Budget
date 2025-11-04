@@ -26,11 +26,11 @@ CORS(app)
 
 # Database configuration
 DB_CONFIG = {
-    'host': os.environ.get('DB_HOST', 'll206l.h.filess.io'),
-    'port': os.environ.get('DB_PORT', '3307'),
-    'database': os.environ.get('DB_NAME', 'CWDB_typedozen'),
-    'user': os.environ.get('DB_USER', 'CWDB_typedozen'),
-    'password': os.environ.get('DB_PASSWORD', '7fc07286a1e6279284511aff43f618f26dedff65'),
+    'host': os.environ.get('DB_HOST'),
+    'port': os.environ.get('DB_PORT'),
+    'database': os.environ.get('DB_NAME'),
+    'user': os.environ.get('DB_USER'),
+    'password': os.environ.get('DB_PASSWORD'),
     'charset': 'utf8mb4',
     'use_unicode': True
 }
