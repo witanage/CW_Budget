@@ -541,6 +541,68 @@ def get_categories():
     
     return jsonify({'error': 'Database connection failed'}), 500
 
+@app.route('/api/recalculate-balances', methods=['POST'])
+@login_required
+def recalculate_balances():
+    """Recalculate all transaction balances for a given month/year."""
+    connection = get_db_connection()
+    if connection:
+        cursor = connection.cursor(dictionary=True)
+        try:
+            user_id = session['user_id']
+            data = request.get_json()
+            year = data.get('year', datetime.now().year)
+            month = data.get('month', datetime.now().month)
+
+            # Get monthly record
+            cursor.execute("""
+                SELECT id FROM monthly_records
+                WHERE user_id = %s AND year = %s AND month = %s
+            """, (user_id, year, month))
+
+            monthly_record = cursor.fetchone()
+            if not monthly_record:
+                return jsonify({'error': 'No monthly record found'}), 404
+
+            monthly_record_id = monthly_record['id']
+
+            # Get all transactions for this month, ordered by date and ID
+            cursor.execute("""
+                SELECT id, debit, credit
+                FROM transactions
+                WHERE monthly_record_id = %s
+                ORDER BY transaction_date, id
+            """, (monthly_record_id,))
+
+            transactions = cursor.fetchall()
+
+            # Recalculate balances starting from 0
+            running_balance = Decimal('0')
+            for trans in transactions:
+                debit = Decimal(str(trans['debit'])) if trans['debit'] else Decimal('0')
+                credit = Decimal(str(trans['credit'])) if trans['credit'] else Decimal('0')
+                running_balance = running_balance + debit - credit
+
+                # Update transaction with new balance
+                cursor.execute("""
+                    UPDATE transactions SET balance = %s WHERE id = %s
+                """, (running_balance, trans['id']))
+
+            connection.commit()
+            return jsonify({
+                'message': 'Balances recalculated successfully',
+                'transactions_updated': len(transactions)
+            })
+
+        except Error as e:
+            connection.rollback()
+            return jsonify({'error': str(e)}), 500
+        finally:
+            cursor.close()
+            connection.close()
+
+    return jsonify({'error': 'Database connection failed'}), 500
+
 @app.route('/api/reports/monthly-summary')
 @login_required
 def monthly_summary_report():
