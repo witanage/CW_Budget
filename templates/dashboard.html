@@ -10,23 +10,18 @@
             <div class="position-sticky">
                 <ul class="nav flex-column">
                     <li class="nav-item">
-                        <a class="nav-link active" href="#" data-page="overview">
-                            <i class="fas fa-home me-2"></i>Overview
+                        <a class="nav-link active" href="#" data-page="transactions">
+                            <i class="fas fa-exchange-alt me-2"></i>Transactions
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#" data-page="transactions">
-                            <i class="fas fa-exchange-alt me-2"></i>Transactions
+                        <a class="nav-link" href="#" data-page="overview">
+                            <i class="fas fa-home me-2"></i>Overview
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="#" data-page="budget">
                             <i class="fas fa-calculator me-2"></i>Budget
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#" data-page="recurring">
-                            <i class="fas fa-redo me-2"></i>Recurring
                         </a>
                     </li>
                     <li class="nav-item">
@@ -40,22 +35,12 @@
         
         <!-- Main Content -->
         <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                <h1 class="h2">Dashboard</h1>
-                <div class="btn-toolbar mb-2 mb-md-0">
-                    <div class="btn-group me-2">
-                        <button type="button" class="btn btn-sm btn-outline-secondary" id="refreshBtn">
-                            <i class="fas fa-sync-alt me-1"></i>Refresh
-                        </button>
-                    </div>
-                </div>
-            </div>
-            
+
             <!-- Overview Page -->
             <div id="overviewPage" class="page-content">
                 <!-- Stats Cards -->
                 <div class="row mb-4">
-                    <div class="col-xl-3 col-md-6 mb-3">
+                    <div class="col-md-3 mb-2">
                         <div class="card stat-card bg-primary text-white">
                             <div class="card-body">
                                 <div class="row align-items-center">
@@ -68,8 +53,8 @@
                             </div>
                         </div>
                     </div>
-                    
-                    <div class="col-xl-3 col-md-6 mb-3">
+
+                    <div class="col-md-3 mb-2">
                         <div class="card stat-card bg-success text-white">
                             <div class="card-body">
                                 <div class="row align-items-center">
@@ -82,8 +67,8 @@
                             </div>
                         </div>
                     </div>
-                    
-                    <div class="col-xl-3 col-md-6 mb-3">
+
+                    <div class="col-md-3 mb-2">
                         <div class="card stat-card bg-danger text-white">
                             <div class="card-body">
                                 <div class="row align-items-center">
@@ -96,8 +81,8 @@
                             </div>
                         </div>
                     </div>
-                    
-                    <div class="col-xl-3 col-md-6 mb-3">
+
+                    <div class="col-md-3 mb-2">
                         <div class="card stat-card bg-info text-white">
                             <div class="card-body">
                                 <div class="row align-items-center">
@@ -113,25 +98,14 @@
                 </div>
                 
                 <!-- Charts Row -->
-                <div class="row mb-4">
-                    <div class="col-lg-8 mb-3">
+                <div class="row mb-3">
+                    <div class="col-12">
                         <div class="card">
                             <div class="card-header">
                                 <h5 class="card-title mb-0">Monthly Trend</h5>
                             </div>
                             <div class="card-body">
                                 <canvas id="trendChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="col-lg-4 mb-3">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5 class="card-title mb-0">Expense Categories</h5>
-                            </div>
-                            <div class="card-body">
-                                <canvas id="categoryChart"></canvas>
                             </div>
                         </div>
                     </div>
@@ -182,19 +156,34 @@
                     <div class="card-body">
                         <!-- Month/Year Selector -->
                         <div class="row mb-3">
-                            <div class="col-md-3">
+                            <div class="col-md-2">
                                 <select class="form-select" id="monthSelect">
                                     <!-- Months will be populated here -->
                                 </select>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-2">
                                 <select class="form-select" id="yearSelect">
                                     <!-- Years will be populated here -->
                                 </select>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-2">
                                 <button class="btn btn-primary" id="loadTransactionsBtn">
                                     <i class="fas fa-search me-1"></i>Load Transactions
+                                </button>
+                            </div>
+                            <div class="col-md-2">
+                                <button class="btn btn-success" id="refreshBtn" onclick="loadTransactions()">
+                                    <i class="fas fa-sync-alt me-1"></i>Refresh
+                                </button>
+                            </div>
+                            <div class="col-md-2">
+                                <button class="btn btn-gradient" id="viewPaymentTotalsBtn" data-bs-toggle="modal" data-bs-target="#paymentTotalsModal">
+                                    <i class="fas fa-wallet me-1"></i>Payment Totals
+                                </button>
+                            </div>
+                            <div class="col-md-2">
+                                <button class="btn btn-info" id="cloneMonthBtn" data-bs-toggle="modal" data-bs-target="#cloneMonthModal">
+                                    <i class="fas fa-clone me-1"></i>Clone Month
                                 </button>
                             </div>
                         </div>
@@ -204,6 +193,7 @@
                             <table class="table table-hover" id="transactionsTable">
                                 <thead>
                                     <tr>
+                                        <th>Method</th>
                                         <th>ID</th>
                                         <th>Description</th>
                                         <th>Category</th>
@@ -259,52 +249,7 @@
                     </div>
                 </div>
             </div>
-            
-            <!-- Recurring Transactions Page -->
-            <div id="recurringPage" class="page-content" style="display:none;">
-                <div class="card">
-                    <div class="card-header">
-                        <div class="row align-items-center">
-                            <div class="col">
-                                <h5 class="card-title mb-0">Recurring Transactions</h5>
-                            </div>
-                            <div class="col-auto">
-                                <button class="btn btn-gradient btn-sm" data-bs-toggle="modal" data-bs-target="#recurringModal">
-                                    <i class="fas fa-plus me-1"></i>Add Recurring
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-hover" id="recurringTable">
-                                <thead>
-                                    <tr>
-                                        <th>Description</th>
-                                        <th>Category</th>
-                                        <th>Type</th>
-                                        <th>Amount</th>
-                                        <th>Day of Month</th>
-                                        <th>Start Date</th>
-                                        <th>End Date</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <!-- Recurring transactions will be loaded here -->
-                                </tbody>
-                            </table>
-                        </div>
-                        
-                        <div class="mt-3">
-                            <button class="btn btn-primary" id="applyRecurringBtn">
-                                <i class="fas fa-play me-1"></i>Apply Recurring for Current Month
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
+
             <!-- Reports Page -->
             <div id="reportsPage" class="page-content" style="display:none;">
                 <div class="row">
@@ -355,7 +300,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <form id="transactionForm">
+                <form id="transactionForm" novalidate>
                     <div class="mb-3">
                         <label for="transDescription" class="form-label">Description</label>
                         <input type="text" class="form-control" id="transDescription" required>
@@ -369,11 +314,11 @@
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="transDebit" class="form-label">Debit (Income)</label>
-                            <input type="number" class="form-control" id="transDebit" step="0.01" min="0">
+                            <input type="text" class="form-control" id="transDebit" placeholder="0.00" inputmode="decimal">
                         </div>
                         <div class="col-md-6 mb-3">
                             <label for="transCredit" class="form-label">Credit (Expense)</label>
-                            <input type="number" class="form-control" id="transCredit" step="0.01" min="0">
+                            <input type="text" class="form-control" id="transCredit" placeholder="0.00" inputmode="decimal">
                         </div>
                     </div>
                     <div class="mb-3">
@@ -389,6 +334,7 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-primary" id="saveTransactionBtn">Save Transaction</button>
+                <input type="hidden" id="editTransactionId" value="">
             </div>
         </div>
     </div>
@@ -424,56 +370,165 @@
     </div>
 </div>
 
-<!-- Recurring Transaction Modal -->
-<div class="modal fade" id="recurringModal" tabindex="-1">
+<!-- Payment Method Selection Modal -->
+<div class="modal fade" id="paymentMethodModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Add Recurring Transaction</h5>
+                <h5 class="modal-title">Select Payment Method</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <form id="recurringForm">
-                    <div class="mb-3">
-                        <label for="recDescription" class="form-label">Description</label>
-                        <input type="text" class="form-control" id="recDescription" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="recCategory" class="form-label">Category</label>
-                        <select class="form-select" id="recCategory">
-                            <!-- Categories will be loaded here -->
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="recType" class="form-label">Type</label>
-                        <select class="form-select" id="recType">
-                            <option value="debit">Income (Debit)</option>
-                            <option value="credit">Expense (Credit)</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="recAmount" class="form-label">Amount</label>
-                        <input type="number" class="form-control" id="recAmount" step="0.01" min="0" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="recDay" class="form-label">Day of Month</label>
-                        <input type="number" class="form-control" id="recDay" min="1" max="31">
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="recStart" class="form-label">Start Date</label>
-                            <input type="date" class="form-control" id="recStart">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="recEnd" class="form-label">End Date (Optional)</label>
-                            <input type="date" class="form-control" id="recEnd">
-                        </div>
-                    </div>
-                </form>
+                <p>How did you pay for this transaction?</p>
+                <div id="paymentMethodList" class="list-group">
+                    <!-- Payment methods will be loaded here -->
+                </div>
+                <hr>
+                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#manageCreditCardsModal">
+                    <i class="fas fa-credit-card me-1"></i>Manage Credit Cards
+                </button>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="saveRecurringBtn">Save Recurring</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Manage Credit Cards Modal -->
+<div class="modal fade" id="manageCreditCardsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Manage Credit Cards</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row mb-3">
+                    <div class="col">
+                        <h6>Your Credit Cards</h6>
+                    </div>
+                    <div class="col-auto">
+                        <button type="button" class="btn btn-sm btn-primary" id="addCreditCardBtn">
+                            <i class="fas fa-plus me-1"></i>Add Credit Card
+                        </button>
+                    </div>
+                </div>
+
+                <div id="creditCardsList" class="list-group mb-3">
+                    <!-- Credit cards will be loaded here -->
+                </div>
+
+                <!-- Add Credit Card Form (initially hidden) -->
+                <div id="addCreditCardForm" style="display:none;">
+                    <hr>
+                    <h6>Add New Credit Card</h6>
+                    <form id="creditCardForm">
+                        <div class="mb-3">
+                            <label for="cardName" class="form-label">Card Name</label>
+                            <input type="text" class="form-control" id="cardName" placeholder="e.g., Visa Gold, Master Card" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="cardColor" class="form-label">Highlight Color</label>
+                            <input type="color" class="form-control form-control-color" id="cardColor" value="#007bff">
+                        </div>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-save me-1"></i>Save Card
+                        </button>
+                        <button type="button" class="btn btn-secondary" id="cancelAddCardBtn">Cancel</button>
+                    </form>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Payment Totals Modal -->
+<div class="modal fade" id="paymentTotalsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Payment Method Totals</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Showing totals for marked transactions only (paid/done)
+                </div>
+
+                <div id="paymentTotalsContent">
+                    <!-- Totals will be loaded here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Clone Month Modal -->
+<div class="modal fade" id="cloneMonthModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Clone Month Transactions</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    This will copy all transactions from the source month to the target month.
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Source Month/Year (Copy From):</label>
+                    <div class="row">
+                        <div class="col-6">
+                            <select class="form-select" id="cloneFromMonth">
+                                <!-- Months will be populated -->
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <select class="form-select" id="cloneFromYear">
+                                <!-- Years will be populated -->
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Target Month/Year (Copy To):</label>
+                    <div class="row">
+                        <div class="col-6">
+                            <select class="form-select" id="cloneToMonth">
+                                <!-- Months will be populated -->
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <select class="form-select" id="cloneToYear">
+                                <!-- Years will be populated -->
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="cloneWithPayments" checked>
+                    <label class="form-check-label" for="cloneWithPayments">
+                        Include payment method assignments
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="executeCloneBtn">
+                    <i class="fas fa-clone me-1"></i>Clone Transactions
+                </button>
             </div>
         </div>
     </div>

@@ -165,17 +165,30 @@ def dashboard_stats():
             current_year = datetime.now().year
             current_month = datetime.now().month
             
+            # Get current month income and expenses
             cursor.execute("""
-                SELECT 
+                SELECT
                     SUM(debit) as total_income,
-                    SUM(credit) as total_expenses,
-                    MAX(balance) as current_balance
+                    SUM(credit) as total_expenses
                 FROM transactions t
                 JOIN monthly_records mr ON t.monthly_record_id = mr.id
                 WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s
             """, (user_id, current_year, current_month))
-            
-            current_stats = cursor.fetchone()
+
+            current_stats = cursor.fetchone() or {'total_income': 0, 'total_expenses': 0}
+
+            # Get current balance from the last transaction
+            cursor.execute("""
+                SELECT balance
+                FROM transactions t
+                JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s
+                ORDER BY t.id DESC
+                LIMIT 1
+            """, (user_id, current_year, current_month))
+
+            last_transaction = cursor.fetchone()
+            current_stats['current_balance'] = last_transaction['balance'] if last_transaction else 0
             
             # Get year-to-date stats
             cursor.execute("""
@@ -268,15 +281,20 @@ def transactions():
             
             if monthly_record:
                 cursor.execute("""
-                    SELECT 
+                    SELECT
                         t.*,
-                        c.name as category_name
+                        c.name as category_name,
+                        pm.name as payment_method_name,
+                        pm.type as payment_method_type,
+                        pm.color as payment_method_color,
+                        COALESCE(t.is_paid, FALSE) as is_paid
                     FROM transactions t
                     LEFT JOIN categories c ON t.category_id = c.id
+                    LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id
                     WHERE t.monthly_record_id = %s
-                    ORDER BY t.id
+                    ORDER BY t.id DESC
                 """, (monthly_record['id'],))
-                
+
                 transactions = cursor.fetchall()
                 return jsonify(transactions)
             else:
@@ -284,44 +302,82 @@ def transactions():
         
         else:  # POST - Create new transaction
             data = request.get_json()
-            
+            print(f"[DEBUG] Received transaction data: {data}")
+
             # Get or create monthly record
             year = data.get('year', datetime.now().year)
             month = data.get('month', datetime.now().month)
             month_name = calendar.month_name[month]
-            
+
             cursor.execute("""
                 INSERT INTO monthly_records (user_id, year, month, month_name)
                 VALUES (%s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP
             """, (user_id, year, month, month_name))
-            
+
             cursor.execute("""
-                SELECT id FROM monthly_records 
+                SELECT id FROM monthly_records
                 WHERE user_id = %s AND year = %s AND month = %s
             """, (user_id, year, month))
-            
+
             monthly_record = cursor.fetchone()
-            
-            # Insert transaction
+
+            # Calculate balance: get previous balance and add/subtract current transaction
             cursor.execute("""
-                INSERT INTO transactions 
-                (monthly_record_id, description, category_id, debit, credit, balance, transaction_date, notes)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            """, (
+                SELECT balance FROM transactions
+                WHERE monthly_record_id = %s
+                ORDER BY id DESC LIMIT 1
+            """, (monthly_record['id'],))
+
+            last_balance_row = cursor.fetchone()
+            previous_balance = last_balance_row['balance'] if last_balance_row and last_balance_row['balance'] is not None else Decimal('0')
+
+            # Convert to Decimal to avoid float/Decimal arithmetic errors
+            debit_value = data.get('debit')
+            credit_value = data.get('credit')
+
+            debit = Decimal(str(debit_value)) if debit_value else Decimal('0')
+            credit = Decimal(str(credit_value)) if credit_value else Decimal('0')
+
+            # Ensure previous_balance is also Decimal
+            if not isinstance(previous_balance, Decimal):
+                previous_balance = Decimal(str(previous_balance))
+
+            print(f"[DEBUG] Debit: {debit}, Credit: {credit}, Previous balance: {previous_balance}")
+            new_balance = previous_balance + debit - credit
+            print(f"[DEBUG] New balance: {new_balance}")
+
+            # Use current date if no transaction_date provided
+            transaction_date = data.get('transaction_date')
+            if not transaction_date:
+                transaction_date = datetime.now().date()
+
+            # Insert transaction
+            insert_values = (
                 monthly_record['id'],
                 data.get('description'),
                 data.get('category_id'),
-                data.get('debit'),
-                data.get('credit'),
-                data.get('balance'),
-                data.get('transaction_date'),
+                debit if debit > 0 else None,
+                credit if credit > 0 else None,
+                new_balance,
+                transaction_date,
                 data.get('notes')
-            ))
-            
+            )
+            print(f"[DEBUG] Inserting transaction with values: {insert_values}")
+
+            cursor.execute("""
+                INSERT INTO transactions
+                (monthly_record_id, description, category_id, debit, credit, balance, transaction_date, notes)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """, insert_values)
+
+            transaction_id = cursor.lastrowid
+            print(f"[DEBUG] Transaction inserted with ID: {transaction_id}")
+
             connection.commit()
-            
-            return jsonify({'message': 'Transaction created successfully', 'id': cursor.lastrowid}), 201
+            print(f"[DEBUG] Transaction committed successfully")
+
+            return jsonify({'message': 'Transaction created successfully', 'id': transaction_id}), 201
             
     except Error as e:
         return jsonify({'error': str(e)}), 500
@@ -342,24 +398,99 @@ def manage_transaction(transaction_id):
     try:
         if request.method == 'PUT':
             data = request.get_json()
+
+            # Validate request data
+            if not data:
+                return jsonify({'error': 'No data provided'}), 400
+
+            print(f"[DEBUG] Updating transaction {transaction_id} with data: {data}")
+
+            # Get the monthly_record_id for this transaction
             cursor.execute("""
-                UPDATE transactions 
-                SET description = %s, category_id = %s, debit = %s, 
-                    credit = %s, balance = %s, notes = %s
-                WHERE id = %s AND monthly_record_id IN 
+                SELECT monthly_record_id FROM transactions
+                WHERE id = %s AND monthly_record_id IN
                     (SELECT id FROM monthly_records WHERE user_id = %s)
+            """, (transaction_id, session['user_id']))
+
+            result = cursor.fetchone()
+            if not result:
+                print(f"[DEBUG] Transaction {transaction_id} not found for user {session['user_id']}")
+                return jsonify({'error': 'Transaction not found'}), 404
+
+            monthly_record_id = result[0]
+            print(f"[DEBUG] Found monthly_record_id: {monthly_record_id}")
+
+            # Get previous balance (from transaction before this one)
+            cursor.execute("""
+                SELECT balance FROM transactions
+                WHERE monthly_record_id = %s AND id < %s
+                ORDER BY id DESC LIMIT 1
+            """, (monthly_record_id, transaction_id))
+
+            prev_balance_row = cursor.fetchone()
+            previous_balance = prev_balance_row[0] if prev_balance_row and prev_balance_row[0] is not None else Decimal('0')
+
+            # Convert to Decimal to avoid float/Decimal arithmetic errors
+            debit_value = data.get('debit')
+            credit_value = data.get('credit')
+
+            debit = Decimal(str(debit_value)) if debit_value else Decimal('0')
+            credit = Decimal(str(credit_value)) if credit_value else Decimal('0')
+
+            # Ensure previous_balance is also Decimal
+            if not isinstance(previous_balance, Decimal):
+                previous_balance = Decimal(str(previous_balance))
+
+            new_balance = previous_balance + debit - credit
+
+            # Handle transaction_date - use current date if not provided or empty
+            transaction_date = data.get('transaction_date')
+            if not transaction_date or transaction_date == '':
+                transaction_date = datetime.now().date()
+
+            # Update transaction
+            cursor.execute("""
+                UPDATE transactions
+                SET description = %s, category_id = %s, debit = %s,
+                    credit = %s, balance = %s, transaction_date = %s, notes = %s
+                WHERE id = %s
             """, (
                 data.get('description'),
                 data.get('category_id'),
-                data.get('debit'),
-                data.get('credit'),
-                data.get('balance'),
+                debit if debit > 0 else None,
+                credit if credit > 0 else None,
+                new_balance,
+                transaction_date,
                 data.get('notes'),
-                transaction_id,
-                session['user_id']
+                transaction_id
             ))
-            
+
+            print(f"[DEBUG] Transaction {transaction_id} updated successfully, new balance: {new_balance}")
+
+            # Recalculate balances for all subsequent transactions
+            cursor.execute("""
+                SELECT id, debit, credit FROM transactions
+                WHERE monthly_record_id = %s AND id > %s
+                ORDER BY id
+            """, (monthly_record_id, transaction_id))
+
+            subsequent_transactions = cursor.fetchall()
+            current_balance = new_balance
+
+            for trans in subsequent_transactions:
+                trans_id, trans_debit, trans_credit = trans
+                # Convert to Decimal for arithmetic
+                trans_debit = Decimal(str(trans_debit)) if trans_debit else Decimal('0')
+                trans_credit = Decimal(str(trans_credit)) if trans_credit else Decimal('0')
+                current_balance = current_balance + trans_debit - trans_credit
+                cursor.execute("""
+                    UPDATE transactions SET balance = %s WHERE id = %s
+                """, (current_balance, trans_id))
+
+            print(f"[DEBUG] Updated {len(subsequent_transactions)} subsequent transactions")
+
             connection.commit()
+            print(f"[DEBUG] Transaction update committed successfully")
             return jsonify({'message': 'Transaction updated successfully'})
         
         else:  # DELETE
@@ -371,9 +502,15 @@ def manage_transaction(transaction_id):
             
             connection.commit()
             return jsonify({'message': 'Transaction deleted successfully'})
-            
+
     except Error as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"[ERROR] Database error in manage_transaction: {str(e)}")
+        connection.rollback()
+        return jsonify({'error': f'Database error: {str(e)}'}), 500
+    except Exception as e:
+        print(f"[ERROR] Unexpected error in manage_transaction: {str(e)}")
+        connection.rollback()
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
     finally:
         cursor.close()
         connection.close()
@@ -396,173 +533,6 @@ def get_categories():
             connection.close()
     
     return jsonify({'error': 'Database connection failed'}), 500
-
-@app.route('/api/recurring-transactions', methods=['GET', 'POST'])
-@login_required
-def recurring_transactions():
-    """Manage recurring transactions."""
-    connection = get_db_connection()
-    if not connection:
-        return jsonify({'error': 'Database connection failed'}), 500
-    
-    cursor = connection.cursor(dictionary=True)
-    user_id = session['user_id']
-    
-    try:
-        if request.method == 'GET':
-            cursor.execute("""
-                SELECT rt.*, c.name as category_name
-                FROM recurring_transactions rt
-                LEFT JOIN categories c ON rt.category_id = c.id
-                WHERE rt.user_id = %s AND rt.is_active = TRUE
-            """, (user_id,))
-            
-            recurring = cursor.fetchall()
-            return jsonify(recurring)
-        
-        else:  # POST
-            data = request.get_json()
-            cursor.execute("""
-                INSERT INTO recurring_transactions 
-                (user_id, description, category_id, type, amount, day_of_month, start_date, end_date)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            """, (
-                user_id,
-                data.get('description'),
-                data.get('category_id'),
-                data.get('type'),
-                data.get('amount'),
-                data.get('day_of_month'),
-                data.get('start_date'),
-                data.get('end_date')
-            ))
-            
-            connection.commit()
-            return jsonify({'message': 'Recurring transaction created successfully'}), 201
-            
-    except Error as e:
-        return jsonify({'error': str(e)}), 500
-    finally:
-        cursor.close()
-        connection.close()
-
-@app.route('/api/recurring-transactions/<int:recurring_id>', methods=['DELETE'])
-@login_required
-def delete_recurring_transaction(recurring_id):
-    """Delete a recurring transaction."""
-    connection = get_db_connection()
-    if not connection:
-        return jsonify({'error': 'Database connection failed'}), 500
-
-    cursor = connection.cursor()
-    user_id = session['user_id']
-
-    try:
-        # Set is_active to FALSE instead of deleting (soft delete)
-        cursor.execute("""
-            UPDATE recurring_transactions
-            SET is_active = FALSE
-            WHERE id = %s AND user_id = %s
-        """, (recurring_id, user_id))
-
-        connection.commit()
-
-        if cursor.rowcount == 0:
-            return jsonify({'error': 'Recurring transaction not found'}), 404
-
-        return jsonify({'message': 'Recurring transaction deleted successfully'})
-
-    except Error as e:
-        return jsonify({'error': str(e)}), 500
-    finally:
-        cursor.close()
-        connection.close()
-
-@app.route('/api/apply-recurring/<int:year>/<int:month>')
-@login_required
-def apply_recurring_transactions(year, month):
-    """Apply recurring transactions for a specific month."""
-    connection = get_db_connection()
-    if not connection:
-        return jsonify({'error': 'Database connection failed'}), 500
-    
-    cursor = connection.cursor(dictionary=True)
-    user_id = session['user_id']
-    
-    try:
-        # Get or create monthly record
-        month_name = calendar.month_name[month]
-        cursor.execute("""
-            INSERT INTO monthly_records (user_id, year, month, month_name)
-            VALUES (%s, %s, %s, %s)
-            ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP
-        """, (user_id, year, month, month_name))
-        
-        cursor.execute("""
-            SELECT id FROM monthly_records 
-            WHERE user_id = %s AND year = %s AND month = %s
-        """, (user_id, year, month))
-        
-        monthly_record = cursor.fetchone()
-        
-        # Get active recurring transactions
-        cursor.execute("""
-            SELECT * FROM recurring_transactions
-            WHERE user_id = %s AND is_active = TRUE
-        """, (user_id,))
-        
-        recurring = cursor.fetchall()
-        
-        applied_count = 0
-        for rec in recurring:
-            # Check date range
-            start_date = rec['start_date']
-            end_date = rec['end_date']
-            current_date = datetime(year, month, rec['day_of_month'] or 1)
-            
-            if start_date and current_date.date() < start_date:
-                continue
-            if end_date and current_date.date() > end_date:
-                continue
-            
-            # Check if already exists
-            cursor.execute("""
-                SELECT id FROM transactions
-                WHERE monthly_record_id = %s AND description = %s
-            """, (monthly_record['id'], rec['description']))
-            
-            if not cursor.fetchone():
-                # Apply transaction
-                if rec['type'] == 'debit':
-                    debit = rec['amount']
-                    credit = None
-                else:
-                    debit = None
-                    credit = rec['amount']
-                
-                cursor.execute("""
-                    INSERT INTO transactions 
-                    (monthly_record_id, description, category_id, debit, credit, transaction_date)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                """, (
-                    monthly_record['id'],
-                    rec['description'],
-                    rec['category_id'],
-                    debit,
-                    credit,
-                    current_date
-                ))
-                
-                applied_count += 1
-        
-        connection.commit()
-        return jsonify({'message': f'Applied {applied_count} recurring transactions'})
-        
-    except Error as e:
-        return jsonify({'error': str(e)}), 500
-    finally:
-        cursor.close()
-        connection.close()
 
 @app.route('/api/reports/monthly-summary')
 @login_required
@@ -707,6 +677,371 @@ def budget():
             return jsonify({'message': 'Budget updated successfully'}), 201
             
     except Error as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+@app.route('/api/payment-methods', methods=['GET', 'POST'])
+@login_required
+def payment_methods():
+    """Get or create payment methods."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor(dictionary=True)
+    user_id = session['user_id']
+
+    try:
+        if request.method == 'GET':
+            cursor.execute("""
+                SELECT * FROM payment_methods
+                WHERE user_id = %s AND is_active = TRUE
+                ORDER BY type, name
+            """, (user_id,))
+
+            methods = cursor.fetchall()
+            return jsonify(methods)
+
+        else:  # POST
+            data = request.get_json()
+            cursor.execute("""
+                INSERT INTO payment_methods (user_id, name, type, color)
+                VALUES (%s, %s, %s, %s)
+            """, (
+                user_id,
+                data.get('name'),
+                data.get('type', 'credit_card'),
+                data.get('color', '#007bff')
+            ))
+
+            connection.commit()
+            return jsonify({'message': 'Payment method added successfully', 'id': cursor.lastrowid}), 201
+
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+@app.route('/api/payment-methods/<int:method_id>', methods=['DELETE'])
+@login_required
+def delete_payment_method(method_id):
+    """Delete a payment method."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor()
+
+    try:
+        cursor.execute("""
+            UPDATE payment_methods
+            SET is_active = FALSE
+            WHERE id = %s AND user_id = %s
+        """, (method_id, session['user_id']))
+
+        connection.commit()
+        return jsonify({'message': 'Payment method deleted successfully'})
+
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+@app.route('/api/transactions/<int:transaction_id>/mark-done', methods=['POST'])
+@login_required
+def mark_transaction_done(transaction_id):
+    """Mark a transaction as done with payment method."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor()
+
+    try:
+        data = request.get_json()
+        payment_method_id = data.get('payment_method_id')
+
+        cursor.execute("""
+            UPDATE transactions
+            SET is_done = TRUE,
+                payment_method_id = %s,
+                marked_done_at = CURRENT_TIMESTAMP
+            WHERE id = %s AND monthly_record_id IN
+                (SELECT id FROM monthly_records WHERE user_id = %s)
+        """, (payment_method_id, transaction_id, session['user_id']))
+
+        connection.commit()
+        return jsonify({'message': 'Transaction marked as done'})
+
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+@app.route('/api/transactions/<int:transaction_id>/mark-undone', methods=['POST'])
+@login_required
+def mark_transaction_undone(transaction_id):
+    """Mark a transaction as not done."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor()
+
+    try:
+        cursor.execute("""
+            UPDATE transactions
+            SET is_done = FALSE,
+                payment_method_id = NULL,
+                marked_done_at = NULL
+            WHERE id = %s AND monthly_record_id IN
+                (SELECT id FROM monthly_records WHERE user_id = %s)
+        """, (transaction_id, session['user_id']))
+
+        connection.commit()
+        return jsonify({'message': 'Transaction marked as not done'})
+
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+@app.route('/api/transactions/<int:transaction_id>/mark-paid', methods=['POST'])
+@login_required
+def mark_transaction_paid(transaction_id):
+    """Mark a transaction as paid (when description cell is clicked)."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor()
+
+    try:
+        data = request.get_json()
+        payment_method_id = data.get('payment_method_id')
+
+        cursor.execute("""
+            UPDATE transactions
+            SET is_done = TRUE,
+                is_paid = TRUE,
+                payment_method_id = %s,
+                marked_done_at = CURRENT_TIMESTAMP,
+                paid_at = CURRENT_TIMESTAMP
+            WHERE id = %s AND monthly_record_id IN
+                (SELECT id FROM monthly_records WHERE user_id = %s)
+        """, (payment_method_id, transaction_id, session['user_id']))
+
+        connection.commit()
+        return jsonify({'message': 'Transaction marked as paid'})
+
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+@app.route('/api/transactions/<int:transaction_id>/mark-unpaid', methods=['POST'])
+@login_required
+def mark_transaction_unpaid(transaction_id):
+    """Unmark a transaction as paid (reverse the paid status)."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor()
+
+    try:
+        cursor.execute("""
+            UPDATE transactions
+            SET is_done = FALSE,
+                is_paid = FALSE,
+                payment_method_id = NULL,
+                marked_done_at = NULL,
+                paid_at = NULL
+            WHERE id = %s AND monthly_record_id IN
+                (SELECT id FROM monthly_records WHERE user_id = %s)
+        """, (transaction_id, session['user_id']))
+
+        connection.commit()
+        return jsonify({'message': 'Transaction marked as unpaid'})
+
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+@app.route('/api/payment-method-totals', methods=['GET'])
+@login_required
+def get_payment_method_totals():
+    """Get totals for each payment method for the current month."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor(dictionary=True)
+    user_id = session['user_id']
+
+    try:
+        year = request.args.get('year', datetime.now().year, type=int)
+        month = request.args.get('month', datetime.now().month, type=int)
+
+        # Get monthly record
+        cursor.execute("""
+            SELECT id FROM monthly_records
+            WHERE user_id = %s AND year = %s AND month = %s
+        """, (user_id, year, month))
+
+        monthly_record = cursor.fetchone()
+
+        if not monthly_record:
+            return jsonify([])
+
+        # Get totals by payment method
+        cursor.execute("""
+            SELECT
+                pm.id,
+                pm.name,
+                pm.type,
+                pm.color,
+                COUNT(t.id) as transaction_count,
+                SUM(t.debit) as total_debit,
+                SUM(t.credit) as total_credit,
+                SUM(COALESCE(t.debit, 0) - COALESCE(t.credit, 0)) as net_amount
+            FROM payment_methods pm
+            LEFT JOIN transactions t ON pm.id = t.payment_method_id
+                AND t.monthly_record_id = %s
+                AND t.is_done = TRUE
+            WHERE pm.user_id = %s AND pm.is_active = TRUE
+            GROUP BY pm.id, pm.name, pm.type, pm.color
+            ORDER BY pm.type, pm.name
+        """, (monthly_record['id'], user_id))
+
+        totals = cursor.fetchall()
+        return jsonify(totals)
+
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+@app.route('/api/clone-month-transactions', methods=['POST'])
+@login_required
+def clone_month_transactions():
+    """Clone all transactions from one month to another."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor(dictionary=True)
+    user_id = session['user_id']
+
+    try:
+        data = request.get_json()
+        from_year = data.get('from_year')
+        from_month = data.get('from_month')
+        to_year = data.get('to_year')
+        to_month = data.get('to_month')
+        include_payments = data.get('include_payments', False)
+
+        # Validate inputs
+        if not all([from_year, from_month, to_year, to_month]):
+            return jsonify({'error': 'All date fields are required'}), 400
+
+        if from_year == to_year and from_month == to_month:
+            return jsonify({'error': 'Source and target months cannot be the same'}), 400
+
+        # Get source monthly record
+        cursor.execute("""
+            SELECT id FROM monthly_records
+            WHERE user_id = %s AND year = %s AND month = %s
+        """, (user_id, from_year, from_month))
+
+        source_record = cursor.fetchone()
+
+        if not source_record:
+            return jsonify({'error': 'Source month has no transactions'}), 404
+
+        # Get or create target monthly record
+        month_name = calendar.month_name[to_month]
+        cursor.execute("""
+            INSERT INTO monthly_records (user_id, year, month, month_name)
+            VALUES (%s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP
+        """, (user_id, to_year, to_month, month_name))
+
+        cursor.execute("""
+            SELECT id FROM monthly_records
+            WHERE user_id = %s AND year = %s AND month = %s
+        """, (user_id, to_year, to_month))
+
+        target_record = cursor.fetchone()
+
+        # Get all transactions from source month
+        cursor.execute("""
+            SELECT description, category_id, debit, credit, notes,
+                   payment_method_id, is_done, is_paid
+            FROM transactions
+            WHERE monthly_record_id = %s
+            ORDER BY id
+        """, (source_record['id'],))
+
+        source_transactions = cursor.fetchall()
+
+        if not source_transactions:
+            return jsonify({'error': 'No transactions found in source month'}), 404
+
+        # Clone transactions
+        cloned_count = 0
+        running_balance = Decimal('0')
+
+        for trans in source_transactions:
+            debit = Decimal(str(trans['debit'])) if trans['debit'] else Decimal('0')
+            credit = Decimal(str(trans['credit'])) if trans['credit'] else Decimal('0')
+            running_balance = running_balance + debit - credit
+
+            # Set payment fields based on checkbox
+            payment_method_id = trans['payment_method_id'] if include_payments else None
+            is_done = trans['is_done'] if include_payments else False
+            is_paid = trans['is_paid'] if include_payments else False
+
+            cursor.execute("""
+                INSERT INTO transactions
+                (monthly_record_id, description, category_id, debit, credit, balance,
+                 transaction_date, notes, payment_method_id, is_done, is_paid)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                target_record['id'],
+                trans['description'],
+                trans['category_id'],
+                debit if debit > 0 else None,
+                credit if credit > 0 else None,
+                running_balance,
+                datetime.now().date(),  # Use current date for cloned transactions
+                trans['notes'],
+                payment_method_id,
+                is_done,
+                is_paid
+            ))
+
+            cloned_count += 1
+
+        connection.commit()
+
+        return jsonify({
+            'message': f'Successfully cloned {cloned_count} transactions',
+            'count': cloned_count
+        }), 200
+
+    except Error as e:
+        connection.rollback()
         return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()

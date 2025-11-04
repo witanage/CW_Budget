@@ -17,73 +17,166 @@
     <!-- Custom CSS -->
     <style>
         :root {
-            --primary-color: #4a90e2;
-            --secondary-color: #2c3e50;
-            --success-color: #27ae60;
-            --danger-color: #e74c3c;
-            --warning-color: #f39c12;
-            --info-color: #3498db;
-            --light-bg: #f8f9fa;
-            --dark-bg: #343a40;
+            --primary-color: #3b82f6;
+            --primary-dark: #2563eb;
+            --secondary-color: #1e293b;
+            --success-color: #10b981;
+            --danger-color: #ef4444;
+            --warning-color: #f59e0b;
+            --info-color: #06b6d4;
         }
-        
+
+        /* Light Theme Variables */
+        [data-theme="light"] {
+            --bg-primary: #f1f5f9;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #e2e8f0;
+            --text-primary: #0f172a;
+            --text-secondary: #64748b;
+            --border-color: #cbd5e1;
+            --sidebar-bg: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+            --sidebar-hover: #f1f5f9;
+            --card-bg: #ffffff;
+            --card-header-bg: linear-gradient(135deg, #f8fafc, #e2e8f0);
+            --table-bg: #ffffff;
+            --table-hover: rgba(59, 130, 246, 0.08);
+            --input-bg: #ffffff;
+            --input-border: #cbd5e1;
+            --modal-bg: #ffffff;
+            --navbar-bg: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+            --accent-gradient: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        /* Dark Theme Variables - Default - True Black */
+        [data-theme="dark"], :root {
+            --bg-primary: #000000;
+            --bg-secondary: #0a0a0a;
+            --bg-tertiary: #1a1a1a;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0a0;
+            --border-color: #2a2a2a;
+            --sidebar-bg: linear-gradient(180deg, #0a0a0a 0%, #000000 100%);
+            --sidebar-hover: #1a1a1a;
+            --card-bg: #0a0a0a;
+            --card-header-bg: linear-gradient(135deg, #1a1a1a, #0a0a0a);
+            --table-bg: #0a0a0a;
+            --table-hover: #1a1a1a;
+            --input-bg: #1a1a1a;
+            --input-border: #2a2a2a;
+            --modal-bg: #0a0a0a;
+            --navbar-bg: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%);
+            --accent-gradient: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            --card-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.8), 0 4px 6px -2px rgba(0, 0, 0, 0.5);
+        }
+
         body {
-            background-color: var(--light-bg);
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            transition: background-color 0.3s, color 0.3s;
         }
-        
+
         .navbar {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            background: var(--navbar-bg);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
         }
-        
+
         .navbar-brand {
             font-weight: bold;
             font-size: 1.5rem;
         }
-        
+
         .sidebar {
             min-height: calc(100vh - 56px);
-            background-color: white;
-            box-shadow: 2px 0 10px rgba(0,0,0,0.05);
+            background: var(--sidebar-bg);
+            box-shadow: 2px 0 20px rgba(0,0,0,0.15);
             padding: 20px 0;
+            border-right: 1px solid var(--border-color);
         }
-        
+
         .sidebar .nav-link {
-            color: var(--secondary-color);
-            padding: 12px 20px;
-            margin: 5px 0;
-            border-radius: 0;
-            transition: all 0.3s;
+            color: var(--text-primary);
+            padding: 14px 24px;
+            margin: 4px 12px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            font-weight: 500;
         }
-        
+
         .sidebar .nav-link:hover {
-            background-color: var(--light-bg);
+            background-color: var(--sidebar-hover);
             color: var(--primary-color);
-            padding-left: 25px;
+            transform: translateX(4px);
         }
-        
+
         .sidebar .nav-link.active {
-            background-color: var(--primary-color);
+            background: var(--accent-gradient);
             color: white;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
         }
-        
+
         .card {
-            border: none;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-            transition: transform 0.3s;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            background-color: var(--card-bg);
+            color: var(--text-primary);
+            box-shadow: var(--card-shadow);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            overflow: hidden;
         }
-        
+
         .card:hover {
-            transform: translateY(-2px);
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
         }
-        
+
+        [data-theme="dark"] .card:hover {
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.7), 0 10px 10px -5px rgba(0, 0, 0, 0.5);
+        }
+
+        .card-header {
+            background: var(--card-header-bg);
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            padding: 16px 20px;
+        }
+
+        .card-body {
+            background-color: var(--card-bg);
+            padding: 20px;
+        }
+
+        /* Compact card for transaction table page */
+        #transactionsPage .card-header {
+            padding: 10px 16px;
+        }
+
+        #transactionsPage .card-body {
+            padding: 12px;
+        }
+
+        /* Reduce margins in transaction page controls */
+        #transactionsPage .row.mb-3 {
+            margin-bottom: 0.75rem !important;
+        }
+
+        #transactionsPage .btn {
+            padding: 6px 12px;
+            font-size: 0.875rem;
+        }
+
+        #transactionsPage .form-select {
+            padding: 6px 10px;
+            font-size: 0.875rem;
+        }
+
         .stat-card {
             position: relative;
             overflow: hidden;
         }
-        
+
         .stat-card::before {
             content: '';
             position: absolute;
@@ -91,58 +184,285 @@
             right: -50px;
             width: 100px;
             height: 100%;
-            background: rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.03);
             transform: skewX(-25deg);
         }
-        
+
+        /* Smaller stat cards */
+        .stat-card .card-body {
+            padding: 12px 16px;
+        }
+
+        .stat-card h6 {
+            font-size: 0.75rem;
+            margin-bottom: 0.3rem !important;
+        }
+
+        .stat-card h3 {
+            font-size: 1.3rem;
+            margin-bottom: 0 !important;
+        }
+
         .stat-icon {
-            font-size: 3rem;
-            opacity: 0.3;
+            font-size: 2rem;
+            opacity: 0.15;
             position: absolute;
-            right: 20px;
-            top: 20px;
+            right: 15px;
+            top: 15px;
+        }
+
+        /* Smaller chart cards */
+        #overviewPage .card-header {
+            padding: 10px 16px;
+        }
+
+        #overviewPage .card-body {
+            padding: 15px;
+        }
+
+        #overviewPage .row.mb-4 {
+            margin-bottom: 1rem !important;
+        }
+
+        #overviewPage .row.mb-3 {
+            margin-bottom: 0.75rem !important;
+        }
+
+        /* Reduce chart height */
+        .chart-container {
+            height: 250px !important;
+        }
+
+        #trendChart {
+            max-height: 250px;
         }
         
-        .btn-gradient {
-            background: linear-gradient(135deg, var(--primary-color), var(--info-color));
-            color: white;
-            border: none;
-            transition: all 0.3s;
+        /* Dark theme buttons */
+        .btn-gradient, .btn-primary, .btn-success, .btn-info, .btn-warning, .btn-danger {
+            background-color: #2a2a2a;
+            border-color: #3a3a3a;
+            color: #ffffff;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .btn-gradient:hover, .btn-primary:hover, .btn-success:hover, .btn-info:hover, .btn-warning:hover, .btn-danger:hover {
+            background-color: #3a3a3a;
+            border-color: #4a4a4a;
+            color: #ffffff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
+        }
+
+        .btn {
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            background-color: #2a2a2a;
+            border-color: #3a3a3a;
+            color: #ffffff;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            background-color: #3a3a3a;
+            border-color: #4a4a4a;
+        }
+
+        .btn-sm {
+            background-color: #2a2a2a;
+            border-color: #3a3a3a;
+            color: #ffffff;
+        }
+
+        .btn-sm:hover {
+            background-color: #3a3a3a;
+            border-color: #4a4a4a;
+            color: #ffffff;
         }
         
-        .btn-gradient:hover {
-            transform: scale(1.05);
-            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
-            color: white;
+        /* Tables */
+        .table {
+            color: var(--text-primary);
         }
-        
+
+        .table-hover tbody tr {
+            background-color: var(--table-bg);
+        }
+
         .table-hover tbody tr:hover {
-            background-color: rgba(74, 144, 226, 0.05);
+            background-color: var(--table-hover);
         }
-        
+
+        .table thead th {
+            border-color: var(--border-color);
+            background-color: var(--card-bg);
+            color: var(--text-primary);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        /* Sticky header for transactions table */
+        #transactionsTable thead th {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background-color: var(--card-bg) !important;
+            box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.4);
+            padding: 8px 6px !important;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        /* Compact transaction table rows */
+        #transactionsTable tbody td {
+            padding: 6px 6px !important;
+            font-size: 0.875rem;
+            vertical-align: middle;
+        }
+
+        /* Smaller buttons in transaction table */
+        #transactionsTable .btn-sm {
+            padding: 2px 6px;
+            font-size: 0.75rem;
+        }
+
+        /* Smaller badges in transaction table */
+        #transactionsTable .badge {
+            padding: 2px 8px;
+            font-size: 0.7rem;
+        }
+
+        /* Smaller checkbox in transaction table */
+        #transactionsTable .form-check-input {
+            width: 16px;
+            height: 16px;
+            margin-top: 0;
+        }
+
+        /* Scrollable table container - increased height for more rows */
+        .table-responsive {
+            max-height: calc(100vh - 280px);
+            overflow-y: auto;
+        }
+
+        /* Ensure transaction page table uses full available height */
+        #transactionsPage .table-responsive {
+            max-height: calc(100vh - 250px);
+        }
+
+        .table td, .table th {
+            border-color: var(--border-color);
+        }
+
+        /* Transaction highlighting - Dark theme friendly */
+        [data-theme="dark"] .transaction-highlighted td {
+            filter: brightness(1.3) !important;
+        }
+
+        [data-theme="light"] .transaction-highlighted td {
+            filter: brightness(0.95) !important;
+        }
+
+        /* Better text colors for dark theme */
+        [data-theme="dark"] .table .text-success {
+            color: #4ade80 !important;
+        }
+
+        [data-theme="dark"] .table .text-danger {
+            color: #f87171 !important;
+        }
+
+        [data-theme="dark"] .table .fw-bold {
+            color: #fbbf24 !important;
+        }
+
         .badge {
             padding: 5px 10px;
             border-radius: 20px;
         }
-        
+
         .income-badge {
             background-color: var(--success-color);
         }
-        
+
         .expense-badge {
             background-color: var(--danger-color);
         }
-        
-        .form-control:focus, .form-select:focus {
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 0.2rem rgba(74, 144, 226, 0.25);
+
+        /* Forms */
+        .form-control, .form-select {
+            background-color: var(--input-bg);
+            border: 1px solid var(--input-border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            padding: 10px 14px;
+            transition: all 0.3s ease;
         }
-        
+
+        .form-control:focus, .form-select:focus {
+            background-color: var(--input-bg);
+            border-color: var(--primary-color);
+            color: var(--text-primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            outline: none;
+        }
+
+        .form-label {
+            color: var(--text-primary);
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        textarea.form-control {
+            background-color: var(--input-bg);
+            color: var(--text-primary);
+        }
+
+        /* Modals */
+        .modal-content {
+            background-color: var(--modal-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            box-shadow: var(--card-shadow);
+        }
+
+        .modal-header {
+            background: var(--card-header-bg);
+            border-bottom: 1px solid var(--border-color);
+            border-radius: 16px 16px 0 0;
+            padding: 20px 24px;
+        }
+
+        .modal-footer {
+            background: var(--card-header-bg);
+            border-top: 1px solid var(--border-color);
+            border-radius: 0 0 16px 16px;
+            padding: 16px 24px;
+        }
+
+        .modal-body {
+            padding: 24px;
+        }
+
+        .modal-title {
+            font-weight: 600;
+            font-size: 1.25rem;
+        }
+
+        [data-theme="dark"] .btn-close {
+            filter: invert(1);
+        }
+
         .progress {
             height: 25px;
             border-radius: 15px;
+            background-color: var(--bg-tertiary);
         }
-        
+
         .progress-bar {
             font-size: 0.9rem;
             font-weight: bold;
@@ -179,6 +499,145 @@
             right: 20px;
             z-index: 9999;
         }
+
+        /* Transaction row highlighting for payment methods */
+        .transaction-highlighted {
+            font-weight: 500;
+        }
+
+        .transaction-highlighted td {
+            border-color: rgba(0,0,0,0.1) !important;
+        }
+
+        .transaction-highlighted:hover td {
+            filter: brightness(0.95) !important;
+        }
+
+        /* List Groups */
+        .list-group-item {
+            background-color: var(--card-bg);
+            border-color: var(--border-color);
+            color: var(--text-primary);
+        }
+
+        .list-group-item:hover {
+            background-color: var(--table-hover);
+        }
+
+        .list-group-item-action:hover {
+            background-color: var(--table-hover);
+            color: var(--primary-color);
+        }
+
+        /* Alerts */
+        [data-theme="light"] .alert-info {
+            background-color: #d1ecf1;
+            border-color: #bee5eb;
+            color: #0c5460;
+        }
+
+        [data-theme="dark"] .alert-info {
+            background-color: #1a3a42;
+            border-color: var(--primary-color);
+            color: var(--text-primary);
+        }
+
+        [data-theme="light"] .alert-warning {
+            background-color: #fff3cd;
+            border-color: #ffeaa7;
+            color: #856404;
+        }
+
+        [data-theme="dark"] .alert-warning {
+            background-color: #3d2800;
+            border-color: var(--warning-color);
+            color: var(--text-primary);
+        }
+
+        [data-theme="light"] .alert-danger {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+
+        [data-theme="dark"] .alert-danger {
+            background-color: #3d0800;
+            border-color: var(--danger-color);
+            color: var(--text-primary);
+        }
+
+        [data-theme="light"] .alert-success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+
+        [data-theme="dark"] .alert-success {
+            background-color: #0d3d1f;
+            border-color: var(--success-color);
+            color: var(--text-primary);
+        }
+
+        .payment-method-list-item {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .payment-method-list-item:hover {
+            background-color: var(--table-hover);
+            transform: translateX(5px);
+        }
+
+        .payment-method-color-indicator {
+            width: 30px;
+            height: 30px;
+            border-radius: 5px;
+            display: inline-block;
+            margin-right: 10px;
+        }
+
+        .credit-card-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            margin-bottom: 10px;
+            background-color: var(--card-bg);
+            color: var(--text-primary);
+        }
+
+        .credit-card-color {
+            width: 40px;
+            height: 40px;
+            border-radius: 5px;
+            margin-right: 15px;
+        }
+
+        /* Dropdown */
+        .dropdown-menu {
+            background-color: var(--card-bg);
+            border-color: var(--border-color);
+        }
+
+        .dropdown-item {
+            color: var(--text-primary);
+        }
+
+        .dropdown-item:hover {
+            background-color: var(--table-hover);
+            color: var(--primary-color);
+        }
+
+        /* Theme Toggle Icon */
+        .theme-toggle-icon {
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+
+        .theme-toggle-icon:hover {
+            transform: rotate(20deg);
+        }
     </style>
     
     {% block extra_css %}{% endblock %}
@@ -202,6 +661,11 @@
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end">
                             <li><a class="dropdown-item" href="{{ url_for('dashboard') }}"><i class="fas fa-tachometer-alt me-2"></i>Dashboard</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" id="themeToggle" onclick="toggleTheme(); return false;">
+                                <i class="fas fa-moon me-2 theme-toggle-icon" id="themeIcon"></i>
+                                <span id="themeText">Light Theme</span>
+                            </a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
                         </ul>
@@ -286,6 +750,51 @@
             const options = { year: 'numeric', month: 'short', day: 'numeric' };
             return new Date(dateString).toLocaleDateString('en-US', options);
         }
+
+        // Theme Toggle Functions
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+
+            // Set theme
+            document.documentElement.setAttribute('data-theme', newTheme);
+
+            // Save to localStorage
+            localStorage.setItem('theme', newTheme);
+
+            // Update button
+            updateThemeButton(newTheme);
+
+            // Show toast
+            showToast(`Switched to ${newTheme} theme`, 'success');
+        }
+
+        function updateThemeButton(theme) {
+            const themeIcon = document.getElementById('themeIcon');
+            const themeText = document.getElementById('themeText');
+
+            if (theme === 'dark') {
+                themeIcon.className = 'fas fa-sun me-2 theme-toggle-icon';
+                themeText.textContent = 'Light Theme';
+            } else {
+                themeIcon.className = 'fas fa-moon me-2 theme-toggle-icon';
+                themeText.textContent = 'Dark Theme';
+            }
+        }
+
+        // Initialize theme on page load
+        (function initTheme() {
+            // Check for saved theme preference or default to 'dark'
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+
+            // Set the theme
+            document.documentElement.setAttribute('data-theme', savedTheme);
+
+            // Update button if it exists
+            if (document.getElementById('themeIcon')) {
+                updateThemeButton(savedTheme);
+            }
+        })();
     </script>
     
     {% block extra_js %}{% endblock %}
