@@ -150,6 +150,17 @@ function setupFormButtons() {
         nextMonthBtn.addEventListener('click', navigateToNextMonth);
     }
 
+    // Auto-load transactions when month or year changes
+    const monthSelect = document.getElementById('monthSelect');
+    if (monthSelect) {
+        monthSelect.addEventListener('change', loadTransactions);
+    }
+
+    const yearSelect = document.getElementById('yearSelect');
+    if (yearSelect) {
+        yearSelect.addEventListener('change', loadTransactions);
+    }
+
     const viewPaymentTotalsBtn = document.getElementById('viewPaymentTotalsBtn');
     if (viewPaymentTotalsBtn) {
         viewPaymentTotalsBtn.addEventListener('click', loadPaymentTotals);
