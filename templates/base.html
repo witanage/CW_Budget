@@ -486,17 +486,64 @@
             filter: brightness(0.95) !important;
         }
 
-        /* Better text colors for dark theme */
-        [data-theme="dark"] .table .text-success {
-            color: #4ade80 !important;
+        /* Dark theme: Black background with light theme text colors for transaction table */
+        [data-theme="dark"] #transactionsTable {
+            background-color: #000000;
         }
 
-        [data-theme="dark"] .table .text-danger {
-            color: #f87171 !important;
+        [data-theme="dark"] #transactionsTable thead th {
+            background-color: #000000 !important;
+            color: #1c1e21 !important;
         }
 
-        [data-theme="dark"] .table .fw-bold {
-            color: #fbbf24 !important;
+        [data-theme="dark"] #transactionsTable tbody tr {
+            background-color: #000000;
+        }
+
+        [data-theme="dark"] #transactionsTable tbody td {
+            background-color: #000000;
+            color: #1c1e21 !important;
+        }
+
+        [data-theme="dark"] #transactionsTable .text-success {
+            color: #28a745 !important;
+        }
+
+        [data-theme="dark"] #transactionsTable .text-danger {
+            color: #dc3545 !important;
+        }
+
+        [data-theme="dark"] #transactionsTable .fw-bold {
+            color: #856404 !important;
+        }
+
+        [data-theme="dark"] #transactionsTable .badge {
+            color: #1c1e21 !important;
+        }
+
+        /* Dark theme: Keep table hover with black background */
+        [data-theme="dark"] #transactionsTable tbody tr:hover {
+            background-color: #0a0a0a !important;
+        }
+
+        [data-theme="dark"] #transactionsTable tbody tr:hover td {
+            background-color: #0a0a0a !important;
+        }
+
+        /* Dark theme: Table wrapper background */
+        [data-theme="dark"] #transactionsPage .table-responsive {
+            background-color: #000000;
+        }
+
+        /* Dark theme: Buttons in transaction table */
+        [data-theme="dark"] #transactionsTable .btn-sm {
+            background-color: #f8f9fa;
+            color: #1c1e21;
+            border-color: #dee2e6;
+        }
+
+        [data-theme="dark"] #transactionsTable .btn-sm:hover {
+            background-color: #e9ecef;
         }
 
         .badge {
