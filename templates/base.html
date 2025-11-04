@@ -516,6 +516,22 @@
             border-color: #21262d !important;
         }
 
+        /* Dark theme: ID, Description, Notes columns with light background and black text */
+        [data-theme="dark"] #transactionsTable tbody td:nth-child(2),
+        [data-theme="dark"] #transactionsTable tbody td:nth-child(3),
+        [data-theme="dark"] #transactionsTable tbody td:nth-child(8) {
+            background-color: #f0f0f0 !important;
+            color: #000000 !important;
+        }
+
+        /* Dark theme: ID, Description, Notes header columns */
+        [data-theme="dark"] #transactionsTable thead th:nth-child(2),
+        [data-theme="dark"] #transactionsTable thead th:nth-child(3),
+        [data-theme="dark"] #transactionsTable thead th:nth-child(8) {
+            background: #e0e0e0 !important;
+            color: #000000 !important;
+        }
+
         /* Dark theme: Credit amounts in green */
         [data-theme="dark"] #transactionsTable .text-success {
             color: #3fb950 !important;
@@ -539,14 +555,21 @@
             color: #ffffff !important;
         }
 
-        /* Dark theme: Hover effect with blue tint */
+        /* Dark theme: Hover effect with lighter blue tint */
         [data-theme="dark"] #transactionsTable tbody tr:hover {
-            background-color: #1c2128 !important;
+            background-color: #2d333b !important;
         }
 
         [data-theme="dark"] #transactionsTable tbody tr:hover td {
-            background-color: #1c2128 !important;
+            background-color: #2d333b !important;
             border-color: #30363d !important;
+        }
+
+        /* Dark theme: Keep light background on ID, Description, Notes columns even on hover */
+        [data-theme="dark"] #transactionsTable tbody tr:hover td:nth-child(2),
+        [data-theme="dark"] #transactionsTable tbody tr:hover td:nth-child(3),
+        [data-theme="dark"] #transactionsTable tbody tr:hover td:nth-child(8) {
+            background-color: #e8e8e8 !important;
         }
 
         /* Dark theme: Table wrapper background */
@@ -586,6 +609,14 @@
 
         [data-theme="dark"] .transaction-highlighted td {
             color: #c9d1d9 !important;
+        }
+
+        /* Dark theme: Keep light background on ID, Description, Notes even on highlighted rows */
+        [data-theme="dark"] .transaction-highlighted td:nth-child(2),
+        [data-theme="dark"] .transaction-highlighted td:nth-child(3),
+        [data-theme="dark"] .transaction-highlighted td:nth-child(8) {
+            background-color: #f0f0f0 !important;
+            color: #000000 !important;
         }
 
         [data-theme="dark"] .transaction-highlighted .badge,
