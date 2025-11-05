@@ -12,213 +12,217 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
-        /* Mobile uses same theme system */
-        :root {
-            --bg-primary: #1a1a1a;
-            --bg-secondary: #2d2d2d;
-            --bg-tertiary: #3d3d3d;
-            --text-primary: #ffffff;
-            --text-secondary: #cccccc;
-            --border-color: #555555;
-            --accent-color: #007acc;
-            --success-color: #28a745;
-            --warning-color: #ffc107;
-            --danger-color: #dc3545;
-            --shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-            --radius: 8px;
+        * {
+            box-sizing: border-box;
         }
 
         body {
-            background-color: var(--bg-primary);
-            color: var(--text-primary);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            padding: 0;
             margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #ffffff;
             overflow: hidden;
         }
 
         .mobile-header {
-            background: linear-gradient(135deg, var(--bg-tertiary) 0%, var(--bg-secondary) 100%);
-            padding: 15px;
+            background: linear-gradient(135deg, #0866ff 0%, #0645b8 100%);
+            padding: 12px 15px;
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
             z-index: 100;
-            box-shadow: var(--shadow);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         .mobile-header h1 {
-            font-size: 1.2rem;
+            font-size: 1.1rem;
             margin: 0;
             font-weight: 600;
+            color: white;
+        }
+
+        .btn-back {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
         }
 
         .mobile-content {
-            margin-top: 120px;
-            height: calc(100vh - 180px);
-            overflow-y: auto;
-            padding: 10px;
+            margin-top: 50px;
+            height: calc(100vh - 50px);
+            overflow: auto;
+            -webkit-overflow-scrolling: touch;
         }
 
-        .add-btn-container {
-            position: fixed;
-            top: 60px;
-            left: 0;
-            right: 0;
-            padding: 10px 15px;
-            background: var(--bg-primary);
-            z-index: 99;
-        }
-
-        .btn-add {
+        /* Excel-like table */
+        .excel-table {
             width: 100%;
-            background: var(--accent-color);
-            border: none;
-            color: white;
-            padding: 12px;
+            border-collapse: collapse;
+            font-size: 0.75rem;
+            background: white;
+        }
+
+        .excel-table thead {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: #f8f9fa;
+        }
+
+        .excel-table th {
+            padding: 6px 4px;
+            border: 1px solid #dee2e6;
             font-weight: 600;
-            border-radius: var(--radius);
-            transition: all 0.3s ease;
+            text-align: left;
+            background: #e9ecef;
+            white-space: nowrap;
+            font-size: 0.7rem;
         }
 
-        .btn-add:hover {
-            filter: brightness(1.1);
+        .excel-table td {
+            padding: 4px 4px;
+            border: 1px solid #dee2e6;
+            vertical-align: middle;
+            font-size: 0.7rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 150px;
         }
 
-        .transaction-card {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 12px;
-            margin-bottom: 10px;
+        .excel-table tbody tr:nth-child(even) {
+            background-color: #f8f9fa;
         }
 
-        .transaction-desc {
-            font-weight: 600;
-            font-size: 1rem;
-            margin-bottom: 8px;
+        .excel-table tbody tr:hover {
+            background-color: #e7f3ff;
+        }
+
+        /* Column widths */
+        .col-desc {
+            min-width: 120px;
+            max-width: 180px;
+            white-space: normal;
             word-wrap: break-word;
         }
 
-        .transaction-amounts {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 10px;
-            font-size: 0.9rem;
+        .col-debit, .col-credit, .col-balance {
+            text-align: right;
+            min-width: 70px;
         }
 
-        .amount-item {
-            text-align: center;
-        }
-
-        .amount-label {
-            color: var(--text-secondary);
-            font-size: 0.75rem;
-            display: block;
-            margin-bottom: 4px;
-        }
-
-        .amount-value {
+        .text-debit {
+            color: #28a745;
             font-weight: 600;
         }
 
-        .amount-debit {
-            color: #4ade80;
+        .text-credit {
+            color: #dc3545;
+            font-weight: 600;
         }
 
-        .amount-credit {
-            color: #f87171;
+        .text-balance {
+            color: #0866ff;
+            font-weight: 600;
         }
 
-        .amount-balance {
-            color: #fbbf24;
+        .add-btn-float {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: #0866ff;
+            color: white;
+            border: none;
+            box-shadow: 0 4px 12px rgba(8, 102, 255, 0.4);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
         }
 
-        /* Modal styles */
-        .modal-content {
-            background-color: var(--bg-secondary);
-            color: var(--text-primary);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius);
-        }
-
-        .modal-header {
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .modal-footer {
-            border-top: 1px solid var(--border-color);
-        }
-
-        .form-control, .form-select {
-            background-color: var(--bg-tertiary);
-            border: 1px solid var(--border-color);
-            color: var(--text-primary);
-            border-radius: var(--radius);
-        }
-
-        .form-control:focus, .form-select:focus {
-            background-color: var(--bg-tertiary);
-            border-color: var(--accent-color);
-            color: var(--text-primary);
-            box-shadow: 0 0 0 3px rgba(0, 122, 204, 0.2);
-        }
-
-        .form-label {
-            color: var(--text-primary);
-        }
-
-        .btn-close {
-            filter: invert(1);
-        }
-
-        .btn-secondary {
-            background-color: var(--bg-tertiary);
-            border-color: var(--border-color);
-        }
-
-        .btn-secondary:hover {
-            background-color: var(--bg-quaternary);
-        }
-
-        .btn-primary {
-            background-color: var(--accent-color);
-            border-color: var(--accent-color);
-        }
-
-        .btn-primary:hover {
-            filter: brightness(1.1);
+        .add-btn-float:active {
+            transform: scale(0.95);
         }
 
         .no-transactions {
             text-align: center;
-            padding: 40px 20px;
-            color: var(--text-secondary);
+            padding: 60px 20px;
+            color: #6c757d;
+        }
+
+        /* Modal styles */
+        .modal-content {
+            border-radius: 12px;
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, #0866ff 0%, #0645b8 100%);
+            color: white;
+            border-radius: 12px 12px 0 0;
+        }
+
+        .modal-header .btn-close {
+            filter: brightness(0) invert(1);
+        }
+
+        .form-control:focus, .form-select:focus {
+            border-color: #0866ff;
+            box-shadow: 0 0 0 3px rgba(8, 102, 255, 0.1);
         }
     </style>
 </head>
 <body>
     <!-- Header -->
     <div class="mobile-header">
-        <h1><i class="fas fa-wallet me-2"></i>Transactions</h1>
-        <div class="text-secondary" style="font-size: 0.85rem;">{{ username }}</div>
+        <h1><i class="fas fa-table me-2"></i>Transactions</h1>
+        <a href="/dashboard" class="btn-back">
+            <i class="fas fa-desktop"></i>Desktop
+        </a>
     </div>
 
-    <!-- Add Transaction Button -->
-    <div class="add-btn-container">
-        <button class="btn btn-add" data-bs-toggle="modal" data-bs-target="#transactionModal">
-            <i class="fas fa-plus me-2"></i>Add Transaction
-        </button>
+    <!-- Excel-like Table View -->
+    <div class="mobile-content">
+        <table class="excel-table" id="transactionsTable">
+            <thead>
+                <tr>
+                    <th class="col-desc">Description</th>
+                    <th class="col-debit">Debit</th>
+                    <th class="col-credit">Credit</th>
+                    <th class="col-balance">Balance</th>
+                </tr>
+            </thead>
+            <tbody id="transactionsList">
+                <tr>
+                    <td colspan="4">
+                        <div class="no-transactions">
+                            <i class="fas fa-receipt fa-3x mb-3"></i>
+                            <p>No transactions yet</p>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 
-    <!-- Transactions List -->
-    <div class="mobile-content" id="transactionsList">
-        <div class="no-transactions">
-            <i class="fas fa-receipt fa-3x mb-3"></i>
-            <p>No transactions yet</p>
-        </div>
-    </div>
+    <!-- Floating Add Button -->
+    <button class="add-btn-float" data-bs-toggle="modal" data-bs-target="#transactionModal">
+        <i class="fas fa-plus"></i>
+    </button>
 
     <!-- Add Transaction Modal -->
     <div class="modal fade" id="transactionModal" tabindex="-1">
@@ -269,14 +273,11 @@
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- jQuery -->
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-
     <script>
         // Format currency
         function formatCurrency(amount) {
-            if (amount == null || isNaN(amount)) return 'LKR 0.00';
-            return 'LKR ' + parseFloat(amount).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
+            if (amount == null || isNaN(amount)) return '0.00';
+            return parseFloat(amount).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
         }
 
         // Load categories
@@ -308,40 +309,32 @@
 
         // Display transactions
         function displayTransactions(transactions) {
-            const container = document.getElementById('transactionsList');
+            const tbody = document.getElementById('transactionsList');
 
             if (!transactions || transactions.length === 0) {
-                container.innerHTML = `
-                    <div class="no-transactions">
-                        <i class="fas fa-receipt fa-3x mb-3"></i>
-                        <p>No transactions yet</p>
-                    </div>
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4">
+                            <div class="no-transactions">
+                                <i class="fas fa-receipt fa-3x mb-3"></i>
+                                <p>No transactions yet</p>
+                            </div>
+                        </td>
+                    </tr>
                 `;
                 return;
             }
 
-            container.innerHTML = '';
+            tbody.innerHTML = '';
             transactions.forEach(t => {
-                const card = document.createElement('div');
-                card.className = 'transaction-card';
-                card.innerHTML = `
-                    <div class="transaction-desc">${t.description}</div>
-                    <div class="transaction-amounts">
-                        <div class="amount-item">
-                            <span class="amount-label">Debit</span>
-                            <div class="amount-value amount-debit">${t.debit ? formatCurrency(t.debit) : '-'}</div>
-                        </div>
-                        <div class="amount-item">
-                            <span class="amount-label">Credit</span>
-                            <div class="amount-value amount-credit">${t.credit ? formatCurrency(t.credit) : '-'}</div>
-                        </div>
-                        <div class="amount-item">
-                            <span class="amount-label">Balance</span>
-                            <div class="amount-value amount-balance">${formatCurrency(t.balance)}</div>
-                        </div>
-                    </div>
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="col-desc">${t.description || ''}</td>
+                    <td class="col-debit text-debit">${t.debit ? formatCurrency(t.debit) : '-'}</td>
+                    <td class="col-credit text-credit">${t.credit ? formatCurrency(t.credit) : '-'}</td>
+                    <td class="col-balance text-balance">${formatCurrency(t.balance)}</td>
                 `;
-                container.appendChild(card);
+                tbody.appendChild(row);
             });
         }
 
