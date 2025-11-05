@@ -12,211 +12,466 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
-        /* Mobile uses same theme system */
-        :root {
-            --bg-primary: #1a1a1a;
-            --bg-secondary: #2d2d2d;
-            --bg-tertiary: #3d3d3d;
-            --text-primary: #ffffff;
-            --text-secondary: #cccccc;
-            --border-color: #555555;
-            --accent-color: #007acc;
-            --success-color: #28a745;
-            --warning-color: #ffc107;
-            --danger-color: #dc3545;
-            --shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-            --radius: 8px;
+        * {
+            box-sizing: border-box;
         }
 
         body {
-            background-color: var(--bg-primary);
-            color: var(--text-primary);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            padding: 0;
             margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0d1117;
             overflow: hidden;
         }
 
         .mobile-header {
-            background: linear-gradient(135deg, var(--bg-tertiary) 0%, var(--bg-secondary) 100%);
-            padding: 15px;
+            background: linear-gradient(135deg, #3d3d3d 0%, #2d2d2d 100%);
+            padding: 8px 10px;
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
             z-index: 100;
-            box-shadow: var(--shadow);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
         }
 
         .mobile-header h1 {
-            font-size: 1.2rem;
+            font-size: 1rem;
             margin: 0;
             font-weight: 600;
+            color: #ffffff;
         }
 
-        .mobile-content {
-            margin-top: 120px;
-            height: calc(100vh - 180px);
-            overflow-y: auto;
-            padding: 10px;
+        .header-buttons {
+            display: flex;
+            gap: 6px;
+            align-items: center;
         }
 
-        .add-btn-container {
-            position: fixed;
-            top: 60px;
-            left: 0;
-            right: 0;
-            padding: 10px 15px;
-            background: var(--bg-primary);
-            z-index: 99;
-        }
-
-        .btn-add {
-            width: 100%;
-            background: var(--accent-color);
+        .btn-back {
+            background: rgba(255,255,255,0.1);
             border: none;
-            color: white;
-            padding: 12px;
+            color: #ffffff;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* User dropdown for mobile */
+        .mobile-user-dropdown {
+            position: relative;
+        }
+
+        .mobile-user-btn {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: #ffffff;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .mobile-dropdown-menu {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: #2d2d2d;
+            border: 1px solid #555555;
+            border-radius: 6px;
+            min-width: 180px;
+            margin-top: 4px;
+            display: none;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+
+        .mobile-dropdown-menu.show {
+            display: block;
+        }
+
+        .mobile-dropdown-item {
+            padding: 8px 12px;
+            color: #ffffff;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.8rem;
+            border-bottom: 1px solid #3d3d3d;
+            cursor: pointer;
+        }
+
+        .mobile-dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .mobile-dropdown-item:hover {
+            background: #3d3d3d;
+        }
+
+        .mobile-dropdown-divider {
+            height: 1px;
+            background: #3d3d3d;
+            margin: 0;
+        }
+
+        .month-nav {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            justify-content: center;
+        }
+
+        .month-nav button, .action-btn {
+            background: #3d3d3d;
+            border: 1px solid #555555;
+            color: #ffffff;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            cursor: pointer;
+        }
+
+        .month-nav button:active, .action-btn:active {
+            background: #4d4d4d;
+        }
+
+        .month-display {
+            color: #ffffff;
+            font-size: 0.8rem;
             font-weight: 600;
-            border-radius: var(--radius);
-            transition: all 0.3s ease;
-        }
-
-        .btn-add:hover {
-            filter: brightness(1.1);
-        }
-
-        .transaction-card {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 12px;
-            margin-bottom: 10px;
-        }
-
-        .transaction-desc {
-            font-weight: 600;
-            font-size: 1rem;
-            margin-bottom: 8px;
-            word-wrap: break-word;
-        }
-
-        .transaction-amounts {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 10px;
-            font-size: 0.9rem;
-        }
-
-        .amount-item {
+            min-width: 100px;
             text-align: center;
         }
 
-        .amount-label {
-            color: var(--text-secondary);
+        .action-buttons {
+            display: flex;
+            gap: 4px;
+        }
+
+        .mobile-content {
+            margin-top: 85px;
+            height: calc(100vh - 85px);
+            overflow: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* Excel-like table - Dark theme */
+        .excel-table {
+            width: 100%;
+            border-collapse: collapse;
             font-size: 0.75rem;
-            display: block;
-            margin-bottom: 4px;
+            background: #161b22;
         }
 
-        .amount-value {
+        .excel-table thead {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: #0d1117;
+        }
+
+        .excel-table th {
+            padding: 6px 4px;
+            border: 1px solid #30363d;
             font-weight: 600;
+            text-align: left;
+            background: #161b22;
+            color: #58a6ff;
+            white-space: nowrap;
+            font-size: 0.7rem;
         }
 
-        .amount-debit {
-            color: #4ade80;
+        .excel-table td {
+            padding: 4px 4px;
+            border: 1px solid #21262d;
+            vertical-align: middle;
+            font-size: 0.7rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 150px;
+            color: #000000;
         }
 
-        .amount-credit {
-            color: #f87171;
+        .excel-table tbody tr:nth-child(even) {
+            background-color: #0d1117;
         }
 
-        .amount-balance {
-            color: #fbbf24;
+        .excel-table tbody tr:nth-child(odd) {
+            background-color: #161b22;
         }
 
-        /* Modal styles */
-        .modal-content {
-            background-color: var(--bg-secondary);
-            color: var(--text-primary);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius);
+        .excel-table tbody tr:hover {
+            background-color: #1c2128;
         }
 
-        .modal-header {
-            border-bottom: 1px solid var(--border-color);
+        /* Column widths */
+        .col-desc {
+            min-width: 120px;
+            max-width: 180px;
+            white-space: normal;
+            word-wrap: break-word;
         }
 
-        .modal-footer {
-            border-top: 1px solid var(--border-color);
+        .col-debit, .col-credit, .col-balance {
+            text-align: right;
+            min-width: 70px;
         }
 
-        .form-control, .form-select {
-            background-color: var(--bg-tertiary);
-            border: 1px solid var(--border-color);
-            color: var(--text-primary);
-            border-radius: var(--radius);
+        /* Override text colors to black for table */
+        .excel-table .text-success,
+        .excel-table .text-danger,
+        .excel-table .fw-bold {
+            color: #000000 !important;
+            font-weight: normal !important;
         }
 
-        .form-control:focus, .form-select:focus {
-            background-color: var(--bg-tertiary);
-            border-color: var(--accent-color);
-            color: var(--text-primary);
-            box-shadow: 0 0 0 3px rgba(0, 122, 204, 0.2);
+        .add-btn-float {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: rgba(31, 111, 235, 0.7);
+            color: white;
+            border: none;
+            box-shadow: 0 4px 12px rgba(31, 111, 235, 0.3);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            backdrop-filter: blur(10px);
         }
 
-        .form-label {
-            color: var(--text-primary);
+        .add-btn-float:active {
+            transform: scale(0.95);
+            background: rgba(31, 111, 235, 0.9);
         }
 
-        .btn-close {
-            filter: invert(1);
-        }
-
-        .btn-secondary {
-            background-color: var(--bg-tertiary);
-            border-color: var(--border-color);
-        }
-
-        .btn-secondary:hover {
-            background-color: var(--bg-quaternary);
-        }
-
-        .btn-primary {
-            background-color: var(--accent-color);
-            border-color: var(--accent-color);
-        }
-
-        .btn-primary:hover {
-            filter: brightness(1.1);
+        /* Payment method highlighting */
+        .transaction-highlighted {
+            /* Payment method color will be set inline */
         }
 
         .no-transactions {
             text-align: center;
-            padding: 40px 20px;
-            color: var(--text-secondary);
+            padding: 60px 20px;
+            color: #8b949e;
+        }
+
+        /* Modal styles - Dark theme */
+        .modal-content {
+            background-color: #2d2d2d;
+            color: #ffffff;
+            border: 1px solid #555555;
+            border-radius: 12px;
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, #3d3d3d 0%, #2d2d2d 100%);
+            color: white;
+            border-bottom: 1px solid #555555;
+            border-radius: 12px 12px 0 0;
+        }
+
+        .modal-footer {
+            border-top: 1px solid #555555;
+        }
+
+        .modal-header .btn-close {
+            filter: brightness(0) invert(1);
+        }
+
+        .form-label {
+            color: #ffffff;
+        }
+
+        .form-control, .form-select {
+            background-color: #3d3d3d;
+            border: 1px solid #555555;
+            color: #ffffff;
+        }
+
+        .form-control:focus, .form-select:focus {
+            background-color: #3d3d3d;
+            border-color: #1f6feb;
+            color: #ffffff;
+            box-shadow: 0 0 0 3px rgba(31, 111, 235, 0.2);
+        }
+
+        .btn-secondary {
+            background-color: #3d3d3d;
+            border-color: #555555;
+        }
+
+        .btn-primary {
+            background-color: #1f6feb;
+            border-color: #1f6feb;
+        }
+
+        /* Payment totals modal specific styles */
+        .payment-totals-table {
+            width: 100%;
+            font-size: 0.8rem;
+        }
+
+        .payment-totals-table td {
+            padding: 8px 4px;
+            border-bottom: 1px solid #555555;
+        }
+
+        .payment-method-color-indicator {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+
+        .payment-method-name {
+            color: #ffffff;
+        }
+
+        .payment-amount {
+            text-align: right;
+            font-weight: 600;
+            color: #58a6ff;
+        }
+
+        /* Loading overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+
+        .loading-overlay.show {
+            display: flex;
+        }
+
+        .loading-spinner {
+            text-align: center;
+            color: #ffffff;
+        }
+
+        .loading-spinner i {
+            font-size: 3rem;
+            margin-bottom: 10px;
         }
     </style>
 </head>
 <body>
     <!-- Header -->
     <div class="mobile-header">
-        <h1><i class="fas fa-wallet me-2"></i>Transactions</h1>
-        <div class="text-secondary" style="font-size: 0.85rem;">{{ username }}</div>
+        <div class="header-top">
+            <h1><i class="fas fa-table me-2"></i>Transactions</h1>
+            <div class="header-buttons">
+                <a href="/dashboard" class="btn-back">
+                    <i class="fas fa-desktop"></i>Desktop
+                </a>
+                <div class="mobile-user-dropdown">
+                    <button class="mobile-user-btn" id="mobileUserBtn">
+                        <i class="fas fa-user-circle"></i>
+                        <i class="fas fa-chevron-down" style="font-size: 0.6rem;"></i>
+                    </button>
+                    <div class="mobile-dropdown-menu" id="mobileUserDropdown">
+                        <a href="/dashboard" class="mobile-dropdown-item">
+                            <i class="fas fa-tachometer-alt"></i>Dashboard
+                        </a>
+                        <div class="mobile-dropdown-divider"></div>
+                        <a href="#" class="mobile-dropdown-item" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
+                            <i class="fas fa-key"></i>Change Password
+                        </a>
+                        <a href="#" class="mobile-dropdown-item" id="mobileThemeToggle">
+                            <i class="fas fa-moon" id="mobileThemeIcon"></i>
+                            <span id="mobileThemeText">Light Theme</span>
+                        </a>
+                        <div class="mobile-dropdown-divider"></div>
+                        <a href="/logout" class="mobile-dropdown-item">
+                            <i class="fas fa-sign-out-alt"></i>Logout
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="month-nav">
+            <button id="prevMonthBtn" onclick="navigateToPreviousMonth()">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <div class="month-display" id="monthDisplay">Loading...</div>
+            <button id="nextMonthBtn" onclick="navigateToNextMonth()">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+            <div class="action-buttons">
+                <button class="action-btn" onclick="refreshTransactions()" title="Refresh">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+                <button class="action-btn" data-bs-toggle="modal" data-bs-target="#paymentTotalsModal" title="Payment Totals">
+                    <i class="fas fa-credit-card"></i>
+                </button>
+            </div>
+        </div>
     </div>
 
-    <!-- Add Transaction Button -->
-    <div class="add-btn-container">
-        <button class="btn btn-add" data-bs-toggle="modal" data-bs-target="#transactionModal">
-            <i class="fas fa-plus me-2"></i>Add Transaction
-        </button>
+    <!-- Excel-like Table View -->
+    <div class="mobile-content">
+        <table class="excel-table" id="transactionsTable">
+            <thead>
+                <tr>
+                    <th class="col-desc">Description</th>
+                    <th class="col-debit">Debit</th>
+                    <th class="col-credit">Credit</th>
+                    <th class="col-balance">Balance</th>
+                </tr>
+            </thead>
+            <tbody id="transactionsList">
+                <tr>
+                    <td colspan="4">
+                        <div class="no-transactions">
+                            <i class="fas fa-receipt fa-3x mb-3"></i>
+                            <p>No transactions yet</p>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 
-    <!-- Transactions List -->
-    <div class="mobile-content" id="transactionsList">
-        <div class="no-transactions">
-            <i class="fas fa-receipt fa-3x mb-3"></i>
-            <p>No transactions yet</p>
+    <!-- Floating Add Button -->
+    <button class="add-btn-float" data-bs-toggle="modal" data-bs-target="#transactionModal">
+        <i class="fas fa-plus"></i>
+    </button>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Loading...</p>
         </div>
     </div>
 
@@ -266,17 +521,85 @@
         </div>
     </div>
 
+    <!-- Payment Totals Modal -->
+    <div class="modal fade" id="paymentTotalsModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Payment Method Totals</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="paymentTotalsContainer">
+                        <div class="text-center" style="color: #8b949e;">
+                            <i class="fas fa-spinner fa-spin fa-2x mb-3"></i>
+                            <p>Loading...</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Change Password Modal -->
+    <div class="modal fade" id="changePasswordModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Change Password</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="changePasswordForm">
+                        <div class="mb-3">
+                            <label for="currentPassword" class="form-label">Current Password</label>
+                            <input type="password" class="form-control" id="currentPassword" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="newPassword" class="form-label">New Password</label>
+                            <input type="password" class="form-control" id="newPassword" required minlength="6">
+                            <div class="form-text">Password must be at least 6 characters long.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="confirmPassword" class="form-label">Confirm New Password</label>
+                            <input type="password" class="form-control" id="confirmPassword" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="savePasswordBtn">Change Password</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- jQuery -->
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-
     <script>
+        // Loading overlay functions
+        function showLoading() {
+            const overlay = document.getElementById('loadingOverlay');
+            if (overlay) {
+                overlay.classList.add('show');
+            }
+        }
+
+        function hideLoading() {
+            const overlay = document.getElementById('loadingOverlay');
+            if (overlay) {
+                overlay.classList.remove('show');
+            }
+        }
+
         // Format currency
         function formatCurrency(amount) {
-            if (amount == null || isNaN(amount)) return 'LKR 0.00';
-            return 'LKR ' + parseFloat(amount).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
+            if (amount == null || isNaN(amount)) return '0.00';
+            return parseFloat(amount).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
         }
 
         // Load categories
@@ -293,63 +616,111 @@
                 .catch(error => console.error('Error loading categories:', error));
         }
 
+        // Current month and year
+        let currentYear = new Date().getFullYear();
+        let currentMonth = new Date().getMonth() + 1;
+
+        // Month names
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                           'July', 'August', 'September', 'October', 'November', 'December'];
+
+        // Update month display
+        function updateMonthDisplay() {
+            const display = document.getElementById('monthDisplay');
+            display.textContent = `${monthNames[currentMonth - 1]} ${currentYear}`;
+        }
+
+        // Navigate to previous month
+        function navigateToPreviousMonth() {
+            currentMonth--;
+            if (currentMonth < 1) {
+                currentMonth = 12;
+                currentYear--;
+            }
+            updateMonthDisplay();
+            loadTransactions();
+        }
+
+        // Navigate to next month
+        function navigateToNextMonth() {
+            currentMonth++;
+            if (currentMonth > 12) {
+                currentMonth = 1;
+                currentYear++;
+            }
+            updateMonthDisplay();
+            loadTransactions();
+        }
+
         // Load transactions
         function loadTransactions() {
-            const year = new Date().getFullYear();
-            const month = new Date().getMonth() + 1;
-
-            fetch(`/api/transactions?year=${year}&month=${month}`)
+            showLoading();
+            fetch(`/api/transactions?year=${currentYear}&month=${currentMonth}`)
                 .then(response => response.json())
                 .then(data => {
                     displayTransactions(data);
+                    hideLoading();
                 })
-                .catch(error => console.error('Error loading transactions:', error));
+                .catch(error => {
+                    console.error('Error loading transactions:', error);
+                    hideLoading();
+                });
         }
 
         // Display transactions
         function displayTransactions(transactions) {
-            const container = document.getElementById('transactionsList');
+            const tbody = document.getElementById('transactionsList');
 
             if (!transactions || transactions.length === 0) {
-                container.innerHTML = `
-                    <div class="no-transactions">
-                        <i class="fas fa-receipt fa-3x mb-3"></i>
-                        <p>No transactions yet</p>
-                    </div>
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4">
+                            <div class="no-transactions">
+                                <i class="fas fa-receipt fa-3x mb-3"></i>
+                                <p>No transactions yet</p>
+                            </div>
+                        </td>
+                    </tr>
                 `;
                 return;
             }
 
-            container.innerHTML = '';
+            tbody.innerHTML = '';
             transactions.forEach(t => {
-                const card = document.createElement('div');
-                card.className = 'transaction-card';
-                card.innerHTML = `
-                    <div class="transaction-desc">${t.description}</div>
-                    <div class="transaction-amounts">
-                        <div class="amount-item">
-                            <span class="amount-label">Debit</span>
-                            <div class="amount-value amount-debit">${t.debit ? formatCurrency(t.debit) : '-'}</div>
-                        </div>
-                        <div class="amount-item">
-                            <span class="amount-label">Credit</span>
-                            <div class="amount-value amount-credit">${t.credit ? formatCurrency(t.credit) : '-'}</div>
-                        </div>
-                        <div class="amount-item">
-                            <span class="amount-label">Balance</span>
-                            <div class="amount-value amount-balance">${formatCurrency(t.balance)}</div>
-                        </div>
-                    </div>
+                const row = document.createElement('tr');
+
+                // Apply payment method highlight color if present
+                const isDone = t.payment_method_id && t.payment_method_id !== null;
+                if (isDone && t.payment_method_color) {
+                    row.classList.add('transaction-highlighted');
+                }
+
+                row.innerHTML = `
+                    <td class="col-desc">${t.description || ''}</td>
+                    <td class="col-debit text-success">${t.debit ? formatCurrency(t.debit) : '-'}</td>
+                    <td class="col-credit text-danger">${t.credit ? formatCurrency(t.credit) : '-'}</td>
+                    <td class="col-balance fw-bold">${formatCurrency(t.balance)}</td>
                 `;
-                container.appendChild(card);
+
+                // Apply background color to cells if payment method color exists
+                if (isDone && t.payment_method_color) {
+                    const cells = row.querySelectorAll('td');
+                    cells.forEach(cell => {
+                        cell.style.backgroundColor = t.payment_method_color;
+                    });
+                }
+
+                tbody.appendChild(row);
             });
+        }
+
+        // Refresh transactions
+        function refreshTransactions() {
+            loadTransactions();
         }
 
         // Save transaction
         function saveTransaction() {
-            const year = new Date().getFullYear();
-            const month = new Date().getMonth() + 1;
-
             const description = document.getElementById('transDescription').value;
             if (!description || description.trim() === '') {
                 alert('Description is required');
@@ -377,8 +748,8 @@
                 credit: credit,
                 transaction_date: document.getElementById('transDate').value,
                 notes: document.getElementById('transNotes').value,
-                year: parseInt(year),
-                month: parseInt(month)
+                year: parseInt(currentYear),
+                month: parseInt(currentMonth)
             };
 
             fetch('/api/transactions', {
@@ -409,10 +780,93 @@
             });
         }
 
+        // Load payment totals
+        function loadPaymentTotals() {
+            const container = document.getElementById('paymentTotalsContainer');
+            container.innerHTML = '<div class="text-center" style="color: #8b949e;"><i class="fas fa-spinner fa-spin fa-2x mb-3"></i><p>Loading...</p></div>';
+
+            fetch(`/api/payment-method-totals?year=${currentYear}&month=${currentMonth}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (!data || data.length === 0) {
+                        container.innerHTML = '<div class="alert alert-warning">No payment methods found with transactions.</div>';
+                        return;
+                    }
+
+                    let html = '<table class="payment-totals-table"><tbody>';
+                    data.forEach(item => {
+                        html += `
+                            <tr>
+                                <td>
+                                    <span class="payment-method-color-indicator" style="background-color: ${item.color}"></span>
+                                    <span class="payment-method-name">${item.name}</span>
+                                </td>
+                                <td class="payment-amount">${formatCurrency(item.net_amount || 0)}</td>
+                            </tr>
+                        `;
+                    });
+                    html += '</tbody></table>';
+                    container.innerHTML = html;
+                })
+                .catch(error => {
+                    console.error('Error loading payment totals:', error);
+                    container.innerHTML = '<div class="alert alert-danger">Error loading payment totals</div>';
+                });
+        }
+
+        // Toast notification function
+        function showToast(message, type = 'info') {
+            // Create toast element
+            const toast = document.createElement('div');
+            toast.className = 'position-fixed top-0 start-50 translate-middle-x p-3';
+            toast.style.zIndex = '9999';
+            toast.style.marginTop = '20px';
+            toast.innerHTML = `
+                <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+            document.body.appendChild(toast);
+
+            // Remove after 3 seconds
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+
+        // Theme toggle functionality
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+
+            document.documentElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+
+            updateThemeButton(newTheme);
+            showToast(`Switched to ${newTheme} theme`, 'success');
+        }
+
+        function updateThemeButton(theme) {
+            const icon = document.getElementById('mobileThemeIcon');
+            const text = document.getElementById('mobileThemeText');
+
+            if (theme === 'dark') {
+                icon.className = 'fas fa-sun';
+                text.textContent = 'Light Theme';
+            } else {
+                icon.className = 'fas fa-moon';
+                text.textContent = 'Dark Theme';
+            }
+        }
+
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
             // Set today's date
             document.getElementById('transDate').value = new Date().toISOString().split('T')[0];
+
+            // Update month display
+            updateMonthDisplay();
 
             // Load data
             loadCategories();
@@ -420,6 +874,105 @@
 
             // Save button
             document.getElementById('saveTransactionBtn').addEventListener('click', saveTransaction);
+
+            // Load payment totals when modal is shown
+            const paymentTotalsModal = document.getElementById('paymentTotalsModal');
+            if (paymentTotalsModal) {
+                paymentTotalsModal.addEventListener('show.bs.modal', loadPaymentTotals);
+            }
+
+            // User dropdown toggle
+            const userBtn = document.getElementById('mobileUserBtn');
+            const userDropdown = document.getElementById('mobileUserDropdown');
+
+            if (userBtn && userDropdown) {
+                userBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    userDropdown.classList.toggle('show');
+                });
+
+                // Close dropdown when clicking outside
+                document.addEventListener('click', function(e) {
+                    if (!userDropdown.contains(e.target) && !userBtn.contains(e.target)) {
+                        userDropdown.classList.remove('show');
+                    }
+                });
+
+                // Close dropdown when clicking a link
+                userDropdown.querySelectorAll('.mobile-dropdown-item').forEach(item => {
+                    item.addEventListener('click', function() {
+                        userDropdown.classList.remove('show');
+                    });
+                });
+            }
+
+            // Theme toggle button
+            const themeToggle = document.getElementById('mobileThemeToggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    toggleTheme();
+                });
+            }
+
+            // Initialize theme
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            updateThemeButton(savedTheme);
+
+            // Change password functionality
+            const savePasswordBtn = document.getElementById('savePasswordBtn');
+            if (savePasswordBtn) {
+                savePasswordBtn.addEventListener('click', function() {
+                    const currentPassword = document.getElementById('currentPassword').value;
+                    const newPassword = document.getElementById('newPassword').value;
+                    const confirmPassword = document.getElementById('confirmPassword').value;
+
+                    // Validation
+                    if (!currentPassword || !newPassword || !confirmPassword) {
+                        showToast('All fields are required', 'warning');
+                        return;
+                    }
+
+                    if (newPassword.length < 6) {
+                        showToast('New password must be at least 6 characters long', 'warning');
+                        return;
+                    }
+
+                    if (newPassword !== confirmPassword) {
+                        showToast('New passwords do not match', 'warning');
+                        return;
+                    }
+
+                    // Send request
+                    showLoading();
+                    fetch('/api/change-password', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            current_password: currentPassword,
+                            new_password: newPassword
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        hideLoading();
+                        if (data.error) {
+                            showToast(data.error, 'danger');
+                        } else {
+                            showToast(data.message, 'success');
+                            const modal = bootstrap.Modal.getInstance(document.getElementById('changePasswordModal'));
+                            modal.hide();
+                            document.getElementById('changePasswordForm').reset();
+                        }
+                    })
+                    .catch(error => {
+                        hideLoading();
+                        showToast('Error changing password', 'danger');
+                        console.error('Error:', error);
+                    });
+                });
+            }
         });
     </script>
 </body>

@@ -1,5 +1,6 @@
 import os
 import json
+import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash
@@ -10,6 +11,19 @@ import mysql.connector
 from mysql.connector import Error
 from functools import wraps
 import calendar
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+logger.info("Environment variables loaded")
 
 # Custom JSON provider to handle Decimal objects
 class DecimalJSONProvider(DefaultJSONProvider):
@@ -24,24 +38,65 @@ app.json = DecimalJSONProvider(app)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
 CORS(app)
 
-# Database configuration
-DB_CONFIG = {
-    'host': os.environ.get('DB_HOST'),
-    'port': os.environ.get('DB_PORT'),
-    'database': os.environ.get('DB_NAME'),
-    'user': os.environ.get('DB_USER'),
-    'password': os.environ.get('DB_PASSWORD'),
-    'charset': 'utf8mb4',
-    'use_unicode': True
-}
+# Database configuration with proper type conversion and defaults
+def get_db_config():
+    """Get database configuration from environment variables."""
+    host = os.environ.get('DB_HOST')
+    port = os.environ.get('DB_PORT', '3306')  # Default MySQL port
+    database = os.environ.get('DB_NAME')
+    user = os.environ.get('DB_USER')
+    password = os.environ.get('DB_PASSWORD')
+
+    # Validate required fields
+    if not all([host, database, user, password]):
+        logger.error("Missing required database configuration in environment variables")
+        logger.error(f"DB_HOST: {host}, DB_NAME: {database}, DB_USER: {user}, DB_PASSWORD: {'***' if password else None}")
+        return None
+
+    # Convert port to integer
+    try:
+        port_int = int(port)
+    except (ValueError, TypeError):
+        logger.error(f"Invalid DB_PORT value: {port}, using default 3306")
+        port_int = 3306
+
+    return {
+        'host': host,
+        'port': port_int,
+        'database': database,
+        'user': user,
+        'password': password,
+        'charset': 'utf8mb4',
+        'use_unicode': True
+    }
+
+DB_CONFIG = get_db_config()
+
+# Log database configuration status
+if DB_CONFIG:
+    logger.info(f"Database configuration loaded successfully")
+    logger.info(f"DB Host: {DB_CONFIG['host']}, Port: {DB_CONFIG['port']}, Database: {DB_CONFIG['database']}")
+else:
+    logger.error("CRITICAL: Database configuration failed to load. Application may not function properly.")
+    logger.error("Please check your .env file and ensure all required variables are set:")
+    logger.error("Required: DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD")
 
 def get_db_connection():
     """Create a database connection."""
+    if DB_CONFIG is None:
+        logger.error("Cannot connect to database: DB_CONFIG is not properly configured")
+        return None
+
     try:
         connection = mysql.connector.connect(**DB_CONFIG)
+        logger.info("Database connection established successfully")
         return connection
     except Error as e:
-        print(f"Error connecting to MySQL: {e}")
+        logger.error(f"Error connecting to MySQL: {e}")
+        logger.error(f"DB_CONFIG: host={DB_CONFIG.get('host')}, port={DB_CONFIG.get('port')}, database={DB_CONFIG.get('database')}")
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected error connecting to database: {e}", exc_info=True)
         return None
 
 def login_required(f):
@@ -63,9 +118,20 @@ def decimal_default(obj):
 # Routes
 @app.route('/')
 def index():
-    """Landing page - redirect to login or dashboard."""
+    """Landing page - redirect to login or dashboard/mobile based on device."""
+    logger.info(f"Index route accessed - User logged in: {'user_id' in session}")
     if 'user_id' in session:
+        # Detect if mobile device from user agent
+        user_agent = request.headers.get('User-Agent', '').lower()
+        is_mobile = any(device in user_agent for device in
+                       ['android', 'webos', 'iphone', 'ipad', 'ipod', 'blackberry', 'windows phone'])
+
+        if is_mobile:
+            logger.info(f"Redirecting user {session.get('user_id')} to mobile view")
+            return redirect(url_for('mobile'))
+        logger.info(f"Redirecting user {session.get('user_id')} to dashboard")
         return redirect(url_for('dashboard'))
+    logger.info("No user session found, redirecting to login")
     return redirect(url_for('login'))
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -113,7 +179,9 @@ def login():
         data = request.get_json() if request.is_json else request.form
         username = data.get('username')
         password = data.get('password')
-        
+
+        logger.info(f"Login attempt for username: {username}")
+
         connection = get_db_connection()
         if connection:
             cursor = connection.cursor(dictionary=True)
@@ -122,21 +190,25 @@ def login():
                 cursor.execute("SELECT * FROM users WHERE username = %s OR email = %s",
                              (username, username))
                 user = cursor.fetchone()
-                
+
                 if user and check_password_hash(user['password_hash'], password):
                     session['user_id'] = user['id']
                     session['username'] = user['username']
+                    logger.info(f"Login successful for user: {username} (ID: {user['id']})")
                     return jsonify({'message': 'Login successful'}), 200
                 else:
+                    logger.warning(f"Login failed for username: {username} - Invalid credentials")
                     return jsonify({'error': 'Invalid credentials'}), 401
             except Error as e:
+                logger.error(f"Database error during login: {str(e)}")
                 return jsonify({'error': str(e)}), 500
             finally:
                 cursor.close()
                 connection.close()
-        
-        return jsonify({'error': 'Database connection failed'}), 500
-    
+        else:
+            logger.error("Failed to establish database connection during login")
+            return jsonify({'error': 'Database connection failed'}), 500
+
     return render_template('login.html')
 
 @app.route('/logout')
@@ -145,6 +217,55 @@ def logout():
     session.clear()
     flash('You have been logged out.', 'info')
     return redirect(url_for('index'))
+
+@app.route('/api/change-password', methods=['POST'])
+@login_required
+def change_password():
+    """Change user password."""
+    data = request.get_json()
+    current_password = data.get('current_password')
+    new_password = data.get('new_password')
+
+    if not current_password or not new_password:
+        return jsonify({'error': 'Current and new passwords are required'}), 400
+
+    if len(new_password) < 6:
+        return jsonify({'error': 'New password must be at least 6 characters long'}), 400
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor(dictionary=True)
+    user_id = session['user_id']
+
+    try:
+        # Get current user
+        cursor.execute("SELECT password_hash FROM users WHERE id = %s", (user_id,))
+        user = cursor.fetchone()
+
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        # Verify current password
+        if not check_password_hash(user['password_hash'], current_password):
+            return jsonify({'error': 'Current password is incorrect'}), 401
+
+        # Update password
+        new_password_hash = generate_password_hash(new_password)
+        cursor.execute(
+            "UPDATE users SET password_hash = %s WHERE id = %s",
+            (new_password_hash, user_id)
+        )
+        connection.commit()
+
+        return jsonify({'message': 'Password changed successfully'}), 200
+
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
 
 @app.route('/dashboard')
 @login_required
@@ -1111,10 +1232,47 @@ def clone_month_transactions():
 
     except Error as e:
         connection.rollback()
+        logger.error(f"Error cloning transactions: {str(e)}")
         return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()
         connection.close()
 
+# Global error handlers (must be outside if __name__ block)
+@app.errorhandler(500)
+def internal_error(error):
+    logger.error(f"Internal server error: {str(error)}")
+    # For API requests, return JSON
+    if request.path.startswith('/api/'):
+        return jsonify({'error': 'Internal server error'}), 500
+    # For page requests, render error template or return HTML
+    return render_template('error.html', error_code=500, error_message='Internal Server Error'), 500
+
+@app.errorhandler(404)
+def not_found(error):
+    logger.warning(f"404 error: {request.path}")
+    # For API requests, return JSON
+    if request.path.startswith('/api/'):
+        return jsonify({'error': 'Not found'}), 404
+    # For page requests, redirect to dashboard or login
+    if 'user_id' in session:
+        return redirect(url_for('dashboard'))
+    return redirect(url_for('login'))
+
+@app.errorhandler(Exception)
+def handle_exception(error):
+    logger.error(f"Unhandled exception: {str(error)}", exc_info=True)
+    # For API requests, return JSON
+    if request.path.startswith('/api/'):
+        return jsonify({'error': 'An unexpected error occurred'}), 500
+    # For page requests, render error template
+    return render_template('error.html', error_code=500, error_message='An unexpected error occurred'), 500
+
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5003)
+    logger.info("Starting Personal Finance Budget application...")
+    logger.info(f"Debug mode: False (Production)")
+    logger.info(f"Host: 0.0.0.0, Port: 5003")
+
+    # Use debug=False for production
+    # Set to True for development (detailed error messages)
+    app.run(debug=False, host='0.0.0.0', port=5003)
