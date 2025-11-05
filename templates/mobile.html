@@ -1236,8 +1236,9 @@
                                 'btn-warning'
                             );
                         } else {
-                            // If not paid, show payment method modal
-                            showPaymentMethodModal(t.id);
+                            // If not paid, show payment method modal to mark as paid
+                            // Pass true to indicate this is a "paid" click (sets is_paid=TRUE)
+                            showPaymentMethodModal(t.id, true);
                         }
                     });
                 }
