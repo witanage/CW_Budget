@@ -292,6 +292,22 @@
             background: #bb2d3b;
         }
 
+        .swipe-action-payment {
+            background: #198754;
+        }
+
+        .swipe-action-payment:active {
+            background: #146c43;
+        }
+
+        .swipe-action-unpay {
+            background: #fd7e14;
+        }
+
+        .swipe-action-unpay:active {
+            background: #e06610;
+        }
+
         /* Touch feedback */
         .swipe-container.swiping .swipe-content {
             transition: none;
@@ -965,12 +981,20 @@
                     row.classList.add('transaction-highlighted');
                 }
 
+                // Determine payment method button
+                const paymentBtnClass = isPaid ? 'swipe-action-unpay' : 'swipe-action-payment';
+                const paymentBtnIcon = isPaid ? 'fa-times-circle' : 'fa-credit-card';
+                const paymentBtnAction = isPaid ? 'unpay' : 'pay';
+
                 // Build the row with swipe-to-reveal structure
                 row.innerHTML = `
                     <td colspan="4" style="padding: 0;">
                         <div class="swipe-actions">
                             <button class="swipe-action-btn swipe-action-edit" data-action="edit" data-id="${t.id}">
                                 <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="swipe-action-btn ${paymentBtnClass}" data-action="${paymentBtnAction}" data-id="${t.id}" data-is-paid="${isPaid}">
+                                <i class="fas ${paymentBtnIcon}"></i>
                             </button>
                             <button class="swipe-action-btn swipe-action-delete" data-action="delete" data-id="${t.id}">
                                 <i class="fas fa-trash"></i>
@@ -1038,11 +1062,35 @@
 
                 // Add action button handlers
                 const editBtn = row.querySelector('[data-action="edit"]');
+                const payBtn = row.querySelector('[data-action="pay"]');
+                const unpayBtn = row.querySelector('[data-action="unpay"]');
                 const deleteBtn = row.querySelector('[data-action="delete"]');
 
                 if (editBtn) {
                     editBtn.addEventListener('click', function() {
                         editTransaction(t.id);
+                    });
+                }
+
+                if (payBtn) {
+                    payBtn.addEventListener('click', function() {
+                        // Show payment method modal
+                        showPaymentMethodModal(t.id);
+                    });
+                }
+
+                if (unpayBtn) {
+                    unpayBtn.addEventListener('click', function() {
+                        // Show confirmation to mark as unpaid
+                        showConfirmModal(
+                            'Mark as Unpaid',
+                            'Remove payment method from this transaction?',
+                            function() {
+                                markTransactionAsUnpaid(t.id);
+                            },
+                            'Mark Unpaid',
+                            'btn-warning'
+                        );
                     });
                 }
 
@@ -1085,7 +1133,7 @@
 
                 // Only allow left swipe
                 if (diff > 0) {
-                    const maxSwipe = 140; // Width of both buttons
+                    const maxSwipe = 210; // Width of three buttons (70px each)
                     const swipeAmount = Math.min(diff, maxSwipe);
                     swipeContent.style.transform = `translateX(-${swipeAmount}px)`;
                 }
@@ -1106,8 +1154,8 @@
                 const shouldOpen = diff > threshold || velocity > 0.5;
 
                 if (shouldOpen && diff > 0) {
-                    // Open swipe
-                    swipeContent.style.transform = 'translateX(-140px)';
+                    // Open swipe - show all three buttons
+                    swipeContent.style.transform = 'translateX(-210px)';
                     row.classList.add('swiped');
                 } else {
                     // Close swipe
