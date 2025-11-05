@@ -178,6 +178,7 @@
             border-collapse: collapse;
             font-size: 0.75rem;
             background: #161b22;
+            table-layout: fixed;
         }
 
         .excel-table thead {
@@ -222,21 +223,26 @@
             background-color: #1c2128;
         }
 
-        /* Column widths */
+        /* Column widths - Use percentages to fit viewport */
         .col-desc {
-            min-width: 120px;
-            max-width: 180px;
+            width: 35%;
             white-space: normal;
             word-wrap: break-word;
+            cursor: pointer;
         }
 
-        .col-debit, .col-credit, .col-balance {
+        .col-debit, .col-credit {
+            width: 18%;
             text-align: right;
-            min-width: 70px;
+        }
+
+        .col-balance {
+            width: 18%;
+            text-align: right;
         }
 
         .col-actions {
-            min-width: 80px;
+            width: 11%;
             text-align: center;
         }
 
@@ -406,6 +412,30 @@
         .loading-spinner i {
             font-size: 3rem;
             margin-bottom: 10px;
+        }
+
+        /* Payment method list in modal */
+        .list-group-item {
+            background-color: #3d3d3d;
+            border-color: #555555;
+            color: #ffffff;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .list-group-item:hover {
+            background-color: #4d4d4d;
+            transform: translateX(5px);
+        }
+
+        .payment-method-list-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .payment-method-list-item .badge {
+            margin-left: auto;
         }
     </style>
 </head>
@@ -621,6 +651,27 @@
         </div>
     </div>
 
+    <!-- Payment Method Selection Modal -->
+    <div class="modal fade" id="paymentMethodModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Select Payment Method</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p style="color: #ffffff;">How did you pay for this transaction?</p>
+                    <div id="paymentMethodList" class="list-group">
+                        <!-- Payment methods will be loaded here -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
@@ -675,6 +726,102 @@
             // Show modal
             const bootstrapModal = new bootstrap.Modal(modal);
             bootstrapModal.show();
+        }
+
+        // Global variables
+        let paymentMethods = [];
+        let selectedTransactionIdForPayment = null;
+
+        // Load payment methods
+        function loadPaymentMethods() {
+            fetch('/api/payment-methods')
+                .then(response => response.json())
+                .then(data => {
+                    paymentMethods = data;
+                })
+                .catch(error => {
+                    console.error('Error loading payment methods:', error);
+                });
+        }
+
+        // Show payment method modal
+        function showPaymentMethodModal(transactionId) {
+            selectedTransactionIdForPayment = transactionId;
+
+            const listContainer = document.getElementById('paymentMethodList');
+            listContainer.innerHTML = '';
+
+            if (!paymentMethods || paymentMethods.length === 0) {
+                listContainer.innerHTML = '<p style="color: #ffffff;">No payment methods available. Please add one in settings.</p>';
+            } else {
+                paymentMethods.forEach(method => {
+                    const item = document.createElement('div');
+                    item.className = 'list-group-item payment-method-list-item';
+                    item.innerHTML = `
+                        <span class="payment-method-color-indicator" style="background-color: ${method.color}; width: 30px; height: 30px; display: inline-block; border-radius: 5px;"></span>
+                        <span style="flex: 1;">${method.name}</span>
+                    `;
+                    item.onclick = () => markTransactionAsPaid(selectedTransactionIdForPayment, method.id);
+                    listContainer.appendChild(item);
+                });
+            }
+
+            const modal = new bootstrap.Modal(document.getElementById('paymentMethodModal'));
+            modal.show();
+        }
+
+        // Mark transaction as paid
+        function markTransactionAsPaid(transactionId, paymentMethodId) {
+            showLoading();
+
+            fetch(`/api/transactions/${transactionId}/mark-paid`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ payment_method_id: paymentMethodId })
+            })
+            .then(response => response.json())
+            .then(result => {
+                hideLoading();
+                if (result.error) {
+                    showToast(result.error, 'danger');
+                } else {
+                    showToast('Transaction marked as paid', 'success');
+                    // Close modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('paymentMethodModal'));
+                    if (modal) modal.hide();
+                    // Reload transactions
+                    loadTransactions();
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                console.error('Error marking transaction as paid:', error);
+                showToast('Error marking transaction as paid', 'danger');
+            });
+        }
+
+        // Mark transaction as unpaid
+        function markTransactionAsUnpaid(transactionId) {
+            showLoading();
+
+            fetch(`/api/transactions/${transactionId}/mark-unpaid`, {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(result => {
+                hideLoading();
+                if (result.error) {
+                    showToast(result.error, 'danger');
+                } else {
+                    showToast('Transaction marked as unpaid', 'success');
+                    loadTransactions();
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                console.error('Error marking transaction as unpaid:', error);
+                showToast('Error marking transaction as unpaid', 'danger');
+            });
         }
 
         // Load categories
@@ -806,6 +953,30 @@
                     const cells = row.querySelectorAll('td');
                     cells.forEach(cell => {
                         cell.style.backgroundColor = t.payment_method_color;
+                    });
+                }
+
+                // Add click handler to description cell (same as desktop behavior)
+                const descCell = row.querySelector('.col-desc');
+                if (descCell) {
+                    descCell.style.cursor = 'pointer';
+                    descCell.addEventListener('click', function() {
+                        const isPaid = t.is_paid === true || t.is_paid === 1;
+                        if (isPaid) {
+                            // If already paid, mark as unpaid
+                            showConfirmModal(
+                                'Mark as Unpaid',
+                                'Remove payment method from this transaction?',
+                                function() {
+                                    markTransactionAsUnpaid(t.id);
+                                },
+                                'Mark Unpaid',
+                                'btn-warning'
+                            );
+                        } else {
+                            // If not paid, show payment method modal
+                            showPaymentMethodModal(t.id);
+                        }
                     });
                 }
 
@@ -1048,6 +1219,7 @@
 
             // Load data
             loadCategories();
+            loadPaymentMethods();
             loadTransactions();
 
             // Save button
