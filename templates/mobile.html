@@ -247,12 +247,21 @@
             /* TR element - no positioning needed here */
         }
 
+        /* Remove spacing on the outer TD that contains swipe-wrapper */
+        .swipe-container > td {
+            padding: 0 !important;
+            border: none !important;
+            vertical-align: top;
+        }
+
         .swipe-wrapper {
             position: relative;
             overflow: hidden;
             display: block;
             width: 100%;
             isolation: isolate; /* Create new stacking context */
+            margin: 0;
+            padding: 0;
         }
 
         .swipe-content {
@@ -262,6 +271,19 @@
             z-index: 2;
             width: 100%;
             pointer-events: auto; /* Ensure content is clickable */
+        }
+
+        /* Inner table cells - keep the Excel styling */
+        .swipe-content td {
+            padding: 4px 4px;
+            border: 1px solid #555555;
+            vertical-align: middle;
+            font-size: 0.7rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 150px;
+            color: #000000;
         }
 
         .swipe-actions {
@@ -322,11 +344,6 @@
         /* Touch feedback */
         .swipe-container.swiping .swipe-content {
             transition: none;
-        }
-
-        /* Ensure swipe-wrapper contains the buttons properly */
-        .swipe-wrapper {
-            min-height: 30px; /* Minimum height to contain buttons */
         }
 
         /* Override text colors to black for table */
