@@ -138,7 +138,7 @@
             overflow: hidden;
             text-overflow: ellipsis;
             max-width: 150px;
-            color: #c9d1d9;
+            color: #000000;
         }
 
         .excel-table tbody tr:nth-child(even) {
@@ -166,17 +166,12 @@
             min-width: 70px;
         }
 
-        /* Match desktop Bootstrap colors */
-        .text-success {
-            color: #28a745 !important;
-        }
-
-        .text-danger {
-            color: #dc3545 !important;
-        }
-
-        .fw-bold {
-            font-weight: 600 !important;
+        /* Override text colors to black for table */
+        .excel-table .text-success,
+        .excel-table .text-danger,
+        .excel-table .fw-bold {
+            color: #000000 !important;
+            font-weight: normal !important;
         }
 
         .add-btn-float {
