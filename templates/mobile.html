@@ -1041,6 +1041,8 @@
         // Display transactions
         function displayTransactions(transactions) {
             const tbody = document.getElementById('transactionsList');
+            const table = document.getElementById('transactionsTable');
+            const thead = table ? table.querySelector('thead') : null;
 
             if (!transactions || transactions.length === 0) {
                 tbody.innerHTML = `
@@ -1053,6 +1055,12 @@
                         </td>
                     </tr>
                 `;
+                // Force reflow to fix sticky positioning on mobile
+                if (thead) {
+                    thead.style.display = 'none';
+                    void thead.offsetHeight; // Trigger reflow
+                    thead.style.display = '';
+                }
                 return;
             }
 
@@ -1198,6 +1206,15 @@
 
                 tbody.appendChild(row);
             });
+
+            // Force reflow to fix sticky positioning on mobile browsers
+            // Mobile Safari and other mobile browsers sometimes lose sticky
+            // positioning after DOM updates. This forces a recalculation.
+            if (thead) {
+                thead.style.display = 'none';
+                void thead.offsetHeight; // Trigger reflow
+                thead.style.display = '';
+            }
         }
 
         // Mark transaction as undone
