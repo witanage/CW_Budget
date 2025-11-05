@@ -1150,6 +1150,13 @@
                 const descCell = row.querySelector('.col-desc');
                 if (descCell) {
                     descCell.style.cursor = 'pointer';
+
+                    // Set description text color based on payment status
+                    // White for unpaid (is_paid = 0), current color for paid (is_paid = 1)
+                    if (!isPaid) {
+                        descCell.style.color = '#ffffff';
+                    }
+
                     descCell.addEventListener('click', function(e) {
                         // Prevent click during swipe
                         if (row.classList.contains('swiped')) return;
