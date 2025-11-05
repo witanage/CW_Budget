@@ -292,20 +292,20 @@
             background: #bb2d3b;
         }
 
-        .swipe-action-payment {
+        .swipe-action-done {
             background: #198754;
         }
 
-        .swipe-action-payment:active {
+        .swipe-action-done:active {
             background: #146c43;
         }
 
-        .swipe-action-unpay {
-            background: #fd7e14;
+        .swipe-action-undone {
+            background: #6c757d;
         }
 
-        .swipe-action-unpay:active {
-            background: #e06610;
+        .swipe-action-undone:active {
+            background: #5a6268;
         }
 
         /* Touch feedback */
@@ -974,17 +974,18 @@
                 row.className = 'swipe-container';
 
                 // Check payment status
-                const isDone = t.payment_method_id && t.payment_method_id !== null;
+                const hasPaymentMethod = t.payment_method_id && t.payment_method_id !== null;
                 const isPaid = t.is_paid === true || t.is_paid === 1;
+                const isDone = t.is_done === true || t.is_done === 1;
 
-                if (isDone && t.payment_method_color) {
+                if (hasPaymentMethod && t.payment_method_color) {
                     row.classList.add('transaction-highlighted');
                 }
 
-                // Determine payment method button
-                const paymentBtnClass = isPaid ? 'swipe-action-unpay' : 'swipe-action-payment';
-                const paymentBtnIcon = isPaid ? 'fa-times-circle' : 'fa-credit-card';
-                const paymentBtnAction = isPaid ? 'unpay' : 'pay';
+                // Determine done/undone button
+                const doneBtnClass = isDone ? 'swipe-action-undone' : 'swipe-action-done';
+                const doneBtnIcon = isDone ? 'fa-times-circle' : 'fa-check-circle';
+                const doneBtnAction = isDone ? 'undone' : 'done';
 
                 // Build the row with swipe-to-reveal structure
                 row.innerHTML = `
@@ -993,8 +994,8 @@
                             <button class="swipe-action-btn swipe-action-edit" data-action="edit" data-id="${t.id}">
                                 <i class="fas fa-edit"></i>
                             </button>
-                            <button class="swipe-action-btn ${paymentBtnClass}" data-action="${paymentBtnAction}" data-id="${t.id}" data-is-paid="${isPaid}">
-                                <i class="fas ${paymentBtnIcon}"></i>
+                            <button class="swipe-action-btn ${doneBtnClass}" data-action="${doneBtnAction}" data-id="${t.id}" data-is-done="${isDone}">
+                                <i class="fas ${doneBtnIcon}"></i>
                             </button>
                             <button class="swipe-action-btn swipe-action-delete" data-action="delete" data-id="${t.id}">
                                 <i class="fas fa-trash"></i>
@@ -1062,8 +1063,8 @@
 
                 // Add action button handlers
                 const editBtn = row.querySelector('[data-action="edit"]');
-                const payBtn = row.querySelector('[data-action="pay"]');
-                const unpayBtn = row.querySelector('[data-action="unpay"]');
+                const doneBtn = row.querySelector('[data-action="done"]');
+                const undoneBtn = row.querySelector('[data-action="undone"]');
                 const deleteBtn = row.querySelector('[data-action="delete"]');
 
                 if (editBtn) {
@@ -1072,25 +1073,17 @@
                     });
                 }
 
-                if (payBtn) {
-                    payBtn.addEventListener('click', function() {
-                        // Show payment method modal
-                        showPaymentMethodModal(t.id);
+                if (doneBtn) {
+                    doneBtn.addEventListener('click', function() {
+                        // Mark transaction as done
+                        markTransactionAsDone(t.id);
                     });
                 }
 
-                if (unpayBtn) {
-                    unpayBtn.addEventListener('click', function() {
-                        // Show confirmation to mark as unpaid
-                        showConfirmModal(
-                            'Mark as Unpaid',
-                            'Remove payment method from this transaction?',
-                            function() {
-                                markTransactionAsUnpaid(t.id);
-                            },
-                            'Mark Unpaid',
-                            'btn-warning'
-                        );
+                if (undoneBtn) {
+                    undoneBtn.addEventListener('click', function() {
+                        // Mark transaction as undone
+                        markTransactionAsUndone(t.id);
                     });
                 }
 
@@ -1101,6 +1094,54 @@
                 }
 
                 tbody.appendChild(row);
+            });
+        }
+
+        // Mark transaction as done
+        function markTransactionAsDone(transactionId) {
+            showLoading();
+
+            fetch(`/api/transactions/${transactionId}/mark-done`, {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(result => {
+                hideLoading();
+                if (result.error) {
+                    showToast(result.error, 'danger');
+                } else {
+                    showToast('Transaction marked as done', 'success');
+                    loadTransactions();
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                console.error('Error marking transaction as done:', error);
+                showToast('Error marking transaction as done', 'danger');
+            });
+        }
+
+        // Mark transaction as undone
+        function markTransactionAsUndone(transactionId) {
+            showLoading();
+
+            fetch(`/api/transactions/${transactionId}/mark-undone`, {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(result => {
+                hideLoading();
+                if (result.error) {
+                    showToast(result.error, 'danger');
+                } else {
+                    showToast('Transaction marked as undone', 'success');
+                    loadTransactions();
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                console.error('Error marking transaction as undone:', error);
+                showToast('Error marking transaction as undone', 'danger');
             });
         }
 
