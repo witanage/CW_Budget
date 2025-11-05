@@ -11,6 +11,10 @@ import mysql.connector
 from mysql.connector import Error
 from functools import wraps
 import calendar
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(
@@ -18,6 +22,8 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+logger.info("Environment variables loaded")
 
 # Custom JSON provider to handle Decimal objects
 class DecimalJSONProvider(DefaultJSONProvider):
@@ -32,25 +38,65 @@ app.json = DecimalJSONProvider(app)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
 CORS(app)
 
-# Database configuration
-DB_CONFIG = {
-    'host': os.environ.get('DB_HOST'),
-    'port': os.environ.get('DB_PORT'),
-    'database': os.environ.get('DB_NAME'),
-    'user': os.environ.get('DB_USER'),
-    'password': os.environ.get('DB_PASSWORD'),
-    'charset': 'utf8mb4',
-    'use_unicode': True
-}
+# Database configuration with proper type conversion and defaults
+def get_db_config():
+    """Get database configuration from environment variables."""
+    host = os.environ.get('DB_HOST')
+    port = os.environ.get('DB_PORT', '3306')  # Default MySQL port
+    database = os.environ.get('DB_NAME')
+    user = os.environ.get('DB_USER')
+    password = os.environ.get('DB_PASSWORD')
+
+    # Validate required fields
+    if not all([host, database, user, password]):
+        logger.error("Missing required database configuration in environment variables")
+        logger.error(f"DB_HOST: {host}, DB_NAME: {database}, DB_USER: {user}, DB_PASSWORD: {'***' if password else None}")
+        return None
+
+    # Convert port to integer
+    try:
+        port_int = int(port)
+    except (ValueError, TypeError):
+        logger.error(f"Invalid DB_PORT value: {port}, using default 3306")
+        port_int = 3306
+
+    return {
+        'host': host,
+        'port': port_int,
+        'database': database,
+        'user': user,
+        'password': password,
+        'charset': 'utf8mb4',
+        'use_unicode': True
+    }
+
+DB_CONFIG = get_db_config()
+
+# Log database configuration status
+if DB_CONFIG:
+    logger.info(f"Database configuration loaded successfully")
+    logger.info(f"DB Host: {DB_CONFIG['host']}, Port: {DB_CONFIG['port']}, Database: {DB_CONFIG['database']}")
+else:
+    logger.error("CRITICAL: Database configuration failed to load. Application may not function properly.")
+    logger.error("Please check your .env file and ensure all required variables are set:")
+    logger.error("Required: DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD")
 
 def get_db_connection():
     """Create a database connection."""
+    if DB_CONFIG is None:
+        logger.error("Cannot connect to database: DB_CONFIG is not properly configured")
+        return None
+
     try:
         connection = mysql.connector.connect(**DB_CONFIG)
         logger.info("Database connection established successfully")
         return connection
     except Error as e:
         logger.error(f"Error connecting to MySQL: {e}")
+        logger.error(f"DB_CONFIG: host={DB_CONFIG.get('host')}, port={DB_CONFIG.get('port')}, database={DB_CONFIG.get('database')}")
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected error connecting to database: {e}", exc_info=True)
         return None
 
 def login_required(f):
