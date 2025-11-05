@@ -45,6 +45,12 @@
 </div>
 
 <script>
+// Check if user is on mobile device
+function isMobileDevice() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+           (window.innerWidth <= 768);
+}
+
 document.getElementById('loginForm').addEventListener('submit', function(e) {
     e.preventDefault();
 
@@ -67,7 +73,12 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
         } else {
             showToast('Login successful! Redirecting...', 'success');
             setTimeout(() => {
-                window.location.href = '/dashboard';
+                // Redirect to mobile view if on mobile device
+                if (isMobileDevice()) {
+                    window.location.href = '/mobile';
+                } else {
+                    window.location.href = '/dashboard';
+                }
             }, 1000);
         }
     })

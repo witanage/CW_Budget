@@ -63,8 +63,15 @@ def decimal_default(obj):
 # Routes
 @app.route('/')
 def index():
-    """Landing page - redirect to login or dashboard."""
+    """Landing page - redirect to login or dashboard/mobile based on device."""
     if 'user_id' in session:
+        # Detect if mobile device from user agent
+        user_agent = request.headers.get('User-Agent', '').lower()
+        is_mobile = any(device in user_agent for device in
+                       ['android', 'webos', 'iphone', 'ipad', 'ipod', 'blackberry', 'windows phone'])
+
+        if is_mobile:
+            return redirect(url_for('mobile'))
         return redirect(url_for('dashboard'))
     return redirect(url_for('login'))
 
@@ -145,6 +152,55 @@ def logout():
     session.clear()
     flash('You have been logged out.', 'info')
     return redirect(url_for('index'))
+
+@app.route('/api/change-password', methods=['POST'])
+@login_required
+def change_password():
+    """Change user password."""
+    data = request.get_json()
+    current_password = data.get('current_password')
+    new_password = data.get('new_password')
+
+    if not current_password or not new_password:
+        return jsonify({'error': 'Current and new passwords are required'}), 400
+
+    if len(new_password) < 6:
+        return jsonify({'error': 'New password must be at least 6 characters long'}), 400
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor(dictionary=True)
+    user_id = session['user_id']
+
+    try:
+        # Get current user
+        cursor.execute("SELECT password_hash FROM users WHERE id = %s", (user_id,))
+        user = cursor.fetchone()
+
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        # Verify current password
+        if not check_password_hash(user['password_hash'], current_password):
+            return jsonify({'error': 'Current password is incorrect'}), 401
+
+        # Update password
+        new_password_hash = generate_password_hash(new_password)
+        cursor.execute(
+            "UPDATE users SET password_hash = %s WHERE id = %s",
+            (new_password_hash, user_id)
+        )
+        connection.commit()
+
+        return jsonify({'message': 'Password changed successfully'}), 200
+
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
 
 @app.route('/dashboard')
 @login_required
