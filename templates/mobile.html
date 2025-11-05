@@ -244,8 +244,15 @@
 
         /* Swipe-to-reveal container */
         .swipe-container {
+            /* TR element - no positioning needed here */
+        }
+
+        .swipe-wrapper {
             position: relative;
             overflow: hidden;
+            display: block;
+            width: 100%;
+            isolation: isolate; /* Create new stacking context */
         }
 
         .swipe-content {
@@ -253,16 +260,19 @@
             background: #2d2d2d;
             transition: transform 0.3s ease;
             z-index: 2;
+            width: 100%;
+            pointer-events: auto; /* Ensure content is clickable */
         }
 
         .swipe-actions {
             position: absolute;
             right: 0;
             top: 0;
-            bottom: 0;
+            height: 100%;
             display: flex;
             align-items: stretch;
             z-index: 1;
+            pointer-events: auto; /* Ensure buttons are clickable */
         }
 
         .swipe-action-btn {
@@ -312,6 +322,11 @@
         /* Touch feedback */
         .swipe-container.swiping .swipe-content {
             transition: none;
+        }
+
+        /* Ensure swipe-wrapper contains the buttons properly */
+        .swipe-wrapper {
+            min-height: 30px; /* Minimum height to contain buttons */
         }
 
         /* Override text colors to black for table */
@@ -1033,25 +1048,27 @@
                 // Build the row with swipe-to-reveal structure
                 row.innerHTML = `
                     <td colspan="4" style="padding: 0;">
-                        <div class="swipe-actions">
-                            <button class="swipe-action-btn swipe-action-edit" data-action="edit" data-id="${t.id}">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button class="swipe-action-btn ${doneBtnClass}" data-action="${doneBtnAction}" data-id="${t.id}" data-is-done="${isDone}">
-                                <i class="fas ${doneBtnIcon}"></i>
-                            </button>
-                            <button class="swipe-action-btn swipe-action-delete" data-action="delete" data-id="${t.id}">
-                                <i class="fas fa-trash"></i>
-                            </button>
+                        <div class="swipe-wrapper">
+                            <div class="swipe-actions">
+                                <button class="swipe-action-btn swipe-action-edit" data-action="edit" data-id="${t.id}">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="swipe-action-btn ${doneBtnClass}" data-action="${doneBtnAction}" data-id="${t.id}" data-is-done="${isDone}">
+                                    <i class="fas ${doneBtnIcon}"></i>
+                                </button>
+                                <button class="swipe-action-btn swipe-action-delete" data-action="delete" data-id="${t.id}">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                            <table class="swipe-content" style="width: 100%; border-collapse: collapse;">
+                                <tr>
+                                    <td class="col-desc" data-transaction-id="${t.id}">${t.description || ''}</td>
+                                    <td class="col-debit text-success">${t.debit ? formatCurrency(t.debit) : '-'}</td>
+                                    <td class="col-credit text-danger">${t.credit ? formatCurrency(t.credit) : '-'}</td>
+                                    <td class="col-balance fw-bold">${formatCurrency(t.calculatedBalance)}</td>
+                                </tr>
+                            </table>
                         </div>
-                        <table class="swipe-content" style="width: 100%; border-collapse: collapse;">
-                            <tr>
-                                <td class="col-desc" data-transaction-id="${t.id}">${t.description || ''}</td>
-                                <td class="col-debit text-success">${t.debit ? formatCurrency(t.debit) : '-'}</td>
-                                <td class="col-credit text-danger">${t.credit ? formatCurrency(t.credit) : '-'}</td>
-                                <td class="col-balance fw-bold">${formatCurrency(t.calculatedBalance)}</td>
-                            </tr>
-                        </table>
                     </td>
                 `;
 
