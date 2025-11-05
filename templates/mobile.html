@@ -65,30 +65,35 @@
         .month-nav {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
             justify-content: center;
         }
 
-        .month-nav button {
+        .month-nav button, .action-btn {
             background: #3d3d3d;
             border: 1px solid #555555;
             color: #ffffff;
-            padding: 4px 10px;
+            padding: 4px 8px;
             border-radius: 6px;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             cursor: pointer;
         }
 
-        .month-nav button:active {
+        .month-nav button:active, .action-btn:active {
             background: #4d4d4d;
         }
 
         .month-display {
             color: #ffffff;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             font-weight: 600;
-            min-width: 120px;
+            min-width: 100px;
             text-align: center;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 4px;
         }
 
         .mobile-content {
@@ -183,19 +188,26 @@
             width: 56px;
             height: 56px;
             border-radius: 50%;
-            background: #1f6feb;
+            background: rgba(31, 111, 235, 0.7);
             color: white;
             border: none;
-            box-shadow: 0 4px 12px rgba(31, 111, 235, 0.4);
+            box-shadow: 0 4px 12px rgba(31, 111, 235, 0.3);
             z-index: 1000;
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 1.5rem;
+            backdrop-filter: blur(10px);
         }
 
         .add-btn-float:active {
             transform: scale(0.95);
+            background: rgba(31, 111, 235, 0.9);
+        }
+
+        /* Payment method highlighting */
+        .transaction-highlighted {
+            /* Payment method color will be set inline */
         }
 
         .no-transactions {
@@ -253,6 +265,35 @@
             background-color: #1f6feb;
             border-color: #1f6feb;
         }
+
+        /* Payment totals modal specific styles */
+        .payment-totals-table {
+            width: 100%;
+            font-size: 0.8rem;
+        }
+
+        .payment-totals-table td {
+            padding: 8px 4px;
+            border-bottom: 1px solid #555555;
+        }
+
+        .payment-method-color-indicator {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+
+        .payment-method-name {
+            color: #ffffff;
+        }
+
+        .payment-amount {
+            text-align: right;
+            font-weight: 600;
+            color: #58a6ff;
+        }
     </style>
 </head>
 <body>
@@ -272,6 +313,14 @@
             <button id="nextMonthBtn" onclick="navigateToNextMonth()">
                 <i class="fas fa-chevron-right"></i>
             </button>
+            <div class="action-buttons">
+                <button class="action-btn" onclick="refreshTransactions()" title="Refresh">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+                <button class="action-btn" data-bs-toggle="modal" data-bs-target="#paymentTotalsModal" title="Payment Totals">
+                    <i class="fas fa-credit-card"></i>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -345,6 +394,29 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="button" class="btn btn-primary" id="saveTransactionBtn">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Totals Modal -->
+    <div class="modal fade" id="paymentTotalsModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Payment Method Totals</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="paymentTotalsContainer">
+                        <div class="text-center" style="color: #8b949e;">
+                            <i class="fas fa-spinner fa-spin fa-2x mb-3"></i>
+                            <p>Loading...</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
@@ -441,14 +513,35 @@
             tbody.innerHTML = '';
             transactions.forEach(t => {
                 const row = document.createElement('tr');
+
+                // Apply payment method highlight color if present
+                const isDone = t.payment_method_id && t.payment_method_id !== null;
+                if (isDone && t.payment_method_color) {
+                    row.classList.add('transaction-highlighted');
+                }
+
                 row.innerHTML = `
                     <td class="col-desc">${t.description || ''}</td>
                     <td class="col-debit text-debit">${t.debit ? formatCurrency(t.debit) : '-'}</td>
                     <td class="col-credit text-credit">${t.credit ? formatCurrency(t.credit) : '-'}</td>
                     <td class="col-balance text-balance">${formatCurrency(t.balance)}</td>
                 `;
+
+                // Apply background color to cells if payment method color exists
+                if (isDone && t.payment_method_color) {
+                    const cells = row.querySelectorAll('td');
+                    cells.forEach(cell => {
+                        cell.style.backgroundColor = t.payment_method_color;
+                    });
+                }
+
                 tbody.appendChild(row);
             });
+        }
+
+        // Refresh transactions
+        function refreshTransactions() {
+            loadTransactions();
         }
 
         // Save transaction
@@ -512,6 +605,40 @@
             });
         }
 
+        // Load payment totals
+        function loadPaymentTotals() {
+            const container = document.getElementById('paymentTotalsContainer');
+            container.innerHTML = '<div class="text-center" style="color: #8b949e;"><i class="fas fa-spinner fa-spin fa-2x mb-3"></i><p>Loading...</p></div>';
+
+            fetch(`/api/payment-method-totals?year=${currentYear}&month=${currentMonth}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (!data || data.length === 0) {
+                        container.innerHTML = '<div class="alert alert-warning">No payment methods found with transactions.</div>';
+                        return;
+                    }
+
+                    let html = '<table class="payment-totals-table"><tbody>';
+                    data.forEach(item => {
+                        html += `
+                            <tr>
+                                <td>
+                                    <span class="payment-method-color-indicator" style="background-color: ${item.color}"></span>
+                                    <span class="payment-method-name">${item.method_name}</span>
+                                </td>
+                                <td class="payment-amount">${formatCurrency(item.total)}</td>
+                            </tr>
+                        `;
+                    });
+                    html += '</tbody></table>';
+                    container.innerHTML = html;
+                })
+                .catch(error => {
+                    console.error('Error loading payment totals:', error);
+                    container.innerHTML = '<div class="alert alert-danger">Error loading payment totals</div>';
+                });
+        }
+
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
             // Set today's date
@@ -526,6 +653,12 @@
 
             // Save button
             document.getElementById('saveTransactionBtn').addEventListener('click', saveTransaction);
+
+            // Load payment totals when modal is shown
+            const paymentTotalsModal = document.getElementById('paymentTotalsModal');
+            if (paymentTotalsModal) {
+                paymentTotalsModal.addEventListener('show.bs.modal', loadPaymentTotals);
+            }
         });
     </script>
 </body>

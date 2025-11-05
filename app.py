@@ -1117,4 +1117,15 @@ def clone_month_transactions():
         connection.close()
 
 if __name__ == '__main__':
-    app.run(debug=False, host='0.0.0.0', port=5003)
+    # Add error handlers for production
+    @app.errorhandler(500)
+    def internal_error(error):
+        return jsonify({'error': 'Internal server error'}), 500
+
+    @app.errorhandler(404)
+    def not_found(error):
+        return jsonify({'error': 'Not found'}), 404
+
+    # Use debug=True for development (detailed error messages)
+    # Set to False for production deployment
+    app.run(debug=True, host='0.0.0.0', port=5003)
