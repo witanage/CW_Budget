@@ -764,19 +764,28 @@ function saveTransaction() {
 }
 
 function deleteTransaction(id) {
-    if (!confirm('Delete this transaction?')) return;
-
-    fetch(`/api/transactions/${id}`, { method: 'DELETE' })
-        .then(response => response.json())
-        .then(result => {
-            showToast('Transaction deleted', 'success');
-            loadTransactions();
-            loadDashboardStats();
-        })
-        .catch(error => {
-            console.error('Error deleting transaction:', error);
-            showToast('Error deleting transaction', 'danger');
-        });
+    showConfirmModal(
+        'Delete Transaction',
+        'Are you sure you want to delete this transaction? This action cannot be undone.',
+        function() {
+            showLoading();
+            fetch(`/api/transactions/${id}`, { method: 'DELETE' })
+                .then(response => response.json())
+                .then(result => {
+                    hideLoading();
+                    showToast('Transaction deleted successfully', 'success');
+                    loadTransactions();
+                    loadDashboardStats();
+                })
+                .catch(error => {
+                    hideLoading();
+                    console.error('Error deleting transaction:', error);
+                    showToast('Error deleting transaction', 'danger');
+                });
+        },
+        'Delete',
+        'btn-danger'
+    );
 }
 
 function executeCloneMonth() {
@@ -801,13 +810,13 @@ function executeCloneMonth() {
     const fromMonthName = document.getElementById('cloneFromMonth')?.options[document.getElementById('cloneFromMonth')?.selectedIndex]?.text;
     const toMonthName = document.getElementById('cloneToMonth')?.options[document.getElementById('cloneToMonth')?.selectedIndex]?.text;
 
-    if (!confirm(`Clone all transactions from ${fromMonthName} ${fromYear} to ${toMonthName} ${toYear}?`)) {
-        return;
-    }
+    showConfirmModal(
+        'Clone Month Transactions',
+        `Clone all transactions from ${fromMonthName} ${fromYear} to ${toMonthName} ${toYear}?`,
+        function() {
+            showLoading();
 
-    showLoading();
-
-    fetch('/api/clone-month-transactions', {
+            fetch('/api/clone-month-transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -835,11 +844,15 @@ function executeCloneMonth() {
             }
         }
     })
-    .catch(error => {
-        hideLoading();
-        console.error('Error cloning transactions:', error);
-        showToast('Error cloning transactions', 'danger');
-    });
+            .catch(error => {
+                hideLoading();
+                console.error('Error cloning transactions:', error);
+                showToast('Error cloning transactions', 'danger');
+            });
+        },
+        'Clone',
+        'btn-primary'
+    );
 }
 
 // ================================
@@ -1402,21 +1415,30 @@ function loadCreditCardsList() {
 }
 
 function deleteCreditCard(cardId) {
-    if (!confirm('Are you sure you want to delete this credit card?')) return;
-
-    fetch(`/api/payment-methods/${cardId}`, {
-        method: 'DELETE'
-    })
-    .then(response => response.json())
-    .then(data => {
-        showToast('Credit card deleted successfully', 'success');
-        loadPaymentMethods();
-        loadCreditCardsList();
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showToast('Error deleting credit card', 'danger');
-    });
+    showConfirmModal(
+        'Delete Credit Card',
+        'Are you sure you want to delete this credit card? This action cannot be undone.',
+        function() {
+            showLoading();
+            fetch(`/api/payment-methods/${cardId}`, {
+                method: 'DELETE'
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                showToast('Credit card deleted successfully', 'success');
+                loadPaymentMethods();
+                loadCreditCardsList();
+            })
+            .catch(error => {
+                hideLoading();
+                console.error('Error:', error);
+                showToast('Error deleting credit card', 'danger');
+            });
+        },
+        'Delete',
+        'btn-danger'
+    );
 }
 
 // Load credit cards when the manage modal is shown
