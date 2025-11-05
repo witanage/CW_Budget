@@ -793,11 +793,17 @@
         }
 
         // Show payment method modal
-        function showPaymentMethodModal(transactionId) {
+        function showPaymentMethodModal(transactionId, isPaidClick = false) {
             selectedTransactionIdForPayment = transactionId;
 
             const listContainer = document.getElementById('paymentMethodList');
             listContainer.innerHTML = '';
+
+            // Update modal title based on context
+            const modalTitle = document.querySelector('#paymentMethodModal .modal-title');
+            if (modalTitle) {
+                modalTitle.textContent = isPaidClick ? 'Select Payment Method' : 'Mark as Done - Select Payment Method';
+            }
 
             if (!paymentMethods || paymentMethods.length === 0) {
                 listContainer.innerHTML = '<p style="color: #ffffff;">No payment methods available. Please add one in settings.</p>';
@@ -809,13 +815,49 @@
                         <span class="payment-method-color-indicator" style="background-color: ${method.color}; width: 30px; height: 30px; display: inline-block; border-radius: 5px;"></span>
                         <span style="flex: 1;">${method.name}</span>
                     `;
-                    item.onclick = () => markTransactionAsPaid(selectedTransactionIdForPayment, method.id);
+                    item.onclick = () => {
+                        if (isPaidClick) {
+                            markTransactionAsPaid(selectedTransactionIdForPayment, method.id);
+                        } else {
+                            markTransactionWithPaymentMethod(selectedTransactionIdForPayment, method.id);
+                        }
+                    };
                     listContainer.appendChild(item);
                 });
             }
 
             const modal = new bootstrap.Modal(document.getElementById('paymentMethodModal'));
             modal.show();
+        }
+
+        // Mark transaction with payment method (marks as done)
+        function markTransactionWithPaymentMethod(transactionId, paymentMethodId) {
+            showLoading();
+
+            fetch(`/api/transactions/${transactionId}/mark-done`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ payment_method_id: paymentMethodId })
+            })
+            .then(response => response.json())
+            .then(result => {
+                hideLoading();
+                if (result.error) {
+                    showToast(result.error, 'danger');
+                } else {
+                    showToast('Transaction marked as done', 'success');
+                    // Close modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('paymentMethodModal'));
+                    if (modal) modal.hide();
+                    // Reload transactions
+                    loadTransactions();
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                console.error('Error marking transaction as done:', error);
+                showToast('Error marking transaction as done', 'danger');
+            });
         }
 
         // Mark transaction as paid
@@ -1075,14 +1117,14 @@
 
                 if (doneBtn) {
                     doneBtn.addEventListener('click', function() {
-                        // Mark transaction as done
-                        markTransactionAsDone(t.id);
+                        // Show payment method modal to mark as done (same as desktop checkbox behavior)
+                        showPaymentMethodModal(t.id, false);
                     });
                 }
 
                 if (undoneBtn) {
                     undoneBtn.addEventListener('click', function() {
-                        // Mark transaction as undone
+                        // Mark transaction as undone (same as desktop checkbox behavior)
                         markTransactionAsUndone(t.id);
                     });
                 }
@@ -1094,30 +1136,6 @@
                 }
 
                 tbody.appendChild(row);
-            });
-        }
-
-        // Mark transaction as done
-        function markTransactionAsDone(transactionId) {
-            showLoading();
-
-            fetch(`/api/transactions/${transactionId}/mark-done`, {
-                method: 'POST'
-            })
-            .then(response => response.json())
-            .then(result => {
-                hideLoading();
-                if (result.error) {
-                    showToast(result.error, 'danger');
-                } else {
-                    showToast('Transaction marked as done', 'success');
-                    loadTransactions();
-                }
-            })
-            .catch(error => {
-                hideLoading();
-                console.error('Error marking transaction as done:', error);
-                showToast('Error marking transaction as done', 'danger');
             });
         }
 
