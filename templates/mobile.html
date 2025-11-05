@@ -1214,6 +1214,13 @@
                 tbody.appendChild(row);
             });
 
+            // Scroll to top first to ensure sticky header calculates position correctly
+            // This prevents the table from appearing under the fixed mobile header
+            const mobileContent = document.querySelector('.mobile-content');
+            if (mobileContent) {
+                mobileContent.scrollTop = 0;
+            }
+
             // Force reflow to fix sticky positioning on mobile browsers
             // Mobile Safari and other mobile browsers sometimes lose sticky
             // positioning after DOM updates. This forces a recalculation.
