@@ -291,7 +291,19 @@ function updateRecentTransactions(transactions) {
         return;
     }
 
-    transactions.forEach(t => {
+    // Calculate running balance for recent transactions
+    // Note: transactions come sorted by created_at DESC, so we need to reverse to calculate
+    const sortedTransactions = [...transactions].reverse();
+    let runningBalance = 0;
+    sortedTransactions.forEach(t => {
+        const debit = parseFloat(t.debit) || 0;
+        const credit = parseFloat(t.credit) || 0;
+        runningBalance += debit - credit;
+        t.calculatedBalance = runningBalance;
+    });
+
+    // Display in original order (newest first)
+    sortedTransactions.reverse().forEach(t => {
         const row = document.createElement('tr');
         row.innerHTML = `
             <td>${t.transaction_date ? formatDate(t.transaction_date) : '-'}</td>
@@ -299,7 +311,7 @@ function updateRecentTransactions(transactions) {
             <td><span class="badge bg-secondary">${t.category || 'Uncategorized'}</span></td>
             <td class="text-success">${t.debit ? formatCurrency(t.debit) : '-'}</td>
             <td class="text-danger">${t.credit ? formatCurrency(t.credit) : '-'}</td>
-            <td class="fw-bold">${t.balance ? formatCurrency(t.balance) : '-'}</td>
+            <td class="fw-bold">${formatCurrency(t.calculatedBalance)}</td>
         `;
         tbody.appendChild(row);
     });
@@ -426,7 +438,20 @@ function displayTransactions(transactions) {
         return;
     }
 
-    transactions.forEach(t => {
+    // Sort transactions by ID (oldest first) to calculate balance correctly
+    const sortedTransactions = [...transactions].sort((a, b) => a.id - b.id);
+
+    // Calculate balance for each transaction
+    let runningBalance = 0;
+    sortedTransactions.forEach(t => {
+        const debit = parseFloat(t.debit) || 0;
+        const credit = parseFloat(t.credit) || 0;
+        runningBalance += debit - credit;
+        t.calculatedBalance = runningBalance;
+    });
+
+    // Display transactions in reverse order (newest first)
+    sortedTransactions.reverse().forEach(t => {
         const row = document.createElement('tr');
 
         // Checkbox for marking done/undone (handle both boolean and numeric values)
@@ -452,7 +477,7 @@ function displayTransactions(transactions) {
             <td><span class="badge bg-secondary">${t.category_name || 'Uncategorized'}</span></td>
             <td class="text-success">${t.debit ? formatCurrency(t.debit) : '-'}</td>
             <td class="text-danger">${t.credit ? formatCurrency(t.credit) : '-'}</td>
-            <td class="fw-bold">${t.balance ? formatCurrency(t.balance) : '-'}</td>
+            <td class="fw-bold">${formatCurrency(t.calculatedBalance)}</td>
             <td>${t.notes || '-'}</td>
             <td>
                 <button class="btn btn-sm btn-primary me-1" onclick="editTransaction(${t.id})">
@@ -739,19 +764,28 @@ function saveTransaction() {
 }
 
 function deleteTransaction(id) {
-    if (!confirm('Delete this transaction?')) return;
-
-    fetch(`/api/transactions/${id}`, { method: 'DELETE' })
-        .then(response => response.json())
-        .then(result => {
-            showToast('Transaction deleted', 'success');
-            loadTransactions();
-            loadDashboardStats();
-        })
-        .catch(error => {
-            console.error('Error deleting transaction:', error);
-            showToast('Error deleting transaction', 'danger');
-        });
+    showConfirmModal(
+        'Delete Transaction',
+        'Are you sure you want to delete this transaction? This action cannot be undone.',
+        function() {
+            showLoading();
+            fetch(`/api/transactions/${id}`, { method: 'DELETE' })
+                .then(response => response.json())
+                .then(result => {
+                    hideLoading();
+                    showToast('Transaction deleted successfully', 'success');
+                    loadTransactions();
+                    loadDashboardStats();
+                })
+                .catch(error => {
+                    hideLoading();
+                    console.error('Error deleting transaction:', error);
+                    showToast('Error deleting transaction', 'danger');
+                });
+        },
+        'Delete',
+        'btn-danger'
+    );
 }
 
 function executeCloneMonth() {
@@ -776,13 +810,13 @@ function executeCloneMonth() {
     const fromMonthName = document.getElementById('cloneFromMonth')?.options[document.getElementById('cloneFromMonth')?.selectedIndex]?.text;
     const toMonthName = document.getElementById('cloneToMonth')?.options[document.getElementById('cloneToMonth')?.selectedIndex]?.text;
 
-    if (!confirm(`Clone all transactions from ${fromMonthName} ${fromYear} to ${toMonthName} ${toYear}?`)) {
-        return;
-    }
+    showConfirmModal(
+        'Clone Month Transactions',
+        `Clone all transactions from ${fromMonthName} ${fromYear} to ${toMonthName} ${toYear}?`,
+        function() {
+            showLoading();
 
-    showLoading();
-
-    fetch('/api/clone-month-transactions', {
+            fetch('/api/clone-month-transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -810,11 +844,15 @@ function executeCloneMonth() {
             }
         }
     })
-    .catch(error => {
-        hideLoading();
-        console.error('Error cloning transactions:', error);
-        showToast('Error cloning transactions', 'danger');
-    });
+            .catch(error => {
+                hideLoading();
+                console.error('Error cloning transactions:', error);
+                showToast('Error cloning transactions', 'danger');
+            });
+        },
+        'Clone',
+        'btn-primary'
+    );
 }
 
 // ================================
@@ -1377,21 +1415,30 @@ function loadCreditCardsList() {
 }
 
 function deleteCreditCard(cardId) {
-    if (!confirm('Are you sure you want to delete this credit card?')) return;
-
-    fetch(`/api/payment-methods/${cardId}`, {
-        method: 'DELETE'
-    })
-    .then(response => response.json())
-    .then(data => {
-        showToast('Credit card deleted successfully', 'success');
-        loadPaymentMethods();
-        loadCreditCardsList();
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showToast('Error deleting credit card', 'danger');
-    });
+    showConfirmModal(
+        'Delete Credit Card',
+        'Are you sure you want to delete this credit card? This action cannot be undone.',
+        function() {
+            showLoading();
+            fetch(`/api/payment-methods/${cardId}`, {
+                method: 'DELETE'
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                showToast('Credit card deleted successfully', 'success');
+                loadPaymentMethods();
+                loadCreditCardsList();
+            })
+            .catch(error => {
+                hideLoading();
+                console.error('Error:', error);
+                showToast('Error deleting credit card', 'danger');
+            });
+        },
+        'Delete',
+        'btn-danger'
+    );
 }
 
 // Load credit cards when the manage modal is shown

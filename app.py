@@ -305,18 +305,8 @@ def dashboard_stats():
 
             current_stats = cursor.fetchone() or {'total_income': 0, 'total_expenses': 0}
 
-            # Get current balance from the last transaction
-            cursor.execute("""
-                SELECT balance
-                FROM transactions t
-                JOIN monthly_records mr ON t.monthly_record_id = mr.id
-                WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s
-                ORDER BY t.id DESC
-                LIMIT 1
-            """, (user_id, current_year, current_month))
-
-            last_transaction = cursor.fetchone()
-            current_stats['current_balance'] = last_transaction['balance'] if last_transaction else 0
+            # Balance will be calculated on frontend
+            current_stats['current_balance'] = (current_stats.get('total_income', 0) or 0) - (current_stats.get('total_expenses', 0) or 0)
             
             # Get year-to-date stats
             cursor.execute("""
@@ -330,13 +320,12 @@ def dashboard_stats():
             
             ytd_stats = cursor.fetchone()
             
-            # Get recent transactions
+            # Get recent transactions (balance will be calculated on frontend)
             cursor.execute("""
-                SELECT 
+                SELECT
                     t.description,
                     t.debit,
                     t.credit,
-                    t.balance,
                     t.transaction_date,
                     c.name as category
                 FROM transactions t
@@ -450,16 +439,6 @@ def transactions():
 
             monthly_record = cursor.fetchone()
 
-            # Calculate balance: get previous balance and add/subtract current transaction
-            cursor.execute("""
-                SELECT balance FROM transactions
-                WHERE monthly_record_id = %s
-                ORDER BY id DESC LIMIT 1
-            """, (monthly_record['id'],))
-
-            last_balance_row = cursor.fetchone()
-            previous_balance = last_balance_row['balance'] if last_balance_row and last_balance_row['balance'] is not None else Decimal('0')
-
             # Convert to Decimal to avoid float/Decimal arithmetic errors
             debit_value = data.get('debit')
             credit_value = data.get('credit')
@@ -467,27 +446,20 @@ def transactions():
             debit = Decimal(str(debit_value)) if debit_value else Decimal('0')
             credit = Decimal(str(credit_value)) if credit_value else Decimal('0')
 
-            # Ensure previous_balance is also Decimal
-            if not isinstance(previous_balance, Decimal):
-                previous_balance = Decimal(str(previous_balance))
-
-            print(f"[DEBUG] Debit: {debit}, Credit: {credit}, Previous balance: {previous_balance}")
-            new_balance = previous_balance + debit - credit
-            print(f"[DEBUG] New balance: {new_balance}")
+            print(f"[DEBUG] Debit: {debit}, Credit: {credit}")
 
             # Use current date if no transaction_date provided
             transaction_date = data.get('transaction_date')
             if not transaction_date:
                 transaction_date = datetime.now().date()
 
-            # Insert transaction
+            # Insert transaction (balance will be calculated on frontend)
             insert_values = (
                 monthly_record['id'],
                 data.get('description'),
                 data.get('category_id'),
                 debit if debit > 0 else None,
                 credit if credit > 0 else None,
-                new_balance,
                 transaction_date,
                 data.get('notes')
             )
@@ -495,8 +467,8 @@ def transactions():
 
             cursor.execute("""
                 INSERT INTO transactions
-                (monthly_record_id, description, category_id, debit, credit, balance, transaction_date, notes)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                (monthly_record_id, description, category_id, debit, credit, transaction_date, notes)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
             """, insert_values)
 
             transaction_id = cursor.lastrowid
@@ -548,16 +520,6 @@ def manage_transaction(transaction_id):
             monthly_record_id = result[0]
             print(f"[DEBUG] Found monthly_record_id: {monthly_record_id}")
 
-            # Get previous balance (from transaction before this one)
-            cursor.execute("""
-                SELECT balance FROM transactions
-                WHERE monthly_record_id = %s AND id < %s
-                ORDER BY id DESC LIMIT 1
-            """, (monthly_record_id, transaction_id))
-
-            prev_balance_row = cursor.fetchone()
-            previous_balance = prev_balance_row[0] if prev_balance_row and prev_balance_row[0] is not None else Decimal('0')
-
             # Convert to Decimal to avoid float/Decimal arithmetic errors
             debit_value = data.get('debit')
             credit_value = data.get('credit')
@@ -565,57 +527,30 @@ def manage_transaction(transaction_id):
             debit = Decimal(str(debit_value)) if debit_value else Decimal('0')
             credit = Decimal(str(credit_value)) if credit_value else Decimal('0')
 
-            # Ensure previous_balance is also Decimal
-            if not isinstance(previous_balance, Decimal):
-                previous_balance = Decimal(str(previous_balance))
-
-            new_balance = previous_balance + debit - credit
+            print(f"[DEBUG] Debit: {debit}, Credit: {credit}")
 
             # Handle transaction_date - use current date if not provided or empty
             transaction_date = data.get('transaction_date')
             if not transaction_date or transaction_date == '':
                 transaction_date = datetime.now().date()
 
-            # Update transaction
+            # Update transaction (balance will be calculated on frontend)
             cursor.execute("""
                 UPDATE transactions
                 SET description = %s, category_id = %s, debit = %s,
-                    credit = %s, balance = %s, transaction_date = %s, notes = %s
+                    credit = %s, transaction_date = %s, notes = %s
                 WHERE id = %s
             """, (
                 data.get('description'),
                 data.get('category_id'),
                 debit if debit > 0 else None,
                 credit if credit > 0 else None,
-                new_balance,
                 transaction_date,
                 data.get('notes'),
                 transaction_id
             ))
 
-            print(f"[DEBUG] Transaction {transaction_id} updated successfully, new balance: {new_balance}")
-
-            # Recalculate balances for all subsequent transactions
-            cursor.execute("""
-                SELECT id, debit, credit FROM transactions
-                WHERE monthly_record_id = %s AND id > %s
-                ORDER BY id
-            """, (monthly_record_id, transaction_id))
-
-            subsequent_transactions = cursor.fetchall()
-            current_balance = new_balance
-
-            for trans in subsequent_transactions:
-                trans_id, trans_debit, trans_credit = trans
-                # Convert to Decimal for arithmetic
-                trans_debit = Decimal(str(trans_debit)) if trans_debit else Decimal('0')
-                trans_credit = Decimal(str(trans_credit)) if trans_credit else Decimal('0')
-                current_balance = current_balance + trans_debit - trans_credit
-                cursor.execute("""
-                    UPDATE transactions SET balance = %s WHERE id = %s
-                """, (current_balance, trans_id))
-
-            print(f"[DEBUG] Updated {len(subsequent_transactions)} subsequent transactions")
+            print(f"[DEBUG] Transaction {transaction_id} updated successfully")
 
             connection.commit()
             print(f"[DEBUG] Transaction update committed successfully")
@@ -665,64 +600,11 @@ def get_categories():
 @app.route('/api/recalculate-balances', methods=['POST'])
 @login_required
 def recalculate_balances():
-    """Recalculate all transaction balances for a given month/year."""
-    connection = get_db_connection()
-    if connection:
-        cursor = connection.cursor(dictionary=True)
-        try:
-            user_id = session['user_id']
-            data = request.get_json()
-            year = data.get('year', datetime.now().year)
-            month = data.get('month', datetime.now().month)
-
-            # Get monthly record
-            cursor.execute("""
-                SELECT id FROM monthly_records
-                WHERE user_id = %s AND year = %s AND month = %s
-            """, (user_id, year, month))
-
-            monthly_record = cursor.fetchone()
-            if not monthly_record:
-                return jsonify({'error': 'No monthly record found'}), 404
-
-            monthly_record_id = monthly_record['id']
-
-            # Get all transactions for this month, ordered by date and ID
-            cursor.execute("""
-                SELECT id, debit, credit
-                FROM transactions
-                WHERE monthly_record_id = %s
-                ORDER BY transaction_date, id
-            """, (monthly_record_id,))
-
-            transactions = cursor.fetchall()
-
-            # Recalculate balances starting from 0
-            running_balance = Decimal('0')
-            for trans in transactions:
-                debit = Decimal(str(trans['debit'])) if trans['debit'] else Decimal('0')
-                credit = Decimal(str(trans['credit'])) if trans['credit'] else Decimal('0')
-                running_balance = running_balance + debit - credit
-
-                # Update transaction with new balance
-                cursor.execute("""
-                    UPDATE transactions SET balance = %s WHERE id = %s
-                """, (running_balance, trans['id']))
-
-            connection.commit()
-            return jsonify({
-                'message': 'Balances recalculated successfully',
-                'transactions_updated': len(transactions)
-            })
-
-        except Error as e:
-            connection.rollback()
-            return jsonify({'error': str(e)}), 500
-        finally:
-            cursor.close()
-            connection.close()
-
-    return jsonify({'error': 'Database connection failed'}), 500
+    """Deprecated: Balance calculation now happens on frontend."""
+    return jsonify({
+        'message': 'Balance calculation now happens on frontend',
+        'transactions_updated': 0
+    })
 
 @app.route('/api/reports/monthly-summary')
 @login_required
@@ -1188,14 +1070,12 @@ def clone_month_transactions():
         if not source_transactions:
             return jsonify({'error': 'No transactions found in source month'}), 404
 
-        # Clone transactions
+        # Clone transactions (balance will be calculated on frontend)
         cloned_count = 0
-        running_balance = Decimal('0')
 
         for trans in source_transactions:
             debit = Decimal(str(trans['debit'])) if trans['debit'] else Decimal('0')
             credit = Decimal(str(trans['credit'])) if trans['credit'] else Decimal('0')
-            running_balance = running_balance + debit - credit
 
             # Set payment fields based on checkbox
             payment_method_id = trans['payment_method_id'] if include_payments else None
@@ -1204,16 +1084,15 @@ def clone_month_transactions():
 
             cursor.execute("""
                 INSERT INTO transactions
-                (monthly_record_id, description, category_id, debit, credit, balance,
+                (monthly_record_id, description, category_id, debit, credit,
                  transaction_date, notes, payment_method_id, is_done, is_paid)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 target_record['id'],
                 trans['description'],
                 trans['category_id'],
                 debit if debit > 0 else None,
                 credit if credit > 0 else None,
-                running_balance,
                 datetime.now().date(),  # Use current date for cloned transactions
                 trans['notes'],
                 payment_method_id,
