@@ -186,19 +186,32 @@
            - Modals/overlays: 9999
            - Add button / Dropdowns: 1000
            - Mobile header (fixed): 100
-           - Table headers (sticky): 50
+           - Table headers (sticky): 99
            - Table content / Swipe elements: 1-2
         */
         .excel-table thead {
             position: sticky;
             top: 0;
-            z-index: 50;
-            background: #2d2d2d;
+            z-index: 99;
+            background: #2d2d2d !important;
+        }
+
+        .excel-table thead tr {
+            background: #2d2d2d !important;
         }
 
         .excel-table thead th {
-            position: relative;
-            z-index: 50;
+            position: sticky;
+            top: 0;
+            z-index: 99;
+            padding: 6px 4px;
+            border: 1px solid #555555;
+            font-weight: 600;
+            text-align: left;
+            background: #3d3d3d !important;
+            color: #007acc;
+            white-space: nowrap;
+            font-size: 0.7rem;
         }
 
         .excel-table th {
