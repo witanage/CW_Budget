@@ -5,11 +5,11 @@
 {% block content %}
 <div class="container mt-5">
     <div class="row justify-content-center">
-        <div class="col-md-6 col-lg-5">
+        <div class="col-md-6 col-lg-4">
             <div class="card shadow">
-                <div class="card-body p-5">
-                    <h3 class="card-title text-center mb-4">Login to Your Account</h3>
-                    
+                <div class="card-body p-4">
+                    <h4 class="text-center mb-4">Login</h4>
+
                     {% with messages = get_flashed_messages(with_categories=true) %}
                         {% if messages %}
                             {% for category, message in messages %}
@@ -20,34 +20,21 @@
                             {% endfor %}
                         {% endif %}
                     {% endwith %}
-                    
+
                     <form id="loginForm">
                         <div class="mb-3">
-                            <label for="username" class="form-label">Username or Email</label>
-                            <div class="input-group">
-                                <span class="input-group-text"><i class="fas fa-user"></i></span>
-                                <input type="text" class="form-control" id="username" name="username" required>
-                            </div>
+                            <label for="username" class="form-label">Username</label>
+                            <input type="text" class="form-control" id="username" name="username" required>
                         </div>
-                        
+
                         <div class="mb-3">
                             <label for="password" class="form-label">Password</label>
-                            <div class="input-group">
-                                <span class="input-group-text"><i class="fas fa-lock"></i></span>
-                                <input type="password" class="form-control" id="password" name="password" required>
-                            </div>
+                            <input type="password" class="form-control" id="password" name="password" required>
                         </div>
-                        
-                        <div class="mb-3 form-check">
-                            <input type="checkbox" class="form-check-input" id="rememberMe">
-                            <label class="form-check-label" for="rememberMe">Remember me</label>
-                        </div>
-                        
-                        <button type="submit" class="btn btn-gradient w-100 mb-3">
-                            <i class="fas fa-sign-in-alt me-2"></i>Login
-                        </button>
+
+                        <button type="submit" class="btn btn-primary w-100 mb-3">Login</button>
                     </form>
-                    
+
                     <div class="text-center">
                         <p class="mb-0">Don't have an account? <a href="{{ url_for('register') }}">Register here</a></p>
                     </div>
@@ -60,12 +47,12 @@
 <script>
 document.getElementById('loginForm').addEventListener('submit', function(e) {
     e.preventDefault();
-    
+
     const formData = {
         username: document.getElementById('username').value,
         password: document.getElementById('password').value
     };
-    
+
     fetch('/login', {
         method: 'POST',
         headers: {

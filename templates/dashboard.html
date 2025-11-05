@@ -334,12 +334,12 @@
                         <label for="transNotes" class="form-label">Notes</label>
                         <textarea class="form-control" id="transNotes" rows="2"></textarea>
                     </div>
+                    <input type="hidden" id="editTransactionId" value="">
                 </form>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-primary" id="saveTransactionBtn">Save Transaction</button>
-                <input type="hidden" id="editTransactionId" value="">
             </div>
         </div>
     </div>
@@ -437,10 +437,12 @@
                             <label for="cardColor" class="form-label">Highlight Color</label>
                             <input type="color" class="form-control form-control-color" id="cardColor" value="#007bff">
                         </div>
-                        <button type="submit" class="btn btn-success">
-                            <i class="fas fa-save me-1"></i>Save Card
-                        </button>
-                        <button type="button" class="btn btn-secondary" id="cancelAddCardBtn">Cancel</button>
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-save me-1"></i>Save Card
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="cancelAddCardBtn">Cancel</button>
+                        </div>
                     </form>
                 </div>
             </div>
@@ -490,15 +492,17 @@
                     This will copy all transactions from the source month to the target month.
                 </div>
 
-                <div class="mb-3">
-                    <label class="form-label fw-bold">Source Month/Year (Copy From):</label>
-                    <div class="row">
+                <div class="mb-4">
+                    <label class="form-label">Copy From:</label>
+                    <div class="row g-2">
                         <div class="col-6">
+                            <label class="form-label text-muted small">Month</label>
                             <select class="form-select" id="cloneFromMonth">
                                 <!-- Months will be populated -->
                             </select>
                         </div>
                         <div class="col-6">
+                            <label class="form-label text-muted small">Year</label>
                             <select class="form-select" id="cloneFromYear">
                                 <!-- Years will be populated -->
                             </select>
@@ -506,15 +510,17 @@
                     </div>
                 </div>
 
-                <div class="mb-3">
-                    <label class="form-label fw-bold">Target Month/Year (Copy To):</label>
-                    <div class="row">
+                <div class="mb-4">
+                    <label class="form-label">Copy To:</label>
+                    <div class="row g-2">
                         <div class="col-6">
+                            <label class="form-label text-muted small">Month</label>
                             <select class="form-select" id="cloneToMonth">
                                 <!-- Months will be populated -->
                             </select>
                         </div>
                         <div class="col-6">
+                            <label class="form-label text-muted small">Year</label>
                             <select class="form-select" id="cloneToYear">
                                 <!-- Years will be populated -->
                             </select>
