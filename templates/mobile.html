@@ -225,43 +225,76 @@
 
         /* Column widths - Use percentages to fit viewport */
         .col-desc {
-            width: 35%;
+            width: 40%;
             white-space: normal;
             word-wrap: break-word;
             cursor: pointer;
         }
 
         .col-debit, .col-credit {
-            width: 18%;
+            width: 20%;
             text-align: right;
         }
 
         .col-balance {
-            width: 18%;
+            width: 20%;
             text-align: right;
         }
 
-        .col-actions {
-            width: 11%;
-            text-align: center;
+        /* Swipe-to-reveal container */
+        .swipe-container {
+            position: relative;
+            overflow: hidden;
         }
 
-        /* Action buttons */
-        .action-icon-btn {
-            background: none;
+        .swipe-content {
+            position: relative;
+            background: #0d1117;
+            transition: transform 0.3s ease;
+            z-index: 2;
+        }
+
+        .swipe-actions {
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            display: flex;
+            align-items: stretch;
+            z-index: 1;
+        }
+
+        .swipe-action-btn {
+            width: 70px;
             border: none;
-            color: #58a6ff;
-            padding: 4px 8px;
+            color: white;
+            font-size: 1.2rem;
             cursor: pointer;
-            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
         }
 
-        .action-icon-btn.delete {
-            color: #f85149;
+        .swipe-action-edit {
+            background: #0d6efd;
         }
 
-        .action-icon-btn:active {
-            opacity: 0.7;
+        .swipe-action-edit:active {
+            background: #0a58ca;
+        }
+
+        .swipe-action-delete {
+            background: #dc3545;
+        }
+
+        .swipe-action-delete:active {
+            background: #bb2d3b;
+        }
+
+        /* Touch feedback */
+        .swipe-container.swiping .swipe-content {
+            transition: none;
         }
 
         /* Override text colors to black for table */
@@ -501,12 +534,11 @@
                     <th class="col-debit">Debit</th>
                     <th class="col-credit">Credit</th>
                     <th class="col-balance">Balance</th>
-                    <th class="col-actions">Actions</th>
                 </tr>
             </thead>
             <tbody id="transactionsList">
                 <tr>
-                    <td colspan="5">
+                    <td colspan="4">
                         <div class="no-transactions">
                             <i class="fas fa-receipt fa-3x mb-3"></i>
                             <p>No transactions yet</p>
@@ -923,45 +955,69 @@
             tbody.innerHTML = '';
             sortedTransactions.reverse().forEach(t => {
                 const row = document.createElement('tr');
+                row.className = 'swipe-container';
 
-                // Apply payment method highlight color if present
+                // Check payment status
                 const isDone = t.payment_method_id && t.payment_method_id !== null;
+                const isPaid = t.is_paid === true || t.is_paid === 1;
+
                 if (isDone && t.payment_method_color) {
                     row.classList.add('transaction-highlighted');
                 }
 
+                // Build the row with swipe-to-reveal structure
                 row.innerHTML = `
-                    <td class="col-desc">${t.description || ''}</td>
-                    <td class="col-debit text-success">${t.debit ? formatCurrency(t.debit) : '-'}</td>
-                    <td class="col-credit text-danger">${t.credit ? formatCurrency(t.credit) : '-'}</td>
-                    <td class="col-balance fw-bold">${formatCurrency(t.calculatedBalance)}</td>
-                    <td class="col-actions">
-                        <button class="action-icon-btn" onclick="editTransaction(${t.id})" title="Edit">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="action-icon-btn delete" onclick="deleteTransaction(${t.id})" title="Delete">
-                            <i class="fas fa-trash"></i>
-                        </button>
+                    <td colspan="4" style="padding: 0;">
+                        <div class="swipe-actions">
+                            <button class="swipe-action-btn swipe-action-edit" data-action="edit" data-id="${t.id}">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="swipe-action-btn swipe-action-delete" data-action="delete" data-id="${t.id}">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                        <table class="swipe-content" style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                                <td class="col-desc" data-transaction-id="${t.id}">${t.description || ''}</td>
+                                <td class="col-debit text-success">${t.debit ? formatCurrency(t.debit) : '-'}</td>
+                                <td class="col-credit text-danger">${t.credit ? formatCurrency(t.credit) : '-'}</td>
+                                <td class="col-balance fw-bold">${formatCurrency(t.calculatedBalance)}</td>
+                            </tr>
+                        </table>
                     </td>
                 `;
 
-                // Store transaction data for edit
+                // Store transaction data
                 row.dataset.transaction = JSON.stringify(t);
 
-                // Apply background color to cells if payment method color exists
+                // Apply background color (desktop behavior: description cell only gets color if is_paid)
                 if (isDone && t.payment_method_color) {
-                    const cells = row.querySelectorAll('td');
-                    cells.forEach(cell => {
-                        cell.style.backgroundColor = t.payment_method_color;
+                    const swipeContent = row.querySelector('.swipe-content');
+                    const cells = swipeContent.querySelectorAll('td');
+                    cells.forEach((cell, index) => {
+                        // Apply to all cells except description (index 0)
+                        if (index !== 0) {
+                            cell.style.backgroundColor = t.payment_method_color;
+                        } else {
+                            // Apply to description cell only if is_paid is true
+                            if (isPaid) {
+                                cell.style.backgroundColor = t.payment_method_color;
+                            }
+                        }
                     });
                 }
+
+                // Initialize swipe functionality
+                initializeSwipe(row);
 
                 // Add click handler to description cell (same as desktop behavior)
                 const descCell = row.querySelector('.col-desc');
                 if (descCell) {
                     descCell.style.cursor = 'pointer';
-                    descCell.addEventListener('click', function() {
-                        const isPaid = t.is_paid === true || t.is_paid === 1;
+                    descCell.addEventListener('click', function(e) {
+                        // Prevent click during swipe
+                        if (row.classList.contains('swiped')) return;
+
                         if (isPaid) {
                             // If already paid, mark as unpaid
                             showConfirmModal(
@@ -980,7 +1036,107 @@
                     });
                 }
 
+                // Add action button handlers
+                const editBtn = row.querySelector('[data-action="edit"]');
+                const deleteBtn = row.querySelector('[data-action="delete"]');
+
+                if (editBtn) {
+                    editBtn.addEventListener('click', function() {
+                        editTransaction(t.id);
+                    });
+                }
+
+                if (deleteBtn) {
+                    deleteBtn.addEventListener('click', function() {
+                        deleteTransaction(t.id);
+                    });
+                }
+
                 tbody.appendChild(row);
+            });
+        }
+
+        // Initialize swipe functionality for a row
+        function initializeSwipe(row) {
+            const swipeContent = row.querySelector('.swipe-content');
+            if (!swipeContent) return;
+
+            let startX = 0;
+            let currentX = 0;
+            let isDragging = false;
+            let startTime = 0;
+
+            swipeContent.addEventListener('touchstart', function(e) {
+                startX = e.touches[0].clientX;
+                currentX = startX;
+                isDragging = true;
+                startTime = Date.now();
+                row.classList.add('swiping');
+
+                // Close other open swipes
+                closeAllSwipes(row);
+            });
+
+            swipeContent.addEventListener('touchmove', function(e) {
+                if (!isDragging) return;
+
+                currentX = e.touches[0].clientX;
+                const diff = startX - currentX;
+
+                // Only allow left swipe
+                if (diff > 0) {
+                    const maxSwipe = 140; // Width of both buttons
+                    const swipeAmount = Math.min(diff, maxSwipe);
+                    swipeContent.style.transform = `translateX(-${swipeAmount}px)`;
+                }
+            });
+
+            swipeContent.addEventListener('touchend', function(e) {
+                if (!isDragging) return;
+
+                const diff = startX - currentX;
+                const duration = Date.now() - startTime;
+                const velocity = diff / duration;
+
+                isDragging = false;
+                row.classList.remove('swiping');
+
+                // Determine if we should open or close
+                const threshold = 60;
+                const shouldOpen = diff > threshold || velocity > 0.5;
+
+                if (shouldOpen && diff > 0) {
+                    // Open swipe
+                    swipeContent.style.transform = 'translateX(-140px)';
+                    row.classList.add('swiped');
+                } else {
+                    // Close swipe
+                    swipeContent.style.transform = 'translateX(0)';
+                    row.classList.remove('swiped');
+                }
+            });
+
+            // Close swipe when clicking outside
+            swipeContent.addEventListener('click', function(e) {
+                if (row.classList.contains('swiped')) {
+                    e.stopPropagation();
+                    swipeContent.style.transform = 'translateX(0)';
+                    row.classList.remove('swiped');
+                }
+            });
+        }
+
+        // Close all open swipes except the specified row
+        function closeAllSwipes(exceptRow) {
+            const allRows = document.querySelectorAll('.swipe-container');
+            allRows.forEach(row => {
+                if (row !== exceptRow && row.classList.contains('swiped')) {
+                    const swipeContent = row.querySelector('.swipe-content');
+                    if (swipeContent) {
+                        swipeContent.style.transform = 'translateX(0)';
+                        row.classList.remove('swiped');
+                    }
+                }
             });
         }
 
