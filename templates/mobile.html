@@ -169,6 +169,7 @@
             height: calc(100vh - 85px);
             overflow: auto;
             -webkit-overflow-scrolling: touch;
+            padding-bottom: 100px; /* Extra padding to prevent last records from being hidden by browser toolbar */
         }
 
         /* Excel-like table - Dark theme */
@@ -685,8 +686,21 @@
                 return;
             }
 
+            // Sort transactions by ID (oldest first) to calculate balance correctly
+            const sortedTransactions = [...transactions].sort((a, b) => a.id - b.id);
+
+            // Calculate balance for each transaction
+            let runningBalance = 0;
+            sortedTransactions.forEach(t => {
+                const debit = parseFloat(t.debit) || 0;
+                const credit = parseFloat(t.credit) || 0;
+                runningBalance += debit - credit;
+                t.calculatedBalance = runningBalance;
+            });
+
+            // Display transactions in reverse order (newest first)
             tbody.innerHTML = '';
-            transactions.forEach(t => {
+            sortedTransactions.reverse().forEach(t => {
                 const row = document.createElement('tr');
 
                 // Apply payment method highlight color if present
@@ -699,7 +713,7 @@
                     <td class="col-desc">${t.description || ''}</td>
                     <td class="col-debit text-success">${t.debit ? formatCurrency(t.debit) : '-'}</td>
                     <td class="col-credit text-danger">${t.credit ? formatCurrency(t.credit) : '-'}</td>
-                    <td class="col-balance fw-bold">${formatCurrency(t.balance)}</td>
+                    <td class="col-balance fw-bold">${formatCurrency(t.calculatedBalance)}</td>
                 `;
 
                 // Apply background color to cells if payment method color exists
