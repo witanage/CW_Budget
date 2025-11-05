@@ -134,6 +134,31 @@ def index():
     logger.info("No user session found, redirecting to login")
     return redirect(url_for('login'))
 
+@app.route('/health')
+def health_check():
+    """Health check endpoint for monitoring and keeping the app alive."""
+    try:
+        # Test database connection
+        connection = get_db_connection()
+        if connection:
+            connection.close()
+            db_status = 'connected'
+        else:
+            db_status = 'disconnected'
+
+        return jsonify({
+            'status': 'ok',
+            'database': db_status,
+            'timestamp': datetime.now().isoformat()
+        }), 200
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     """User registration."""
