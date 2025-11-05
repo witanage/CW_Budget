@@ -1182,6 +1182,6 @@ if __name__ == '__main__':
     def not_found(error):
         return jsonify({'error': 'Not found'}), 404
 
-    # Use debug=True for development (detailed error messages)
-    # Set to False for production deployment
-    app.run(debug=True, host='0.0.0.0', port=5003)
+    # Use debug=False for production
+    # Set to True for development (detailed error messages)
+    app.run(debug=False, host='0.0.0.0', port=5003)

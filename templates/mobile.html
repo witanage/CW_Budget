@@ -49,6 +49,12 @@
             color: #ffffff;
         }
 
+        .header-buttons {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
         .btn-back {
             background: rgba(255,255,255,0.1);
             border: none;
@@ -60,6 +66,68 @@
             display: inline-flex;
             align-items: center;
             gap: 4px;
+        }
+
+        /* User dropdown for mobile */
+        .mobile-user-dropdown {
+            position: relative;
+        }
+
+        .mobile-user-btn {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: #ffffff;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .mobile-dropdown-menu {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: #2d2d2d;
+            border: 1px solid #555555;
+            border-radius: 6px;
+            min-width: 180px;
+            margin-top: 4px;
+            display: none;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+
+        .mobile-dropdown-menu.show {
+            display: block;
+        }
+
+        .mobile-dropdown-item {
+            padding: 8px 12px;
+            color: #ffffff;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.8rem;
+            border-bottom: 1px solid #3d3d3d;
+            cursor: pointer;
+        }
+
+        .mobile-dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .mobile-dropdown-item:hover {
+            background: #3d3d3d;
+        }
+
+        .mobile-dropdown-divider {
+            height: 1px;
+            background: #3d3d3d;
+            margin: 0;
         }
 
         .month-nav {
@@ -322,9 +390,34 @@
     <div class="mobile-header">
         <div class="header-top">
             <h1><i class="fas fa-table me-2"></i>Transactions</h1>
-            <a href="/dashboard" class="btn-back">
-                <i class="fas fa-desktop"></i>Desktop
-            </a>
+            <div class="header-buttons">
+                <a href="/dashboard" class="btn-back">
+                    <i class="fas fa-desktop"></i>Desktop
+                </a>
+                <div class="mobile-user-dropdown">
+                    <button class="mobile-user-btn" id="mobileUserBtn">
+                        <i class="fas fa-user-circle"></i>
+                        <i class="fas fa-chevron-down" style="font-size: 0.6rem;"></i>
+                    </button>
+                    <div class="mobile-dropdown-menu" id="mobileUserDropdown">
+                        <a href="/dashboard" class="mobile-dropdown-item">
+                            <i class="fas fa-tachometer-alt"></i>Dashboard
+                        </a>
+                        <div class="mobile-dropdown-divider"></div>
+                        <a href="#" class="mobile-dropdown-item" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
+                            <i class="fas fa-key"></i>Change Password
+                        </a>
+                        <a href="#" class="mobile-dropdown-item" id="mobileThemeToggle">
+                            <i class="fas fa-moon" id="mobileThemeIcon"></i>
+                            <span id="mobileThemeText">Light Theme</span>
+                        </a>
+                        <div class="mobile-dropdown-divider"></div>
+                        <a href="/logout" class="mobile-dropdown-item">
+                            <i class="fas fa-sign-out-alt"></i>Logout
+                        </a>
+                    </div>
+                </div>
+            </div>
         </div>
         <div class="month-nav">
             <button id="prevMonthBtn" onclick="navigateToPreviousMonth()">
@@ -446,6 +539,39 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Change Password Modal -->
+    <div class="modal fade" id="changePasswordModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Change Password</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="changePasswordForm">
+                        <div class="mb-3">
+                            <label for="currentPassword" class="form-label">Current Password</label>
+                            <input type="password" class="form-control" id="currentPassword" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="newPassword" class="form-label">New Password</label>
+                            <input type="password" class="form-control" id="newPassword" required minlength="6">
+                            <div class="form-text">Password must be at least 6 characters long.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="confirmPassword" class="form-label">Confirm New Password</label>
+                            <input type="password" class="form-control" id="confirmPassword" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="savePasswordBtn">Change Password</button>
                 </div>
             </div>
         </div>
@@ -688,6 +814,52 @@
                 });
         }
 
+        // Toast notification function
+        function showToast(message, type = 'info') {
+            // Create toast element
+            const toast = document.createElement('div');
+            toast.className = 'position-fixed top-0 start-50 translate-middle-x p-3';
+            toast.style.zIndex = '9999';
+            toast.style.marginTop = '20px';
+            toast.innerHTML = `
+                <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+            document.body.appendChild(toast);
+
+            // Remove after 3 seconds
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+
+        // Theme toggle functionality
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+
+            document.documentElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+
+            updateThemeButton(newTheme);
+            showToast(`Switched to ${newTheme} theme`, 'success');
+        }
+
+        function updateThemeButton(theme) {
+            const icon = document.getElementById('mobileThemeIcon');
+            const text = document.getElementById('mobileThemeText');
+
+            if (theme === 'dark') {
+                icon.className = 'fas fa-sun';
+                text.textContent = 'Light Theme';
+            } else {
+                icon.className = 'fas fa-moon';
+                text.textContent = 'Dark Theme';
+            }
+        }
+
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
             // Set today's date
@@ -707,6 +879,99 @@
             const paymentTotalsModal = document.getElementById('paymentTotalsModal');
             if (paymentTotalsModal) {
                 paymentTotalsModal.addEventListener('show.bs.modal', loadPaymentTotals);
+            }
+
+            // User dropdown toggle
+            const userBtn = document.getElementById('mobileUserBtn');
+            const userDropdown = document.getElementById('mobileUserDropdown');
+
+            if (userBtn && userDropdown) {
+                userBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    userDropdown.classList.toggle('show');
+                });
+
+                // Close dropdown when clicking outside
+                document.addEventListener('click', function(e) {
+                    if (!userDropdown.contains(e.target) && !userBtn.contains(e.target)) {
+                        userDropdown.classList.remove('show');
+                    }
+                });
+
+                // Close dropdown when clicking a link
+                userDropdown.querySelectorAll('.mobile-dropdown-item').forEach(item => {
+                    item.addEventListener('click', function() {
+                        userDropdown.classList.remove('show');
+                    });
+                });
+            }
+
+            // Theme toggle button
+            const themeToggle = document.getElementById('mobileThemeToggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    toggleTheme();
+                });
+            }
+
+            // Initialize theme
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            updateThemeButton(savedTheme);
+
+            // Change password functionality
+            const savePasswordBtn = document.getElementById('savePasswordBtn');
+            if (savePasswordBtn) {
+                savePasswordBtn.addEventListener('click', function() {
+                    const currentPassword = document.getElementById('currentPassword').value;
+                    const newPassword = document.getElementById('newPassword').value;
+                    const confirmPassword = document.getElementById('confirmPassword').value;
+
+                    // Validation
+                    if (!currentPassword || !newPassword || !confirmPassword) {
+                        showToast('All fields are required', 'warning');
+                        return;
+                    }
+
+                    if (newPassword.length < 6) {
+                        showToast('New password must be at least 6 characters long', 'warning');
+                        return;
+                    }
+
+                    if (newPassword !== confirmPassword) {
+                        showToast('New passwords do not match', 'warning');
+                        return;
+                    }
+
+                    // Send request
+                    showLoading();
+                    fetch('/api/change-password', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            current_password: currentPassword,
+                            new_password: newPassword
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        hideLoading();
+                        if (data.error) {
+                            showToast(data.error, 'danger');
+                        } else {
+                            showToast(data.message, 'success');
+                            const modal = bootstrap.Modal.getInstance(document.getElementById('changePasswordModal'));
+                            modal.hide();
+                            document.getElementById('changePasswordForm').reset();
+                        }
+                    })
+                    .catch(error => {
+                        hideLoading();
+                        showToast('Error changing password', 'danger');
+                        console.error('Error:', error);
+                    });
+                });
             }
         });
     </script>
