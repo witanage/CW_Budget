@@ -181,11 +181,37 @@
             table-layout: fixed;
         }
 
+        /* Sticky table header - positioned below fixed mobile-header
+           Z-index hierarchy:
+           - Modals/overlays: 9999
+           - Add button / Dropdowns: 1000
+           - Mobile header (fixed): 100
+           - Table headers (sticky): 99
+           - Table content / Swipe elements: 1-2
+        */
         .excel-table thead {
             position: sticky;
             top: 0;
-            z-index: 5;
-            background: #2d2d2d;
+            z-index: 99;
+            background: #2d2d2d !important;
+        }
+
+        .excel-table thead tr {
+            background: #2d2d2d !important;
+        }
+
+        .excel-table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 99;
+            padding: 6px 4px;
+            border: 1px solid #555555;
+            font-weight: 600;
+            text-align: left;
+            background: #3d3d3d !important;
+            color: #007acc;
+            white-space: nowrap;
+            font-size: 0.7rem;
         }
 
         .excel-table th {
@@ -244,8 +270,24 @@
 
         /* Swipe-to-reveal container */
         .swipe-container {
+            /* TR element - no positioning needed here */
+        }
+
+        /* Remove spacing on the outer TD that contains swipe-wrapper */
+        .swipe-container > td {
+            padding: 0 !important;
+            border: none !important;
+            vertical-align: top;
+        }
+
+        .swipe-wrapper {
             position: relative;
             overflow: hidden;
+            display: block;
+            width: 100%;
+            isolation: isolate; /* Create new stacking context */
+            margin: 0;
+            padding: 0;
         }
 
         .swipe-content {
@@ -253,16 +295,32 @@
             background: #2d2d2d;
             transition: transform 0.3s ease;
             z-index: 2;
+            width: 100%;
+            pointer-events: auto; /* Ensure content is clickable */
+        }
+
+        /* Inner table cells - keep the Excel styling */
+        .swipe-content td {
+            padding: 4px 4px;
+            border: 1px solid #555555;
+            vertical-align: middle;
+            font-size: 0.7rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 150px;
+            color: #000000;
         }
 
         .swipe-actions {
             position: absolute;
             right: 0;
             top: 0;
-            bottom: 0;
+            height: 100%;
             display: flex;
             align-items: stretch;
             z-index: 1;
+            pointer-events: auto; /* Ensure buttons are clickable */
         }
 
         .swipe-action-btn {
@@ -983,6 +1041,8 @@
         // Display transactions
         function displayTransactions(transactions) {
             const tbody = document.getElementById('transactionsList');
+            const table = document.getElementById('transactionsTable');
+            const thead = table ? table.querySelector('thead') : null;
 
             if (!transactions || transactions.length === 0) {
                 tbody.innerHTML = `
@@ -995,6 +1055,12 @@
                         </td>
                     </tr>
                 `;
+                // Force reflow to fix sticky positioning on mobile
+                if (thead) {
+                    thead.style.display = 'none';
+                    void thead.offsetHeight; // Trigger reflow
+                    thead.style.display = '';
+                }
                 return;
             }
 
@@ -1033,25 +1099,27 @@
                 // Build the row with swipe-to-reveal structure
                 row.innerHTML = `
                     <td colspan="4" style="padding: 0;">
-                        <div class="swipe-actions">
-                            <button class="swipe-action-btn swipe-action-edit" data-action="edit" data-id="${t.id}">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button class="swipe-action-btn ${doneBtnClass}" data-action="${doneBtnAction}" data-id="${t.id}" data-is-done="${isDone}">
-                                <i class="fas ${doneBtnIcon}"></i>
-                            </button>
-                            <button class="swipe-action-btn swipe-action-delete" data-action="delete" data-id="${t.id}">
-                                <i class="fas fa-trash"></i>
-                            </button>
+                        <div class="swipe-wrapper">
+                            <div class="swipe-actions">
+                                <button class="swipe-action-btn swipe-action-edit" data-action="edit" data-id="${t.id}">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="swipe-action-btn ${doneBtnClass}" data-action="${doneBtnAction}" data-id="${t.id}" data-is-done="${isDone}">
+                                    <i class="fas ${doneBtnIcon}"></i>
+                                </button>
+                                <button class="swipe-action-btn swipe-action-delete" data-action="delete" data-id="${t.id}">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                            <table class="swipe-content" style="width: 100%; border-collapse: collapse;">
+                                <tr>
+                                    <td class="col-desc" data-transaction-id="${t.id}">${t.description || ''}</td>
+                                    <td class="col-debit text-success">${t.debit ? formatCurrency(t.debit) : '-'}</td>
+                                    <td class="col-credit text-danger">${t.credit ? formatCurrency(t.credit) : '-'}</td>
+                                    <td class="col-balance fw-bold">${formatCurrency(t.calculatedBalance)}</td>
+                                </tr>
+                            </table>
                         </div>
-                        <table class="swipe-content" style="width: 100%; border-collapse: collapse;">
-                            <tr>
-                                <td class="col-desc" data-transaction-id="${t.id}">${t.description || ''}</td>
-                                <td class="col-debit text-success">${t.debit ? formatCurrency(t.debit) : '-'}</td>
-                                <td class="col-credit text-danger">${t.credit ? formatCurrency(t.credit) : '-'}</td>
-                                <td class="col-balance fw-bold">${formatCurrency(t.calculatedBalance)}</td>
-                            </tr>
-                        </table>
                     </td>
                 `;
 
@@ -1082,6 +1150,13 @@
                 const descCell = row.querySelector('.col-desc');
                 if (descCell) {
                     descCell.style.cursor = 'pointer';
+
+                    // Set description text color based on payment status
+                    // White for unpaid (is_paid = 0), current color for paid (is_paid = 1)
+                    if (!isPaid) {
+                        descCell.style.color = '#ffffff';
+                    }
+
                     descCell.addEventListener('click', function(e) {
                         // Prevent click during swipe
                         if (row.classList.contains('swiped')) return;
@@ -1138,6 +1213,15 @@
 
                 tbody.appendChild(row);
             });
+
+            // Force reflow to fix sticky positioning on mobile browsers
+            // Mobile Safari and other mobile browsers sometimes lose sticky
+            // positioning after DOM updates. This forces a recalculation.
+            if (thead) {
+                thead.style.display = 'none';
+                void thead.offsetHeight; // Trigger reflow
+                thead.style.display = '';
+            }
         }
 
         // Mark transaction as undone
@@ -1164,88 +1248,209 @@
             });
         }
 
-        // Initialize swipe functionality for a row
-        function initializeSwipe(row) {
-            const swipeContent = row.querySelector('.swipe-content');
-            if (!swipeContent) return;
+        // ===== REVAMPED SWIPE MANAGER =====
+        // Modern, event-delegation-based swipe system
+        // Fixes: memory leaks, mouse support, touch conflicts, better architecture
 
-            let startX = 0;
-            let currentX = 0;
-            let isDragging = false;
-            let startTime = 0;
+        const SwipeManager = {
+            // Configuration
+            config: {
+                buttonWidth: 70,
+                buttonCount: 3,
+                snapThreshold: 60,
+                velocityThreshold: 0.3,
+                get maxSwipe() {
+                    return this.buttonWidth * this.buttonCount;
+                }
+            },
 
-            swipeContent.addEventListener('touchstart', function(e) {
-                startX = e.touches[0].clientX;
-                currentX = startX;
-                isDragging = true;
-                startTime = Date.now();
+            // State
+            state: {
+                startX: 0,
+                currentX: 0,
+                startY: 0,
+                currentY: 0,
+                isDragging: false,
+                startTime: 0,
+                activeRow: null,
+                isTouch: false,
+                scrollBlocked: false
+            },
+
+            // Initialize the swipe manager (call once)
+            init: function() {
+                const tbody = document.getElementById('transactionsList');
+                if (!tbody) return;
+
+                // Use event delegation - single listener for all rows
+                // Touch events
+                tbody.addEventListener('touchstart', this.handleStart.bind(this), { passive: false });
+                tbody.addEventListener('touchmove', this.handleMove.bind(this), { passive: false });
+                tbody.addEventListener('touchend', this.handleEnd.bind(this), { passive: false });
+
+                // Mouse events for desktop testing
+                tbody.addEventListener('mousedown', this.handleStart.bind(this), { passive: false });
+                tbody.addEventListener('mousemove', this.handleMove.bind(this), { passive: false });
+                tbody.addEventListener('mouseup', this.handleEnd.bind(this), { passive: false });
+                tbody.addEventListener('mouseleave', this.handleEnd.bind(this), { passive: false });
+
+                // Close swipe when clicking outside
+                document.addEventListener('click', this.handleOutsideClick.bind(this));
+            },
+
+            // Get coordinates from touch or mouse event
+            getCoords: function(e) {
+                if (e.touches && e.touches.length > 0) {
+                    return {
+                        x: e.touches[0].clientX,
+                        y: e.touches[0].clientY
+                    };
+                }
+                return {
+                    x: e.clientX,
+                    y: e.clientY
+                };
+            },
+
+            // Find the swipe container row from event target
+            findSwipeRow: function(target) {
+                return target.closest('.swipe-container');
+            },
+
+            // Handle start of swipe (touch/mouse down)
+            handleStart: function(e) {
+                const row = this.findSwipeRow(e.target);
+                if (!row) return;
+
+                // Don't swipe if clicking on action buttons
+                if (e.target.closest('.swipe-action-btn')) return;
+
+                const coords = this.getCoords(e);
+                this.state.startX = coords.x;
+                this.state.currentX = coords.x;
+                this.state.startY = coords.y;
+                this.state.currentY = coords.y;
+                this.state.isDragging = true;
+                this.state.startTime = Date.now();
+                this.state.activeRow = row;
+                this.state.isTouch = e.type.startsWith('touch');
+                this.state.scrollBlocked = false;
+
                 row.classList.add('swiping');
 
                 // Close other open swipes
-                closeAllSwipes(row);
-            });
+                this.closeAllSwipes(row);
+            },
 
-            swipeContent.addEventListener('touchmove', function(e) {
-                if (!isDragging) return;
+            // Handle swipe movement
+            handleMove: function(e) {
+                if (!this.state.isDragging || !this.state.activeRow) return;
 
-                currentX = e.touches[0].clientX;
-                const diff = startX - currentX;
+                const coords = this.getCoords(e);
+                this.state.currentX = coords.x;
+                this.state.currentY = coords.y;
+
+                const diffX = this.state.startX - this.state.currentX;
+                const diffY = Math.abs(this.state.startY - this.state.currentY);
+
+                // Detect horizontal vs vertical scroll
+                if (!this.state.scrollBlocked && Math.abs(diffX) > 10) {
+                    // Horizontal swipe detected - block vertical scroll
+                    if (diffX > diffY * 1.5) {
+                        this.state.scrollBlocked = true;
+                        e.preventDefault(); // Prevent page scroll
+                    }
+                }
 
                 // Only allow left swipe
-                if (diff > 0) {
-                    const maxSwipe = 210; // Width of three buttons (70px each)
-                    const swipeAmount = Math.min(diff, maxSwipe);
-                    swipeContent.style.transform = `translateX(-${swipeAmount}px)`;
+                if (diffX > 0 && this.state.scrollBlocked) {
+                    const swipeAmount = Math.min(diffX, this.config.maxSwipe);
+                    const swipeContent = this.state.activeRow.querySelector('.swipe-content');
+                    if (swipeContent) {
+                        swipeContent.style.transform = `translateX(-${swipeAmount}px)`;
+                    }
                 }
-            });
+            },
 
-            swipeContent.addEventListener('touchend', function(e) {
-                if (!isDragging) return;
+            // Handle end of swipe (touch/mouse up)
+            handleEnd: function(e) {
+                if (!this.state.isDragging || !this.state.activeRow) return;
 
-                const diff = startX - currentX;
-                const duration = Date.now() - startTime;
-                const velocity = diff / duration;
+                const diffX = this.state.startX - this.state.currentX;
+                const duration = Date.now() - this.state.startTime;
+                const velocity = duration > 0 ? diffX / duration : 0;
 
-                isDragging = false;
+                const row = this.state.activeRow;
+                const swipeContent = row.querySelector('.swipe-content');
+
                 row.classList.remove('swiping');
 
                 // Determine if we should open or close
-                const threshold = 60;
-                const shouldOpen = diff > threshold || velocity > 0.5;
+                const shouldOpen = diffX > this.config.snapThreshold ||
+                                 (velocity > this.config.velocityThreshold && diffX > 20);
 
-                if (shouldOpen && diff > 0) {
-                    // Open swipe - show all three buttons
-                    swipeContent.style.transform = 'translateX(-210px)';
+                if (shouldOpen && diffX > 0 && swipeContent) {
+                    // Open swipe - show all buttons
+                    swipeContent.style.transform = `translateX(-${this.config.maxSwipe}px)`;
                     row.classList.add('swiped');
-                } else {
+                    row.dataset.swipeOpen = 'true';
+                } else if (swipeContent) {
                     // Close swipe
-                    swipeContent.style.transform = 'translateX(0)';
-                    row.classList.remove('swiped');
+                    this.closeSwipe(row);
                 }
-            });
 
-            // Close swipe when clicking outside
-            swipeContent.addEventListener('click', function(e) {
-                if (row.classList.contains('swiped')) {
-                    e.stopPropagation();
+                // Reset state
+                this.state.isDragging = false;
+                this.state.activeRow = null;
+                this.state.scrollBlocked = false;
+            },
+
+            // Handle clicks outside swiped rows
+            handleOutsideClick: function(e) {
+                // Don't close if clicking on action buttons
+                if (e.target.closest('.swipe-action-btn')) return;
+
+                const clickedRow = this.findSwipeRow(e.target);
+                const allRows = document.querySelectorAll('.swipe-container[data-swipe-open="true"]');
+
+                allRows.forEach(row => {
+                    // Close if clicking different row or clicking on swiped row content
+                    if (row !== clickedRow || (row === clickedRow && row.dataset.swipeOpen === 'true')) {
+                        this.closeSwipe(row);
+                    }
+                });
+            },
+
+            // Close a specific swipe
+            closeSwipe: function(row) {
+                const swipeContent = row.querySelector('.swipe-content');
+                if (swipeContent) {
                     swipeContent.style.transform = 'translateX(0)';
                     row.classList.remove('swiped');
+                    delete row.dataset.swipeOpen;
                 }
-            });
+            },
+
+            // Close all swipes except specified row
+            closeAllSwipes: function(exceptRow) {
+                const allRows = document.querySelectorAll('.swipe-container');
+                allRows.forEach(row => {
+                    if (row !== exceptRow && row.classList.contains('swiped')) {
+                        this.closeSwipe(row);
+                    }
+                });
+            }
+        };
+
+        // Legacy function for compatibility (now a no-op)
+        function initializeSwipe(row) {
+            // No longer needed - SwipeManager uses event delegation
+            // This function is kept for compatibility but does nothing
         }
 
-        // Close all open swipes except the specified row
+        // Legacy function for compatibility
         function closeAllSwipes(exceptRow) {
-            const allRows = document.querySelectorAll('.swipe-container');
-            allRows.forEach(row => {
-                if (row !== exceptRow && row.classList.contains('swiped')) {
-                    const swipeContent = row.querySelector('.swipe-content');
-                    if (swipeContent) {
-                        swipeContent.style.transform = 'translateX(0)';
-                        row.classList.remove('swiped');
-                    }
-                }
-            });
+            SwipeManager.closeAllSwipes(exceptRow);
         }
 
         // Refresh transactions
@@ -1480,6 +1685,9 @@
 
             // Update month display
             updateMonthDisplay();
+
+            // Initialize the new swipe manager
+            SwipeManager.init();
 
             // Load data
             loadCategories();
