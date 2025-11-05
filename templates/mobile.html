@@ -170,8 +170,6 @@
             overflow: auto;
             -webkit-overflow-scrolling: touch;
             padding-bottom: 100px; /* Extra padding to prevent last records from being hidden by browser toolbar */
-            position: relative;
-            z-index: 1;
         }
 
         /* Excel-like table - Dark theme (matching desktop) */
@@ -183,11 +181,24 @@
             table-layout: fixed;
         }
 
+        /* Sticky table header - positioned below fixed mobile-header
+           Z-index hierarchy:
+           - Modals/overlays: 9999
+           - Add button / Dropdowns: 1000
+           - Mobile header (fixed): 100
+           - Table headers (sticky): 50
+           - Table content / Swipe elements: 1-2
+        */
         .excel-table thead {
             position: sticky;
             top: 0;
-            z-index: 10;
+            z-index: 50;
             background: #2d2d2d;
+        }
+
+        .excel-table thead th {
+            position: relative;
+            z-index: 50;
         }
 
         .excel-table th {
