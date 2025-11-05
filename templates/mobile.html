@@ -545,6 +545,69 @@
         .payment-method-list-item .badge {
             margin-left: auto;
         }
+
+        /* Android-style toast notifications */
+        .android-toast {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(50, 50, 50, 0.95);
+            color: #ffffff;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            z-index: 10000;
+            max-width: 90%;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            opacity: 0;
+            animation: toast-fade-in 0.3s ease forwards;
+            pointer-events: none;
+        }
+
+        .android-toast.toast-success {
+            background-color: rgba(25, 135, 84, 0.95);
+        }
+
+        .android-toast.toast-danger {
+            background-color: rgba(220, 53, 69, 0.95);
+        }
+
+        .android-toast.toast-warning {
+            background-color: rgba(255, 193, 7, 0.95);
+            color: #000000;
+        }
+
+        .android-toast.toast-info {
+            background-color: rgba(13, 110, 253, 0.95);
+        }
+
+        .android-toast.toast-fade-out {
+            animation: toast-fade-out 0.3s ease forwards;
+        }
+
+        @keyframes toast-fade-in {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+        }
+
+        @keyframes toast-fade-out {
+            from {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateX(-50%) translateY(20px);
+            }
+        }
     </style>
 </head>
 <body>
@@ -1173,8 +1236,9 @@
                                 'btn-warning'
                             );
                         } else {
-                            // If not paid, show payment method modal
-                            showPaymentMethodModal(t.id);
+                            // If not paid, show payment method modal to mark as paid
+                            // Pass true to indicate this is a "paid" click (sets is_paid=TRUE)
+                            showPaymentMethodModal(t.id, true);
                         }
                     });
                 }
@@ -1213,6 +1277,13 @@
 
                 tbody.appendChild(row);
             });
+
+            // Scroll to top first to ensure sticky header calculates position correctly
+            // This prevents the table from appearing under the fixed mobile header
+            const mobileContent = document.querySelector('.mobile-content');
+            if (mobileContent) {
+                mobileContent.scrollTop = 0;
+            }
 
             // Force reflow to fix sticky positioning on mobile browsers
             // Mobile Safari and other mobile browsers sometimes lose sticky
@@ -1515,6 +1586,18 @@
 
                     // Close modal
                     const modal = bootstrap.Modal.getInstance(document.getElementById('transactionModal'));
+                    const modalElement = document.getElementById('transactionModal');
+
+                    // Wait for modal to fully close before reloading transactions
+                    // This prevents the modal closing animation from interfering with scroll-to-top
+                    modalElement.addEventListener('hidden.bs.modal', function onModalHidden() {
+                        // Remove this listener after it fires once
+                        modalElement.removeEventListener('hidden.bs.modal', onModalHidden);
+
+                        // Now reload transactions after modal is fully closed
+                        loadTransactions();
+                    });
+
                     modal.hide();
 
                     // Reset form
@@ -1522,9 +1605,6 @@
                     document.getElementById('transactionForm').dataset.editId = '';
                     document.querySelector('#transactionModal .modal-title').textContent = 'Add Transaction';
                     document.getElementById('transDate').value = new Date().toISOString().split('T')[0];
-
-                    // Reload transactions
-                    loadTransactions();
                 }
             })
             .catch(error => {
@@ -1632,25 +1712,21 @@
                 });
         }
 
-        // Toast notification function
+        // Toast notification function - Android style
         function showToast(message, type = 'info') {
             // Create toast element
             const toast = document.createElement('div');
-            toast.className = 'position-fixed top-0 start-50 translate-middle-x p-3';
-            toast.style.zIndex = '9999';
-            toast.style.marginTop = '20px';
-            toast.innerHTML = `
-                <div class="alert alert-${type} alert-dismissible fade show" role="alert">
-                    ${message}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
-            `;
+            toast.className = `android-toast toast-${type}`;
+            toast.textContent = message;
             document.body.appendChild(toast);
 
-            // Remove after 3 seconds
+            // Fade out and remove after 2.5 seconds
             setTimeout(() => {
-                toast.remove();
-            }, 3000);
+                toast.classList.add('toast-fade-out');
+                setTimeout(() => {
+                    toast.remove();
+                }, 300); // Wait for fade-out animation to complete
+            }, 2500);
         }
 
         // Theme toggle functionality
