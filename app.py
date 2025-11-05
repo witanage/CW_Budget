@@ -1,5 +1,6 @@
 import os
 import json
+import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash
@@ -10,6 +11,13 @@ import mysql.connector
 from mysql.connector import Error
 from functools import wraps
 import calendar
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # Custom JSON provider to handle Decimal objects
 class DecimalJSONProvider(DefaultJSONProvider):
@@ -39,9 +47,10 @@ def get_db_connection():
     """Create a database connection."""
     try:
         connection = mysql.connector.connect(**DB_CONFIG)
+        logger.info("Database connection established successfully")
         return connection
     except Error as e:
-        print(f"Error connecting to MySQL: {e}")
+        logger.error(f"Error connecting to MySQL: {e}")
         return None
 
 def login_required(f):
@@ -64,6 +73,7 @@ def decimal_default(obj):
 @app.route('/')
 def index():
     """Landing page - redirect to login or dashboard/mobile based on device."""
+    logger.info(f"Index route accessed - User logged in: {'user_id' in session}")
     if 'user_id' in session:
         # Detect if mobile device from user agent
         user_agent = request.headers.get('User-Agent', '').lower()
@@ -71,8 +81,11 @@ def index():
                        ['android', 'webos', 'iphone', 'ipad', 'ipod', 'blackberry', 'windows phone'])
 
         if is_mobile:
+            logger.info(f"Redirecting user {session.get('user_id')} to mobile view")
             return redirect(url_for('mobile'))
+        logger.info(f"Redirecting user {session.get('user_id')} to dashboard")
         return redirect(url_for('dashboard'))
+    logger.info("No user session found, redirecting to login")
     return redirect(url_for('login'))
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -120,7 +133,9 @@ def login():
         data = request.get_json() if request.is_json else request.form
         username = data.get('username')
         password = data.get('password')
-        
+
+        logger.info(f"Login attempt for username: {username}")
+
         connection = get_db_connection()
         if connection:
             cursor = connection.cursor(dictionary=True)
@@ -129,21 +144,25 @@ def login():
                 cursor.execute("SELECT * FROM users WHERE username = %s OR email = %s",
                              (username, username))
                 user = cursor.fetchone()
-                
+
                 if user and check_password_hash(user['password_hash'], password):
                     session['user_id'] = user['id']
                     session['username'] = user['username']
+                    logger.info(f"Login successful for user: {username} (ID: {user['id']})")
                     return jsonify({'message': 'Login successful'}), 200
                 else:
+                    logger.warning(f"Login failed for username: {username} - Invalid credentials")
                     return jsonify({'error': 'Invalid credentials'}), 401
             except Error as e:
+                logger.error(f"Database error during login: {str(e)}")
                 return jsonify({'error': str(e)}), 500
             finally:
                 cursor.close()
                 connection.close()
-        
-        return jsonify({'error': 'Database connection failed'}), 500
-    
+        else:
+            logger.error("Failed to establish database connection during login")
+            return jsonify({'error': 'Database connection failed'}), 500
+
     return render_template('login.html')
 
 @app.route('/logout')
@@ -1167,20 +1186,46 @@ def clone_month_transactions():
 
     except Error as e:
         connection.rollback()
+        logger.error(f"Error cloning transactions: {str(e)}")
         return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()
         connection.close()
 
-if __name__ == '__main__':
-    # Add error handlers for production
-    @app.errorhandler(500)
-    def internal_error(error):
+# Global error handlers (must be outside if __name__ block)
+@app.errorhandler(500)
+def internal_error(error):
+    logger.error(f"Internal server error: {str(error)}")
+    # For API requests, return JSON
+    if request.path.startswith('/api/'):
         return jsonify({'error': 'Internal server error'}), 500
+    # For page requests, render error template or return HTML
+    return render_template('error.html', error_code=500, error_message='Internal Server Error'), 500
 
-    @app.errorhandler(404)
-    def not_found(error):
+@app.errorhandler(404)
+def not_found(error):
+    logger.warning(f"404 error: {request.path}")
+    # For API requests, return JSON
+    if request.path.startswith('/api/'):
         return jsonify({'error': 'Not found'}), 404
+    # For page requests, redirect to dashboard or login
+    if 'user_id' in session:
+        return redirect(url_for('dashboard'))
+    return redirect(url_for('login'))
+
+@app.errorhandler(Exception)
+def handle_exception(error):
+    logger.error(f"Unhandled exception: {str(error)}", exc_info=True)
+    # For API requests, return JSON
+    if request.path.startswith('/api/'):
+        return jsonify({'error': 'An unexpected error occurred'}), 500
+    # For page requests, render error template
+    return render_template('error.html', error_code=500, error_message='An unexpected error occurred'), 500
+
+if __name__ == '__main__':
+    logger.info("Starting Personal Finance Budget application...")
+    logger.info(f"Debug mode: False (Production)")
+    logger.info(f"Host: 0.0.0.0, Port: 5003")
 
     # Use debug=False for production
     # Set to True for development (detailed error messages)
