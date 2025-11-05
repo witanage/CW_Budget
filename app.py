@@ -58,13 +58,13 @@ def ping_health_check():
 
 # Initialize and configure the background scheduler
 scheduler = BackgroundScheduler()
-scheduler.add_job(func=ping_health_check, trigger="interval", minutes=1, id='health_check_job')
+scheduler.add_job(func=ping_health_check, trigger="interval", minutes=5, id='health_check_job')
 scheduler.start()
 
 # Ensure the scheduler shuts down cleanly when the app exits
 atexit.register(lambda: scheduler.shutdown())
 
-logger.info("Health check scheduler initialized - running every 1 minute")
+logger.info("Health check scheduler initialized - running every 5 minutes")
 
 # Database configuration with proper type conversion and defaults
 def get_db_config():
@@ -165,27 +165,10 @@ def index():
 @app.route('/health')
 def health_check():
     """Health check endpoint for monitoring and keeping the app alive."""
-    try:
-        # Test database connection
-        connection = get_db_connection()
-        if connection:
-            connection.close()
-            db_status = 'connected'
-        else:
-            db_status = 'disconnected'
-
-        return jsonify({
-            'status': 'ok',
-            'database': db_status,
-            'timestamp': datetime.now().isoformat()
-        }), 200
-    except Exception as e:
-        logger.error(f"Health check failed: {str(e)}")
-        return jsonify({
-            'status': 'error',
-            'error': str(e),
-            'timestamp': datetime.now().isoformat()
-        }), 500
+    return jsonify({
+        'status': 'ok',
+        'timestamp': datetime.now().isoformat()
+    }), 200
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
