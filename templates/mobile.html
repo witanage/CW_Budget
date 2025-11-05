@@ -20,93 +20,132 @@
             margin: 0;
             padding: 0;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #ffffff;
+            background-color: #0d1117;
             overflow: hidden;
         }
 
         .mobile-header {
-            background: linear-gradient(135deg, #0866ff 0%, #0645b8 100%);
-            padding: 12px 15px;
+            background: linear-gradient(135deg, #3d3d3d 0%, #2d2d2d 100%);
+            padding: 8px 10px;
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
             z-index: 100;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .header-top {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            margin-bottom: 8px;
         }
 
         .mobile-header h1 {
-            font-size: 1.1rem;
+            font-size: 1rem;
             margin: 0;
             font-weight: 600;
-            color: white;
+            color: #ffffff;
         }
 
         .btn-back {
-            background: rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.1);
             border: none;
-            color: white;
-            padding: 6px 12px;
+            color: #ffffff;
+            padding: 4px 10px;
             border-radius: 6px;
-            font-size: 0.85rem;
+            font-size: 0.75rem;
             text-decoration: none;
             display: inline-flex;
             align-items: center;
-            gap: 6px;
+            gap: 4px;
+        }
+
+        .month-nav {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: center;
+        }
+
+        .month-nav button {
+            background: #3d3d3d;
+            border: 1px solid #555555;
+            color: #ffffff;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            cursor: pointer;
+        }
+
+        .month-nav button:active {
+            background: #4d4d4d;
+        }
+
+        .month-display {
+            color: #ffffff;
+            font-size: 0.85rem;
+            font-weight: 600;
+            min-width: 120px;
+            text-align: center;
         }
 
         .mobile-content {
-            margin-top: 50px;
-            height: calc(100vh - 50px);
+            margin-top: 85px;
+            height: calc(100vh - 85px);
             overflow: auto;
             -webkit-overflow-scrolling: touch;
         }
 
-        /* Excel-like table */
+        /* Excel-like table - Dark theme */
         .excel-table {
             width: 100%;
             border-collapse: collapse;
             font-size: 0.75rem;
-            background: white;
+            background: #161b22;
         }
 
         .excel-table thead {
             position: sticky;
             top: 0;
             z-index: 10;
-            background: #f8f9fa;
+            background: #0d1117;
         }
 
         .excel-table th {
             padding: 6px 4px;
-            border: 1px solid #dee2e6;
+            border: 1px solid #30363d;
             font-weight: 600;
             text-align: left;
-            background: #e9ecef;
+            background: #161b22;
+            color: #58a6ff;
             white-space: nowrap;
             font-size: 0.7rem;
         }
 
         .excel-table td {
             padding: 4px 4px;
-            border: 1px solid #dee2e6;
+            border: 1px solid #21262d;
             vertical-align: middle;
             font-size: 0.7rem;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
             max-width: 150px;
+            color: #c9d1d9;
         }
 
         .excel-table tbody tr:nth-child(even) {
-            background-color: #f8f9fa;
+            background-color: #0d1117;
+        }
+
+        .excel-table tbody tr:nth-child(odd) {
+            background-color: #161b22;
         }
 
         .excel-table tbody tr:hover {
-            background-color: #e7f3ff;
+            background-color: #1c2128;
         }
 
         /* Column widths */
@@ -123,17 +162,17 @@
         }
 
         .text-debit {
-            color: #28a745;
+            color: #3fb950;
             font-weight: 600;
         }
 
         .text-credit {
-            color: #dc3545;
+            color: #f85149;
             font-weight: 600;
         }
 
         .text-balance {
-            color: #0866ff;
+            color: #58a6ff;
             font-weight: 600;
         }
 
@@ -144,10 +183,10 @@
             width: 56px;
             height: 56px;
             border-radius: 50%;
-            background: #0866ff;
+            background: #1f6feb;
             color: white;
             border: none;
-            box-shadow: 0 4px 12px rgba(8, 102, 255, 0.4);
+            box-shadow: 0 4px 12px rgba(31, 111, 235, 0.4);
             z-index: 1000;
             display: flex;
             align-items: center;
@@ -162,37 +201,78 @@
         .no-transactions {
             text-align: center;
             padding: 60px 20px;
-            color: #6c757d;
+            color: #8b949e;
         }
 
-        /* Modal styles */
+        /* Modal styles - Dark theme */
         .modal-content {
+            background-color: #2d2d2d;
+            color: #ffffff;
+            border: 1px solid #555555;
             border-radius: 12px;
         }
 
         .modal-header {
-            background: linear-gradient(135deg, #0866ff 0%, #0645b8 100%);
+            background: linear-gradient(135deg, #3d3d3d 0%, #2d2d2d 100%);
             color: white;
+            border-bottom: 1px solid #555555;
             border-radius: 12px 12px 0 0;
+        }
+
+        .modal-footer {
+            border-top: 1px solid #555555;
         }
 
         .modal-header .btn-close {
             filter: brightness(0) invert(1);
         }
 
+        .form-label {
+            color: #ffffff;
+        }
+
+        .form-control, .form-select {
+            background-color: #3d3d3d;
+            border: 1px solid #555555;
+            color: #ffffff;
+        }
+
         .form-control:focus, .form-select:focus {
-            border-color: #0866ff;
-            box-shadow: 0 0 0 3px rgba(8, 102, 255, 0.1);
+            background-color: #3d3d3d;
+            border-color: #1f6feb;
+            color: #ffffff;
+            box-shadow: 0 0 0 3px rgba(31, 111, 235, 0.2);
+        }
+
+        .btn-secondary {
+            background-color: #3d3d3d;
+            border-color: #555555;
+        }
+
+        .btn-primary {
+            background-color: #1f6feb;
+            border-color: #1f6feb;
         }
     </style>
 </head>
 <body>
     <!-- Header -->
     <div class="mobile-header">
-        <h1><i class="fas fa-table me-2"></i>Transactions</h1>
-        <a href="/dashboard" class="btn-back">
-            <i class="fas fa-desktop"></i>Desktop
-        </a>
+        <div class="header-top">
+            <h1><i class="fas fa-table me-2"></i>Transactions</h1>
+            <a href="/dashboard" class="btn-back">
+                <i class="fas fa-desktop"></i>Desktop
+            </a>
+        </div>
+        <div class="month-nav">
+            <button id="prevMonthBtn" onclick="navigateToPreviousMonth()">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <div class="month-display" id="monthDisplay">Loading...</div>
+            <button id="nextMonthBtn" onclick="navigateToNextMonth()">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+        </div>
     </div>
 
     <!-- Excel-like Table View -->
@@ -294,12 +374,45 @@
                 .catch(error => console.error('Error loading categories:', error));
         }
 
+        // Current month and year
+        let currentYear = new Date().getFullYear();
+        let currentMonth = new Date().getMonth() + 1;
+
+        // Month names
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                           'July', 'August', 'September', 'October', 'November', 'December'];
+
+        // Update month display
+        function updateMonthDisplay() {
+            const display = document.getElementById('monthDisplay');
+            display.textContent = `${monthNames[currentMonth - 1]} ${currentYear}`;
+        }
+
+        // Navigate to previous month
+        function navigateToPreviousMonth() {
+            currentMonth--;
+            if (currentMonth < 1) {
+                currentMonth = 12;
+                currentYear--;
+            }
+            updateMonthDisplay();
+            loadTransactions();
+        }
+
+        // Navigate to next month
+        function navigateToNextMonth() {
+            currentMonth++;
+            if (currentMonth > 12) {
+                currentMonth = 1;
+                currentYear++;
+            }
+            updateMonthDisplay();
+            loadTransactions();
+        }
+
         // Load transactions
         function loadTransactions() {
-            const year = new Date().getFullYear();
-            const month = new Date().getMonth() + 1;
-
-            fetch(`/api/transactions?year=${year}&month=${month}`)
+            fetch(`/api/transactions?year=${currentYear}&month=${currentMonth}`)
                 .then(response => response.json())
                 .then(data => {
                     displayTransactions(data);
@@ -340,9 +453,6 @@
 
         // Save transaction
         function saveTransaction() {
-            const year = new Date().getFullYear();
-            const month = new Date().getMonth() + 1;
-
             const description = document.getElementById('transDescription').value;
             if (!description || description.trim() === '') {
                 alert('Description is required');
@@ -370,8 +480,8 @@
                 credit: credit,
                 transaction_date: document.getElementById('transDate').value,
                 notes: document.getElementById('transNotes').value,
-                year: parseInt(year),
-                month: parseInt(month)
+                year: parseInt(currentYear),
+                month: parseInt(currentMonth)
             };
 
             fetch('/api/transactions', {
@@ -406,6 +516,9 @@
         document.addEventListener('DOMContentLoaded', function() {
             // Set today's date
             document.getElementById('transDate').value = new Date().toISOString().split('T')[0];
+
+            // Update month display
+            updateMonthDisplay();
 
             // Load data
             loadCategories();
