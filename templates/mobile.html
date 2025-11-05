@@ -235,6 +235,29 @@
             min-width: 70px;
         }
 
+        .col-actions {
+            min-width: 80px;
+            text-align: center;
+        }
+
+        /* Action buttons */
+        .action-icon-btn {
+            background: none;
+            border: none;
+            color: #58a6ff;
+            padding: 4px 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .action-icon-btn.delete {
+            color: #f85149;
+        }
+
+        .action-icon-btn:active {
+            opacity: 0.7;
+        }
+
         /* Override text colors to black for table */
         .excel-table .text-success,
         .excel-table .text-danger,
@@ -448,11 +471,12 @@
                     <th class="col-debit">Debit</th>
                     <th class="col-credit">Credit</th>
                     <th class="col-balance">Balance</th>
+                    <th class="col-actions">Actions</th>
                 </tr>
             </thead>
             <tbody id="transactionsList">
                 <tr>
-                    <td colspan="4">
+                    <td colspan="5">
                         <div class="no-transactions">
                             <i class="fas fa-receipt fa-3x mb-3"></i>
                             <p>No transactions yet</p>
@@ -675,7 +699,7 @@
             if (!transactions || transactions.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="4">
+                        <td colspan="5">
                             <div class="no-transactions">
                                 <i class="fas fa-receipt fa-3x mb-3"></i>
                                 <p>No transactions yet</p>
@@ -714,7 +738,18 @@
                     <td class="col-debit text-success">${t.debit ? formatCurrency(t.debit) : '-'}</td>
                     <td class="col-credit text-danger">${t.credit ? formatCurrency(t.credit) : '-'}</td>
                     <td class="col-balance fw-bold">${formatCurrency(t.calculatedBalance)}</td>
+                    <td class="col-actions">
+                        <button class="action-icon-btn" onclick="editTransaction(${t.id})" title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="action-icon-btn delete" onclick="deleteTransaction(${t.id})" title="Delete">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
                 `;
+
+                // Store transaction data for edit
+                row.dataset.transaction = JSON.stringify(t);
 
                 // Apply background color to cells if payment method color exists
                 if (isDone && t.payment_method_color) {
@@ -735,9 +770,13 @@
 
         // Save transaction
         function saveTransaction() {
+            // Check if this is an edit
+            const editId = document.getElementById('transactionForm').dataset.editId;
+            const isEdit = editId && editId !== '';
+
             const description = document.getElementById('transDescription').value;
             if (!description || description.trim() === '') {
-                alert('Description is required');
+                showToast('Description is required', 'warning');
                 return;
             }
 
@@ -766,22 +805,32 @@
                 month: parseInt(currentMonth)
             };
 
-            fetch('/api/transactions', {
-                method: 'POST',
+            const url = isEdit ? `/api/transactions/${editId}` : '/api/transactions';
+            const method = isEdit ? 'PUT' : 'POST';
+
+            showLoading();
+
+            fetch(url, {
+                method: method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             })
             .then(response => response.json())
             .then(result => {
+                hideLoading();
                 if (result.error) {
-                    alert(result.error);
+                    showToast(result.error, 'danger');
                 } else {
+                    showToast(isEdit ? 'Transaction updated successfully' : 'Transaction saved successfully', 'success');
+
                     // Close modal
                     const modal = bootstrap.Modal.getInstance(document.getElementById('transactionModal'));
                     modal.hide();
 
                     // Reset form
                     document.getElementById('transactionForm').reset();
+                    document.getElementById('transactionForm').dataset.editId = '';
+                    document.querySelector('#transactionModal .modal-title').textContent = 'Add Transaction';
                     document.getElementById('transDate').value = new Date().toISOString().split('T')[0];
 
                     // Reload transactions
@@ -789,8 +838,67 @@
                 }
             })
             .catch(error => {
+                hideLoading();
                 console.error('Error saving transaction:', error);
-                alert('Error saving transaction');
+                showToast('Error saving transaction', 'danger');
+            });
+        }
+
+        // Edit transaction
+        function editTransaction(id) {
+            // Find the transaction in the table
+            const tbody = document.getElementById('transactionsList');
+            const row = tbody.querySelector(`tr[data-transaction*='"id":${id}']`);
+
+            if (!row) {
+                showToast('Transaction not found', 'danger');
+                return;
+            }
+
+            const transaction = JSON.parse(row.dataset.transaction);
+
+            // Populate form
+            document.getElementById('transDescription').value = transaction.description || '';
+            document.getElementById('transCategory').value = transaction.category_id || '';
+            document.getElementById('transDebit').value = transaction.debit || '';
+            document.getElementById('transCredit').value = transaction.credit || '';
+            document.getElementById('transDate').value = transaction.transaction_date ? transaction.transaction_date.split('T')[0] : '';
+            document.getElementById('transNotes').value = transaction.notes || '';
+
+            // Store edit ID
+            document.getElementById('transactionForm').dataset.editId = id;
+
+            // Update modal title
+            document.querySelector('#transactionModal .modal-title').textContent = 'Edit Transaction';
+
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('transactionModal'));
+            modal.show();
+        }
+
+        // Delete transaction
+        function deleteTransaction(id) {
+            if (!confirm('Delete this transaction?')) return;
+
+            showLoading();
+
+            fetch(`/api/transactions/${id}`, {
+                method: 'DELETE'
+            })
+            .then(response => response.json())
+            .then(result => {
+                hideLoading();
+                if (result.error) {
+                    showToast(result.error, 'danger');
+                } else {
+                    showToast('Transaction deleted successfully', 'success');
+                    loadTransactions();
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                console.error('Error deleting transaction:', error);
+                showToast('Error deleting transaction', 'danger');
             });
         }
 
@@ -933,6 +1041,17 @@
             const savedTheme = localStorage.getItem('theme') || 'dark';
             document.documentElement.setAttribute('data-theme', savedTheme);
             updateThemeButton(savedTheme);
+
+            // Reset form when modal is closed
+            const transactionModal = document.getElementById('transactionModal');
+            if (transactionModal) {
+                transactionModal.addEventListener('hidden.bs.modal', function() {
+                    document.getElementById('transactionForm').reset();
+                    document.getElementById('transactionForm').dataset.editId = '';
+                    document.querySelector('#transactionModal .modal-title').textContent = 'Add Transaction';
+                    document.getElementById('transDate').value = new Date().toISOString().split('T')[0];
+                });
+            }
 
             // Change password functionality
             const savePasswordBtn = document.getElementById('savePasswordBtn');
