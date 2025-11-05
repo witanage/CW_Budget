@@ -63,10 +63,10 @@ def decimal_default(obj):
 # Routes
 @app.route('/')
 def index():
-    """Landing page."""
+    """Landing page - redirect to login or dashboard."""
     if 'user_id' in session:
         return redirect(url_for('dashboard'))
-    return render_template('index.html')
+    return redirect(url_for('login'))
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
