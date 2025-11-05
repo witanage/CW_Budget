@@ -166,19 +166,17 @@
             min-width: 70px;
         }
 
-        .text-debit {
-            color: #3fb950;
-            font-weight: 600;
+        /* Match desktop Bootstrap colors */
+        .text-success {
+            color: #28a745 !important;
         }
 
-        .text-credit {
-            color: #f85149;
-            font-weight: 600;
+        .text-danger {
+            color: #dc3545 !important;
         }
 
-        .text-balance {
-            color: #58a6ff;
-            font-weight: 600;
+        .fw-bold {
+            font-weight: 600 !important;
         }
 
         .add-btn-float {
@@ -294,6 +292,34 @@
             font-weight: 600;
             color: #58a6ff;
         }
+
+        /* Loading overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+
+        .loading-overlay.show {
+            display: flex;
+        }
+
+        .loading-spinner {
+            text-align: center;
+            color: #ffffff;
+        }
+
+        .loading-spinner i {
+            font-size: 3rem;
+            margin-bottom: 10px;
+        }
     </style>
 </head>
 <body>
@@ -352,6 +378,14 @@
     <button class="add-btn-float" data-bs-toggle="modal" data-bs-target="#transactionModal">
         <i class="fas fa-plus"></i>
     </button>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Loading...</p>
+        </div>
+    </div>
 
     <!-- Add Transaction Modal -->
     <div class="modal fade" id="transactionModal" tabindex="-1">
@@ -426,6 +460,21 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
+        // Loading overlay functions
+        function showLoading() {
+            const overlay = document.getElementById('loadingOverlay');
+            if (overlay) {
+                overlay.classList.add('show');
+            }
+        }
+
+        function hideLoading() {
+            const overlay = document.getElementById('loadingOverlay');
+            if (overlay) {
+                overlay.classList.remove('show');
+            }
+        }
+
         // Format currency
         function formatCurrency(amount) {
             if (amount == null || isNaN(amount)) return '0.00';
@@ -484,12 +533,17 @@
 
         // Load transactions
         function loadTransactions() {
+            showLoading();
             fetch(`/api/transactions?year=${currentYear}&month=${currentMonth}`)
                 .then(response => response.json())
                 .then(data => {
                     displayTransactions(data);
+                    hideLoading();
                 })
-                .catch(error => console.error('Error loading transactions:', error));
+                .catch(error => {
+                    console.error('Error loading transactions:', error);
+                    hideLoading();
+                });
         }
 
         // Display transactions
@@ -522,9 +576,9 @@
 
                 row.innerHTML = `
                     <td class="col-desc">${t.description || ''}</td>
-                    <td class="col-debit text-debit">${t.debit ? formatCurrency(t.debit) : '-'}</td>
-                    <td class="col-credit text-credit">${t.credit ? formatCurrency(t.credit) : '-'}</td>
-                    <td class="col-balance text-balance">${formatCurrency(t.balance)}</td>
+                    <td class="col-debit text-success">${t.debit ? formatCurrency(t.debit) : '-'}</td>
+                    <td class="col-credit text-danger">${t.credit ? formatCurrency(t.credit) : '-'}</td>
+                    <td class="col-balance fw-bold">${formatCurrency(t.balance)}</td>
                 `;
 
                 // Apply background color to cells if payment method color exists
@@ -624,9 +678,9 @@
                             <tr>
                                 <td>
                                     <span class="payment-method-color-indicator" style="background-color: ${item.color}"></span>
-                                    <span class="payment-method-name">${item.method_name}</span>
+                                    <span class="payment-method-name">${item.name}</span>
                                 </td>
-                                <td class="payment-amount">${formatCurrency(item.total)}</td>
+                                <td class="payment-amount">${formatCurrency(item.net_amount || 0)}</td>
                             </tr>
                         `;
                     });
