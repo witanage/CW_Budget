@@ -12,9 +12,6 @@ from mysql.connector import Error
 from functools import wraps
 import calendar
 from dotenv import load_dotenv
-from apscheduler.schedulers.background import BackgroundScheduler
-import requests
-import atexit
 
 # Load environment variables from .env file
 load_dotenv()
@@ -40,31 +37,6 @@ app = Flask(__name__)
 app.json = DecimalJSONProvider(app)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
 CORS(app)
-
-# Health check scheduler to keep the app alive
-def ping_health_check():
-    """Ping the health check endpoint to keep the app alive."""
-    try:
-        # Determine the base URL for the health check
-        # Use 127.0.0.1 for local ping to avoid network issues
-        url = 'http://127.0.0.1:5003/health'
-        response = requests.get(url, timeout=5)
-        if response.status_code == 200:
-            logger.info(f"Health check successful: {response.json()}")
-        else:
-            logger.warning(f"Health check returned status code: {response.status_code}")
-    except Exception as e:
-        logger.error(f"Health check ping failed: {str(e)}")
-
-# Initialize and configure the background scheduler
-scheduler = BackgroundScheduler()
-scheduler.add_job(func=ping_health_check, trigger="interval", minutes=5, id='health_check_job')
-scheduler.start()
-
-# Ensure the scheduler shuts down cleanly when the app exits
-atexit.register(lambda: scheduler.shutdown())
-
-logger.info("Health check scheduler initialized - running every 5 minutes")
 
 # Database configuration with proper type conversion and defaults
 def get_db_config():
@@ -161,14 +133,6 @@ def index():
         return redirect(url_for('dashboard'))
     logger.info("No user session found, redirecting to login")
     return redirect(url_for('login'))
-
-@app.route('/health')
-def health_check():
-    """Health check endpoint for monitoring and keeping the app alive."""
-    return jsonify({
-        'status': 'ok',
-        'timestamp': datetime.now().isoformat()
-    }), 200
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():

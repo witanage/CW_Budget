@@ -32,7 +32,10 @@
                             <input type="password" class="form-control" id="password" name="password" required>
                         </div>
 
-                        <button type="submit" class="btn btn-primary w-100 mb-3">Login</button>
+                        <button type="submit" class="btn btn-primary w-100 mb-3 d-flex align-items-center justify-content-center" id="loginButton">
+                            <span class="spinner-border spinner-border-sm me-2 d-none" id="loginSpinner" role="status" aria-hidden="true"></span>
+                            <span id="loginButtonText">Login</span>
+                        </button>
                     </form>
 
                     <div class="text-center">
@@ -54,6 +57,15 @@ function isMobileDevice() {
 document.getElementById('loginForm').addEventListener('submit', function(e) {
     e.preventDefault();
 
+    // Show loader and disable button
+    const loginButton = document.getElementById('loginButton');
+    const loginSpinner = document.getElementById('loginSpinner');
+    const loginButtonText = document.getElementById('loginButtonText');
+
+    loginButton.disabled = true;
+    loginSpinner.classList.remove('d-none');
+    loginButtonText.textContent = 'Logging in...';
+
     const formData = {
         username: document.getElementById('username').value,
         password: document.getElementById('password').value
@@ -69,6 +81,10 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
     .then(response => response.json())
     .then(data => {
         if (data.error) {
+            // Hide loader and enable button on error
+            loginButton.disabled = false;
+            loginSpinner.classList.add('d-none');
+            loginButtonText.textContent = 'Login';
             showToast(data.error, 'danger');
         } else {
             showToast('Login successful! Redirecting...', 'success');
@@ -83,6 +99,10 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
         }
     })
     .catch(error => {
+        // Hide loader and enable button on error
+        loginButton.disabled = false;
+        loginSpinner.classList.add('d-none');
+        loginButtonText.textContent = 'Login';
         console.error('Error:', error);
         showToast('An error occurred during login', 'danger');
     });
