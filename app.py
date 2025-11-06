@@ -36,6 +36,7 @@ class DecimalJSONProvider(DefaultJSONProvider):
 app = Flask(__name__)
 app.json = DecimalJSONProvider(app)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365)  # Remember me for 1 year
 CORS(app)
 
 # Database configuration with proper type conversion and defaults
@@ -179,8 +180,9 @@ def login():
         data = request.get_json() if request.is_json else request.form
         username = data.get('username')
         password = data.get('password')
+        remember_me = data.get('remember_me', False)
 
-        logger.info(f"Login attempt for username: {username}")
+        logger.info(f"Login attempt for username: {username}, remember_me: {remember_me}")
 
         connection = get_db_connection()
         if connection:
@@ -192,9 +194,11 @@ def login():
                 user = cursor.fetchone()
 
                 if user and check_password_hash(user['password_hash'], password):
+                    # Set session as permanent if remember_me is checked
+                    session.permanent = remember_me
                     session['user_id'] = user['id']
                     session['username'] = user['username']
-                    logger.info(f"Login successful for user: {username} (ID: {user['id']})")
+                    logger.info(f"Login successful for user: {username} (ID: {user['id']}), permanent: {remember_me}")
                     return jsonify({'message': 'Login successful'}), 200
                 else:
                     logger.warning(f"Login failed for username: {username} - Invalid credentials")

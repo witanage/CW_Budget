@@ -32,6 +32,13 @@
                             <input type="password" class="form-control" id="password" name="password" required>
                         </div>
 
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="rememberMe" name="remember_me">
+                            <label class="form-check-label" for="rememberMe">
+                                Remember me
+                            </label>
+                        </div>
+
                         <button type="submit" class="btn btn-primary w-100 mb-3 d-flex align-items-center justify-content-center" id="loginButton">
                             <span class="spinner-border spinner-border-sm me-2 d-none" id="loginSpinner" role="status" aria-hidden="true"></span>
                             <span id="loginButtonText">Login</span>
@@ -68,7 +75,8 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
 
     const formData = {
         username: document.getElementById('username').value,
-        password: document.getElementById('password').value
+        password: document.getElementById('password').value,
+        remember_me: document.getElementById('rememberMe').checked
     };
 
     fetch('/login', {
