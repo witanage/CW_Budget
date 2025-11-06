@@ -181,7 +181,9 @@
             table-layout: fixed;
         }
 
-        /* Sticky table header - positioned below fixed mobile-header
+        /* Sticky table header - positioned at top of scrolling container
+           The mobile-content container has margin-top: 85px to account for fixed header
+           Sticky positioning is relative to the scrolling container, not viewport
            Z-index hierarchy:
            - Modals/overlays: 9999
            - Add button / Dropdowns: 1000
@@ -191,7 +193,7 @@
         */
         .excel-table thead {
             position: sticky;
-            top: 85px;
+            top: 0;
             z-index: 99;
             background: #2d2d2d !important;
         }
@@ -202,7 +204,7 @@
 
         .excel-table thead th {
             position: sticky;
-            top: 85px;
+            top: 0;
             z-index: 99;
             padding: 6px 4px;
             border: 1px solid #555555;
