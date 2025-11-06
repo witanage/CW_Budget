@@ -200,8 +200,11 @@
         }
 
         .mobile-content {
-            margin-top: 115px; /* Increased from 85px to account for table headers */
-            height: calc(100vh - 115px);
+            position: fixed;
+            top: 115px; /* Position below the fixed header */
+            left: 0;
+            right: 0;
+            bottom: 0;
             overflow: auto;
             -webkit-overflow-scrolling: touch;
             padding-bottom: 100px; /* Extra padding to prevent last records from being hidden by browser toolbar */
