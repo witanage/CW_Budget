@@ -164,9 +164,44 @@
             gap: 4px;
         }
 
+        /* Table header row in mobile header */
+        .table-header-row {
+            display: flex;
+            width: 100%;
+            background: #3d3d3d;
+            border-top: 1px solid #555555;
+            margin-top: 8px;
+        }
+
+        .table-header-cell {
+            padding: 6px 4px;
+            font-weight: 600;
+            text-align: left;
+            color: #007acc;
+            white-space: nowrap;
+            font-size: 0.7rem;
+            border-right: 1px solid #555555;
+        }
+
+        .table-header-cell:last-child {
+            border-right: none;
+        }
+
+        /* Match table column widths */
+        .table-header-cell.col-desc {
+            width: 40%;
+        }
+
+        .table-header-cell.col-debit,
+        .table-header-cell.col-credit,
+        .table-header-cell.col-balance {
+            width: 20%;
+            text-align: right;
+        }
+
         .mobile-content {
-            margin-top: 85px;
-            height: calc(100vh - 85px);
+            margin-top: 115px; /* Increased from 85px to account for table headers */
+            height: calc(100vh - 115px);
             overflow: auto;
             -webkit-overflow-scrolling: touch;
             padding-bottom: 100px; /* Extra padding to prevent last records from being hidden by browser toolbar */
@@ -179,52 +214,6 @@
             font-size: 0.75rem;
             background: #2d2d2d;
             table-layout: fixed;
-        }
-
-        /* Sticky table header - positioned at top of scrolling container
-           The mobile-content container has margin-top: 85px to account for fixed header
-           Sticky positioning is relative to the scrolling container, not viewport
-           Z-index hierarchy:
-           - Modals/overlays: 9999
-           - Add button / Dropdowns: 1000
-           - Mobile header (fixed): 100
-           - Table headers (sticky): 99
-           - Table content / Swipe elements: 1-2
-        */
-        .excel-table thead {
-            position: sticky;
-            top: 0;
-            z-index: 99;
-            background: #2d2d2d !important;
-        }
-
-        .excel-table thead tr {
-            background: #2d2d2d !important;
-        }
-
-        .excel-table thead th {
-            position: sticky;
-            top: 0;
-            z-index: 99;
-            padding: 6px 4px;
-            border: 1px solid #555555;
-            font-weight: 600;
-            text-align: left;
-            background: #3d3d3d !important;
-            color: #007acc;
-            white-space: nowrap;
-            font-size: 0.7rem;
-        }
-
-        .excel-table th {
-            padding: 6px 4px;
-            border: 1px solid #555555;
-            font-weight: 600;
-            text-align: left;
-            background: #3d3d3d;
-            color: #007acc;
-            white-space: nowrap;
-            font-size: 0.7rem;
         }
 
         .excel-table td {
@@ -663,19 +652,18 @@
                 </button>
             </div>
         </div>
+        <!-- Table Headers (Fixed with mobile header) -->
+        <div class="table-header-row">
+            <div class="table-header-cell col-desc">Description</div>
+            <div class="table-header-cell col-debit">Debit</div>
+            <div class="table-header-cell col-credit">Credit</div>
+            <div class="table-header-cell col-balance">Balance</div>
+        </div>
     </div>
 
     <!-- Excel-like Table View -->
     <div class="mobile-content">
         <table class="excel-table" id="transactionsTable">
-            <thead>
-                <tr>
-                    <th class="col-desc">Description</th>
-                    <th class="col-debit">Debit</th>
-                    <th class="col-credit">Credit</th>
-                    <th class="col-balance">Balance</th>
-                </tr>
-            </thead>
             <tbody id="transactionsList">
                 <tr>
                     <td colspan="4">
@@ -1106,13 +1094,11 @@
         // Display transactions
         function displayTransactions(transactions) {
             const tbody = document.getElementById('transactionsList');
-            const table = document.getElementById('transactionsTable');
-            const thead = table ? table.querySelector('thead') : null;
 
             if (!transactions || transactions.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="5">
+                        <td colspan="4">
                             <div class="no-transactions">
                                 <i class="fas fa-receipt fa-3x mb-3"></i>
                                 <p>No transactions yet</p>
@@ -1120,12 +1106,6 @@
                         </td>
                     </tr>
                 `;
-                // Force reflow to fix sticky positioning on mobile
-                if (thead) {
-                    thead.style.display = 'none';
-                    void thead.offsetHeight; // Trigger reflow
-                    thead.style.display = '';
-                }
                 return;
             }
 
@@ -1280,20 +1260,10 @@
                 tbody.appendChild(row);
             });
 
-            // Scroll to top first to ensure sticky header calculates position correctly
-            // This prevents the table from appearing under the fixed mobile header
+            // Scroll to top after loading transactions
             const mobileContent = document.querySelector('.mobile-content');
             if (mobileContent) {
                 mobileContent.scrollTop = 0;
-            }
-
-            // Force reflow to fix sticky positioning on mobile browsers
-            // Mobile Safari and other mobile browsers sometimes lose sticky
-            // positioning after DOM updates. This forces a recalculation.
-            if (thead) {
-                thead.style.display = 'none';
-                void thead.offsetHeight; // Trigger reflow
-                thead.style.display = '';
             }
         }
 
