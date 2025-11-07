@@ -709,6 +709,8 @@ function saveTransaction() {
     const url = isEdit ? `/api/transactions/${editId}` : '/api/transactions';
     const method = isEdit ? 'PUT' : 'POST';
 
+    showLoading();
+
     fetch(url, {
         method: method,
         headers: { 'Content-Type': 'application/json' },
@@ -736,6 +738,7 @@ function saveTransaction() {
     })
     .then(({ status, ok, result }) => {
         console.log('Parsed result:', result);
+        hideLoading();
         if (!ok || result.error) {
             const errorMsg = result.error || `Server error (${status})`;
             console.error('Save failed:', errorMsg);
@@ -758,6 +761,7 @@ function saveTransaction() {
         }
     })
     .catch(error => {
+        hideLoading();
         console.error('Error saving transaction:', error);
         showToast('Error saving transaction: ' + error.message, 'danger');
     });
@@ -934,6 +938,8 @@ function saveBudget() {
         month: parseInt(month)
     };
 
+    showLoading();
+
     fetch('/api/budget', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -941,6 +947,7 @@ function saveBudget() {
     })
     .then(response => response.json())
     .then(result => {
+        hideLoading();
         if (result.error) {
             showToast(result.error, 'danger');
         } else {
@@ -951,6 +958,7 @@ function saveBudget() {
         }
     })
     .catch(error => {
+        hideLoading();
         console.error('Error saving budget:', error);
         showToast('Error saving budget', 'danger');
     });
@@ -963,19 +971,29 @@ function saveBudget() {
 function loadReports() {
     const year = new Date().getFullYear();
 
-    fetch(`/api/reports/monthly-summary?year=${year}`)
-        .then(response => response.json())
-        .then(data => {
-            updateMonthlyReportChart(data);
-        })
-        .catch(error => console.error('Error loading monthly report:', error));
+    showLoading();
 
-    fetch(`/api/reports/category-breakdown?year=${year}`)
-        .then(response => response.json())
-        .then(data => {
-            updateCategoryReportChart(data);
-        })
-        .catch(error => console.error('Error loading category report:', error));
+    // Use Promise.all to wait for both requests to complete
+    Promise.all([
+        fetch(`/api/reports/monthly-summary?year=${year}`)
+            .then(response => response.json())
+            .then(data => {
+                updateMonthlyReportChart(data);
+            }),
+        fetch(`/api/reports/category-breakdown?year=${year}`)
+            .then(response => response.json())
+            .then(data => {
+                updateCategoryReportChart(data);
+            })
+    ])
+    .then(() => {
+        hideLoading();
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Error loading reports:', error);
+        showToast('Error loading reports', 'danger');
+    });
 }
 
 // ================================
@@ -1270,6 +1288,8 @@ function showPaymentMethodModal(transactionId, isPaidClick = false) {
 }
 
 function markTransactionWithPaymentMethod(transactionId, paymentMethodId) {
+    showLoading();
+
     fetch(`/api/transactions/${transactionId}/mark-done`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1277,6 +1297,7 @@ function markTransactionWithPaymentMethod(transactionId, paymentMethodId) {
     })
     .then(response => response.json())
     .then(data => {
+        hideLoading();
         if (data.error) {
             showToast(data.error, 'danger');
         } else {
@@ -1286,27 +1307,34 @@ function markTransactionWithPaymentMethod(transactionId, paymentMethodId) {
         }
     })
     .catch(error => {
+        hideLoading();
         console.error('Error:', error);
         showToast('Error marking transaction', 'danger');
     });
 }
 
 function unmarkTransaction(transactionId) {
+    showLoading();
+
     fetch(`/api/transactions/${transactionId}/mark-undone`, {
         method: 'POST'
     })
     .then(response => response.json())
     .then(data => {
+        hideLoading();
         showToast('Transaction unmarked', 'success');
         loadTransactions();
     })
     .catch(error => {
+        hideLoading();
         console.error('Error:', error);
         showToast('Error unmarking transaction', 'danger');
     });
 }
 
 function markTransactionAsPaid(transactionId, paymentMethodId) {
+    showLoading();
+
     fetch(`/api/transactions/${transactionId}/mark-paid`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1314,6 +1342,7 @@ function markTransactionAsPaid(transactionId, paymentMethodId) {
     })
     .then(response => response.json())
     .then(data => {
+        hideLoading();
         if (data.error) {
             showToast(data.error, 'danger');
         } else {
@@ -1323,17 +1352,21 @@ function markTransactionAsPaid(transactionId, paymentMethodId) {
         }
     })
     .catch(error => {
+        hideLoading();
         console.error('Error:', error);
         showToast('Error marking transaction as paid', 'danger');
     });
 }
 
 function markTransactionAsUnpaid(transactionId) {
+    showLoading();
+
     fetch(`/api/transactions/${transactionId}/mark-unpaid`, {
         method: 'POST'
     })
     .then(response => response.json())
     .then(data => {
+        hideLoading();
         if (data.error) {
             showToast(data.error, 'danger');
         } else {
@@ -1342,6 +1375,7 @@ function markTransactionAsUnpaid(transactionId) {
         }
     })
     .catch(error => {
+        hideLoading();
         console.error('Error:', error);
         showToast('Error unmarking transaction as paid', 'danger');
     });
@@ -1365,6 +1399,8 @@ function saveCreditCard(e) {
         color: document.getElementById('cardColor').value
     };
 
+    showLoading();
+
     fetch('/api/payment-methods', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1372,6 +1408,7 @@ function saveCreditCard(e) {
     })
     .then(response => response.json())
     .then(data => {
+        hideLoading();
         if (data.error) {
             showToast(data.error, 'danger');
         } else {
@@ -1382,6 +1419,7 @@ function saveCreditCard(e) {
         }
     })
     .catch(error => {
+        hideLoading();
         console.error('Error:', error);
         showToast('Error adding credit card', 'danger');
     });
