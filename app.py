@@ -37,6 +37,13 @@ app = Flask(__name__)
 app.json = DecimalJSONProvider(app)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365)  # Remember me for 1 year
+
+# Session cookie configuration for mobile browser compatibility
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Allow cookies in same-site context
+app.config['SESSION_COOKIE_HTTPONLY'] = True  # Prevent JavaScript access for security
+app.config['SESSION_COOKIE_SECURE'] = False  # Set to True if using HTTPS in production
+app.config['SESSION_COOKIE_NAME'] = 'session'  # Explicit session cookie name
+
 CORS(app)
 
 # Database configuration with proper type conversion and defaults
