@@ -573,6 +573,15 @@
             display: flex;
             align-items: center;
             gap: 10px;
+            background: #1a1a1a !important;
+            border-color: #555 !important;
+            color: #fff !important;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .payment-method-list-item:hover {
+            background: #2a2a2a !important;
         }
 
         .payment-method-list-item .badge {
@@ -966,12 +975,20 @@
         // Load payment methods
         function loadPaymentMethods() {
             fetch('/api/payment-methods')
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
-                    paymentMethods = data;
+                    paymentMethods = data || [];
+                    console.log('Payment methods loaded:', paymentMethods.length, 'methods');
                 })
                 .catch(error => {
                     console.error('Error loading payment methods:', error);
+                    paymentMethods = [];
+                    showToast('Failed to load payment methods', 'danger');
                 });
         }
 
@@ -1262,11 +1279,11 @@
                                 </button>
                             </div>
                             <div class="swipe-actions">
-                                <button class="swipe-action-btn swipe-action-edit" data-action="edit" data-id="${t.id}">
-                                    <i class="fas fa-edit"></i>
-                                </button>
                                 <button class="swipe-action-btn ${doneBtnClass}" data-action="${doneBtnAction}" data-id="${t.id}" data-is-done="${isDone}">
                                     <i class="fas ${doneBtnIcon}"></i>
+                                </button>
+                                <button class="swipe-action-btn swipe-action-edit" data-action="edit" data-id="${t.id}">
+                                    <i class="fas fa-edit"></i>
                                 </button>
                                 <button class="swipe-action-btn swipe-action-delete" data-action="delete" data-id="${t.id}">
                                     <i class="fas fa-trash"></i>
@@ -1815,7 +1832,7 @@
                 .then(response => response.json())
                 .then(data => {
                     if (!data || data.length === 0) {
-                        container.innerHTML = '<div class="alert alert-warning">No payment methods found with transactions.</div>';
+                        container.innerHTML = '<div class="alert alert-warning" style="background: #3d3d3d; border-color: #555; color: #ffc107;">No payment methods found with transactions.</div>';
                         return;
                     }
 
@@ -1836,7 +1853,7 @@
                 })
                 .catch(error => {
                     console.error('Error loading payment totals:', error);
-                    container.innerHTML = '<div class="alert alert-danger">Error loading payment totals</div>';
+                    container.innerHTML = '<div class="alert alert-danger" style="background: #3d3d3d; border-color: #555; color: #dc3545;">Error loading payment totals</div>';
                 });
         }
 
