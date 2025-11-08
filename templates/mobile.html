@@ -321,12 +321,17 @@
             width: 70px;
             border: none;
             color: white;
-            font-size: 1.2rem;
+            font-size: 0.9rem;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
             transition: all 0.2s;
+            padding: 0;
+        }
+
+        .swipe-action-btn i {
+            font-size: 1rem;
         }
 
         .swipe-action-edit {
@@ -359,6 +364,40 @@
 
         .swipe-action-undone:active {
             background: #5a6268;
+        }
+
+        /* Info button on left side (for right swipe) */
+        .swipe-info-actions {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            display: flex;
+            align-items: stretch;
+            z-index: 1;
+            pointer-events: auto;
+        }
+
+        .swipe-action-info {
+            width: 70px;
+            background: #17a2b8;
+            border: none;
+            color: white;
+            font-size: 0.9rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            padding: 0;
+        }
+
+        .swipe-action-info i {
+            font-size: 1rem;
+        }
+
+        .swipe-action-info:active {
+            background: #138496;
         }
 
         /* Touch feedback */
@@ -534,6 +573,15 @@
             display: flex;
             align-items: center;
             gap: 10px;
+            background: #0d0d0d !important;
+            border-color: #333 !important;
+            color: #fff !important;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .payment-method-list-item:hover {
+            background: #1a1a1a !important;
         }
 
         .payment-method-list-item .badge {
@@ -696,42 +744,42 @@
     <!-- Add Transaction Modal -->
     <div class="modal fade" id="transactionModal" tabindex="-1">
         <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
+            <div class="modal-content" style="background: #1a1a1a; color: #ffffff;">
+                <div class="modal-header" style="border-bottom: 1px solid #333;">
                     <h5 class="modal-title">Add Transaction</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <form id="transactionForm">
                         <div class="mb-3">
-                            <label for="transDescription" class="form-label">Description</label>
-                            <input type="text" class="form-control" id="transDescription" required>
+                            <label for="transDescription" class="form-label" style="color: #aaa;">Description</label>
+                            <input type="text" class="form-control" id="transDescription" required style="background: #0d0d0d; border-color: #333; color: #fff;">
                         </div>
                         <div class="mb-3">
-                            <label for="transCategory" class="form-label">Category</label>
-                            <select class="form-select" id="transCategory">
+                            <label for="transCategory" class="form-label" style="color: #aaa;">Category</label>
+                            <select class="form-select" id="transCategory" style="background: #0d0d0d; border-color: #333; color: #fff;">
                                 <!-- Categories will be loaded here -->
                             </select>
                         </div>
                         <div class="mb-3">
-                            <label for="transDebit" class="form-label">Debit (Income)</label>
-                            <input type="number" class="form-control" id="transDebit" placeholder="0.00" step="0.01">
+                            <label for="transDebit" class="form-label" style="color: #aaa;">Debit (Income)</label>
+                            <input type="number" class="form-control" id="transDebit" placeholder="0.00" step="0.01" style="background: #0d0d0d; border-color: #333; color: #fff;">
                         </div>
                         <div class="mb-3">
-                            <label for="transCredit" class="form-label">Credit (Expense)</label>
-                            <input type="number" class="form-control" id="transCredit" placeholder="0.00" step="0.01">
+                            <label for="transCredit" class="form-label" style="color: #aaa;">Credit (Expense)</label>
+                            <input type="number" class="form-control" id="transCredit" placeholder="0.00" step="0.01" style="background: #0d0d0d; border-color: #333; color: #fff;">
                         </div>
                         <div class="mb-3">
-                            <label for="transDate" class="form-label">Date</label>
-                            <input type="date" class="form-control" id="transDate">
+                            <label for="transDate" class="form-label" style="color: #aaa;">Date</label>
+                            <input type="date" class="form-control" id="transDate" style="background: #0d0d0d; border-color: #333; color: #fff;">
                         </div>
                         <div class="mb-3">
-                            <label for="transNotes" class="form-label">Notes</label>
-                            <textarea class="form-control" id="transNotes" rows="2"></textarea>
+                            <label for="transNotes" class="form-label" style="color: #aaa;">Notes</label>
+                            <textarea class="form-control" id="transNotes" rows="2" style="background: #0d0d0d; border-color: #333; color: #fff;"></textarea>
                         </div>
                     </form>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer" style="border-top: 1px solid #333;">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="button" class="btn btn-primary" id="saveTransactionBtn">Save</button>
                 </div>
@@ -742,10 +790,10 @@
     <!-- Payment Totals Modal -->
     <div class="modal fade" id="paymentTotalsModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header">
+            <div class="modal-content" style="background: #1a1a1a; color: #ffffff;">
+                <div class="modal-header" style="border-bottom: 1px solid #333;">
                     <h5 class="modal-title">Payment Method Totals</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div id="paymentTotalsContainer">
@@ -755,7 +803,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer" style="border-top: 1px solid #333;">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
@@ -765,29 +813,29 @@
     <!-- Change Password Modal -->
     <div class="modal fade" id="changePasswordModal" tabindex="-1">
         <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
+            <div class="modal-content" style="background: #1a1a1a; color: #ffffff;">
+                <div class="modal-header" style="border-bottom: 1px solid #333;">
                     <h5 class="modal-title">Change Password</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <form id="changePasswordForm">
                         <div class="mb-3">
-                            <label for="currentPassword" class="form-label">Current Password</label>
-                            <input type="password" class="form-control" id="currentPassword" required>
+                            <label for="currentPassword" class="form-label" style="color: #aaa;">Current Password</label>
+                            <input type="password" class="form-control" id="currentPassword" required style="background: #0d0d0d; border-color: #333; color: #fff;">
                         </div>
                         <div class="mb-3">
-                            <label for="newPassword" class="form-label">New Password</label>
-                            <input type="password" class="form-control" id="newPassword" required minlength="6">
-                            <div class="form-text">Password must be at least 6 characters long.</div>
+                            <label for="newPassword" class="form-label" style="color: #aaa;">New Password</label>
+                            <input type="password" class="form-control" id="newPassword" required minlength="6" style="background: #0d0d0d; border-color: #333; color: #fff;">
+                            <div class="form-text" style="color: #888;">Password must be at least 6 characters long.</div>
                         </div>
                         <div class="mb-3">
-                            <label for="confirmPassword" class="form-label">Confirm New Password</label>
-                            <input type="password" class="form-control" id="confirmPassword" required>
+                            <label for="confirmPassword" class="form-label" style="color: #aaa;">Confirm New Password</label>
+                            <input type="password" class="form-control" id="confirmPassword" required style="background: #0d0d0d; border-color: #333; color: #fff;">
                         </div>
                     </form>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer" style="border-top: 1px solid #333;">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="button" class="btn btn-primary" id="savePasswordBtn">Change Password</button>
                 </div>
@@ -798,17 +846,46 @@
     <!-- Universal Confirmation Modal -->
     <div class="modal fade" id="confirmModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
+            <div class="modal-content" style="background: #1a1a1a; color: #ffffff;">
+                <div class="modal-header" style="border-bottom: 1px solid #333;">
                     <h5 class="modal-title" id="confirmModalTitle">Confirm Action</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <p id="confirmModalMessage">Are you sure you want to proceed?</p>
+                    <p id="confirmModalMessage" style="color: #fff;">Are you sure you want to proceed?</p>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer" style="border-top: 1px solid #333;">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="button" class="btn btn-danger" id="confirmModalBtn">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Transaction Info Modal -->
+    <div class="modal fade" id="transactionInfoModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="background: #1a1a1a; color: #ffffff;">
+                <div class="modal-header" style="border-bottom: 1px solid #333;">
+                    <h5 class="modal-title">Transaction Details</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold" style="color: #aaa;">Description:</label>
+                        <p id="infoDescription" style="color: #fff; margin: 0;">-</p>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold" style="color: #aaa;">Notes:</label>
+                        <p id="infoNotes" style="color: #fff; margin: 0; white-space: pre-wrap;">-</p>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold" style="color: #aaa;">Paid At:</label>
+                        <p id="infoPaidAt" style="color: #fff; margin: 0;">-</p>
+                    </div>
+                </div>
+                <div class="modal-footer" style="border-top: 1px solid #333;">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
@@ -817,10 +894,10 @@
     <!-- Payment Method Selection Modal -->
     <div class="modal fade" id="paymentMethodModal" tabindex="-1">
         <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
+            <div class="modal-content" style="background: #1a1a1a; color: #ffffff;">
+                <div class="modal-header" style="border-bottom: 1px solid #333;">
                     <h5 class="modal-title">Select Payment Method</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <p style="color: #ffffff;">How did you pay for this transaction?</p>
@@ -828,7 +905,7 @@
                         <!-- Payment methods will be loaded here -->
                     </div>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer" style="border-top: 1px solid #333;">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 </div>
             </div>
@@ -897,13 +974,25 @@
 
         // Load payment methods
         function loadPaymentMethods() {
+            console.log('Starting to load payment methods...');
             fetch('/api/payment-methods')
-                .then(response => response.json())
+                .then(response => {
+                    console.log('Payment methods response status:', response.status);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
-                    paymentMethods = data;
+                    paymentMethods = data || [];
+                    console.log('Payment methods loaded successfully:', paymentMethods.length, 'methods');
+                    console.log('Payment methods data:', paymentMethods);
                 })
                 .catch(error => {
                     console.error('Error loading payment methods:', error);
+                    console.error('Error details:', error.message);
+                    paymentMethods = [];
+                    showToast('Failed to load payment methods: ' + error.message, 'danger');
                 });
         }
 
@@ -912,7 +1001,6 @@
             selectedTransactionIdForPayment = transactionId;
 
             const listContainer = document.getElementById('paymentMethodList');
-            listContainer.innerHTML = '';
 
             // Update modal title based on context
             const modalTitle = document.querySelector('#paymentMethodModal .modal-title');
@@ -920,8 +1008,43 @@
                 modalTitle.textContent = isPaidClick ? 'Select Payment Method' : 'Mark as Done - Select Payment Method';
             }
 
+            // If payment methods are not loaded, reload them
             if (!paymentMethods || paymentMethods.length === 0) {
-                listContainer.innerHTML = '<p style="color: #ffffff;">No payment methods available. Please add one in settings.</p>';
+                console.log('Payment methods empty, reloading...');
+                listContainer.innerHTML = '<div class="text-center" style="color: #ccc; padding: 20px;"><i class="fas fa-spinner fa-spin fa-2x mb-3"></i><p>Loading payment methods...</p></div>';
+
+                // Reload payment methods
+                fetch('/api/payment-methods')
+                    .then(response => {
+                        console.log('Reload payment methods response status:', response.status);
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        paymentMethods = data || [];
+                        console.log('Payment methods reloaded:', paymentMethods.length, 'methods');
+                        populatePaymentMethodsList(listContainer, isPaidClick);
+                    })
+                    .catch(error => {
+                        console.error('Error reloading payment methods:', error);
+                        listContainer.innerHTML = '<p style="color: #dc3545; padding: 20px;">Failed to load payment methods. Please check your connection and try again.</p>';
+                    });
+            } else {
+                populatePaymentMethodsList(listContainer, isPaidClick);
+            }
+
+            const modal = new bootstrap.Modal(document.getElementById('paymentMethodModal'));
+            modal.show();
+        }
+
+        // Populate payment methods list
+        function populatePaymentMethodsList(listContainer, isPaidClick) {
+            listContainer.innerHTML = '';
+
+            if (!paymentMethods || paymentMethods.length === 0) {
+                listContainer.innerHTML = '<p style="color: #ffffff; padding: 20px;">No payment methods available. Please add one in settings.</p>';
             } else {
                 paymentMethods.forEach(method => {
                     const item = document.createElement('div');
@@ -940,8 +1063,45 @@
                     listContainer.appendChild(item);
                 });
             }
+        }
 
-            const modal = new bootstrap.Modal(document.getElementById('paymentMethodModal'));
+        // Show transaction info modal
+        function showTransactionInfo(transaction) {
+            // Populate modal with transaction details
+            const descElement = document.getElementById('infoDescription');
+            const notesElement = document.getElementById('infoNotes');
+            const paidAtElement = document.getElementById('infoPaidAt');
+
+            // Set description
+            if (descElement) {
+                descElement.textContent = transaction.description || '-';
+            }
+
+            // Set notes
+            if (notesElement) {
+                notesElement.textContent = transaction.notes || '-';
+            }
+
+            // Set paid at date
+            if (paidAtElement) {
+                if (transaction.paid_at) {
+                    // Format the date nicely
+                    const date = new Date(transaction.paid_at);
+                    const formattedDate = date.toLocaleString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                    paidAtElement.textContent = formattedDate;
+                } else {
+                    paidAtElement.textContent = '-';
+                }
+            }
+
+            // Show the modal
+            const modal = new bootstrap.Modal(document.getElementById('transactionInfoModal'));
             modal.show();
         }
 
@@ -1148,12 +1308,17 @@
                 row.innerHTML = `
                     <td colspan="4" style="padding: 0;">
                         <div class="swipe-wrapper">
-                            <div class="swipe-actions">
-                                <button class="swipe-action-btn swipe-action-edit" data-action="edit" data-id="${t.id}">
-                                    <i class="fas fa-edit"></i>
+                            <div class="swipe-info-actions">
+                                <button class="swipe-action-btn swipe-action-info" data-action="info" data-id="${t.id}">
+                                    <i class="fas fa-info-circle"></i>
                                 </button>
+                            </div>
+                            <div class="swipe-actions">
                                 <button class="swipe-action-btn ${doneBtnClass}" data-action="${doneBtnAction}" data-id="${t.id}" data-is-done="${isDone}">
                                     <i class="fas ${doneBtnIcon}"></i>
+                                </button>
+                                <button class="swipe-action-btn swipe-action-edit" data-action="edit" data-id="${t.id}">
+                                    <i class="fas fa-edit"></i>
                                 </button>
                                 <button class="swipe-action-btn swipe-action-delete" data-action="delete" data-id="${t.id}">
                                     <i class="fas fa-trash"></i>
@@ -1233,6 +1398,7 @@
                 const doneBtn = row.querySelector('[data-action="done"]');
                 const undoneBtn = row.querySelector('[data-action="undone"]');
                 const deleteBtn = row.querySelector('[data-action="delete"]');
+                const infoBtn = row.querySelector('[data-action="info"]');
 
                 if (editBtn) {
                     editBtn.addEventListener('click', function() {
@@ -1257,6 +1423,12 @@
                 if (deleteBtn) {
                     deleteBtn.addEventListener('click', function() {
                         deleteTransaction(t.id);
+                    });
+                }
+
+                if (infoBtn) {
+                    infoBtn.addEventListener('click', function() {
+                        showTransactionInfo(t);
                     });
                 }
 
@@ -1303,10 +1475,14 @@
             config: {
                 buttonWidth: 70,
                 buttonCount: 3,
+                infoButtonWidth: 70,
                 snapThreshold: 60,
                 velocityThreshold: 0.3,
                 get maxSwipe() {
                     return this.buttonWidth * this.buttonCount;
+                },
+                get maxSwipeRight() {
+                    return this.infoButtonWidth;
                 }
             },
 
@@ -1320,7 +1496,8 @@
                 startTime: 0,
                 activeRow: null,
                 isTouch: false,
-                scrollBlocked: false
+                scrollBlocked: false,
+                swipeDirection: null  // 'left' or 'right'
             },
 
             // Initialize the swipe manager (call once)
@@ -1402,18 +1579,26 @@
                 // Detect horizontal vs vertical scroll
                 if (!this.state.scrollBlocked && Math.abs(diffX) > 10) {
                     // Horizontal swipe detected - block vertical scroll
-                    if (diffX > diffY * 1.5) {
+                    if (Math.abs(diffX) > diffY * 1.5) {
                         this.state.scrollBlocked = true;
                         e.preventDefault(); // Prevent page scroll
+                        // Determine swipe direction
+                        this.state.swipeDirection = diffX > 0 ? 'left' : 'right';
                     }
                 }
 
-                // Only allow left swipe
-                if (diffX > 0 && this.state.scrollBlocked) {
-                    const swipeAmount = Math.min(diffX, this.config.maxSwipe);
+                if (this.state.scrollBlocked) {
                     const swipeContent = this.state.activeRow.querySelector('.swipe-content');
                     if (swipeContent) {
-                        swipeContent.style.transform = `translateX(-${swipeAmount}px)`;
+                        if (diffX > 0) {
+                            // Left swipe - reveal action buttons on right
+                            const swipeAmount = Math.min(diffX, this.config.maxSwipe);
+                            swipeContent.style.transform = `translateX(-${swipeAmount}px)`;
+                        } else if (diffX < 0) {
+                            // Right swipe - reveal info button on left
+                            const swipeAmount = Math.min(Math.abs(diffX), this.config.maxSwipeRight);
+                            swipeContent.style.transform = `translateX(${swipeAmount}px)`;
+                        }
                     }
                 }
             },
@@ -1424,24 +1609,43 @@
 
                 const diffX = this.state.startX - this.state.currentX;
                 const duration = Date.now() - this.state.startTime;
-                const velocity = duration > 0 ? diffX / duration : 0;
+                const velocity = duration > 0 ? Math.abs(diffX) / duration : 0;
 
                 const row = this.state.activeRow;
                 const swipeContent = row.querySelector('.swipe-content');
 
                 row.classList.remove('swiping');
 
-                // Determine if we should open or close
-                const shouldOpen = diffX > this.config.snapThreshold ||
-                                 (velocity > this.config.velocityThreshold && diffX > 20);
+                if (diffX > 0) {
+                    // Left swipe - reveal action buttons
+                    const shouldOpen = diffX > this.config.snapThreshold ||
+                                     (velocity > this.config.velocityThreshold && diffX > 20);
 
-                if (shouldOpen && diffX > 0 && swipeContent) {
-                    // Open swipe - show all buttons
-                    swipeContent.style.transform = `translateX(-${this.config.maxSwipe}px)`;
-                    row.classList.add('swiped');
-                    row.dataset.swipeOpen = 'true';
+                    if (shouldOpen && swipeContent) {
+                        // Open swipe - show all buttons
+                        swipeContent.style.transform = `translateX(-${this.config.maxSwipe}px)`;
+                        row.classList.add('swiped');
+                        row.dataset.swipeOpen = 'left';
+                    } else if (swipeContent) {
+                        // Close swipe
+                        this.closeSwipe(row);
+                    }
+                } else if (diffX < 0) {
+                    // Right swipe - reveal info button
+                    const shouldOpen = Math.abs(diffX) > this.config.snapThreshold ||
+                                     (velocity > this.config.velocityThreshold && Math.abs(diffX) > 20);
+
+                    if (shouldOpen && swipeContent) {
+                        // Open swipe - show info button
+                        swipeContent.style.transform = `translateX(${this.config.maxSwipeRight}px)`;
+                        row.classList.add('swiped');
+                        row.dataset.swipeOpen = 'right';
+                    } else if (swipeContent) {
+                        // Close swipe
+                        this.closeSwipe(row);
+                    }
                 } else if (swipeContent) {
-                    // Close swipe
+                    // No movement - close
                     this.closeSwipe(row);
                 }
 
@@ -1449,6 +1653,7 @@
                 this.state.isDragging = false;
                 this.state.activeRow = null;
                 this.state.scrollBlocked = false;
+                this.state.swipeDirection = null;
             },
 
             // Handle clicks outside swiped rows
@@ -1457,11 +1662,11 @@
                 if (e.target.closest('.swipe-action-btn')) return;
 
                 const clickedRow = this.findSwipeRow(e.target);
-                const allRows = document.querySelectorAll('.swipe-container[data-swipe-open="true"]');
+                const allRows = document.querySelectorAll('.swipe-container[data-swipe-open]');
 
                 allRows.forEach(row => {
                     // Close if clicking different row or clicking on swiped row content
-                    if (row !== clickedRow || (row === clickedRow && row.dataset.swipeOpen === 'true')) {
+                    if (row !== clickedRow || (row === clickedRow && row.dataset.swipeOpen)) {
                         this.closeSwipe(row);
                     }
                 });
@@ -1662,7 +1867,7 @@
                 .then(response => response.json())
                 .then(data => {
                     if (!data || data.length === 0) {
-                        container.innerHTML = '<div class="alert alert-warning">No payment methods found with transactions.</div>';
+                        container.innerHTML = '<div class="alert alert-warning" style="background: #2d2d2d; border-color: #444; color: #ffc107;">No payment methods found with transactions.</div>';
                         return;
                     }
 
@@ -1683,7 +1888,7 @@
                 })
                 .catch(error => {
                     console.error('Error loading payment totals:', error);
-                    container.innerHTML = '<div class="alert alert-danger">Error loading payment totals</div>';
+                    container.innerHTML = '<div class="alert alert-danger" style="background: #2d2d2d; border-color: #444; color: #dc3545;">Error loading payment totals</div>';
                 });
         }
 
