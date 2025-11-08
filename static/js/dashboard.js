@@ -434,7 +434,7 @@ function displayTransactions(transactions) {
     tbody.innerHTML = '';
 
     if (!transactions || transactions.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center">No transactions for this period</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center">No transactions for this period</td></tr>';
         return;
     }
 
@@ -470,6 +470,9 @@ function displayTransactions(transactions) {
             row.dataset.paymentColor = t.payment_method_color;
         }
 
+        // Format paid_at date if exists
+        const paidAtDisplay = t.paid_at ? formatDate(t.paid_at) : '-';
+
         row.innerHTML = `
             <td class="text-center">${checkboxHtml}</td>
             <td class="description-cell" style="cursor: pointer;" data-transaction-id="${t.id}">${t.description}</td>
@@ -477,6 +480,7 @@ function displayTransactions(transactions) {
             <td class="text-success">${t.debit ? formatCurrency(t.debit) : '-'}</td>
             <td class="text-danger">${t.credit ? formatCurrency(t.credit) : '-'}</td>
             <td class="fw-bold">${formatCurrency(t.calculatedBalance)}</td>
+            <td class="text-muted small">${paidAtDisplay}</td>
             <td>${t.notes || '-'}</td>
             <td>
                 <button class="btn btn-sm btn-primary me-1" onclick="editTransaction(${t.id})">
