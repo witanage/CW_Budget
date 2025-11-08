@@ -361,6 +361,35 @@
             background: #5a6268;
         }
 
+        /* Info button on left side (for right swipe) */
+        .swipe-info-actions {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            display: flex;
+            align-items: stretch;
+            z-index: 1;
+            pointer-events: auto;
+        }
+
+        .swipe-action-info {
+            width: 70px;
+            background: #17a2b8;
+            border: none;
+            color: white;
+            font-size: 1.2rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .swipe-action-info:active {
+            background: #138496;
+        }
+
         /* Touch feedback */
         .swipe-container.swiping .swipe-content {
             transition: none;
@@ -814,6 +843,35 @@
         </div>
     </div>
 
+    <!-- Transaction Info Modal -->
+    <div class="modal fade" id="transactionInfoModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="background: #2d3d3d; color: #ffffff;">
+                <div class="modal-header" style="border-bottom: 1px solid #444;">
+                    <h5 class="modal-title">Transaction Details</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold" style="color: #aaa;">Description:</label>
+                        <p id="infoDescription" style="color: #fff; margin: 0;">-</p>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold" style="color: #aaa;">Notes:</label>
+                        <p id="infoNotes" style="color: #fff; margin: 0; white-space: pre-wrap;">-</p>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold" style="color: #aaa;">Paid At:</label>
+                        <p id="infoPaidAt" style="color: #fff; margin: 0;">-</p>
+                    </div>
+                </div>
+                <div class="modal-footer" style="border-top: 1px solid #444;">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Payment Method Selection Modal -->
     <div class="modal fade" id="paymentMethodModal" tabindex="-1">
         <div class="modal-dialog">
@@ -942,6 +1000,46 @@
             }
 
             const modal = new bootstrap.Modal(document.getElementById('paymentMethodModal'));
+            modal.show();
+        }
+
+        // Show transaction info modal
+        function showTransactionInfo(transaction) {
+            // Populate modal with transaction details
+            const descElement = document.getElementById('infoDescription');
+            const notesElement = document.getElementById('infoNotes');
+            const paidAtElement = document.getElementById('infoPaidAt');
+
+            // Set description
+            if (descElement) {
+                descElement.textContent = transaction.description || '-';
+            }
+
+            // Set notes
+            if (notesElement) {
+                notesElement.textContent = transaction.notes || '-';
+            }
+
+            // Set paid at date
+            if (paidAtElement) {
+                if (transaction.paid_at) {
+                    // Format the date nicely
+                    const date = new Date(transaction.paid_at);
+                    const formattedDate = date.toLocaleString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                    paidAtElement.textContent = formattedDate;
+                } else {
+                    paidAtElement.textContent = '-';
+                }
+            }
+
+            // Show the modal
+            const modal = new bootstrap.Modal(document.getElementById('transactionInfoModal'));
             modal.show();
         }
 
@@ -1148,6 +1246,11 @@
                 row.innerHTML = `
                     <td colspan="4" style="padding: 0;">
                         <div class="swipe-wrapper">
+                            <div class="swipe-info-actions">
+                                <button class="swipe-action-btn swipe-action-info" data-action="info" data-id="${t.id}">
+                                    <i class="fas fa-info-circle"></i>
+                                </button>
+                            </div>
                             <div class="swipe-actions">
                                 <button class="swipe-action-btn swipe-action-edit" data-action="edit" data-id="${t.id}">
                                     <i class="fas fa-edit"></i>
@@ -1233,6 +1336,7 @@
                 const doneBtn = row.querySelector('[data-action="done"]');
                 const undoneBtn = row.querySelector('[data-action="undone"]');
                 const deleteBtn = row.querySelector('[data-action="delete"]');
+                const infoBtn = row.querySelector('[data-action="info"]');
 
                 if (editBtn) {
                     editBtn.addEventListener('click', function() {
@@ -1257,6 +1361,12 @@
                 if (deleteBtn) {
                     deleteBtn.addEventListener('click', function() {
                         deleteTransaction(t.id);
+                    });
+                }
+
+                if (infoBtn) {
+                    infoBtn.addEventListener('click', function() {
+                        showTransactionInfo(t);
                     });
                 }
 
@@ -1303,10 +1413,14 @@
             config: {
                 buttonWidth: 70,
                 buttonCount: 3,
+                infoButtonWidth: 70,
                 snapThreshold: 60,
                 velocityThreshold: 0.3,
                 get maxSwipe() {
                     return this.buttonWidth * this.buttonCount;
+                },
+                get maxSwipeRight() {
+                    return this.infoButtonWidth;
                 }
             },
 
@@ -1320,7 +1434,8 @@
                 startTime: 0,
                 activeRow: null,
                 isTouch: false,
-                scrollBlocked: false
+                scrollBlocked: false,
+                swipeDirection: null  // 'left' or 'right'
             },
 
             // Initialize the swipe manager (call once)
@@ -1402,18 +1517,26 @@
                 // Detect horizontal vs vertical scroll
                 if (!this.state.scrollBlocked && Math.abs(diffX) > 10) {
                     // Horizontal swipe detected - block vertical scroll
-                    if (diffX > diffY * 1.5) {
+                    if (Math.abs(diffX) > diffY * 1.5) {
                         this.state.scrollBlocked = true;
                         e.preventDefault(); // Prevent page scroll
+                        // Determine swipe direction
+                        this.state.swipeDirection = diffX > 0 ? 'left' : 'right';
                     }
                 }
 
-                // Only allow left swipe
-                if (diffX > 0 && this.state.scrollBlocked) {
-                    const swipeAmount = Math.min(diffX, this.config.maxSwipe);
+                if (this.state.scrollBlocked) {
                     const swipeContent = this.state.activeRow.querySelector('.swipe-content');
                     if (swipeContent) {
-                        swipeContent.style.transform = `translateX(-${swipeAmount}px)`;
+                        if (diffX > 0) {
+                            // Left swipe - reveal action buttons on right
+                            const swipeAmount = Math.min(diffX, this.config.maxSwipe);
+                            swipeContent.style.transform = `translateX(-${swipeAmount}px)`;
+                        } else if (diffX < 0) {
+                            // Right swipe - reveal info button on left
+                            const swipeAmount = Math.min(Math.abs(diffX), this.config.maxSwipeRight);
+                            swipeContent.style.transform = `translateX(${swipeAmount}px)`;
+                        }
                     }
                 }
             },
@@ -1424,24 +1547,43 @@
 
                 const diffX = this.state.startX - this.state.currentX;
                 const duration = Date.now() - this.state.startTime;
-                const velocity = duration > 0 ? diffX / duration : 0;
+                const velocity = duration > 0 ? Math.abs(diffX) / duration : 0;
 
                 const row = this.state.activeRow;
                 const swipeContent = row.querySelector('.swipe-content');
 
                 row.classList.remove('swiping');
 
-                // Determine if we should open or close
-                const shouldOpen = diffX > this.config.snapThreshold ||
-                                 (velocity > this.config.velocityThreshold && diffX > 20);
+                if (diffX > 0) {
+                    // Left swipe - reveal action buttons
+                    const shouldOpen = diffX > this.config.snapThreshold ||
+                                     (velocity > this.config.velocityThreshold && diffX > 20);
 
-                if (shouldOpen && diffX > 0 && swipeContent) {
-                    // Open swipe - show all buttons
-                    swipeContent.style.transform = `translateX(-${this.config.maxSwipe}px)`;
-                    row.classList.add('swiped');
-                    row.dataset.swipeOpen = 'true';
+                    if (shouldOpen && swipeContent) {
+                        // Open swipe - show all buttons
+                        swipeContent.style.transform = `translateX(-${this.config.maxSwipe}px)`;
+                        row.classList.add('swiped');
+                        row.dataset.swipeOpen = 'left';
+                    } else if (swipeContent) {
+                        // Close swipe
+                        this.closeSwipe(row);
+                    }
+                } else if (diffX < 0) {
+                    // Right swipe - reveal info button
+                    const shouldOpen = Math.abs(diffX) > this.config.snapThreshold ||
+                                     (velocity > this.config.velocityThreshold && Math.abs(diffX) > 20);
+
+                    if (shouldOpen && swipeContent) {
+                        // Open swipe - show info button
+                        swipeContent.style.transform = `translateX(${this.config.maxSwipeRight}px)`;
+                        row.classList.add('swiped');
+                        row.dataset.swipeOpen = 'right';
+                    } else if (swipeContent) {
+                        // Close swipe
+                        this.closeSwipe(row);
+                    }
                 } else if (swipeContent) {
-                    // Close swipe
+                    // No movement - close
                     this.closeSwipe(row);
                 }
 
@@ -1449,6 +1591,7 @@
                 this.state.isDragging = false;
                 this.state.activeRow = null;
                 this.state.scrollBlocked = false;
+                this.state.swipeDirection = null;
             },
 
             // Handle clicks outside swiped rows
@@ -1457,11 +1600,11 @@
                 if (e.target.closest('.swipe-action-btn')) return;
 
                 const clickedRow = this.findSwipeRow(e.target);
-                const allRows = document.querySelectorAll('.swipe-container[data-swipe-open="true"]');
+                const allRows = document.querySelectorAll('.swipe-container[data-swipe-open]');
 
                 allRows.forEach(row => {
                     // Close if clicking different row or clicking on swiped row content
-                    if (row !== clickedRow || (row === clickedRow && row.dataset.swipeOpen === 'true')) {
+                    if (row !== clickedRow || (row === clickedRow && row.dataset.swipeOpen)) {
                         this.closeSwipe(row);
                     }
                 });
