@@ -1250,11 +1250,13 @@ function loadPaymentMethods() {
     fetch('/api/payment-methods')
         .then(response => response.json())
         .then(methods => {
-            paymentMethods = methods;
-            console.log('✓ Loaded', methods.length, 'payment methods');
+            // Ensure we always have an array
+            paymentMethods = Array.isArray(methods) ? methods : [];
+            console.log('✓ Loaded', paymentMethods.length, 'payment methods');
         })
         .catch(error => {
             console.error('✗ Error loading payment methods:', error);
+            paymentMethods = []; // Ensure it stays an array on error
             showToast('Error loading payment methods', 'danger');
         });
 }
@@ -1266,6 +1268,15 @@ function showPaymentMethodModal(transactionId, isPaidClick = false) {
 
     // Clear and populate payment methods
     listEl.innerHTML = '';
+
+    // Check if paymentMethods is an array
+    if (!Array.isArray(paymentMethods) || paymentMethods.length === 0) {
+        listEl.innerHTML = '<div class="alert alert-warning">No payment methods available. Please add a payment method first.</div>';
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+        return;
+    }
+
     paymentMethods.forEach(method => {
         const item = document.createElement('a');
         item.href = '#';
@@ -1431,6 +1442,12 @@ function saveCreditCard(e) {
 function loadCreditCardsList() {
     const listEl = document.getElementById('creditCardsList');
     listEl.innerHTML = '';
+
+    // Check if paymentMethods is an array
+    if (!Array.isArray(paymentMethods)) {
+        listEl.innerHTML = '<p class="text-muted">No credit cards added yet.</p>';
+        return;
+    }
 
     const creditCards = paymentMethods.filter(m => m.type === 'credit_card');
 
