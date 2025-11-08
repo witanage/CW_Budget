@@ -434,7 +434,7 @@ function displayTransactions(transactions) {
     tbody.innerHTML = '';
 
     if (!transactions || transactions.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="text-center">No transactions for this period</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center">No transactions for this period</td></tr>';
         return;
     }
 
@@ -472,7 +472,6 @@ function displayTransactions(transactions) {
 
         row.innerHTML = `
             <td class="text-center">${checkboxHtml}</td>
-            <td>${t.id}</td>
             <td class="description-cell" style="cursor: pointer;" data-transaction-id="${t.id}">${t.description}</td>
             <td><span class="badge bg-secondary">${t.category_name || 'Uncategorized'}</span></td>
             <td class="text-success">${t.debit ? formatCurrency(t.debit) : '-'}</td>
@@ -501,8 +500,8 @@ function displayTransactions(transactions) {
             row.classList.add('transaction-highlighted');
             const cells = row.querySelectorAll('td');
             cells.forEach((cell, index) => {
-                // Apply to all cells except description (index 2)
-                if (index !== 2) {
+                // Apply to all cells except description (index 1)
+                if (index !== 1) {
                     cell.style.backgroundColor = t.payment_method_color;
                 } else {
                     // Apply to description cell only if is_paid is true
