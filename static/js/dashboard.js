@@ -470,14 +470,17 @@ function displayTransactions(transactions) {
             row.dataset.paymentColor = t.payment_method_color;
         }
 
+        // Format paid_at date if exists
+        const paidAtDisplay = t.paid_at ? formatDate(t.paid_at) : '-';
+
         row.innerHTML = `
             <td class="text-center">${checkboxHtml}</td>
-            <td>${t.id}</td>
             <td class="description-cell" style="cursor: pointer;" data-transaction-id="${t.id}">${t.description}</td>
             <td><span class="badge bg-secondary">${t.category_name || 'Uncategorized'}</span></td>
             <td class="text-success">${t.debit ? formatCurrency(t.debit) : '-'}</td>
             <td class="text-danger">${t.credit ? formatCurrency(t.credit) : '-'}</td>
             <td class="fw-bold">${formatCurrency(t.calculatedBalance)}</td>
+            <td class="text-muted small">${paidAtDisplay}</td>
             <td>${t.notes || '-'}</td>
             <td>
                 <button class="btn btn-sm btn-primary me-1" onclick="editTransaction(${t.id})">
@@ -501,8 +504,8 @@ function displayTransactions(transactions) {
             row.classList.add('transaction-highlighted');
             const cells = row.querySelectorAll('td');
             cells.forEach((cell, index) => {
-                // Apply to all cells except description (index 2)
-                if (index !== 2) {
+                // Apply to all cells except description (index 1)
+                if (index !== 1) {
                     cell.style.backgroundColor = t.payment_method_color;
                 } else {
                     // Apply to description cell only if is_paid is true
@@ -1247,11 +1250,13 @@ function loadPaymentMethods() {
     fetch('/api/payment-methods')
         .then(response => response.json())
         .then(methods => {
-            paymentMethods = methods;
-            console.log('✓ Loaded', methods.length, 'payment methods');
+            // Ensure we always have an array
+            paymentMethods = Array.isArray(methods) ? methods : [];
+            console.log('✓ Loaded', paymentMethods.length, 'payment methods');
         })
         .catch(error => {
             console.error('✗ Error loading payment methods:', error);
+            paymentMethods = []; // Ensure it stays an array on error
             showToast('Error loading payment methods', 'danger');
         });
 }
@@ -1263,6 +1268,15 @@ function showPaymentMethodModal(transactionId, isPaidClick = false) {
 
     // Clear and populate payment methods
     listEl.innerHTML = '';
+
+    // Check if paymentMethods is an array
+    if (!Array.isArray(paymentMethods) || paymentMethods.length === 0) {
+        listEl.innerHTML = '<div class="alert alert-warning">No payment methods available. Please add a payment method first.</div>';
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+        return;
+    }
+
     paymentMethods.forEach(method => {
         const item = document.createElement('a');
         item.href = '#';
@@ -1428,6 +1442,12 @@ function saveCreditCard(e) {
 function loadCreditCardsList() {
     const listEl = document.getElementById('creditCardsList');
     listEl.innerHTML = '';
+
+    // Check if paymentMethods is an array
+    if (!Array.isArray(paymentMethods)) {
+        listEl.innerHTML = '<p class="text-muted">No credit cards added yet.</p>';
+        return;
+    }
 
     const creditCards = paymentMethods.filter(m => m.type === 'credit_card');
 
