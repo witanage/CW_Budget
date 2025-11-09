@@ -1160,14 +1160,28 @@ def savings_progress_report():
 
             monthly_data = cursor.fetchall()
 
-            # Calculate cumulative savings
+            # Calculate cumulative savings and convert Decimals to float
             cumulative = 0
+            processed_data = []
             for row in monthly_data:
-                cumulative += float(row['monthly_savings'])
-                row['cumulative_savings'] = cumulative
-                row['savings_rate'] = (float(row['monthly_savings']) / float(row['income']) * 100) if float(row['income']) > 0 else 0
+                income = float(row['income']) if row['income'] else 0
+                expenses = float(row['expenses']) if row['expenses'] else 0
+                monthly_savings = float(row['monthly_savings']) if row['monthly_savings'] else 0
 
-            return jsonify(monthly_data)
+                cumulative += monthly_savings
+
+                processed_data.append({
+                    'year': row['year'],
+                    'month': row['month'],
+                    'month_name': row['month_name'],
+                    'income': income,
+                    'expenses': expenses,
+                    'monthly_savings': monthly_savings,
+                    'cumulative_savings': cumulative,
+                    'savings_rate': (monthly_savings / income * 100) if income > 0 else 0
+                })
+
+            return jsonify(processed_data)
 
         except Error as e:
             return jsonify({'error': str(e)}), 500
