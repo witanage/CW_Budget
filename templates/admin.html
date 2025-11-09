@@ -1,0 +1,381 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - Personal Finance Manager{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="text-white">
+                <i class="fas fa-user-shield"></i> Admin Dashboard
+            </h2>
+            <p class="text-muted">Manage users and view system audit logs</p>
+        </div>
+    </div>
+
+    <!-- User Management Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm" style="background: var(--card-bg); border: 1px solid var(--border-color);">
+                <div class="card-header" style="background: var(--card-header-bg); color: var(--text-primary);">
+                    <h5 class="mb-0">
+                        <i class="fas fa-users"></i> User Management
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover" id="usersTable" style="color: var(--text-primary);">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Username</th>
+                                    <th>Email</th>
+                                    <th>Status</th>
+                                    <th>Role</th>
+                                    <th>Last Login</th>
+                                    <th>Created</th>
+                                    <th>Records</th>
+                                    <th>Transactions</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersTableBody">
+                                <tr>
+                                    <td colspan="10" class="text-center">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Audit Logs Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm" style="background: var(--card-bg); border: 1px solid var(--border-color);">
+                <div class="card-header" style="background: var(--card-header-bg); color: var(--text-primary);">
+                    <h5 class="mb-0">
+                        <i class="fas fa-history"></i> Audit Logs
+                        <button class="btn btn-sm btn-outline-primary float-end" onclick="loadAuditLogs()">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm" style="color: var(--text-primary);">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Admin</th>
+                                    <th>Action</th>
+                                    <th>Target User</th>
+                                    <th>Details</th>
+                                </tr>
+                            </thead>
+                            <tbody id="auditLogsTableBody">
+                                <tr>
+                                    <td colspan="5" class="text-center">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirm Delete Modal -->
+<div class="modal fade" id="confirmDeleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content" style="background: var(--modal-bg); color: var(--text-primary);">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border-color);">
+                <h5 class="modal-title">
+                    <i class="fas fa-exclamation-triangle text-danger"></i> Confirm Delete
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" style="filter: invert(1);"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete user <strong id="deleteUsername"></strong>?</p>
+                <p class="text-danger">This action cannot be undone. All user data including transactions will be permanently deleted.</p>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid var(--border-color);">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+                    <i class="fas fa-trash"></i> Delete User
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentDeleteUserId = null;
+
+// Load users on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadUsers();
+    loadAuditLogs();
+});
+
+// Load all users
+async function loadUsers() {
+    try {
+        const response = await fetch('/api/admin/users');
+        const users = await response.json();
+
+        if (!response.ok) {
+            throw new Error(users.error || 'Failed to load users');
+        }
+
+        const tbody = document.getElementById('usersTableBody');
+        tbody.innerHTML = '';
+
+        users.forEach(user => {
+            const row = document.createElement('tr');
+            row.style.background = 'var(--table-bg)';
+
+            const statusBadge = user.is_active
+                ? '<span class="badge bg-success">Active</span>'
+                : '<span class="badge bg-danger">Inactive</span>';
+
+            const roleBadge = user.is_admin
+                ? '<span class="badge bg-primary">Admin</span>'
+                : '<span class="badge bg-secondary">User</span>';
+
+            const lastLogin = user.last_login
+                ? new Date(user.last_login).toLocaleString()
+                : '<span class="text-muted">Never</span>';
+
+            const created = user.created_at
+                ? new Date(user.created_at).toLocaleString()
+                : '<span class="text-muted">N/A</span>';
+
+            row.innerHTML = `
+                <td>${user.id}</td>
+                <td><strong>${user.username}</strong></td>
+                <td>${user.email}</td>
+                <td>${statusBadge}</td>
+                <td>${roleBadge}</td>
+                <td>${lastLogin}</td>
+                <td>${created}</td>
+                <td>${user.monthly_records_count || 0}</td>
+                <td>${user.transactions_count || 0}</td>
+                <td>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button class="btn ${user.is_active ? 'btn-warning' : 'btn-success'}"
+                                onclick="toggleUserActive(${user.id}, '${user.username}')"
+                                title="${user.is_active ? 'Deactivate' : 'Activate'} user">
+                            <i class="fas fa-${user.is_active ? 'ban' : 'check'}"></i>
+                        </button>
+                        <button class="btn ${user.is_admin ? 'btn-secondary' : 'btn-primary'}"
+                                onclick="toggleUserAdmin(${user.id}, '${user.username}')"
+                                title="${user.is_admin ? 'Revoke' : 'Grant'} admin">
+                            <i class="fas fa-user-shield"></i>
+                        </button>
+                        <button class="btn btn-danger"
+                                onclick="showDeleteModal(${user.id}, '${user.username}')"
+                                title="Delete user">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+
+    } catch (error) {
+        console.error('Error loading users:', error);
+        showAlert('Error loading users: ' + error.message, 'danger');
+    }
+}
+
+// Toggle user active status
+async function toggleUserActive(userId, username) {
+    if (!confirm(`Are you sure you want to ${username}'s account status?`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/admin/users/${userId}/toggle-active`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to update user');
+        }
+
+        showAlert(data.message, 'success');
+        loadUsers();
+        loadAuditLogs();
+
+    } catch (error) {
+        console.error('Error toggling user active status:', error);
+        showAlert('Error: ' + error.message, 'danger');
+    }
+}
+
+// Toggle user admin status
+async function toggleUserAdmin(userId, username) {
+    if (!confirm(`Are you sure you want to modify ${username}'s admin privileges?`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/admin/users/${userId}/toggle-admin`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to update user');
+        }
+
+        showAlert(data.message, 'success');
+        loadUsers();
+        loadAuditLogs();
+
+    } catch (error) {
+        console.error('Error toggling user admin status:', error);
+        showAlert('Error: ' + error.message, 'danger');
+    }
+}
+
+// Show delete confirmation modal
+function showDeleteModal(userId, username) {
+    currentDeleteUserId = userId;
+    document.getElementById('deleteUsername').textContent = username;
+    const modal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
+    modal.show();
+}
+
+// Confirm delete user
+document.getElementById('confirmDeleteBtn').addEventListener('click', async function() {
+    if (!currentDeleteUserId) return;
+
+    try {
+        const response = await fetch(`/api/admin/users/${currentDeleteUserId}`, {
+            method: 'DELETE'
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to delete user');
+        }
+
+        showAlert(data.message, 'success');
+
+        // Close modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('confirmDeleteModal'));
+        modal.hide();
+
+        // Reload data
+        loadUsers();
+        loadAuditLogs();
+
+        currentDeleteUserId = null;
+
+    } catch (error) {
+        console.error('Error deleting user:', error);
+        showAlert('Error: ' + error.message, 'danger');
+    }
+});
+
+// Load audit logs
+async function loadAuditLogs() {
+    try {
+        const response = await fetch('/api/admin/audit-logs?limit=50');
+        const logs = await response.json();
+
+        if (!response.ok) {
+            throw new Error(logs.error || 'Failed to load audit logs');
+        }
+
+        const tbody = document.getElementById('auditLogsTableBody');
+        tbody.innerHTML = '';
+
+        if (logs.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No audit logs found</td></tr>';
+            return;
+        }
+
+        logs.forEach(log => {
+            const row = document.createElement('tr');
+            row.style.background = 'var(--table-bg)';
+
+            const timestamp = new Date(log.created_at).toLocaleString();
+
+            row.innerHTML = `
+                <td>${timestamp}</td>
+                <td><strong>${log.admin_username}</strong></td>
+                <td><span class="badge bg-info">${log.action}</span></td>
+                <td>${log.target_username || '<span class="text-muted">N/A</span>'}</td>
+                <td>${log.details || ''}</td>
+            `;
+            tbody.appendChild(row);
+        });
+
+    } catch (error) {
+        console.error('Error loading audit logs:', error);
+        showAlert('Error loading audit logs: ' + error.message, 'danger');
+    }
+}
+
+// Show alert
+function showAlert(message, type = 'info') {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3`;
+    alertDiv.style.zIndex = '9999';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(alertDiv);
+
+    setTimeout(() => {
+        alertDiv.remove();
+    }, 5000);
+}
+</script>
+
+<style>
+.table-hover tbody tr:hover {
+    background-color: var(--table-hover) !important;
+}
+
+.btn-group-sm > .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+.card {
+    margin-bottom: 1.5rem;
+}
+
+.badge {
+    padding: 0.35em 0.65em;
+    font-size: 0.875em;
+}
+</style>
+{% endblock %}

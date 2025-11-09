@@ -117,6 +117,36 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def admin_required(f):
+    """Decorator to require admin privileges for routes."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            flash('Please login first.', 'warning')
+            return redirect(url_for('login'))
+
+        # Check if user is admin
+        connection = get_db_connection()
+        if connection:
+            cursor = connection.cursor(dictionary=True)
+            try:
+                cursor.execute("SELECT is_admin FROM users WHERE id = %s", (session['user_id'],))
+                user = cursor.fetchone()
+
+                if not user or not user.get('is_admin'):
+                    flash('Access denied. Admin privileges required.', 'danger')
+                    return redirect(url_for('dashboard'))
+
+            finally:
+                cursor.close()
+                connection.close()
+        else:
+            flash('Database connection failed.', 'danger')
+            return redirect(url_for('dashboard'))
+
+        return f(*args, **kwargs)
+    return decorated_function
+
 # Utility function to serialize Decimal for JSON
 def decimal_default(obj):
     if isinstance(obj, Decimal):
@@ -201,11 +231,21 @@ def login():
                 user = cursor.fetchone()
 
                 if user and check_password_hash(user['password_hash'], password):
+                    # Check if user account is active
+                    if not user.get('is_active', True):
+                        logger.warning(f"Login failed for username: {username} - Account is deactivated")
+                        return jsonify({'error': 'Your account has been deactivated. Please contact an administrator.'}), 403
+
+                    # Update last_login timestamp
+                    cursor.execute("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = %s", (user['id'],))
+                    connection.commit()
+
                     # Set session as permanent if remember_me is checked
                     session.permanent = remember_me
                     session['user_id'] = user['id']
                     session['username'] = user['username']
-                    logger.info(f"Login successful for user: {username} (ID: {user['id']}), permanent: {remember_me}")
+                    session['is_admin'] = user.get('is_admin', False)
+                    logger.info(f"Login successful for user: {username} (ID: {user['id']}), permanent: {remember_me}, is_admin: {user.get('is_admin', False)}")
                     return jsonify({'message': 'Login successful'}), 200
                 else:
                     logger.warning(f"Login failed for username: {username} - Invalid credentials")
@@ -289,6 +329,240 @@ def dashboard():
 def mobile():
     """Mobile view."""
     return render_template('mobile.html', username=session.get('username'))
+
+@app.route('/admin')
+@admin_required
+def admin_dashboard():
+    """Admin dashboard."""
+    return render_template('admin.html', username=session.get('username'))
+
+@app.route('/api/admin/users', methods=['GET'])
+@admin_required
+def get_all_users():
+    """Get all users with their details."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor(dictionary=True)
+
+    try:
+        cursor.execute("""
+            SELECT
+                u.id,
+                u.username,
+                u.email,
+                u.is_admin,
+                u.is_active,
+                u.last_login,
+                u.created_at,
+                COUNT(DISTINCT mr.id) as monthly_records_count,
+                COUNT(DISTINCT t.id) as transactions_count
+            FROM users u
+            LEFT JOIN monthly_records mr ON u.id = mr.user_id
+            LEFT JOIN transactions t ON mr.id = t.monthly_record_id
+            GROUP BY u.id, u.username, u.email, u.is_admin, u.is_active, u.last_login, u.created_at
+            ORDER BY u.created_at DESC
+        """)
+
+        users = cursor.fetchall()
+        return jsonify(users)
+
+    except Error as e:
+        logger.error(f"Error fetching users: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+def log_audit(admin_user_id, action, target_user_id=None, details=None):
+    """Helper function to log admin actions."""
+    connection = get_db_connection()
+    if connection:
+        cursor = connection.cursor()
+        try:
+            cursor.execute("""
+                INSERT INTO audit_logs (admin_user_id, action, target_user_id, details)
+                VALUES (%s, %s, %s, %s)
+            """, (admin_user_id, action, target_user_id, details))
+            connection.commit()
+        except Error as e:
+            logger.error(f"Error logging audit: {str(e)}")
+        finally:
+            cursor.close()
+            connection.close()
+
+@app.route('/api/admin/users/<int:user_id>/toggle-active', methods=['POST'])
+@admin_required
+def toggle_user_active(user_id):
+    """Activate or deactivate a user."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor(dictionary=True)
+    admin_id = session['user_id']
+
+    try:
+        # Prevent admin from deactivating themselves
+        if user_id == admin_id:
+            return jsonify({'error': 'You cannot deactivate your own account'}), 400
+
+        # Get current user status
+        cursor.execute("SELECT username, is_active FROM users WHERE id = %s", (user_id,))
+        user = cursor.fetchone()
+
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        # Toggle active status
+        new_status = not user['is_active']
+        cursor.execute("UPDATE users SET is_active = %s WHERE id = %s", (new_status, user_id))
+        connection.commit()
+
+        # Log the action
+        action = f"{'Activated' if new_status else 'Deactivated'} user"
+        log_audit(admin_id, action, user_id, f"User '{user['username']}' status changed to {'active' if new_status else 'inactive'}")
+
+        logger.info(f"Admin {admin_id} {action.lower()} user {user_id} ({user['username']})")
+
+        return jsonify({
+            'message': f"User {'activated' if new_status else 'deactivated'} successfully",
+            'is_active': new_status
+        })
+
+    except Error as e:
+        logger.error(f"Error toggling user active status: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+@app.route('/api/admin/users/<int:user_id>/toggle-admin', methods=['POST'])
+@admin_required
+def toggle_user_admin(user_id):
+    """Grant or revoke admin privileges."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor(dictionary=True)
+    admin_id = session['user_id']
+
+    try:
+        # Prevent admin from revoking their own admin status
+        if user_id == admin_id:
+            return jsonify({'error': 'You cannot modify your own admin status'}), 400
+
+        # Get current user status
+        cursor.execute("SELECT username, is_admin FROM users WHERE id = %s", (user_id,))
+        user = cursor.fetchone()
+
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        # Toggle admin status
+        new_status = not user['is_admin']
+        cursor.execute("UPDATE users SET is_admin = %s WHERE id = %s", (new_status, user_id))
+        connection.commit()
+
+        # Log the action
+        action = f"{'Granted' if new_status else 'Revoked'} admin privileges"
+        log_audit(admin_id, action, user_id, f"User '{user['username']}' admin status changed to {new_status}")
+
+        logger.info(f"Admin {admin_id} {action.lower()} for user {user_id} ({user['username']})")
+
+        return jsonify({
+            'message': f"Admin privileges {'granted' if new_status else 'revoked'} successfully",
+            'is_admin': new_status
+        })
+
+    except Error as e:
+        logger.error(f"Error toggling user admin status: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+@app.route('/api/admin/users/<int:user_id>', methods=['DELETE'])
+@admin_required
+def delete_user(user_id):
+    """Delete a user and all their data."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor(dictionary=True)
+    admin_id = session['user_id']
+
+    try:
+        # Prevent admin from deleting themselves
+        if user_id == admin_id:
+            return jsonify({'error': 'You cannot delete your own account'}), 400
+
+        # Get user details before deletion
+        cursor.execute("SELECT username, email FROM users WHERE id = %s", (user_id,))
+        user = cursor.fetchone()
+
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        # Delete user (cascading will handle related records)
+        cursor.execute("DELETE FROM users WHERE id = %s", (user_id,))
+        connection.commit()
+
+        # Log the action
+        log_audit(admin_id, 'Deleted user', None, f"User '{user['username']}' ({user['email']}) permanently deleted")
+
+        logger.info(f"Admin {admin_id} deleted user {user_id} ({user['username']})")
+
+        return jsonify({'message': 'User deleted successfully'})
+
+    except Error as e:
+        logger.error(f"Error deleting user: {str(e)}")
+        connection.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+@app.route('/api/admin/audit-logs', methods=['GET'])
+@admin_required
+def get_audit_logs():
+    """Get audit logs of admin actions."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor(dictionary=True)
+
+    try:
+        limit = request.args.get('limit', 100, type=int)
+
+        cursor.execute("""
+            SELECT
+                al.id,
+                al.action,
+                al.details,
+                al.created_at,
+                au.username as admin_username,
+                tu.username as target_username
+            FROM audit_logs al
+            JOIN users au ON al.admin_user_id = au.id
+            LEFT JOIN users tu ON al.target_user_id = tu.id
+            ORDER BY al.created_at DESC
+            LIMIT %s
+        """, (limit,))
+
+        logs = cursor.fetchall()
+        return jsonify(logs)
+
+    except Error as e:
+        logger.error(f"Error fetching audit logs: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
 
 @app.route('/api/dashboard-stats')
 @login_required
