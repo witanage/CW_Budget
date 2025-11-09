@@ -842,6 +842,11 @@
             <a href="{{ url_for('mobile') }}" class="btn btn-sm btn-outline-light ms-2" style="border-radius: 6px;">
                 <i class="fas fa-mobile-alt me-1"></i>Mobile View
             </a>
+            {% if session.is_admin %}
+            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-sm btn-primary ms-2" style="border-radius: 6px;">
+                <i class="fas fa-user-shield me-1"></i>Admin
+            </a>
+            {% endif %}
             {% endif %}
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -855,6 +860,9 @@
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end">
                             <li><a class="dropdown-item" href="{{ url_for('dashboard') }}"><i class="fas fa-tachometer-alt me-2"></i>Dashboard</a></li>
+                            {% if session.is_admin %}
+                            <li><a class="dropdown-item" href="{{ url_for('admin_dashboard') }}"><i class="fas fa-user-shield me-2"></i>Admin Panel</a></li>
+                            {% endif %}
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
                                 <i class="fas fa-key me-2"></i>Change Password

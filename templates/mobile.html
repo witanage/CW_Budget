@@ -658,6 +658,11 @@
         <div class="header-top">
             <h1><i class="fas fa-table me-2"></i>Transactions</h1>
             <div class="header-buttons">
+                {% if session.is_admin %}
+                <a href="/admin" class="btn-back" style="background: linear-gradient(135deg, #0866ff, #0645b8); border: none;">
+                    <i class="fas fa-user-shield"></i>Admin
+                </a>
+                {% endif %}
                 <a href="/dashboard" class="btn-back">
                     <i class="fas fa-desktop"></i>Desktop
                 </a>
@@ -670,6 +675,11 @@
                         <a href="/dashboard" class="mobile-dropdown-item">
                             <i class="fas fa-tachometer-alt"></i>Dashboard
                         </a>
+                        {% if session.is_admin %}
+                        <a href="/admin" class="mobile-dropdown-item">
+                            <i class="fas fa-user-shield"></i>Admin Panel
+                        </a>
+                        {% endif %}
                         <div class="mobile-dropdown-divider"></div>
                         <a href="#" class="mobile-dropdown-item" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
                             <i class="fas fa-key"></i>Change Password
