@@ -148,6 +148,60 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
+-- Notifications Table
+-- ============================================================
+-- Stores user notifications for various system events:
+-- - Bill due date reminders
+-- - Budget limit alerts
+-- - Unusual spending detection
+-- - Goal milestone celebrations
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    type ENUM('bill_reminder', 'budget_alert', 'unusual_spending', 'goal_milestone', 'system') NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    severity ENUM('info', 'warning', 'success', 'danger') DEFAULT 'info',
+    is_read BOOLEAN DEFAULT FALSE,
+    action_url VARCHAR(255) NULL,
+    related_transaction_id INT NULL,
+    related_data JSON NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    read_at TIMESTAMP NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (related_transaction_id) REFERENCES transactions(id) ON DELETE SET NULL,
+    INDEX idx_user_id (user_id),
+    INDEX idx_is_read (is_read),
+    INDEX idx_type (type),
+    INDEX idx_created_at (created_at),
+    INDEX idx_user_unread (user_id, is_read, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- User Preferences Table
+-- ============================================================
+-- Stores user-specific notification and alert preferences
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS user_preferences (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL UNIQUE,
+    enable_bill_reminders BOOLEAN DEFAULT TRUE,
+    bill_reminder_days_before INT DEFAULT 3,
+    enable_budget_alerts BOOLEAN DEFAULT TRUE,
+    monthly_budget_limit DECIMAL(15,2) NULL,
+    enable_unusual_spending_detection BOOLEAN DEFAULT TRUE,
+    unusual_spending_threshold_percentage INT DEFAULT 150,
+    enable_email_notifications BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_id (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
 -- Default Categories
 -- ============================================================
 -- Pre-populate with common income and expense categories
