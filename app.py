@@ -1131,66 +1131,6 @@ def top_spending_report():
 
     return jsonify({'error': 'Database connection failed'}), 500
 
-@app.route('/api/reports/savings-progress')
-@login_required
-def savings_progress_report():
-    """Get savings progress tracker."""
-    connection = get_db_connection()
-    if connection:
-        cursor = connection.cursor(dictionary=True)
-        try:
-            user_id = session['user_id']
-            year = request.args.get('year', datetime.now().year, type=int)
-
-            # Get monthly savings and cumulative progress
-            cursor.execute("""
-                SELECT
-                    mr.year,
-                    mr.month,
-                    mr.month_name,
-                    COALESCE(SUM(t.debit), 0) as income,
-                    COALESCE(SUM(t.credit), 0) as expenses,
-                    COALESCE(SUM(t.debit), 0) - COALESCE(SUM(t.credit), 0) as monthly_savings
-                FROM monthly_records mr
-                LEFT JOIN transactions t ON mr.id = t.monthly_record_id
-                WHERE mr.user_id = %s AND mr.year = %s
-                GROUP BY mr.year, mr.month, mr.month_name
-                ORDER BY mr.month
-            """, (user_id, year))
-
-            monthly_data = cursor.fetchall()
-
-            # Calculate cumulative savings and convert Decimals to float
-            cumulative = 0
-            processed_data = []
-            for row in monthly_data:
-                income = float(row['income']) if row['income'] else 0
-                expenses = float(row['expenses']) if row['expenses'] else 0
-                monthly_savings = float(row['monthly_savings']) if row['monthly_savings'] else 0
-
-                cumulative += monthly_savings
-
-                processed_data.append({
-                    'year': row['year'],
-                    'month': row['month'],
-                    'month_name': row['month_name'],
-                    'income': income,
-                    'expenses': expenses,
-                    'monthly_savings': monthly_savings,
-                    'cumulative_savings': cumulative,
-                    'savings_rate': (monthly_savings / income * 100) if income > 0 else 0
-                })
-
-            return jsonify(processed_data)
-
-        except Error as e:
-            return jsonify({'error': str(e)}), 500
-        finally:
-            cursor.close()
-            connection.close()
-
-    return jsonify({'error': 'Database connection failed'}), 500
-
 @app.route('/api/reports/forecast')
 @login_required
 def forecast_report():

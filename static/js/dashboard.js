@@ -10,7 +10,6 @@ let charts = {
     yearlyReport: null,
     cashFlowReport: null,
     topSpendingReport: null,
-    savingsReport: null,
     forecastReport: null
 };
 let currentCategories = [];
@@ -939,10 +938,6 @@ function loadAllReports(year, month, rangeType) {
             .then(response => response.json())
             .then(data => updateTopSpendingChart(data)),
 
-        fetch(`/api/reports/savings-progress?year=${year}`)
-            .then(response => response.json())
-            .then(data => updateSavingsProgressChart(data)),
-
         fetch(`/api/reports/forecast?months=6`)
             .then(response => response.json())
             .then(data => updateForecastChart(data))
@@ -1268,94 +1263,6 @@ function updateTopSpendingChart(data) {
             }
         }
     });
-}
-
-function updateSavingsProgressChart(data) {
-    const ctx = document.getElementById('savingsReportChart');
-    if (!ctx || !data) return;
-
-    if (charts.savingsReport) {
-        charts.savingsReport.destroy();
-    }
-
-    const labels = data.map(d => `${d.month_name} ${d.year}`);
-    const monthlySavings = data.map(d => d.monthly_savings || 0);
-    const cumulativeSavings = data.map(d => d.cumulative_savings || 0);
-
-    charts.savingsReport = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Monthly Savings',
-                data: monthlySavings,
-                backgroundColor: 'rgba(54, 162, 235, 0.8)',
-                yAxisID: 'y'
-            }, {
-                label: 'Cumulative Savings',
-                data: cumulativeSavings,
-                type: 'line',
-                borderColor: 'rgba(75, 192, 192, 1)',
-                backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                fill: true,
-                tension: 0.4,
-                yAxisID: 'y1'
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    type: 'linear',
-                    display: true,
-                    position: 'left',
-                    beginAtZero: true,
-                    ticks: {
-                        callback: value => 'LKR ' + value.toLocaleString()
-                    }
-                },
-                y1: {
-                    type: 'linear',
-                    display: true,
-                    position: 'right',
-                    beginAtZero: true,
-                    grid: {
-                        drawOnChartArea: false
-                    },
-                    ticks: {
-                        callback: value => 'LKR ' + value.toLocaleString()
-                    }
-                }
-            },
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: ctx => ctx.dataset.label + ': LKR ' + ctx.parsed.y.toLocaleString()
-                    }
-                }
-            }
-        }
-    });
-
-    // Update savings table
-    const tbody = document.getElementById('savingsTableBody');
-    if (tbody) {
-        tbody.innerHTML = data.map(d => `
-            <tr>
-                <td>${d.month_name} ${d.year}</td>
-                <td>LKR ${(d.income || 0).toLocaleString()}</td>
-                <td>LKR ${(d.expenses || 0).toLocaleString()}</td>
-                <td class="${d.monthly_savings >= 0 ? 'text-success' : 'text-danger'}">
-                    LKR ${(d.monthly_savings || 0).toLocaleString()}
-                </td>
-                <td>${(d.savings_rate || 0).toFixed(1)}%</td>
-                <td class="${d.cumulative_savings >= 0 ? 'text-success' : 'text-danger'}">
-                    LKR ${(d.cumulative_savings || 0).toLocaleString()}
-                </td>
-            </tr>
-        `).join('');
-    }
 }
 
 function updateForecastChart(data) {
