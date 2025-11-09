@@ -580,14 +580,13 @@ def dashboard_stats():
             current_year = datetime.now().year
             current_month = datetime.now().month
             
-            # Get current month income and expenses
+            # Get current month income and expenses using view
             cursor.execute("""
                 SELECT
-                    SUM(debit) as total_income,
-                    SUM(credit) as total_expenses
-                FROM transactions t
-                JOIN monthly_records mr ON t.monthly_record_id = mr.id
-                WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s
+                    total_income,
+                    total_expenses
+                FROM v_monthly_summary
+                WHERE user_id = %s AND year = %s AND month = %s
             """, (user_id, current_year, current_month))
 
             current_stats = cursor.fetchone() or {'total_income': 0, 'total_expenses': 0}
@@ -595,49 +594,44 @@ def dashboard_stats():
             # Balance will be calculated on frontend
             current_stats['current_balance'] = (current_stats.get('total_income', 0) or 0) - (current_stats.get('total_expenses', 0) or 0)
             
-            # Get year-to-date stats
+            # Get year-to-date stats using view
             cursor.execute("""
-                SELECT 
-                    SUM(debit) as ytd_income,
-                    SUM(credit) as ytd_expenses
-                FROM transactions t
-                JOIN monthly_records mr ON t.monthly_record_id = mr.id
-                WHERE mr.user_id = %s AND mr.year = %s
+                SELECT
+                    SUM(total_income) as ytd_income,
+                    SUM(total_expenses) as ytd_expenses
+                FROM v_monthly_summary
+                WHERE user_id = %s AND year = %s
             """, (user_id, current_year))
             
             ytd_stats = cursor.fetchone()
             
-            # Get recent transactions (balance will be calculated on frontend)
+            # Get recent transactions using view
             cursor.execute("""
                 SELECT
-                    t.description,
-                    t.debit,
-                    t.credit,
-                    t.transaction_date,
-                    c.name as category
-                FROM transactions t
-                JOIN monthly_records mr ON t.monthly_record_id = mr.id
-                LEFT JOIN categories c ON t.category_id = c.id
-                WHERE mr.user_id = %s
-                ORDER BY t.created_at DESC
+                    description,
+                    debit,
+                    credit,
+                    transaction_date,
+                    category_name as category
+                FROM v_transaction_details
+                WHERE user_id = %s
+                ORDER BY created_at DESC
                 LIMIT 10
             """, (user_id,))
             
             recent_transactions = cursor.fetchall()
             
-            # Get monthly trend (last 12 months)
+            # Get monthly trend (last 12 months) using view
             cursor.execute("""
-                SELECT 
-                    mr.year,
-                    mr.month,
-                    mr.month_name,
-                    SUM(t.debit) as income,
-                    SUM(t.credit) as expenses
-                FROM monthly_records mr
-                LEFT JOIN transactions t ON mr.id = t.monthly_record_id
-                WHERE mr.user_id = %s
-                GROUP BY mr.year, mr.month, mr.month_name
-                ORDER BY mr.year DESC, mr.month DESC
+                SELECT
+                    year,
+                    month,
+                    month_name,
+                    total_income as income,
+                    total_expenses as expenses
+                FROM v_monthly_summary
+                WHERE user_id = %s
+                ORDER BY year DESC, month DESC
                 LIMIT 12
             """, (user_id,))
             
@@ -682,21 +676,19 @@ def transactions():
             """, (user_id, year, month))
             
             monthly_record = cursor.fetchone()
-            
+
             if monthly_record:
+                # Use optimized view for faster access
                 cursor.execute("""
                     SELECT
-                        t.*,
-                        c.name as category_name,
-                        pm.name as payment_method_name,
-                        pm.type as payment_method_type,
-                        pm.color as payment_method_color,
-                        COALESCE(t.is_paid, FALSE) as is_paid
-                    FROM transactions t
-                    LEFT JOIN categories c ON t.category_id = c.id
-                    LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id
-                    WHERE t.monthly_record_id = %s
-                    ORDER BY t.id DESC
+                        id, monthly_record_id, description, category_id, debit, credit,
+                        transaction_date, payment_method_id, is_done, is_paid, notes,
+                        created_at, updated_at, marked_done_at, paid_at,
+                        category_name, category_type, payment_method_name,
+                        payment_method_type, payment_method_color
+                    FROM v_transaction_details
+                    WHERE monthly_record_id = %s
+                    ORDER BY id DESC
                 """, (monthly_record['id'],))
 
                 transactions = cursor.fetchall()
@@ -896,7 +888,7 @@ def recalculate_balances():
 @app.route('/api/reports/monthly-summary')
 @login_required
 def monthly_summary_report():
-    """Get monthly summary report."""
+    """Get monthly summary report using optimized view."""
     connection = get_db_connection()
     if connection:
         cursor = connection.cursor(dictionary=True)
@@ -904,20 +896,18 @@ def monthly_summary_report():
             user_id = session['user_id']
             year = request.args.get('year', datetime.now().year, type=int)
 
-            # Calculate summary from transactions instead of relying on a view
+            # Use pre-aggregated view for better performance
             cursor.execute("""
                 SELECT
-                    mr.year,
-                    mr.month,
-                    mr.month_name,
-                    COALESCE(SUM(t.debit), 0) as total_income,
-                    COALESCE(SUM(t.credit), 0) as total_expenses,
-                    COALESCE(SUM(t.debit), 0) - COALESCE(SUM(t.credit), 0) as net_savings
-                FROM monthly_records mr
-                LEFT JOIN transactions t ON mr.id = t.monthly_record_id
-                WHERE mr.user_id = %s AND mr.year = %s
-                GROUP BY mr.year, mr.month, mr.month_name
-                ORDER BY mr.month
+                    year,
+                    month,
+                    month_name,
+                    total_income,
+                    total_expenses,
+                    net_savings
+                FROM v_monthly_summary
+                WHERE user_id = %s AND year = %s
+                ORDER BY month
             """, (user_id, year))
 
             summary = cursor.fetchall()
@@ -934,7 +924,7 @@ def monthly_summary_report():
 @app.route('/api/reports/category-breakdown')
 @login_required
 def category_breakdown_report():
-    """Get category breakdown report."""
+    """Get category breakdown report using optimized view."""
     connection = get_db_connection()
     if connection:
         cursor = connection.cursor(dictionary=True)
@@ -942,34 +932,36 @@ def category_breakdown_report():
             user_id = session['user_id']
             year = request.args.get('year', datetime.now().year, type=int)
             month = request.args.get('month', type=int)
-            
+
+            # Use pre-aggregated view for better performance
             if month:
                 cursor.execute("""
-                    SELECT 
-                        c.name as category,
-                        c.type,
-                        SUM(CASE WHEN c.type = 'income' THEN t.debit ELSE t.credit END) as amount
-                    FROM transactions t
-                    JOIN monthly_records mr ON t.monthly_record_id = mr.id
-                    LEFT JOIN categories c ON t.category_id = c.id
-                    WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s
-                    GROUP BY c.id, c.name, c.type
+                    SELECT
+                        category,
+                        category_type as type,
+                        CASE
+                            WHEN category_type = 'income' THEN income_amount
+                            ELSE expense_amount
+                        END as amount
+                    FROM v_category_breakdown
+                    WHERE user_id = %s AND year = %s AND month = %s
                     ORDER BY amount DESC
                 """, (user_id, year, month))
             else:
                 cursor.execute("""
-                    SELECT 
-                        c.name as category,
-                        c.type,
-                        SUM(CASE WHEN c.type = 'income' THEN t.debit ELSE t.credit END) as amount
-                    FROM transactions t
-                    JOIN monthly_records mr ON t.monthly_record_id = mr.id
-                    LEFT JOIN categories c ON t.category_id = c.id
-                    WHERE mr.user_id = %s AND mr.year = %s
-                    GROUP BY c.id, c.name, c.type
+                    SELECT
+                        category,
+                        category_type as type,
+                        SUM(CASE
+                            WHEN category_type = 'income' THEN income_amount
+                            ELSE expense_amount
+                        END) as amount
+                    FROM v_category_breakdown
+                    WHERE user_id = %s AND year = %s
+                    GROUP BY category_id, category, category_type
                     ORDER BY amount DESC
                 """, (user_id, year))
-            
+
             breakdown = cursor.fetchall()
             return jsonify(breakdown)
             
@@ -995,50 +987,46 @@ def cash_flow_report():
             month = request.args.get('month', datetime.now().month, type=int)
 
             if range_type == 'weekly':
-                # Get weekly cash flow for the specified month
+                # Get weekly cash flow for the specified month (using view)
                 cursor.execute("""
                     SELECT
-                        WEEK(t.transaction_date) as week_num,
-                        DATE_FORMAT(MIN(t.transaction_date), '%%Y-%%m-%%d') as week_start,
-                        DATE_FORMAT(MAX(t.transaction_date), '%%Y-%%m-%%d') as week_end,
-                        COALESCE(SUM(t.debit), 0) as cash_in,
-                        COALESCE(SUM(t.credit), 0) as cash_out,
-                        COALESCE(SUM(t.debit), 0) - COALESCE(SUM(t.credit), 0) as net_flow
-                    FROM transactions t
-                    JOIN monthly_records mr ON t.monthly_record_id = mr.id
-                    WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s
-                    GROUP BY WEEK(t.transaction_date)
+                        WEEK(transaction_date) as week_num,
+                        DATE_FORMAT(MIN(transaction_date), '%%Y-%%m-%%d') as week_start,
+                        DATE_FORMAT(MAX(transaction_date), '%%Y-%%m-%%d') as week_end,
+                        COALESCE(SUM(debit), 0) as cash_in,
+                        COALESCE(SUM(credit), 0) as cash_out,
+                        COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0) as net_flow
+                    FROM v_transaction_details
+                    WHERE user_id = %s AND year = %s AND month = %s
+                    GROUP BY WEEK(transaction_date)
                     ORDER BY week_num
                 """, (user_id, year, month))
             elif range_type == 'yearly':
-                # Get yearly cash flow (by year)
+                # Get yearly cash flow using pre-aggregated view
                 cursor.execute("""
                     SELECT
-                        mr.year,
-                        COALESCE(SUM(t.debit), 0) as cash_in,
-                        COALESCE(SUM(t.credit), 0) as cash_out,
-                        COALESCE(SUM(t.debit), 0) - COALESCE(SUM(t.credit), 0) as net_flow
-                    FROM monthly_records mr
-                    LEFT JOIN transactions t ON mr.id = t.monthly_record_id
-                    WHERE mr.user_id = %s
-                    GROUP BY mr.year
-                    ORDER BY mr.year
+                        year,
+                        SUM(total_income) as cash_in,
+                        SUM(total_expenses) as cash_out,
+                        SUM(net_savings) as net_flow
+                    FROM v_monthly_summary
+                    WHERE user_id = %s
+                    GROUP BY year
+                    ORDER BY year
                 """, (user_id,))
             else:  # monthly (default)
-                # Get monthly cash flow for the specified year
+                # Get monthly cash flow using pre-aggregated view
                 cursor.execute("""
                     SELECT
-                        mr.year,
-                        mr.month,
-                        mr.month_name,
-                        COALESCE(SUM(t.debit), 0) as cash_in,
-                        COALESCE(SUM(t.credit), 0) as cash_out,
-                        COALESCE(SUM(t.debit), 0) - COALESCE(SUM(t.credit), 0) as net_flow
-                    FROM monthly_records mr
-                    LEFT JOIN transactions t ON mr.id = t.monthly_record_id
-                    WHERE mr.user_id = %s AND mr.year = %s
-                    GROUP BY mr.year, mr.month, mr.month_name
-                    ORDER BY mr.month
+                        year,
+                        month,
+                        month_name,
+                        total_income as cash_in,
+                        total_expenses as cash_out,
+                        net_savings as net_flow
+                    FROM v_monthly_summary
+                    WHERE user_id = %s AND year = %s
+                    ORDER BY month
                 """, (user_id, year))
 
             cash_flow = cursor.fetchall()
@@ -1067,55 +1055,49 @@ def top_spending_report():
             limit = request.args.get('limit', 10, type=int)
 
             if range_type == 'weekly':
-                # Get top spending for the specified month (weekly breakdown)
+                # Get top spending for the specified month using view
                 cursor.execute("""
                     SELECT
-                        c.name as category,
-                        c.type,
-                        SUM(t.credit) as total_spent,
-                        COUNT(t.id) as transaction_count,
-                        AVG(t.credit) as avg_amount
-                    FROM transactions t
-                    JOIN monthly_records mr ON t.monthly_record_id = mr.id
-                    LEFT JOIN categories c ON t.category_id = c.id
-                    WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s
-                        AND c.type = 'expense' AND t.credit > 0
-                    GROUP BY c.id, c.name, c.type
+                        category,
+                        category_type as type,
+                        SUM(expense_amount) as total_spent,
+                        SUM(transaction_count) as transaction_count,
+                        AVG(expense_amount / NULLIF(transaction_count, 0)) as avg_amount
+                    FROM v_category_breakdown
+                    WHERE user_id = %s AND year = %s AND month = %s
+                        AND category_type = 'expense' AND expense_amount > 0
+                    GROUP BY category_id, category, category_type
                     ORDER BY total_spent DESC
                     LIMIT %s
                 """, (user_id, year, month, limit))
             elif range_type == 'yearly':
-                # Get top spending for all time
+                # Get top spending for all time using view
                 cursor.execute("""
                     SELECT
-                        c.name as category,
-                        c.type,
-                        SUM(t.credit) as total_spent,
-                        COUNT(t.id) as transaction_count,
-                        AVG(t.credit) as avg_amount
-                    FROM transactions t
-                    JOIN monthly_records mr ON t.monthly_record_id = mr.id
-                    LEFT JOIN categories c ON t.category_id = c.id
-                    WHERE mr.user_id = %s AND c.type = 'expense' AND t.credit > 0
-                    GROUP BY c.id, c.name, c.type
+                        category,
+                        category_type as type,
+                        SUM(expense_amount) as total_spent,
+                        SUM(transaction_count) as transaction_count,
+                        AVG(expense_amount / NULLIF(transaction_count, 0)) as avg_amount
+                    FROM v_category_breakdown
+                    WHERE user_id = %s AND category_type = 'expense' AND expense_amount > 0
+                    GROUP BY category_id, category, category_type
                     ORDER BY total_spent DESC
                     LIMIT %s
                 """, (user_id, limit))
             else:  # monthly
-                # Get top spending for the specified year
+                # Get top spending for the specified year using view
                 cursor.execute("""
                     SELECT
-                        c.name as category,
-                        c.type,
-                        SUM(t.credit) as total_spent,
-                        COUNT(t.id) as transaction_count,
-                        AVG(t.credit) as avg_amount
-                    FROM transactions t
-                    JOIN monthly_records mr ON t.monthly_record_id = mr.id
-                    LEFT JOIN categories c ON t.category_id = c.id
-                    WHERE mr.user_id = %s AND mr.year = %s
-                        AND c.type = 'expense' AND t.credit > 0
-                    GROUP BY c.id, c.name, c.type
+                        category,
+                        category_type as type,
+                        SUM(expense_amount) as total_spent,
+                        SUM(transaction_count) as transaction_count,
+                        AVG(expense_amount / NULLIF(transaction_count, 0)) as avg_amount
+                    FROM v_category_breakdown
+                    WHERE user_id = %s AND year = %s
+                        AND category_type = 'expense' AND expense_amount > 0
+                    GROUP BY category_id, category, category_type
                     ORDER BY total_spent DESC
                     LIMIT %s
                 """, (user_id, year, limit))
@@ -1142,51 +1124,38 @@ def forecast_report():
             user_id = session['user_id']
             months_to_analyze = request.args.get('months', 6, type=int)
 
-            # Get historical data for the last N months
+            # Get historical data for the last N months using view
             cursor.execute("""
                 SELECT
-                    mr.year,
-                    mr.month,
-                    mr.month_name,
-                    COALESCE(SUM(t.debit), 0) as total_income,
-                    COALESCE(SUM(t.credit), 0) as total_expenses,
-                    COALESCE(SUM(t.debit), 0) - COALESCE(SUM(t.credit), 0) as net_savings
-                FROM monthly_records mr
-                LEFT JOIN transactions t ON mr.id = t.monthly_record_id
-                WHERE mr.user_id = %s
-                GROUP BY mr.year, mr.month, mr.month_name
-                ORDER BY mr.year DESC, mr.month DESC
+                    year,
+                    month,
+                    month_name,
+                    total_income,
+                    total_expenses,
+                    net_savings
+                FROM v_monthly_summary
+                WHERE user_id = %s
+                ORDER BY year DESC, month DESC
                 LIMIT %s
             """, (user_id, months_to_analyze))
 
             historical_data = cursor.fetchall()
 
-            # Get category-wise spending patterns
+            # Get category-wise spending patterns using view
             cursor.execute("""
                 SELECT
-                    c.name as category,
-                    AVG(monthly_totals.total) as avg_monthly_spending,
-                    MIN(monthly_totals.total) as min_spending,
-                    MAX(monthly_totals.total) as max_spending,
-                    STDDEV(monthly_totals.total) as std_deviation
-                FROM (
-                    SELECT
-                        t.category_id,
-                        mr.year,
-                        mr.month,
-                        SUM(t.credit) as total
-                    FROM transactions t
-                    JOIN monthly_records mr ON t.monthly_record_id = mr.id
-                    WHERE mr.user_id = %s
-                    GROUP BY t.category_id, mr.year, mr.month
-                    ORDER BY mr.year DESC, mr.month DESC
-                    LIMIT %s
-                ) as monthly_totals
-                LEFT JOIN categories c ON monthly_totals.category_id = c.id
-                WHERE c.type = 'expense'
-                GROUP BY c.id, c.name
+                    category,
+                    AVG(expense_amount) as avg_monthly_spending,
+                    MIN(expense_amount) as min_spending,
+                    MAX(expense_amount) as max_spending,
+                    STDDEV(expense_amount) as std_deviation
+                FROM v_category_breakdown
+                WHERE user_id = %s
+                    AND category_type = 'expense'
+                    AND expense_amount > 0
+                GROUP BY category_id, category
                 ORDER BY avg_monthly_spending DESC
-            """, (user_id, months_to_analyze * 20))  # Approximate category entries
+            """, (user_id,))
 
             category_forecast = cursor.fetchall()
 
