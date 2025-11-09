@@ -20,11 +20,6 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#" data-page="budget">
-                            <i class="fas fa-calculator me-2"></i>Budget
-                        </a>
-                    </li>
-                    <li class="nav-item">
                         <a class="nav-link" href="#" data-page="reports">
                             <i class="fas fa-chart-bar me-2"></i>Reports
                         </a>
@@ -217,43 +212,6 @@
                     </div>
                 </div>
             </div>
-            
-            <!-- Budget Page -->
-            <div id="budgetPage" class="page-content" style="display:none;">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">Budget Planning</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row mb-3">
-                            <div class="col-md-3">
-                                <select class="form-select" id="budgetMonth">
-                                    <!-- Months will be populated here -->
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <select class="form-select" id="budgetYear">
-                                    <!-- Years will be populated here -->
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <button class="btn btn-primary" id="loadBudgetBtn">
-                                    <i class="fas fa-search me-1"></i>Load Budget
-                                </button>
-                            </div>
-                            <div class="col-md-3">
-                                <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#budgetModal">
-                                    <i class="fas fa-plus me-1"></i>Add Budget Item
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div id="budgetList">
-                            <!-- Budget items will be loaded here -->
-                        </div>
-                    </div>
-                </div>
-            </div>
 
             <!-- Reports Page -->
             <div id="reportsPage" class="page-content" style="display:none;">
@@ -278,13 +236,19 @@
 
                                 <div class="tab-content mt-3">
                                     <div class="tab-pane fade show active" id="monthlyReport">
-                                        <canvas id="monthlyReportChart"></canvas>
+                                        <div style="height: 500px; position: relative;">
+                                            <canvas id="monthlyReportChart"></canvas>
+                                        </div>
                                     </div>
                                     <div class="tab-pane fade" id="categoryReport">
-                                        <canvas id="categoryReportChart"></canvas>
+                                        <div style="height: 500px; position: relative;">
+                                            <canvas id="categoryReportChart"></canvas>
+                                        </div>
                                     </div>
                                     <div class="tab-pane fade" id="yearlyReport">
-                                        <canvas id="yearlyReportChart"></canvas>
+                                        <div style="height: 500px; position: relative;">
+                                            <canvas id="yearlyReportChart"></canvas>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -340,36 +304,6 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-primary" id="saveTransactionBtn">Save Transaction</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Budget Modal -->
-<div class="modal fade" id="budgetModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Set Budget</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="budgetForm">
-                    <div class="mb-3">
-                        <label for="budgetCategory" class="form-label">Category</label>
-                        <select class="form-select" id="budgetCategory">
-                            <!-- Categories will be loaded here -->
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="budgetAmount" class="form-label">Planned Amount</label>
-                        <input type="number" class="form-control" id="budgetAmount" step="0.01" min="0" required>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="saveBudgetBtn">Save Budget</button>
             </div>
         </div>
     </div>

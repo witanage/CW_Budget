@@ -8,8 +8,8 @@
 -- - User authentication and management
 -- - Admin role-based access control
 -- - Transaction tracking with categories
--- - Budget planning
--- - Payment methods
+-- - Payment methods management
+-- - Monthly financial records
 -- - Audit logging for admin actions
 --
 -- Date: 2025-11-09
@@ -124,27 +124,6 @@ CREATE TABLE IF NOT EXISTS transactions (
     INDEX idx_transaction_date (transaction_date),
     INDEX idx_is_done (is_done),
     INDEX idx_is_paid (is_paid)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ============================================================
--- Budget Plans Table
--- ============================================================
--- Stores planned budget amounts for each category by month
--- ============================================================
-
-CREATE TABLE IF NOT EXISTS budget_plans (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    category_id INT NOT NULL,
-    year INT NOT NULL,
-    month INT NOT NULL,
-    planned_amount DECIMAL(15, 2) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_budget (user_id, category_id, year, month),
-    INDEX idx_user_year_month (user_id, year, month)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
