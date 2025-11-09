@@ -842,6 +842,11 @@
             <a href="{{ url_for('mobile') }}" class="btn btn-sm btn-outline-light ms-2" style="border-radius: 6px;">
                 <i class="fas fa-mobile-alt me-1"></i>Mobile View
             </a>
+            {% if session.is_admin %}
+            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-sm btn-primary ms-2" style="border-radius: 6px;">
+                <i class="fas fa-user-shield me-1"></i>Admin
+            </a>
+            {% endif %}
             {% endif %}
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
