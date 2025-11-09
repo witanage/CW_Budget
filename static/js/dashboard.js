@@ -104,9 +104,6 @@ function loadPageData(pageName) {
         case 'transactions':
             loadTransactions();
             break;
-        case 'budget':
-            loadBudget();
-            break;
         case 'reports':
             loadReports();
             break;
@@ -166,17 +163,6 @@ function setupFormButtons() {
         viewPaymentTotalsBtn.addEventListener('click', loadPaymentTotals);
     }
 
-    // Budget form
-    const saveBudgetBtn = document.getElementById('saveBudgetBtn');
-    if (saveBudgetBtn) {
-        saveBudgetBtn.addEventListener('click', saveBudget);
-    }
-
-    const loadBudgetBtn = document.getElementById('loadBudgetBtn');
-    if (loadBudgetBtn) {
-        loadBudgetBtn.addEventListener('click', loadBudget);
-    }
-
     // Set today's date in transaction form
     const transDate = document.getElementById('transDate');
     if (transDate) {
@@ -217,7 +203,7 @@ function loadCategories() {
 }
 
 function populateCategoryDropdowns(categories) {
-    const dropdowns = ['transCategory', 'budgetCategory', 'recCategory'];
+    const dropdowns = ['transCategory', 'recCategory'];
 
     dropdowns.forEach(dropdownId => {
         const dropdown = document.getElementById(dropdownId);
@@ -863,111 +849,6 @@ function executeCloneMonth() {
 }
 
 // ================================
-// BUDGET PAGE
-// ================================
-
-function loadBudget() {
-    const year = document.getElementById('budgetYear')?.value || new Date().getFullYear();
-    const month = document.getElementById('budgetMonth')?.value || (new Date().getMonth() + 1);
-
-    showLoading();
-
-    fetch(`/api/budget?year=${year}&month=${month}`)
-        .then(response => response.json())
-        .then(data => {
-            displayBudgets(data);
-            hideLoading();
-        })
-        .catch(error => {
-            console.error('Error loading budget:', error);
-            hideLoading();
-        });
-}
-
-function displayBudgets(budgets) {
-    const container = document.getElementById('budgetList');
-    if (!container) return;
-
-    container.innerHTML = '';
-
-    if (!budgets || budgets.length === 0) {
-        container.innerHTML = '<div class="alert alert-info">No budget items for this period</div>';
-        return;
-    }
-
-    budgets.forEach(b => {
-        const percent = b.planned_amount > 0 ? (b.actual_amount / b.planned_amount * 100).toFixed(1) : 0;
-        const color = percent > 100 ? 'danger' : percent > 80 ? 'warning' : 'success';
-
-        const card = document.createElement('div');
-        card.className = 'card mb-3';
-        card.innerHTML = `
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-md-3">
-                        <h6 class="mb-0">${b.category_name}</h6>
-                        <small class="text-muted">${b.category_type}</small>
-                    </div>
-                    <div class="col-md-3">
-                        <small class="text-muted">Planned</small>
-                        <h6 class="mb-0">${formatCurrency(b.planned_amount)}</h6>
-                    </div>
-                    <div class="col-md-3">
-                        <small class="text-muted">Actual</small>
-                        <h6 class="mb-0">${formatCurrency(b.actual_amount)}</h6>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="progress">
-                            <div class="progress-bar bg-${color}" style="width: ${Math.min(percent, 100)}%">
-                                ${percent}%
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-        container.appendChild(card);
-    });
-}
-
-function saveBudget() {
-    const year = document.getElementById('budgetYear')?.value || new Date().getFullYear();
-    const month = document.getElementById('budgetMonth')?.value || (new Date().getMonth() + 1);
-
-    const data = {
-        category_id: document.getElementById('budgetCategory')?.value,
-        planned_amount: parseFloat(document.getElementById('budgetAmount')?.value),
-        year: parseInt(year),
-        month: parseInt(month)
-    };
-
-    showLoading();
-
-    fetch('/api/budget', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-    })
-    .then(response => response.json())
-    .then(result => {
-        hideLoading();
-        if (result.error) {
-            showToast(result.error, 'danger');
-        } else {
-            showToast('Budget saved successfully', 'success');
-            closeModal('budgetModal');
-            document.getElementById('budgetForm')?.reset();
-            loadBudget();
-        }
-    })
-    .catch(error => {
-        hideLoading();
-        console.error('Error saving budget:', error);
-        showToast('Error saving budget', 'danger');
-    });
-}
-
-// ================================
 // REPORTS PAGE
 // ================================
 
@@ -1191,7 +1072,7 @@ function populateDateSelectors() {
     const currentMonth = new Date().getMonth() + 1;
 
     // Month selectors
-    const monthSelects = ['monthSelect', 'budgetMonth', 'cloneFromMonth', 'cloneToMonth'];
+    const monthSelects = ['monthSelect', 'cloneFromMonth', 'cloneToMonth'];
     const months = ['January', 'February', 'March', 'April', 'May', 'June',
                     'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -1210,7 +1091,7 @@ function populateDateSelectors() {
     });
 
     // Year selectors
-    const yearSelects = ['yearSelect', 'budgetYear', 'cloneFromYear', 'cloneToYear'];
+    const yearSelects = ['yearSelect', 'cloneFromYear', 'cloneToYear'];
     yearSelects.forEach(id => {
         const select = document.getElementById(id);
         if (select) {

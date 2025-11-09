@@ -981,66 +981,6 @@ def category_breakdown_report():
     
     return jsonify({'error': 'Database connection failed'}), 500
 
-@app.route('/api/budget', methods=['GET', 'POST'])
-@login_required
-def budget():
-    """Manage budget plans."""
-    connection = get_db_connection()
-    if not connection:
-        return jsonify({'error': 'Database connection failed'}), 500
-    
-    cursor = connection.cursor(dictionary=True)
-    user_id = session['user_id']
-    
-    try:
-        if request.method == 'GET':
-            year = request.args.get('year', datetime.now().year, type=int)
-            month = request.args.get('month', datetime.now().month, type=int)
-            
-            cursor.execute("""
-                SELECT 
-                    bp.*,
-                    c.name as category_name,
-                    c.type as category_type,
-                    COALESCE(
-                        (SELECT SUM(CASE WHEN c.type = 'income' THEN t.debit ELSE t.credit END)
-                         FROM transactions t
-                         JOIN monthly_records mr ON t.monthly_record_id = mr.id
-                         WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s
-                         AND t.category_id = bp.category_id), 0
-                    ) as actual_amount
-                FROM budget_plans bp
-                JOIN categories c ON bp.category_id = c.id
-                WHERE bp.user_id = %s AND bp.year = %s AND bp.month = %s
-            """, (user_id, year, month, user_id, year, month))
-            
-            budgets = cursor.fetchall()
-            return jsonify(budgets)
-        
-        else:  # POST
-            data = request.get_json()
-            cursor.execute("""
-                INSERT INTO budget_plans (user_id, category_id, year, month, planned_amount)
-                VALUES (%s, %s, %s, %s, %s)
-                ON DUPLICATE KEY UPDATE planned_amount = %s
-            """, (
-                user_id,
-                data.get('category_id'),
-                data.get('year'),
-                data.get('month'),
-                data.get('planned_amount'),
-                data.get('planned_amount')
-            ))
-            
-            connection.commit()
-            return jsonify({'message': 'Budget updated successfully'}), 201
-            
-    except Error as e:
-        return jsonify({'error': str(e)}), 500
-    finally:
-        cursor.close()
-        connection.close()
-
 @app.route('/api/payment-methods', methods=['GET', 'POST'])
 @login_required
 def payment_methods():
