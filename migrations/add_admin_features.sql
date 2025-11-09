@@ -1,12 +1,14 @@
 -- Migration: Add admin features to users table
 -- Description: Adds is_admin, is_active, and last_login columns to support user management
+-- Note: New user registrations will be created in deactivated state (is_active=FALSE)
+--       Existing users will remain active. Admin approval required for new accounts.
 -- Date: 2025-11-09
 
 -- Add is_admin column (default to FALSE, existing users won't be admin)
 ALTER TABLE users
 ADD COLUMN is_admin BOOLEAN DEFAULT FALSE AFTER password_hash;
 
--- Add is_active column (default to TRUE, existing users remain active)
+-- Add is_active column (default to TRUE for existing users, new registrations will be set to FALSE)
 ALTER TABLE users
 ADD COLUMN is_active BOOLEAN DEFAULT TRUE AFTER is_admin;
 

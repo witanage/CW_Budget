@@ -191,15 +191,17 @@ def register():
                 if cursor.fetchone():
                     return jsonify({'error': 'Username or email already exists'}), 400
                 
-                # Create new user
+                # Create new user (deactivated by default, requires admin activation)
                 password_hash = generate_password_hash(password)
                 cursor.execute(
-                    "INSERT INTO users (username, email, password_hash) VALUES (%s, %s, %s)",
-                    (username, email, password_hash)
+                    "INSERT INTO users (username, email, password_hash, is_active) VALUES (%s, %s, %s, %s)",
+                    (username, email, password_hash, False)
                 )
                 connection.commit()
-                
-                return jsonify({'message': 'Registration successful'}), 201
+
+                logger.info(f"New user registered: {username} ({email}) - Account created in deactivated state")
+
+                return jsonify({'message': 'Registration successful. Your account is pending admin approval.'}), 201
             except Error as e:
                 return jsonify({'error': str(e)}), 500
             finally:
