@@ -148,64 +148,45 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
--- Performance Views for Reports
+-- Performance Views for New Reports Only
 -- ============================================================
--- These views optimize report queries by pre-joining tables
+-- These views optimize the NEW report queries (cash flow, top spending, forecast)
+-- Existing reports remain unchanged
 -- ============================================================
 
--- Monthly Summary View
--- Pre-aggregates monthly income, expenses, and savings per user
-CREATE OR REPLACE VIEW v_monthly_summary AS
+-- Cash Flow View
+-- Aggregates cash in/out by user, year, and month for cash flow analysis
+CREATE OR REPLACE VIEW v_cash_flow AS
 SELECT
     mr.user_id,
     mr.year,
     mr.month,
     mr.month_name,
-    COALESCE(SUM(t.debit), 0) as total_income,
-    COALESCE(SUM(t.credit), 0) as total_expenses,
-    COALESCE(SUM(t.debit), 0) - COALESCE(SUM(t.credit), 0) as net_savings,
-    COUNT(t.id) as transaction_count
+    COALESCE(SUM(t.debit), 0) as cash_in,
+    COALESCE(SUM(t.credit), 0) as cash_out,
+    COALESCE(SUM(t.debit), 0) - COALESCE(SUM(t.credit), 0) as net_flow
 FROM monthly_records mr
 LEFT JOIN transactions t ON mr.id = t.monthly_record_id
 GROUP BY mr.user_id, mr.year, mr.month, mr.month_name;
 
--- Category Breakdown View
--- Pre-aggregates transactions by category, user, year, and month
-CREATE OR REPLACE VIEW v_category_breakdown AS
+-- Top Spending View
+-- Pre-aggregates expense categories for top spending analysis
+CREATE OR REPLACE VIEW v_top_spending AS
 SELECT
     mr.user_id,
     mr.year,
     mr.month,
     c.id as category_id,
     c.name as category,
-    c.type as category_type,
-    SUM(CASE WHEN c.type = 'income' THEN t.debit ELSE 0 END) as income_amount,
-    SUM(CASE WHEN c.type = 'expense' THEN t.credit ELSE 0 END) as expense_amount,
-    COUNT(t.id) as transaction_count
+    c.type,
+    SUM(t.credit) as total_spent,
+    COUNT(t.id) as transaction_count,
+    AVG(t.credit) as avg_amount
 FROM transactions t
 JOIN monthly_records mr ON t.monthly_record_id = mr.id
 LEFT JOIN categories c ON t.category_id = c.id
+WHERE c.type = 'expense' AND t.credit > 0
 GROUP BY mr.user_id, mr.year, mr.month, c.id, c.name, c.type;
-
--- Transaction Details View
--- Pre-joins all related tables for faster access
-CREATE OR REPLACE VIEW v_transaction_details AS
-SELECT
-    t.*,
-    mr.user_id,
-    mr.year,
-    mr.month,
-    mr.month_name,
-    c.name as category_name,
-    c.type as category_type,
-    pm.name as payment_method_name,
-    pm.type as payment_method_type,
-    pm.color as payment_method_color,
-    COALESCE(t.is_paid, FALSE) as is_paid
-FROM transactions t
-JOIN monthly_records mr ON t.monthly_record_id = mr.id
-LEFT JOIN categories c ON t.category_id = c.id
-LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id;
 
 -- Default Categories
 -- ============================================================
