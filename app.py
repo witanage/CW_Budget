@@ -981,6 +981,319 @@ def category_breakdown_report():
     
     return jsonify({'error': 'Database connection failed'}), 500
 
+@app.route('/api/reports/cash-flow')
+@login_required
+def cash_flow_report():
+    """Get cash flow analysis report with customizable date ranges."""
+    connection = get_db_connection()
+    if connection:
+        cursor = connection.cursor(dictionary=True)
+        try:
+            user_id = session['user_id']
+            range_type = request.args.get('range', 'monthly')  # weekly, monthly, yearly
+            year = request.args.get('year', datetime.now().year, type=int)
+            month = request.args.get('month', datetime.now().month, type=int)
+
+            if range_type == 'weekly':
+                # Get weekly cash flow for the specified month
+                cursor.execute("""
+                    SELECT
+                        WEEK(t.transaction_date) as week_num,
+                        DATE_FORMAT(MIN(t.transaction_date), '%%Y-%%m-%%d') as week_start,
+                        DATE_FORMAT(MAX(t.transaction_date), '%%Y-%%m-%%d') as week_end,
+                        COALESCE(SUM(t.debit), 0) as cash_in,
+                        COALESCE(SUM(t.credit), 0) as cash_out,
+                        COALESCE(SUM(t.debit), 0) - COALESCE(SUM(t.credit), 0) as net_flow
+                    FROM transactions t
+                    JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                    WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s
+                    GROUP BY WEEK(t.transaction_date)
+                    ORDER BY week_num
+                """, (user_id, year, month))
+            elif range_type == 'yearly':
+                # Get yearly cash flow (by year)
+                cursor.execute("""
+                    SELECT
+                        mr.year,
+                        COALESCE(SUM(t.debit), 0) as cash_in,
+                        COALESCE(SUM(t.credit), 0) as cash_out,
+                        COALESCE(SUM(t.debit), 0) - COALESCE(SUM(t.credit), 0) as net_flow
+                    FROM monthly_records mr
+                    LEFT JOIN transactions t ON mr.id = t.monthly_record_id
+                    WHERE mr.user_id = %s
+                    GROUP BY mr.year
+                    ORDER BY mr.year
+                """, (user_id,))
+            else:  # monthly (default)
+                # Get monthly cash flow for the specified year
+                cursor.execute("""
+                    SELECT
+                        mr.year,
+                        mr.month,
+                        mr.month_name,
+                        COALESCE(SUM(t.debit), 0) as cash_in,
+                        COALESCE(SUM(t.credit), 0) as cash_out,
+                        COALESCE(SUM(t.debit), 0) - COALESCE(SUM(t.credit), 0) as net_flow
+                    FROM monthly_records mr
+                    LEFT JOIN transactions t ON mr.id = t.monthly_record_id
+                    WHERE mr.user_id = %s AND mr.year = %s
+                    GROUP BY mr.year, mr.month, mr.month_name
+                    ORDER BY mr.month
+                """, (user_id, year))
+
+            cash_flow = cursor.fetchall()
+            return jsonify(cash_flow)
+
+        except Error as e:
+            return jsonify({'error': str(e)}), 500
+        finally:
+            cursor.close()
+            connection.close()
+
+    return jsonify({'error': 'Database connection failed'}), 500
+
+@app.route('/api/reports/top-spending')
+@login_required
+def top_spending_report():
+    """Get top spending categories with customizable date ranges."""
+    connection = get_db_connection()
+    if connection:
+        cursor = connection.cursor(dictionary=True)
+        try:
+            user_id = session['user_id']
+            range_type = request.args.get('range', 'monthly')
+            year = request.args.get('year', datetime.now().year, type=int)
+            month = request.args.get('month', datetime.now().month, type=int)
+            limit = request.args.get('limit', 10, type=int)
+
+            if range_type == 'weekly':
+                # Get top spending for the specified month (weekly breakdown)
+                cursor.execute("""
+                    SELECT
+                        c.name as category,
+                        c.type,
+                        SUM(t.credit) as total_spent,
+                        COUNT(t.id) as transaction_count,
+                        AVG(t.credit) as avg_amount
+                    FROM transactions t
+                    JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                    LEFT JOIN categories c ON t.category_id = c.id
+                    WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s
+                        AND c.type = 'expense' AND t.credit > 0
+                    GROUP BY c.id, c.name, c.type
+                    ORDER BY total_spent DESC
+                    LIMIT %s
+                """, (user_id, year, month, limit))
+            elif range_type == 'yearly':
+                # Get top spending for all time
+                cursor.execute("""
+                    SELECT
+                        c.name as category,
+                        c.type,
+                        SUM(t.credit) as total_spent,
+                        COUNT(t.id) as transaction_count,
+                        AVG(t.credit) as avg_amount
+                    FROM transactions t
+                    JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                    LEFT JOIN categories c ON t.category_id = c.id
+                    WHERE mr.user_id = %s AND c.type = 'expense' AND t.credit > 0
+                    GROUP BY c.id, c.name, c.type
+                    ORDER BY total_spent DESC
+                    LIMIT %s
+                """, (user_id, limit))
+            else:  # monthly
+                # Get top spending for the specified year
+                cursor.execute("""
+                    SELECT
+                        c.name as category,
+                        c.type,
+                        SUM(t.credit) as total_spent,
+                        COUNT(t.id) as transaction_count,
+                        AVG(t.credit) as avg_amount
+                    FROM transactions t
+                    JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                    LEFT JOIN categories c ON t.category_id = c.id
+                    WHERE mr.user_id = %s AND mr.year = %s
+                        AND c.type = 'expense' AND t.credit > 0
+                    GROUP BY c.id, c.name, c.type
+                    ORDER BY total_spent DESC
+                    LIMIT %s
+                """, (user_id, year, limit))
+
+            top_spending = cursor.fetchall()
+            return jsonify(top_spending)
+
+        except Error as e:
+            return jsonify({'error': str(e)}), 500
+        finally:
+            cursor.close()
+            connection.close()
+
+    return jsonify({'error': 'Database connection failed'}), 500
+
+@app.route('/api/reports/savings-progress')
+@login_required
+def savings_progress_report():
+    """Get savings progress tracker."""
+    connection = get_db_connection()
+    if connection:
+        cursor = connection.cursor(dictionary=True)
+        try:
+            user_id = session['user_id']
+            year = request.args.get('year', datetime.now().year, type=int)
+
+            # Get monthly savings and cumulative progress
+            cursor.execute("""
+                SELECT
+                    mr.year,
+                    mr.month,
+                    mr.month_name,
+                    COALESCE(SUM(t.debit), 0) as income,
+                    COALESCE(SUM(t.credit), 0) as expenses,
+                    COALESCE(SUM(t.debit), 0) - COALESCE(SUM(t.credit), 0) as monthly_savings
+                FROM monthly_records mr
+                LEFT JOIN transactions t ON mr.id = t.monthly_record_id
+                WHERE mr.user_id = %s AND mr.year = %s
+                GROUP BY mr.year, mr.month, mr.month_name
+                ORDER BY mr.month
+            """, (user_id, year))
+
+            monthly_data = cursor.fetchall()
+
+            # Calculate cumulative savings
+            cumulative = 0
+            for row in monthly_data:
+                cumulative += float(row['monthly_savings'])
+                row['cumulative_savings'] = cumulative
+                row['savings_rate'] = (float(row['monthly_savings']) / float(row['income']) * 100) if float(row['income']) > 0 else 0
+
+            return jsonify(monthly_data)
+
+        except Error as e:
+            return jsonify({'error': str(e)}), 500
+        finally:
+            cursor.close()
+            connection.close()
+
+    return jsonify({'error': 'Database connection failed'}), 500
+
+@app.route('/api/reports/forecast')
+@login_required
+def forecast_report():
+    """Predict next month's spending based on historical data."""
+    connection = get_db_connection()
+    if connection:
+        cursor = connection.cursor(dictionary=True)
+        try:
+            user_id = session['user_id']
+            months_to_analyze = request.args.get('months', 6, type=int)
+
+            # Get historical data for the last N months
+            cursor.execute("""
+                SELECT
+                    mr.year,
+                    mr.month,
+                    mr.month_name,
+                    COALESCE(SUM(t.debit), 0) as total_income,
+                    COALESCE(SUM(t.credit), 0) as total_expenses,
+                    COALESCE(SUM(t.debit), 0) - COALESCE(SUM(t.credit), 0) as net_savings
+                FROM monthly_records mr
+                LEFT JOIN transactions t ON mr.id = t.monthly_record_id
+                WHERE mr.user_id = %s
+                GROUP BY mr.year, mr.month, mr.month_name
+                ORDER BY mr.year DESC, mr.month DESC
+                LIMIT %s
+            """, (user_id, months_to_analyze))
+
+            historical_data = cursor.fetchall()
+
+            # Get category-wise spending patterns
+            cursor.execute("""
+                SELECT
+                    c.name as category,
+                    AVG(monthly_totals.total) as avg_monthly_spending,
+                    MIN(monthly_totals.total) as min_spending,
+                    MAX(monthly_totals.total) as max_spending,
+                    STDDEV(monthly_totals.total) as std_deviation
+                FROM (
+                    SELECT
+                        t.category_id,
+                        mr.year,
+                        mr.month,
+                        SUM(t.credit) as total
+                    FROM transactions t
+                    JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                    WHERE mr.user_id = %s
+                    GROUP BY t.category_id, mr.year, mr.month
+                    ORDER BY mr.year DESC, mr.month DESC
+                    LIMIT %s
+                ) as monthly_totals
+                LEFT JOIN categories c ON monthly_totals.category_id = c.id
+                WHERE c.type = 'expense'
+                GROUP BY c.id, c.name
+                ORDER BY avg_monthly_spending DESC
+            """, (user_id, months_to_analyze * 20))  # Approximate category entries
+
+            category_forecast = cursor.fetchall()
+
+            # Calculate simple averages for forecasting
+            if historical_data:
+                avg_income = sum(float(row['total_income']) for row in historical_data) / len(historical_data)
+                avg_expenses = sum(float(row['total_expenses']) for row in historical_data) / len(historical_data)
+                avg_savings = sum(float(row['net_savings']) for row in historical_data) / len(historical_data)
+
+                # Calculate trend (simple linear)
+                if len(historical_data) >= 2:
+                    recent_avg_expenses = sum(float(row['total_expenses']) for row in historical_data[:3]) / min(3, len(historical_data))
+                    older_avg_expenses = sum(float(row['total_expenses']) for row in historical_data[-3:]) / min(3, len(historical_data))
+                    trend = ((recent_avg_expenses - older_avg_expenses) / older_avg_expenses * 100) if older_avg_expenses > 0 else 0
+                else:
+                    trend = 0
+
+                forecast = {
+                    'next_month_forecast': {
+                        'predicted_income': round(avg_income, 2),
+                        'predicted_expenses': round(avg_expenses, 2),
+                        'predicted_savings': round(avg_savings, 2),
+                        'expense_trend': round(trend, 2),
+                        'confidence': 'medium' if len(historical_data) >= 3 else 'low'
+                    },
+                    'historical_average': {
+                        'avg_income': round(avg_income, 2),
+                        'avg_expenses': round(avg_expenses, 2),
+                        'avg_savings': round(avg_savings, 2)
+                    },
+                    'category_forecast': category_forecast,
+                    'based_on_months': len(historical_data)
+                }
+            else:
+                forecast = {
+                    'next_month_forecast': {
+                        'predicted_income': 0,
+                        'predicted_expenses': 0,
+                        'predicted_savings': 0,
+                        'expense_trend': 0,
+                        'confidence': 'no_data'
+                    },
+                    'historical_average': {
+                        'avg_income': 0,
+                        'avg_expenses': 0,
+                        'avg_savings': 0
+                    },
+                    'category_forecast': [],
+                    'based_on_months': 0
+                }
+
+            return jsonify(forecast)
+
+        except Error as e:
+            return jsonify({'error': str(e)}), 500
+        finally:
+            cursor.close()
+            connection.close()
+
+    return jsonify({'error': 'Database connection failed'}), 500
+
 @app.route('/api/payment-methods', methods=['GET', 'POST'])
 @login_required
 def payment_methods():

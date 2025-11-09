@@ -7,7 +7,11 @@ let charts = {
     category: null,
     monthlyReport: null,
     categoryReport: null,
-    yearlyReport: null
+    yearlyReport: null,
+    cashFlowReport: null,
+    topSpendingReport: null,
+    savingsReport: null,
+    forecastReport: null
 };
 let currentCategories = [];
 let paymentMethods = [];
@@ -854,21 +858,94 @@ function executeCloneMonth() {
 
 function loadReports() {
     const year = new Date().getFullYear();
+    const month = new Date().getMonth() + 1;
+
+    // Initialize year and month selectors
+    initializeReportFilters(year, month);
 
     showLoading();
 
-    // Use Promise.all to wait for both requests to complete
+    // Load all reports
+    loadAllReports(year, month, 'monthly');
+}
+
+function initializeReportFilters(year, month) {
+    const yearSelect = document.getElementById('reportYear');
+    const monthSelect = document.getElementById('reportMonth');
+    const rangeSelect = document.getElementById('reportRangeType');
+
+    // Populate years (from 2020 to current year + 1)
+    yearSelect.innerHTML = '';
+    for (let y = year + 1; y >= 2020; y--) {
+        const option = document.createElement('option');
+        option.value = y;
+        option.textContent = y;
+        if (y === year) option.selected = true;
+        yearSelect.appendChild(option);
+    }
+
+    // Set current month
+    monthSelect.value = month;
+
+    // Add event listeners
+    yearSelect.addEventListener('change', () => {
+        const selectedYear = yearSelect.value;
+        const selectedMonth = monthSelect.value;
+        const selectedRange = rangeSelect.value;
+        loadAllReports(selectedYear, selectedMonth, selectedRange);
+    });
+
+    monthSelect.addEventListener('change', () => {
+        const selectedYear = yearSelect.value;
+        const selectedMonth = monthSelect.value;
+        const selectedRange = rangeSelect.value;
+        loadAllReports(selectedYear, selectedMonth, selectedRange);
+    });
+
+    rangeSelect.addEventListener('change', () => {
+        const selectedYear = yearSelect.value;
+        const selectedMonth = monthSelect.value;
+        const selectedRange = rangeSelect.value;
+
+        // Show/hide month selector based on range type
+        const monthContainer = document.getElementById('reportMonthContainer');
+        if (selectedRange === 'yearly') {
+            monthContainer.style.display = 'none';
+        } else {
+            monthContainer.style.display = 'block';
+        }
+
+        loadAllReports(selectedYear, selectedMonth, selectedRange);
+    });
+}
+
+function loadAllReports(year, month, rangeType) {
+    showLoading();
+
     Promise.all([
         fetch(`/api/reports/monthly-summary?year=${year}`)
             .then(response => response.json())
-            .then(data => {
-                updateMonthlyReportChart(data);
-            }),
-        fetch(`/api/reports/category-breakdown?year=${year}`)
+            .then(data => updateMonthlyReportChart(data)),
+
+        fetch(`/api/reports/category-breakdown?year=${year}&month=${month}`)
             .then(response => response.json())
-            .then(data => {
-                updateCategoryReportChart(data);
-            })
+            .then(data => updateCategoryReportChart(data)),
+
+        fetch(`/api/reports/cash-flow?range=${rangeType}&year=${year}&month=${month}`)
+            .then(response => response.json())
+            .then(data => updateCashFlowChart(data, rangeType)),
+
+        fetch(`/api/reports/top-spending?range=${rangeType}&year=${year}&month=${month}&limit=10`)
+            .then(response => response.json())
+            .then(data => updateTopSpendingChart(data)),
+
+        fetch(`/api/reports/savings-progress?year=${year}`)
+            .then(response => response.json())
+            .then(data => updateSavingsProgressChart(data)),
+
+        fetch(`/api/reports/forecast?months=6`)
+            .then(response => response.json())
+            .then(data => updateForecastChart(data))
     ])
     .then(() => {
         hideLoading();
@@ -1061,6 +1138,312 @@ function updateCategoryReportChart(data) {
             }
         }
     });
+}
+
+function updateCashFlowChart(data, rangeType) {
+    const ctx = document.getElementById('cashFlowReportChart');
+    if (!ctx || !data) return;
+
+    if (charts.cashFlowReport) {
+        charts.cashFlowReport.destroy();
+    }
+
+    let labels, cashIn, cashOut, netFlow;
+
+    if (rangeType === 'weekly') {
+        labels = data.map(d => `Week ${d.week_num}: ${d.week_start} to ${d.week_end}`);
+        cashIn = data.map(d => d.cash_in || 0);
+        cashOut = data.map(d => d.cash_out || 0);
+        netFlow = data.map(d => d.net_flow || 0);
+    } else if (rangeType === 'yearly') {
+        labels = data.map(d => `${d.year}`);
+        cashIn = data.map(d => d.cash_in || 0);
+        cashOut = data.map(d => d.cash_out || 0);
+        netFlow = data.map(d => d.net_flow || 0);
+    } else {
+        labels = data.map(d => `${d.month_name} ${d.year}`);
+        cashIn = data.map(d => d.cash_in || 0);
+        cashOut = data.map(d => d.cash_out || 0);
+        netFlow = data.map(d => d.net_flow || 0);
+    }
+
+    charts.cashFlowReport = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Cash In',
+                data: cashIn,
+                borderColor: 'rgba(75, 192, 192, 1)',
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                fill: true,
+                tension: 0.4
+            }, {
+                label: 'Cash Out',
+                data: cashOut,
+                borderColor: 'rgba(255, 99, 132, 1)',
+                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                fill: true,
+                tension: 0.4
+            }, {
+                label: 'Net Flow',
+                data: netFlow,
+                borderColor: 'rgba(54, 162, 235, 1)',
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: value => 'LKR ' + value.toLocaleString()
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: ctx => ctx.dataset.label + ': LKR ' + ctx.parsed.y.toLocaleString()
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updateTopSpendingChart(data) {
+    const ctx = document.getElementById('topSpendingReportChart');
+    if (!ctx || !data) return;
+
+    if (charts.topSpendingReport) {
+        charts.topSpendingReport.destroy();
+    }
+
+    const labels = data.map(d => d.category || 'Uncategorized');
+    const amounts = data.map(d => d.total_spent || 0);
+    const counts = data.map(d => d.transaction_count || 0);
+
+    charts.topSpendingReport = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Total Spent',
+                data: amounts,
+                backgroundColor: 'rgba(255, 99, 132, 0.8)',
+                borderColor: 'rgba(255, 99, 132, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: value => 'LKR ' + value.toLocaleString()
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: ctx => {
+                            const index = ctx.dataIndex;
+                            return [
+                                'Total: LKR ' + ctx.parsed.x.toLocaleString(),
+                                'Transactions: ' + counts[index],
+                                'Average: LKR ' + (amounts[index] / counts[index]).toLocaleString()
+                            ];
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updateSavingsProgressChart(data) {
+    const ctx = document.getElementById('savingsReportChart');
+    if (!ctx || !data) return;
+
+    if (charts.savingsReport) {
+        charts.savingsReport.destroy();
+    }
+
+    const labels = data.map(d => `${d.month_name} ${d.year}`);
+    const monthlySavings = data.map(d => d.monthly_savings || 0);
+    const cumulativeSavings = data.map(d => d.cumulative_savings || 0);
+
+    charts.savingsReport = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Monthly Savings',
+                data: monthlySavings,
+                backgroundColor: 'rgba(54, 162, 235, 0.8)',
+                yAxisID: 'y'
+            }, {
+                label: 'Cumulative Savings',
+                data: cumulativeSavings,
+                type: 'line',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                fill: true,
+                tension: 0.4,
+                yAxisID: 'y1'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    beginAtZero: true,
+                    ticks: {
+                        callback: value => 'LKR ' + value.toLocaleString()
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    beginAtZero: true,
+                    grid: {
+                        drawOnChartArea: false
+                    },
+                    ticks: {
+                        callback: value => 'LKR ' + value.toLocaleString()
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: ctx => ctx.dataset.label + ': LKR ' + ctx.parsed.y.toLocaleString()
+                    }
+                }
+            }
+        }
+    });
+
+    // Update savings table
+    const tbody = document.getElementById('savingsTableBody');
+    if (tbody) {
+        tbody.innerHTML = data.map(d => `
+            <tr>
+                <td>${d.month_name} ${d.year}</td>
+                <td>LKR ${(d.income || 0).toLocaleString()}</td>
+                <td>LKR ${(d.expenses || 0).toLocaleString()}</td>
+                <td class="${d.monthly_savings >= 0 ? 'text-success' : 'text-danger'}">
+                    LKR ${(d.monthly_savings || 0).toLocaleString()}
+                </td>
+                <td>${(d.savings_rate || 0).toFixed(1)}%</td>
+                <td class="${d.cumulative_savings >= 0 ? 'text-success' : 'text-danger'}">
+                    LKR ${(d.cumulative_savings || 0).toLocaleString()}
+                </td>
+            </tr>
+        `).join('');
+    }
+}
+
+function updateForecastChart(data) {
+    const ctx = document.getElementById('forecastReportChart');
+    if (!ctx || !data) return;
+
+    if (charts.forecastReport) {
+        charts.forecastReport.destroy();
+    }
+
+    const forecast = data.next_month_forecast;
+    const historical = data.historical_average;
+
+    // Update forecast summary
+    const summaryDiv = document.getElementById('forecastSummary');
+    if (summaryDiv) {
+        const confidenceText = forecast.confidence === 'medium' ? 'Medium' :
+                               forecast.confidence === 'low' ? 'Low' : 'No Data';
+        const trendText = forecast.expense_trend > 0 ?
+            `trending up by ${forecast.expense_trend.toFixed(1)}%` :
+            forecast.expense_trend < 0 ?
+            `trending down by ${Math.abs(forecast.expense_trend).toFixed(1)}%` :
+            'stable';
+
+        summaryDiv.innerHTML = `
+            <h5>Next Month Forecast (Confidence: ${confidenceText})</h5>
+            <p><strong>Predicted Income:</strong> LKR ${forecast.predicted_income.toLocaleString()}</p>
+            <p><strong>Predicted Expenses:</strong> LKR ${forecast.predicted_expenses.toLocaleString()}
+               <span class="badge ${forecast.expense_trend > 0 ? 'bg-danger' : 'bg-success'}">${trendText}</span>
+            </p>
+            <p><strong>Predicted Savings:</strong> LKR ${forecast.predicted_savings.toLocaleString()}</p>
+            <p class="text-muted">Based on ${data.based_on_months} months of historical data</p>
+        `;
+    }
+
+    // Create comparison chart
+    charts.forecastReport = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Historical Average', 'Next Month Forecast'],
+            datasets: [{
+                label: 'Income',
+                data: [historical.avg_income, forecast.predicted_income],
+                backgroundColor: 'rgba(75, 192, 192, 0.8)'
+            }, {
+                label: 'Expenses',
+                data: [historical.avg_expenses, forecast.predicted_expenses],
+                backgroundColor: 'rgba(255, 99, 132, 0.8)'
+            }, {
+                label: 'Savings',
+                data: [historical.avg_savings, forecast.predicted_savings],
+                backgroundColor: 'rgba(54, 162, 235, 0.8)'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: value => 'LKR ' + value.toLocaleString()
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: ctx => ctx.dataset.label + ': LKR ' + ctx.parsed.y.toLocaleString()
+                    }
+                }
+            }
+        }
+    });
+
+    // Update category forecast table
+    const tbody = document.getElementById('forecastTableBody');
+    if (tbody && data.category_forecast) {
+        tbody.innerHTML = data.category_forecast.map(d => `
+            <tr>
+                <td>${d.category || 'Uncategorized'}</td>
+                <td>LKR ${(d.avg_monthly_spending || 0).toLocaleString()}</td>
+                <td>LKR ${(d.min_spending || 0).toLocaleString()}</td>
+                <td>LKR ${(d.max_spending || 0).toLocaleString()}</td>
+                <td>LKR ${(d.std_deviation || 0).toLocaleString()}</td>
+            </tr>
+        `).join('');
+    }
 }
 
 // ================================
