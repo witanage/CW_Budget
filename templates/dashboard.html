@@ -35,6 +35,18 @@
         
         <!-- Main Content -->
         <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+            {% if session.is_admin %}
+            <!-- Admin Quick Access -->
+            <div class="alert alert-info d-flex align-items-center justify-content-between" style="background: var(--bg-tertiary); border: 1px solid var(--accent-color); border-radius: 8px; margin-top: 1rem; margin-bottom: 1rem;">
+                <div>
+                    <i class="fas fa-user-shield me-2"></i>
+                    <strong>Admin Access:</strong> Manage users and view system logs
+                </div>
+                <a href="{{ url_for('admin_dashboard') }}" class="btn btn-primary btn-sm">
+                    <i class="fas fa-cog me-1"></i> Admin Panel
+                </a>
+            </div>
+            {% endif %}
 
             <!-- Overview Page -->
             <div id="overviewPage" class="page-content">
