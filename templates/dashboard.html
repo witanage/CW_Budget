@@ -411,6 +411,13 @@
                     <div class="mb-3">
                         <label for="transDate" class="form-label">Date</label>
                         <input type="date" class="form-control" id="transDate">
+                        <small class="text-muted">For bills, set a future date to receive reminders</small>
+                    </div>
+                    <div class="mb-3 form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="transIsBill">
+                        <label class="form-check-label" for="transIsBill">
+                            This is an unpaid bill (will trigger reminders before due date)
+                        </label>
                     </div>
                     <div class="mb-3">
                         <label for="transNotes" class="form-label">Notes</label>

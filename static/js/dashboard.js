@@ -639,6 +639,7 @@ function editTransaction(id) {
     document.getElementById('transCredit').value = transaction.credit || '';
     document.getElementById('transDate').value = transaction.transaction_date ? transaction.transaction_date.split('T')[0] : '';
     document.getElementById('transNotes').value = transaction.notes || '';
+    document.getElementById('transIsBill').checked = !transaction.is_done;  // If not done, it's an unpaid bill
 
     // Update modal title
     document.querySelector('#transactionModal .modal-title').textContent = 'Edit Transaction';
@@ -686,6 +687,9 @@ function saveTransaction() {
         }
     }
 
+    // Check if this is marked as an unpaid bill
+    const isBill = document.getElementById('transIsBill')?.checked || false;
+
     const data = {
         description: description,
         category_id: document.getElementById('transCategory')?.value || null,
@@ -694,7 +698,8 @@ function saveTransaction() {
         transaction_date: document.getElementById('transDate')?.value,
         notes: document.getElementById('transNotes')?.value,
         year: parseInt(year),
-        month: parseInt(month)
+        month: parseInt(month),
+        is_done: !isBill  // If it's a bill, set is_done to FALSE (unpaid)
     };
 
     console.log('Saving transaction with data:', data);

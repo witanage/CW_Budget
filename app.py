@@ -741,6 +741,8 @@ def transactions():
                 transaction_date = datetime.now().date()
 
             # Insert transaction (balance will be calculated on frontend)
+            is_done = data.get('is_done', True)  # Default to True (paid) if not specified
+
             insert_values = (
                 monthly_record['id'],
                 data.get('description'),
@@ -748,14 +750,15 @@ def transactions():
                 debit if debit > 0 else None,
                 credit if credit > 0 else None,
                 transaction_date,
-                data.get('notes')
+                data.get('notes'),
+                is_done
             )
             print(f"[DEBUG] Inserting transaction with values: {insert_values}")
 
             cursor.execute("""
                 INSERT INTO transactions
-                (monthly_record_id, description, category_id, debit, credit, transaction_date, notes)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                (monthly_record_id, description, category_id, debit, credit, transaction_date, notes, is_done)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """, insert_values)
 
             transaction_id = cursor.lastrowid
@@ -822,10 +825,12 @@ def manage_transaction(transaction_id):
                 transaction_date = datetime.now().date()
 
             # Update transaction (balance will be calculated on frontend)
+            is_done = data.get('is_done', True)  # Default to True if not specified
+
             cursor.execute("""
                 UPDATE transactions
                 SET description = %s, category_id = %s, debit = %s,
-                    credit = %s, transaction_date = %s, notes = %s
+                    credit = %s, transaction_date = %s, notes = %s, is_done = %s
                 WHERE id = %s
             """, (
                 data.get('description'),
@@ -834,6 +839,7 @@ def manage_transaction(transaction_id):
                 credit if credit > 0 else None,
                 transaction_date,
                 data.get('notes'),
+                is_done,
                 transaction_id
             ))
 
