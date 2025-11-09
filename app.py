@@ -741,8 +741,6 @@ def transactions():
                 transaction_date = datetime.now().date()
 
             # Insert transaction (balance will be calculated on frontend)
-            is_done = data.get('is_done', True)  # Default to True (paid) if not specified
-
             insert_values = (
                 monthly_record['id'],
                 data.get('description'),
@@ -750,15 +748,14 @@ def transactions():
                 debit if debit > 0 else None,
                 credit if credit > 0 else None,
                 transaction_date,
-                data.get('notes'),
-                is_done
+                data.get('notes')
             )
             print(f"[DEBUG] Inserting transaction with values: {insert_values}")
 
             cursor.execute("""
                 INSERT INTO transactions
-                (monthly_record_id, description, category_id, debit, credit, transaction_date, notes, is_done)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                (monthly_record_id, description, category_id, debit, credit, transaction_date, notes)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
             """, insert_values)
 
             transaction_id = cursor.lastrowid
@@ -825,12 +822,10 @@ def manage_transaction(transaction_id):
                 transaction_date = datetime.now().date()
 
             # Update transaction (balance will be calculated on frontend)
-            is_done = data.get('is_done', True)  # Default to True if not specified
-
             cursor.execute("""
                 UPDATE transactions
                 SET description = %s, category_id = %s, debit = %s,
-                    credit = %s, transaction_date = %s, notes = %s, is_done = %s
+                    credit = %s, transaction_date = %s, notes = %s
                 WHERE id = %s
             """, (
                 data.get('description'),
@@ -839,7 +834,6 @@ def manage_transaction(transaction_id):
                 credit if credit > 0 else None,
                 transaction_date,
                 data.get('notes'),
-                is_done,
                 transaction_id
             ))
 
@@ -1137,6 +1131,66 @@ def top_spending_report():
 
     return jsonify({'error': 'Database connection failed'}), 500
 
+@app.route('/api/reports/savings-progress')
+@login_required
+def savings_progress_report():
+    """Get savings progress tracker."""
+    connection = get_db_connection()
+    if connection:
+        cursor = connection.cursor(dictionary=True)
+        try:
+            user_id = session['user_id']
+            year = request.args.get('year', datetime.now().year, type=int)
+
+            # Get monthly savings and cumulative progress
+            cursor.execute("""
+                SELECT
+                    mr.year,
+                    mr.month,
+                    mr.month_name,
+                    COALESCE(SUM(t.debit), 0) as income,
+                    COALESCE(SUM(t.credit), 0) as expenses,
+                    COALESCE(SUM(t.debit), 0) - COALESCE(SUM(t.credit), 0) as monthly_savings
+                FROM monthly_records mr
+                LEFT JOIN transactions t ON mr.id = t.monthly_record_id
+                WHERE mr.user_id = %s AND mr.year = %s
+                GROUP BY mr.year, mr.month, mr.month_name
+                ORDER BY mr.month
+            """, (user_id, year))
+
+            monthly_data = cursor.fetchall()
+
+            # Calculate cumulative savings and convert Decimals to float
+            cumulative = 0
+            processed_data = []
+            for row in monthly_data:
+                income = float(row['income']) if row['income'] else 0
+                expenses = float(row['expenses']) if row['expenses'] else 0
+                monthly_savings = float(row['monthly_savings']) if row['monthly_savings'] else 0
+
+                cumulative += monthly_savings
+
+                processed_data.append({
+                    'year': row['year'],
+                    'month': row['month'],
+                    'month_name': row['month_name'],
+                    'income': income,
+                    'expenses': expenses,
+                    'monthly_savings': monthly_savings,
+                    'cumulative_savings': cumulative,
+                    'savings_rate': (monthly_savings / income * 100) if income > 0 else 0
+                })
+
+            return jsonify(processed_data)
+
+        except Error as e:
+            return jsonify({'error': str(e)}), 500
+        finally:
+            cursor.close()
+            connection.close()
+
+    return jsonify({'error': 'Database connection failed'}), 500
+
 @app.route('/api/reports/forecast')
 @login_required
 def forecast_report():
@@ -1245,420 +1299,6 @@ def forecast_report():
                 }
 
             return jsonify(forecast)
-
-        except Error as e:
-            return jsonify({'error': str(e)}), 500
-        finally:
-            cursor.close()
-            connection.close()
-
-    return jsonify({'error': 'Database connection failed'}), 500
-
-# ================================
-# NOTIFICATIONS ENDPOINTS
-# ================================
-
-@app.route('/api/notifications')
-@login_required
-def get_notifications():
-    """Get all notifications for the current user."""
-    connection = get_db_connection()
-    if connection:
-        cursor = connection.cursor(dictionary=True)
-        try:
-            user_id = session['user_id']
-            limit = request.args.get('limit', 50, type=int)
-            unread_only = request.args.get('unread_only', 'false').lower() == 'true'
-
-            if unread_only:
-                cursor.execute("""
-                    SELECT * FROM notifications
-                    WHERE user_id = %s AND is_read = FALSE
-                    ORDER BY created_at DESC
-                    LIMIT %s
-                """, (user_id, limit))
-            else:
-                cursor.execute("""
-                    SELECT * FROM notifications
-                    WHERE user_id = %s
-                    ORDER BY created_at DESC
-                    LIMIT %s
-                """, (user_id, limit))
-
-            notifications = cursor.fetchall()
-
-            # Convert datetime objects to strings for JSON serialization
-            for notif in notifications:
-                if notif.get('created_at'):
-                    notif['created_at'] = notif['created_at'].isoformat()
-                if notif.get('read_at'):
-                    notif['read_at'] = notif['read_at'].isoformat()
-
-            return jsonify(notifications)
-
-        except Error as e:
-            return jsonify({'error': str(e)}), 500
-        finally:
-            cursor.close()
-            connection.close()
-
-    return jsonify({'error': 'Database connection failed'}), 500
-
-@app.route('/api/notifications/<int:notification_id>/read', methods=['PUT'])
-@login_required
-def mark_notification_read(notification_id):
-    """Mark a notification as read."""
-    connection = get_db_connection()
-    if connection:
-        cursor = connection.cursor()
-        try:
-            user_id = session['user_id']
-
-            cursor.execute("""
-                UPDATE notifications
-                SET is_read = TRUE, read_at = NOW()
-                WHERE id = %s AND user_id = %s
-            """, (notification_id, user_id))
-
-            connection.commit()
-
-            if cursor.rowcount > 0:
-                return jsonify({'success': True})
-            else:
-                return jsonify({'error': 'Notification not found'}), 404
-
-        except Error as e:
-            return jsonify({'error': str(e)}), 500
-        finally:
-            cursor.close()
-            connection.close()
-
-    return jsonify({'error': 'Database connection failed'}), 500
-
-@app.route('/api/notifications/mark-all-read', methods=['PUT'])
-@login_required
-def mark_all_notifications_read():
-    """Mark all notifications as read for the current user."""
-    connection = get_db_connection()
-    if connection:
-        cursor = connection.cursor()
-        try:
-            user_id = session['user_id']
-
-            cursor.execute("""
-                UPDATE notifications
-                SET is_read = TRUE, read_at = NOW()
-                WHERE user_id = %s AND is_read = FALSE
-            """, (user_id,))
-
-            connection.commit()
-
-            return jsonify({'success': True, 'marked': cursor.rowcount})
-
-        except Error as e:
-            return jsonify({'error': str(e)}), 500
-        finally:
-            cursor.close()
-            connection.close()
-
-    return jsonify({'error': 'Database connection failed'}), 500
-
-@app.route('/api/notifications/<int:notification_id>', methods=['DELETE'])
-@login_required
-def delete_notification(notification_id):
-    """Delete a notification."""
-    connection = get_db_connection()
-    if connection:
-        cursor = connection.cursor()
-        try:
-            user_id = session['user_id']
-
-            cursor.execute("""
-                DELETE FROM notifications
-                WHERE id = %s AND user_id = %s
-            """, (notification_id, user_id))
-
-            connection.commit()
-
-            if cursor.rowcount > 0:
-                return jsonify({'success': True})
-            else:
-                return jsonify({'error': 'Notification not found'}), 404
-
-        except Error as e:
-            return jsonify({'error': str(e)}), 500
-        finally:
-            cursor.close()
-            connection.close()
-
-    return jsonify({'error': 'Database connection failed'}), 500
-
-@app.route('/api/notifications/check', methods=['POST'])
-@login_required
-def check_notifications():
-    """Check and generate new notifications based on user's financial data."""
-    connection = get_db_connection()
-    if connection:
-        cursor = connection.cursor(dictionary=True)
-        try:
-            user_id = session['user_id']
-            new_notifications = []
-
-            # Get user preferences
-            cursor.execute("""
-                SELECT * FROM user_preferences WHERE user_id = %s
-            """, (user_id,))
-            prefs = cursor.fetchone()
-
-            # Create default preferences if they don't exist
-            if not prefs:
-                cursor.execute("""
-                    INSERT INTO user_preferences (user_id) VALUES (%s)
-                """, (user_id,))
-                connection.commit()
-                prefs = {
-                    'enable_bill_reminders': True,
-                    'bill_reminder_days_before': 3,
-                    'enable_budget_alerts': True,
-                    'monthly_budget_limit': None,
-                    'enable_unusual_spending_detection': True,
-                    'unusual_spending_threshold_percentage': 150
-                }
-
-            # 1. Check for upcoming bills (transactions with is_done=FALSE)
-            if prefs.get('enable_bill_reminders'):
-                days_before = prefs.get('bill_reminder_days_before', 3)
-                cursor.execute("""
-                    SELECT t.*, c.name as category_name
-                    FROM transactions t
-                    LEFT JOIN categories c ON t.category_id = c.id
-                    JOIN monthly_records mr ON t.monthly_record_id = mr.id
-                    WHERE mr.user_id = %s
-                        AND t.is_done = FALSE
-                        AND t.transaction_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL %s DAY)
-                        AND t.transaction_date >= CURDATE()
-                        AND NOT EXISTS (
-                            SELECT 1 FROM notifications
-                            WHERE user_id = %s
-                                AND type = 'bill_reminder'
-                                AND related_transaction_id = t.id
-                                AND DATE(created_at) = CURDATE()
-                        )
-                """, (user_id, days_before, user_id))
-
-                upcoming_bills = cursor.fetchall()
-                for bill in upcoming_bills:
-                    days_until = (bill['transaction_date'] - datetime.now().date()).days
-                    cursor.execute("""
-                        INSERT INTO notifications (user_id, type, title, message, severity, related_transaction_id)
-                        VALUES (%s, 'bill_reminder', %s, %s, 'warning', %s)
-                    """, (
-                        user_id,
-                        f"Bill Due {('Today' if days_until == 0 else f'in {days_until} day' + ('s' if days_until > 1 else ''))}",
-                        f"{bill.get('description', 'Bill')} - LKR {float(bill.get('credit', 0)):,.2f} due on {bill['transaction_date'].strftime('%Y-%m-%d')}",
-                        bill['id']
-                    ))
-                    new_notifications.append('bill_reminder')
-
-            # 2. Check budget limits
-            if prefs.get('enable_budget_alerts') and prefs.get('monthly_budget_limit'):
-                budget_limit = float(prefs['monthly_budget_limit'])
-                current_month = datetime.now().month
-                current_year = datetime.now().year
-
-                cursor.execute("""
-                    SELECT COALESCE(SUM(t.credit), 0) as total_expenses
-                    FROM transactions t
-                    JOIN monthly_records mr ON t.monthly_record_id = mr.id
-                    WHERE mr.user_id = %s
-                        AND mr.year = %s
-                        AND mr.month = %s
-                """, (user_id, current_year, current_month))
-
-                result = cursor.fetchone()
-                total_expenses = float(result['total_expenses']) if result else 0
-                percentage = (total_expenses / budget_limit * 100) if budget_limit > 0 else 0
-
-                # Alert if over 80% of budget
-                if percentage >= 80:
-                    # Check if we haven't sent this alert today
-                    cursor.execute("""
-                        SELECT COUNT(*) as count FROM notifications
-                        WHERE user_id = %s
-                            AND type = 'budget_alert'
-                            AND DATE(created_at) = CURDATE()
-                    """, (user_id,))
-
-                    if cursor.fetchone()['count'] == 0:
-                        severity = 'danger' if percentage >= 100 else 'warning'
-                        title = 'Budget Limit Exceeded!' if percentage >= 100 else 'Budget Alert'
-                        message = f"You've spent LKR {total_expenses:,.2f} ({percentage:.0f}%) of your LKR {budget_limit:,.2f} monthly budget."
-
-                        cursor.execute("""
-                            INSERT INTO notifications (user_id, type, title, message, severity)
-                            VALUES (%s, 'budget_alert', %s, %s, %s)
-                        """, (user_id, title, message, severity))
-                        new_notifications.append('budget_alert')
-
-            # 3. Check for unusual spending
-            if prefs.get('enable_unusual_spending_detection'):
-                threshold = prefs.get('unusual_spending_threshold_percentage', 150)
-                current_month = datetime.now().month
-                current_year = datetime.now().year
-
-                # Get average spending by category over last 3 months (excluding current)
-                cursor.execute("""
-                    SELECT
-                        t.category_id,
-                        c.name as category_name,
-                        AVG(monthly_spending.total) as avg_spending
-                    FROM (
-                        SELECT
-                            category_id,
-                            SUM(credit) as total
-                        FROM transactions t2
-                        JOIN monthly_records mr2 ON t2.monthly_record_id = mr2.id
-                        WHERE mr2.user_id = %s
-                            AND (
-                                (mr2.year = %s AND mr2.month < %s)
-                                OR (mr2.year = %s AND mr2.month > %s)
-                            )
-                        GROUP BY category_id, mr2.year, mr2.month
-                    ) as monthly_spending
-                    JOIN transactions t ON monthly_spending.category_id = t.category_id
-                    LEFT JOIN categories c ON t.category_id = c.id
-                    GROUP BY t.category_id, c.name
-                    HAVING avg_spending > 0
-                """, (user_id, current_year, current_month, current_year - 1, current_month))
-
-                avg_by_category = {row['category_id']: {'avg': float(row['avg_spending']), 'name': row['category_name']} for row in cursor.fetchall()}
-
-                # Get current month spending by category
-                cursor.execute("""
-                    SELECT
-                        category_id,
-                        SUM(credit) as total_spent
-                    FROM transactions t
-                    JOIN monthly_records mr ON t.monthly_record_id = mr.id
-                    WHERE mr.user_id = %s
-                        AND mr.year = %s
-                        AND mr.month = %s
-                    GROUP BY category_id
-                    HAVING total_spent > 0
-                """, (user_id, current_year, current_month))
-
-                for row in cursor.fetchall():
-                    cat_id = row['category_id']
-                    current_spending = float(row['total_spent'])
-
-                    if cat_id in avg_by_category:
-                        avg_spending = avg_by_category[cat_id]['avg']
-                        percentage = (current_spending / avg_spending * 100) if avg_spending > 0 else 0
-
-                        if percentage >= threshold:
-                            # Check if we haven't sent this alert today for this category
-                            cursor.execute("""
-                                SELECT COUNT(*) as count FROM notifications
-                                WHERE user_id = %s
-                                    AND type = 'unusual_spending'
-                                    AND message LIKE %s
-                                    AND DATE(created_at) = CURDATE()
-                            """, (user_id, f"%{avg_by_category[cat_id]['name']}%"))
-
-                            if cursor.fetchone()['count'] == 0:
-                                cursor.execute("""
-                                    INSERT INTO notifications (user_id, type, title, message, severity)
-                                    VALUES (%s, 'unusual_spending', %s, %s, 'info')
-                                """, (
-                                    user_id,
-                                    'Unusual Spending Detected',
-                                    f"Your {avg_by_category[cat_id]['name']} spending (LKR {current_spending:,.2f}) is {percentage:.0f}% higher than your average (LKR {avg_spending:,.2f})."
-                                ))
-                                new_notifications.append('unusual_spending')
-
-            connection.commit()
-
-            return jsonify({
-                'success': True,
-                'new_notifications': len(new_notifications),
-                'types': new_notifications
-            })
-
-        except Error as e:
-            return jsonify({'error': str(e)}), 500
-        finally:
-            cursor.close()
-            connection.close()
-
-    return jsonify({'error': 'Database connection failed'}), 500
-
-@app.route('/api/preferences', methods=['GET', 'PUT'])
-@login_required
-def user_preferences():
-    """Get or update user notification preferences."""
-    connection = get_db_connection()
-    if connection:
-        cursor = connection.cursor(dictionary=True)
-        try:
-            user_id = session['user_id']
-
-            if request.method == 'GET':
-                cursor.execute("""
-                    SELECT * FROM user_preferences WHERE user_id = %s
-                """, (user_id,))
-
-                prefs = cursor.fetchone()
-
-                # Create default preferences if they don't exist
-                if not prefs:
-                    cursor.execute("""
-                        INSERT INTO user_preferences (user_id) VALUES (%s)
-                    """, (user_id,))
-                    connection.commit()
-
-                    cursor.execute("""
-                        SELECT * FROM user_preferences WHERE user_id = %s
-                    """, (user_id,))
-                    prefs = cursor.fetchone()
-
-                # Convert Decimal to float for JSON
-                if prefs.get('monthly_budget_limit'):
-                    prefs['monthly_budget_limit'] = float(prefs['monthly_budget_limit'])
-
-                return jsonify(prefs)
-
-            else:  # PUT
-                data = request.json
-
-                cursor.execute("""
-                    INSERT INTO user_preferences (
-                        user_id, enable_bill_reminders, bill_reminder_days_before,
-                        enable_budget_alerts, monthly_budget_limit,
-                        enable_unusual_spending_detection, unusual_spending_threshold_percentage,
-                        enable_email_notifications
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    ON DUPLICATE KEY UPDATE
-                        enable_bill_reminders = VALUES(enable_bill_reminders),
-                        bill_reminder_days_before = VALUES(bill_reminder_days_before),
-                        enable_budget_alerts = VALUES(enable_budget_alerts),
-                        monthly_budget_limit = VALUES(monthly_budget_limit),
-                        enable_unusual_spending_detection = VALUES(enable_unusual_spending_detection),
-                        unusual_spending_threshold_percentage = VALUES(unusual_spending_threshold_percentage),
-                        enable_email_notifications = VALUES(enable_email_notifications)
-                """, (
-                    user_id,
-                    data.get('enable_bill_reminders', True),
-                    data.get('bill_reminder_days_before', 3),
-                    data.get('enable_budget_alerts', True),
-                    data.get('monthly_budget_limit'),
-                    data.get('enable_unusual_spending_detection', True),
-                    data.get('unusual_spending_threshold_percentage', 150),
-                    data.get('enable_email_notifications', False)
-                ))
-
-                connection.commit()
-
-                return jsonify({'success': True})
 
         except Error as e:
             return jsonify({'error': str(e)}), 500

@@ -10,6 +10,7 @@ let charts = {
     yearlyReport: null,
     cashFlowReport: null,
     topSpendingReport: null,
+    savingsReport: null,
     forecastReport: null
 };
 let currentCategories = [];
@@ -112,9 +113,6 @@ function loadPageData(pageName) {
             break;
         case 'overview':
             loadDashboardStats();
-            break;
-        case 'notifications':
-            loadNotifications();
             break;
     }
 }
@@ -639,7 +637,6 @@ function editTransaction(id) {
     document.getElementById('transCredit').value = transaction.credit || '';
     document.getElementById('transDate').value = transaction.transaction_date ? transaction.transaction_date.split('T')[0] : '';
     document.getElementById('transNotes').value = transaction.notes || '';
-    document.getElementById('transIsBill').checked = !transaction.is_done;  // If not done, it's an unpaid bill
 
     // Update modal title
     document.querySelector('#transactionModal .modal-title').textContent = 'Edit Transaction';
@@ -687,9 +684,6 @@ function saveTransaction() {
         }
     }
 
-    // Check if this is marked as an unpaid bill
-    const isBill = document.getElementById('transIsBill')?.checked || false;
-
     const data = {
         description: description,
         category_id: document.getElementById('transCategory')?.value || null,
@@ -698,8 +692,7 @@ function saveTransaction() {
         transaction_date: document.getElementById('transDate')?.value,
         notes: document.getElementById('transNotes')?.value,
         year: parseInt(year),
-        month: parseInt(month),
-        is_done: !isBill  // If it's a bill, set is_done to FALSE (unpaid)
+        month: parseInt(month)
     };
 
     console.log('Saving transaction with data:', data);
@@ -945,6 +938,10 @@ function loadAllReports(year, month, rangeType) {
         fetch(`/api/reports/top-spending?range=${rangeType}&year=${year}&month=${month}&limit=10`)
             .then(response => response.json())
             .then(data => updateTopSpendingChart(data)),
+
+        fetch(`/api/reports/savings-progress?year=${year}`)
+            .then(response => response.json())
+            .then(data => updateSavingsProgressChart(data)),
 
         fetch(`/api/reports/forecast?months=6`)
             .then(response => response.json())
@@ -1271,6 +1268,94 @@ function updateTopSpendingChart(data) {
             }
         }
     });
+}
+
+function updateSavingsProgressChart(data) {
+    const ctx = document.getElementById('savingsReportChart');
+    if (!ctx || !data) return;
+
+    if (charts.savingsReport) {
+        charts.savingsReport.destroy();
+    }
+
+    const labels = data.map(d => `${d.month_name} ${d.year}`);
+    const monthlySavings = data.map(d => d.monthly_savings || 0);
+    const cumulativeSavings = data.map(d => d.cumulative_savings || 0);
+
+    charts.savingsReport = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Monthly Savings',
+                data: monthlySavings,
+                backgroundColor: 'rgba(54, 162, 235, 0.8)',
+                yAxisID: 'y'
+            }, {
+                label: 'Cumulative Savings',
+                data: cumulativeSavings,
+                type: 'line',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                fill: true,
+                tension: 0.4,
+                yAxisID: 'y1'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    beginAtZero: true,
+                    ticks: {
+                        callback: value => 'LKR ' + value.toLocaleString()
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    beginAtZero: true,
+                    grid: {
+                        drawOnChartArea: false
+                    },
+                    ticks: {
+                        callback: value => 'LKR ' + value.toLocaleString()
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: ctx => ctx.dataset.label + ': LKR ' + ctx.parsed.y.toLocaleString()
+                    }
+                }
+            }
+        }
+    });
+
+    // Update savings table
+    const tbody = document.getElementById('savingsTableBody');
+    if (tbody) {
+        tbody.innerHTML = data.map(d => `
+            <tr>
+                <td>${d.month_name} ${d.year}</td>
+                <td>LKR ${(d.income || 0).toLocaleString()}</td>
+                <td>LKR ${(d.expenses || 0).toLocaleString()}</td>
+                <td class="${d.monthly_savings >= 0 ? 'text-success' : 'text-danger'}">
+                    LKR ${(d.monthly_savings || 0).toLocaleString()}
+                </td>
+                <td>${(d.savings_rate || 0).toFixed(1)}%</td>
+                <td class="${d.cumulative_savings >= 0 ? 'text-success' : 'text-danger'}">
+                    LKR ${(d.cumulative_savings || 0).toLocaleString()}
+                </td>
+            </tr>
+        `).join('');
+    }
 }
 
 function updateForecastChart(data) {
@@ -1684,279 +1769,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (manageCCModal) {
         manageCCModal.addEventListener('shown.bs.modal', loadCreditCardsList);
     }
-
-    // Check for new notifications every 5 minutes
-    setInterval(checkForNewNotifications, 5 * 60 * 1000);
-
-    // Update notification badge initially
-    setTimeout(updateNotificationBadge, 1000);
-
-    // Check for notifications on first load
-    setTimeout(checkForNewNotifications, 3000);
-
-    // Notification buttons
-    const markAllReadBtn = document.getElementById('markAllReadBtn');
-    if (markAllReadBtn) {
-        markAllReadBtn.addEventListener('click', () => {
-            fetch('/api/notifications/mark-all-read', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    loadNotifications();
-                    showToast('All notifications marked as read', 'success');
-                }
-            });
-        });
-    }
-
-    const refreshNotificationsBtn = document.getElementById('refreshNotificationsBtn');
-    if (refreshNotificationsBtn) {
-        refreshNotificationsBtn.addEventListener('click', () => {
-            checkForNewNotifications();
-            setTimeout(() => loadNotifications(), 500);
-        });
-    }
-
-    const savePreferencesBtn = document.getElementById('savePreferencesBtn');
-    if (savePreferencesBtn) {
-        savePreferencesBtn.addEventListener('click', savePreferences);
-    }
-
-    // Load preferences when modal is opened
-    const preferencesModal = document.getElementById('preferencesModal');
-    if (preferencesModal) {
-        preferencesModal.addEventListener('show.bs.modal', loadPreferences);
-    }
 });
-
-// ================================
-// NOTIFICATIONS FUNCTIONS
-// ================================
-
-function loadNotifications() {
-    showLoading();
-
-    Promise.all([
-        fetch('/api/notifications?limit=50')
-            .then(response => response.json()),
-        fetch('/api/preferences')
-            .then(response => response.json())
-    ])
-    .then(([notifications, preferences]) => {
-        displayNotifications(notifications);
-        hideLoading();
-        updateNotificationBadge();
-    })
-    .catch(error => {
-        hideLoading();
-        console.error('Error loading notifications:', error);
-        showToast('Error loading notifications', 'danger');
-    });
-}
-
-function displayNotifications(notifications) {
-    const notificationsList = document.getElementById('notificationsList');
-
-    if (!notifications || notifications.length === 0) {
-        notificationsList.innerHTML = `
-            <div class="text-center py-5 text-muted">
-                <i class="fas fa-bell-slash fa-3x mb-3"></i>
-                <p>No notifications yet</p>
-                <small>We'll notify you about upcoming bills, budget limits, and unusual spending</small>
-            </div>
-        `;
-        return;
-    }
-
-    notificationsList.innerHTML = notifications.map(notif => {
-        const severityColors = {
-            'info': 'primary',
-            'warning': 'warning',
-            'success': 'success',
-            'danger': 'danger'
-        };
-
-        const typeIcons = {
-            'bill_reminder': 'fa-file-invoice-dollar',
-            'budget_alert': 'fa-exclamation-triangle',
-            'unusual_spending': 'fa-chart-line',
-            'goal_milestone': 'fa-trophy',
-            'system': 'fa-info-circle'
-        };
-
-        const color = severityColors[notif.severity] || 'secondary';
-        const icon = typeIcons[notif.type] || 'fa-bell';
-        const isRead = notif.is_read;
-        const readClass = isRead ? 'opacity-75' : '';
-
-        return `
-            <div class="list-group-item ${readClass}" data-notification-id="${notif.id}">
-                <div class="d-flex w-100 justify-content-between">
-                    <h6 class="mb-1">
-                        <i class="fas ${icon} text-${color} me-2"></i>
-                        ${notif.title}
-                        ${!isRead ? '<span class="badge bg-primary ms-2">New</span>' : ''}
-                    </h6>
-                    <small class="text-muted">${timeAgo(notif.created_at)}</small>
-                </div>
-                <p class="mb-1">${notif.message}</p>
-                <div class="d-flex justify-content-end gap-2">
-                    ${!isRead ? `
-                        <button class="btn btn-sm btn-outline-primary mark-read-btn" data-id="${notif.id}">
-                            <i class="fas fa-check"></i> Mark Read
-                        </button>
-                    ` : ''}
-                    <button class="btn btn-sm btn-outline-danger delete-notif-btn" data-id="${notif.id}">
-                        <i class="fas fa-trash"></i> Delete
-                    </button>
-                </div>
-            </div>
-        `;
-    }).join('');
-
-    // Attach event listeners
-    document.querySelectorAll('.mark-read-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            markNotificationRead(this.dataset.id);
-        });
-    });
-
-    document.querySelectorAll('.delete-notif-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            deleteNotification(this.dataset.id);
-        });
-    });
-}
-
-function markNotificationRead(notificationId) {
-    fetch(`/api/notifications/${notificationId}/read`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            loadNotifications();
-        }
-    })
-    .catch(error => {
-        console.error('Error marking notification as read:', error);
-        showToast('Error updating notification', 'danger');
-    });
-}
-
-function deleteNotification(notificationId) {
-    if (!confirm('Delete this notification?')) return;
-
-    fetch(`/api/notifications/${notificationId}`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            loadNotifications();
-            showToast('Notification deleted', 'success');
-        }
-    })
-    .catch(error => {
-        console.error('Error deleting notification:', error);
-        showToast('Error deleting notification', 'danger');
-    });
-}
-
-function updateNotificationBadge() {
-    fetch('/api/notifications?unread_only=true')
-        .then(response => response.json())
-        .then(notifications => {
-            const badge = document.getElementById('notificationBadge');
-            if (notifications && notifications.length > 0) {
-                badge.textContent = notifications.length;
-                badge.style.display = 'inline-block';
-            } else {
-                badge.style.display = 'none';
-            }
-        })
-        .catch(error => {
-            console.error('Error updating notification badge:', error);
-        });
-}
-
-function checkForNewNotifications() {
-    fetch('/api/notifications/check', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success && data.new_notifications > 0) {
-            updateNotificationBadge();
-            showToast(`${data.new_notifications} new notification(s)`, 'info');
-        }
-    })
-    .catch(error => {
-        console.error('Error checking notifications:', error);
-    });
-}
-
-function loadPreferences() {
-    fetch('/api/preferences')
-        .then(response => response.json())
-        .then(prefs => {
-            document.getElementById('enableBillReminders').checked = prefs.enable_bill_reminders;
-            document.getElementById('billReminderDays').value = prefs.bill_reminder_days_before || 3;
-            document.getElementById('enableBudgetAlerts').checked = prefs.enable_budget_alerts;
-            document.getElementById('monthlyBudgetLimit').value = prefs.monthly_budget_limit || '';
-            document.getElementById('enableUnusualSpending').checked = prefs.enable_unusual_spending_detection;
-            document.getElementById('unusualSpendingThreshold').value = prefs.unusual_spending_threshold_percentage || 150;
-        })
-        .catch(error => {
-            console.error('Error loading preferences:', error);
-        });
-}
-
-function savePreferences() {
-    const prefs = {
-        enable_bill_reminders: document.getElementById('enableBillReminders').checked,
-        bill_reminder_days_before: parseInt(document.getElementById('billReminderDays').value),
-        enable_budget_alerts: document.getElementById('enableBudgetAlerts').checked,
-        monthly_budget_limit: document.getElementById('monthlyBudgetLimit').value ? parseFloat(document.getElementById('monthlyBudgetLimit').value) : null,
-        enable_unusual_spending_detection: document.getElementById('enableUnusualSpending').checked,
-        unusual_spending_threshold_percentage: parseInt(document.getElementById('unusualSpendingThreshold').value)
-    };
-
-    fetch('/api/preferences', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(prefs)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showToast('Preferences saved successfully', 'success');
-            bootstrap.Modal.getInstance(document.getElementById('preferencesModal')).hide();
-        }
-    })
-    .catch(error => {
-        console.error('Error saving preferences:', error);
-        showToast('Error saving preferences', 'danger');
-    });
-}
-
-function timeAgo(dateString) {
-    const date = new Date(dateString);
-    const now = new Date();
-    const seconds = Math.floor((now - date) / 1000);
-
-    if (seconds < 60) return 'just now';
-    if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`;
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
-    if (seconds < 604800) return `${Math.floor(seconds / 86400)} days ago`;
-    return date.toLocaleDateString();
-}
 
 // Note: formatCurrency, formatDate, showLoading, hideLoading, showToast
 // are defined in base.html and available globally
