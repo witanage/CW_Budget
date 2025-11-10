@@ -1292,7 +1292,7 @@ def delete_payment_method(method_id):
 @app.route('/api/transactions/<int:transaction_id>/mark-done', methods=['POST'])
 @login_required
 def mark_transaction_done(transaction_id):
-    """Mark a transaction as done with payment method."""
+    """Mark a transaction as done with payment method and optional geolocation."""
     connection = get_db_connection()
     if not connection:
         return jsonify({'error': 'Database connection failed'}), 500
@@ -1302,15 +1302,21 @@ def mark_transaction_done(transaction_id):
     try:
         data = request.get_json()
         payment_method_id = data.get('payment_method_id')
+        latitude = data.get('latitude')
+        longitude = data.get('longitude')
+        accuracy = data.get('accuracy')
 
         cursor.execute("""
             UPDATE transactions
             SET is_done = TRUE,
                 payment_method_id = %s,
-                marked_done_at = CURRENT_TIMESTAMP
+                marked_done_at = CURRENT_TIMESTAMP,
+                done_latitude = %s,
+                done_longitude = %s,
+                done_location_accuracy = %s
             WHERE id = %s AND monthly_record_id IN
                 (SELECT id FROM monthly_records WHERE user_id = %s)
-        """, (payment_method_id, transaction_id, session['user_id']))
+        """, (payment_method_id, latitude, longitude, accuracy, transaction_id, session['user_id']))
 
         connection.commit()
         return jsonify({'message': 'Transaction marked as done'})
@@ -1353,7 +1359,7 @@ def mark_transaction_undone(transaction_id):
 @app.route('/api/transactions/<int:transaction_id>/mark-paid', methods=['POST'])
 @login_required
 def mark_transaction_paid(transaction_id):
-    """Mark a transaction as paid (when description cell is clicked)."""
+    """Mark a transaction as paid (when description cell is clicked) with optional geolocation."""
     connection = get_db_connection()
     if not connection:
         return jsonify({'error': 'Database connection failed'}), 500
@@ -1363,6 +1369,9 @@ def mark_transaction_paid(transaction_id):
     try:
         data = request.get_json()
         payment_method_id = data.get('payment_method_id')
+        latitude = data.get('latitude')
+        longitude = data.get('longitude')
+        accuracy = data.get('accuracy')
 
         cursor.execute("""
             UPDATE transactions
@@ -1370,10 +1379,13 @@ def mark_transaction_paid(transaction_id):
                 is_paid = TRUE,
                 payment_method_id = %s,
                 marked_done_at = CURRENT_TIMESTAMP,
-                paid_at = CURRENT_TIMESTAMP
+                paid_at = CURRENT_TIMESTAMP,
+                paid_latitude = %s,
+                paid_longitude = %s,
+                paid_location_accuracy = %s
             WHERE id = %s AND monthly_record_id IN
                 (SELECT id FROM monthly_records WHERE user_id = %s)
-        """, (payment_method_id, transaction_id, session['user_id']))
+        """, (payment_method_id, latitude, longitude, accuracy, transaction_id, session['user_id']))
 
         connection.commit()
         return jsonify({'message': 'Transaction marked as paid'})
