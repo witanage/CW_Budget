@@ -137,7 +137,7 @@ font-size: 0.8rem;
 }
 
 .sidebar {
-min-height: calc(100vh - 56px);
+min-height: calc(100vh - 50px);
 background: var(--sidebar-bg);
 box-shadow: 2px 0 20px rgba(0,0,0,0.15);
 padding: 20px 0;
@@ -199,15 +199,39 @@ padding: 20px;
 }
 
 /* Compact card for transaction table page */
+#transactionsPage {
+height: calc(100vh - 120px);
+display: flex;
+flex-direction: column;
+}
+
+#transactionsPage .card {
+flex: 1;
+display: flex;
+flex-direction: column;
+margin: 0;
+height: 100%;
+}
+
 #transactionsPage .card-header {
 padding: 10px 16px;
+flex-shrink: 0;
 }
 
 #transactionsPage .card-body {
 padding: 12px;
+flex: 1;
+display: flex;
+flex-direction: column;
+overflow: hidden;
 }
 
 /* Reduce margins in transaction page controls */
+#transactionsPage .card-body > .row:first-child {
+flex-shrink: 0;
+margin-bottom: 0.75rem !important;
+}
+
 #transactionsPage .row.mb-3 {
 margin-bottom: 0.75rem !important;
 align-items: center;
@@ -485,9 +509,10 @@ margin-top: 0;
 
 /* Scrollable table container - only table scrolls */
 #transactionsPage .table-responsive {
-max-height: calc(100vh - 280px);
+flex: 1;
 overflow-y: auto;
 overflow-x: auto;
+min-height: 0;
 }
 
 /* Other pages table responsive */
@@ -613,7 +638,8 @@ font-weight: bold;
 main.col-md-9 {
 padding-left: 2rem;
 padding-right: 2rem;
-padding-top: 1.5rem;
+padding-top: 1rem;
+padding-bottom: 1rem;
 }
 
 /* Prevent content overlap with navbar */
