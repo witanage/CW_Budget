@@ -1,0 +1,819 @@
+/* Dark theme (default) */
+:root[data-theme="dark"] {
+--bg-primary: #1a1a1a;
+--bg-secondary: #2d2d2d;
+--bg-tertiary: #3d3d3d;
+--bg-quaternary: #4d4d4d;
+--text-primary: #ffffff;
+--text-secondary: #cccccc;
+--border-color: #555555;
+--accent-color: #007acc;
+--success-color: #28a745;
+--warning-color: #ffc107;
+--danger-color: #dc3545;
+--shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+--radius: 8px;
+--transition: all 0.3s ease;
+--gradient-start: #0a0a0a;
+--gradient-end: #1a1a1a;
+--glass-bg: rgba(45, 45, 45, 0.7);
+--glass-border: rgba(85, 85, 85, 0.3);
+--code-bg: #1a1a1a;
+--code-border: #555555;
+
+/* Legacy compatibility */
+--primary-color: #007acc;
+--sidebar-bg: linear-gradient(180deg, #2d2d2d 0%, #1a1a1a 100%);
+--sidebar-hover: #3d3d3d;
+--card-bg: #2d2d2d;
+--card-header-bg: linear-gradient(135deg, #3d3d3d, #2d2d2d);
+--table-bg: #2d2d2d;
+--table-hover: rgba(8, 102, 255, 0.08);
+--input-bg: #3d3d3d;
+--input-border: #555555;
+--modal-bg: #2d2d2d;
+--navbar-bg: linear-gradient(135deg, #3d3d3d 0%, #2d2d2d 100%);
+--card-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Light theme */
+:root[data-theme="light"] {
+--bg-primary: #F8FAFC;
+--bg-secondary: #D9EAFD;
+--bg-tertiary: #BCCCDC;
+--bg-quaternary: #9AA6B2;
+--text-primary: #1c1e21;
+--text-secondary: #5f6368;
+--border-color: #BCCCDC;
+--accent-color: #0866ff;
+--success-color: #42b883;
+--warning-color: #f0ad4e;
+--danger-color: #d9534f;
+--shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+--radius: 8px;
+--transition: all 0.3s ease;
+--gradient-start: #D9EAFD;
+--gradient-end: #F8FAFC;
+--glass-bg: rgba(248, 250, 252, 0.8);
+--glass-border: rgba(188, 204, 220, 0.4);
+--code-bg: #f5f5f5;
+--code-border: #ddd;
+
+/* Legacy compatibility */
+--primary-color: #0866ff;
+--sidebar-bg: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+--sidebar-hover: #D9EAFD;
+--card-bg: #ffffff;
+--card-header-bg: linear-gradient(135deg, #f8fafc, #D9EAFD);
+--table-bg: #ffffff;
+--table-hover: rgba(8, 102, 255, 0.08);
+--input-bg: #ffffff;
+--input-border: #BCCCDC;
+--modal-bg: #ffffff;
+--navbar-bg: linear-gradient(135deg, #0866ff 0%, #0645b8 100%);
+--card-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Default to dark theme */
+:root {
+--bg-primary: #1a1a1a;
+--bg-secondary: #2d2d2d;
+--bg-tertiary: #3d3d3d;
+--bg-quaternary: #4d4d4d;
+--text-primary: #ffffff;
+--text-secondary: #cccccc;
+--border-color: #555555;
+--accent-color: #007acc;
+--success-color: #28a745;
+--warning-color: #ffc107;
+--danger-color: #dc3545;
+--shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+--radius: 8px;
+--transition: all 0.3s ease;
+--gradient-start: #0a0a0a;
+--gradient-end: #1a1a1a;
+--glass-bg: rgba(45, 45, 45, 0.7);
+--glass-border: rgba(85, 85, 85, 0.3);
+--code-bg: #1a1a1a;
+--code-border: #555555;
+
+/* Legacy compatibility */
+--primary-color: #007acc;
+--sidebar-bg: linear-gradient(180deg, #2d2d2d 0%, #1a1a1a 100%);
+--sidebar-hover: #3d3d3d;
+--card-bg: #2d2d2d;
+--card-header-bg: linear-gradient(135deg, #3d3d3d, #2d2d2d);
+--table-bg: #2d2d2d;
+--table-hover: rgba(8, 102, 255, 0.08);
+--input-bg: #3d3d3d;
+--input-border: #555555;
+--modal-bg: #2d2d2d;
+--navbar-bg: linear-gradient(135deg, #3d3d3d 0%, #2d2d2d 100%);
+--card-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+body {
+background-color: var(--bg-primary);
+color: var(--text-primary);
+font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+transition: background-color 0.3s, color 0.3s;
+}
+
+.navbar {
+background: var(--navbar-bg);
+box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+}
+
+.navbar-brand {
+font-weight: bold;
+font-size: 1.5rem;
+}
+
+.sidebar {
+min-height: calc(100vh - 56px);
+background: var(--sidebar-bg);
+box-shadow: 2px 0 20px rgba(0,0,0,0.15);
+padding: 20px 0;
+border-right: 1px solid var(--border-color);
+}
+
+.sidebar .nav-link {
+color: var(--text-primary);
+padding: 14px 24px;
+margin: 4px 12px;
+border-radius: 8px;
+transition: all 0.3s ease;
+font-weight: 500;
+}
+
+.sidebar .nav-link:hover {
+background-color: var(--sidebar-hover);
+color: #ffffff;
+transform: translateX(4px);
+}
+
+.sidebar .nav-link.active {
+background-color: #2a2a2a;
+color: white;
+box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+border-left: 3px solid #4a4a4a;
+}
+
+.card {
+border: 1px solid var(--border-color);
+border-radius: 16px;
+background-color: var(--card-bg);
+color: var(--text-primary);
+box-shadow: var(--card-shadow);
+transition: transform 0.3s ease, box-shadow 0.3s ease;
+overflow: hidden;
+}
+
+.card:hover {
+transform: translateY(-4px);
+box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="dark"] .card:hover {
+box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.7), 0 10px 10px -5px rgba(0, 0, 0, 0.5);
+}
+
+.card-header {
+background: var(--card-header-bg);
+color: var(--text-primary);
+border-bottom: 1px solid var(--border-color);
+font-weight: 600;
+padding: 16px 20px;
+}
+
+.card-body {
+background-color: var(--card-bg);
+padding: 20px;
+}
+
+/* Compact card for transaction table page */
+#transactionsPage .card-header {
+padding: 10px 16px;
+}
+
+#transactionsPage .card-body {
+padding: 12px;
+}
+
+/* Reduce margins in transaction page controls */
+#transactionsPage .row.mb-3 {
+margin-bottom: 0.75rem !important;
+align-items: center;
+}
+
+#transactionsPage .btn {
+padding: 6px 12px;
+font-size: 0.875rem;
+height: 34px;
+}
+
+#transactionsPage .form-select {
+padding: 6px 10px;
+font-size: 0.875rem;
+height: 34px;
+}
+
+/* Ensure all controls in transaction controller bar align */
+#transactionsPage .card-body > .row:first-child .col-md-2,
+#transactionsPage .card-body > .row:first-child .col-md-1 {
+display: flex;
+align-items: center;
+}
+
+/* Month navigation buttons */
+#prevMonthBtn, #nextMonthBtn {
+width: 100%;
+background-color: #2a2a2a;
+border-color: #3a3a3a;
+color: #ffffff;
+}
+
+#prevMonthBtn:hover, #nextMonthBtn:hover {
+background-color: #3a3a3a;
+border-color: #4a4a4a;
+}
+
+.stat-card {
+position: relative;
+overflow: hidden;
+}
+
+.stat-card::before {
+content: '';
+position: absolute;
+top: 0;
+right: -50px;
+width: 100px;
+height: 100%;
+background: rgba(255,255,255,0.03);
+transform: skewX(-25deg);
+}
+
+/* Smaller stat cards */
+.stat-card .card-body {
+padding: 12px 16px;
+}
+
+.stat-card h6 {
+font-size: 0.75rem;
+margin-bottom: 0.3rem !important;
+}
+
+.stat-card h3 {
+font-size: 1.3rem;
+margin-bottom: 0 !important;
+}
+
+.stat-icon {
+font-size: 2rem;
+opacity: 0.15;
+position: absolute;
+right: 15px;
+top: 15px;
+}
+
+/* Smaller chart cards */
+#overviewPage .card-header {
+padding: 10px 16px;
+}
+
+#overviewPage .card-body {
+padding: 15px;
+}
+
+#overviewPage .row.mb-4 {
+margin-bottom: 1rem !important;
+}
+
+#overviewPage .row.mb-3 {
+margin-bottom: 0.75rem !important;
+}
+
+/* Reduce chart height */
+.chart-container {
+height: 250px !important;
+}
+
+#trendChart {
+max-height: 250px;
+}
+
+/* Dark theme buttons */
+.btn-gradient, .btn-primary, .btn-success, .btn-info, .btn-warning, .btn-danger {
+background-color: #2a2a2a;
+border-color: #3a3a3a;
+color: #ffffff;
+transition: all 0.3s ease;
+font-weight: 500;
+}
+
+.btn-gradient:hover, .btn-primary:hover, .btn-success:hover, .btn-info:hover, .btn-warning:hover, .btn-danger:hover {
+background-color: #3a3a3a;
+border-color: #4a4a4a;
+color: #ffffff;
+transform: translateY(-2px);
+box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
+}
+
+.btn {
+border-radius: 8px;
+padding: 10px 20px;
+font-weight: 500;
+transition: all 0.3s ease;
+background-color: #2a2a2a;
+border-color: #3a3a3a;
+color: #ffffff;
+}
+
+.btn:hover {
+transform: translateY(-2px);
+background-color: #3a3a3a;
+border-color: #4a4a4a;
+}
+
+.btn-sm {
+background-color: #2a2a2a;
+border-color: #3a3a3a;
+color: #ffffff;
+}
+
+.btn-sm:hover {
+background-color: #3a3a3a;
+border-color: #4a4a4a;
+color: #ffffff;
+}
+
+/* Tables */
+.table {
+color: var(--text-primary);
+}
+
+.table-hover tbody tr {
+background-color: var(--table-bg);
+}
+
+.table-hover tbody tr:hover {
+background-color: var(--table-hover);
+}
+
+.table thead th {
+border-color: var(--border-color);
+background-color: var(--card-bg);
+color: var(--text-primary);
+position: sticky;
+top: 0;
+z-index: 10;
+}
+
+/* Sticky header for transactions table */
+#transactionsTable thead th {
+position: sticky;
+top: 0;
+z-index: 10;
+background-color: var(--card-bg);
+color: var(--text-primary);
+border-bottom: 2px solid var(--border-color);
+padding: 6px 4px !important;
+font-size: 0.8rem;
+font-weight: normal;
+}
+
+/* Fixed table layout for consistent column widths */
+#transactionsTable {
+table-layout: fixed;
+width: 100%;
+}
+
+/* Fixed column widths */
+#transactionsTable thead th:nth-child(1) { width: 50px; }   /* Method checkbox */
+#transactionsTable thead th:nth-child(2) { width: 60px; }   /* ID */
+#transactionsTable thead th:nth-child(3) { width: 250px; }  /* Description */
+#transactionsTable thead th:nth-child(4) { width: 120px; }  /* Category */
+#transactionsTable thead th:nth-child(5) { width: 100px; }  /* Debit */
+#transactionsTable thead th:nth-child(6) { width: 100px; }  /* Credit */
+#transactionsTable thead th:nth-child(7) { width: 110px; }  /* Balance */
+#transactionsTable thead th:nth-child(8) { width: 150px; }  /* Notes */
+#transactionsTable thead th:nth-child(9) { width: 120px; }  /* Actions */
+
+/* Compact transaction table rows with fixed height */
+#transactionsTable tbody tr {
+height: 28px;
+max-height: 28px;
+}
+
+#transactionsTable tbody td {
+padding: 4px 4px !important;
+font-size: 0.8rem;
+vertical-align: middle;
+overflow: hidden;
+max-height: 28px;
+}
+
+/* Remove bold from balance column */
+#transactionsTable .fw-bold {
+font-weight: normal !important;
+}
+
+/* Description column - allow wrapping with fixed height */
+#transactionsTable tbody td:nth-child(3) {
+white-space: normal;
+word-wrap: break-word;
+line-height: 1.2;
+max-height: 28px;
+overflow: hidden;
+}
+
+/* Modern action icons in transaction table */
+#transactionsTable .btn-sm {
+padding: 4px 6px;
+font-size: 0.85rem;
+border: none;
+background: transparent;
+border-radius: 4px;
+transition: all 0.2s ease;
+cursor: pointer;
+}
+
+#transactionsTable .btn-primary {
+color: #0d6efd;
+}
+
+#transactionsTable .btn-primary:hover {
+background-color: rgba(13, 110, 253, 0.1);
+color: #0d6efd;
+transform: scale(1.1);
+}
+
+#transactionsTable .btn-danger {
+color: #dc3545;
+}
+
+#transactionsTable .btn-danger:hover {
+background-color: rgba(220, 53, 69, 0.1);
+color: #dc3545;
+transform: scale(1.1);
+}
+
+#transactionsTable .btn-sm i {
+font-size: 0.9rem;
+}
+
+/* Smaller badges in transaction table */
+#transactionsTable .badge {
+padding: 1px 6px;
+font-size: 0.65rem;
+}
+
+/* Smaller checkbox in transaction table */
+#transactionsTable .form-check-input {
+width: 14px;
+height: 14px;
+margin-top: 0;
+}
+
+/* Scrollable table container - only table scrolls */
+#transactionsPage .table-responsive {
+max-height: calc(100vh - 280px);
+overflow-y: auto;
+overflow-x: auto;
+}
+
+/* Other pages table responsive */
+.table-responsive {
+overflow-y: auto;
+overflow-x: auto;
+}
+
+.table td, .table th {
+border-color: var(--border-color);
+}
+
+/* Transaction highlighting - Keep original colors in both themes */
+.transaction-highlighted td {
+/* No filter - keep payment method colors vibrant and unchanged */
+}
+
+[data-theme="light"] .transaction-highlighted td {
+filter: brightness(0.95) !important;
+}
+
+/* Dark theme: Transaction table uses same styling as light theme */
+/* No custom dark theme styling - keeps light theme appearance for consistency */
+
+.badge {
+padding: 5px 10px;
+border-radius: 20px;
+}
+
+.income-badge {
+background-color: var(--success-color);
+}
+
+.expense-badge {
+background-color: var(--danger-color);
+}
+
+/* Forms */
+.form-control, .form-select {
+background-color: var(--input-bg);
+border: 1px solid var(--input-border);
+border-radius: 8px;
+color: var(--text-primary);
+padding: 10px 14px;
+transition: all 0.3s ease;
+}
+
+.form-control:focus, .form-select:focus {
+background-color: var(--input-bg);
+border-color: var(--primary-color);
+color: var(--text-primary);
+box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+outline: none;
+}
+
+/* Fix text overlap in centered form-select dropdowns */
+.form-select.text-center {
+padding-left: 30px;
+padding-right: 30px;
+text-align: center;
+text-align-last: center;
+}
+
+.form-label {
+color: var(--text-primary);
+font-weight: 500;
+margin-bottom: 8px;
+}
+
+textarea.form-control {
+background-color: var(--input-bg);
+color: var(--text-primary);
+}
+
+/* Modals */
+.modal-content {
+background-color: var(--modal-bg);
+color: var(--text-primary);
+border: 1px solid var(--border-color);
+border-radius: 16px;
+box-shadow: var(--card-shadow);
+}
+
+.modal-header {
+background: var(--card-header-bg);
+border-bottom: 1px solid var(--border-color);
+border-radius: 16px 16px 0 0;
+padding: 20px 24px;
+}
+
+.modal-footer {
+background: var(--card-header-bg);
+border-top: 1px solid var(--border-color);
+border-radius: 0 0 16px 16px;
+padding: 16px 24px;
+}
+
+.modal-body {
+padding: 24px;
+}
+
+.modal-title {
+font-weight: 600;
+font-size: 1.25rem;
+}
+
+[data-theme="dark"] .btn-close {
+filter: invert(1);
+}
+
+.progress {
+height: 25px;
+border-radius: 15px;
+background-color: var(--bg-tertiary);
+}
+
+.progress-bar {
+font-size: 0.9rem;
+font-weight: bold;
+}
+
+/* Fix main content alignment */
+main.col-md-9 {
+padding-left: 2rem;
+padding-right: 2rem;
+padding-top: 1.5rem;
+}
+
+/* Prevent content overlap with navbar */
+.container-fluid {
+padding-top: 1rem;
+}
+
+/* Fix controller bar button alignment */
+.card-header .row {
+align-items: center;
+}
+
+.card-header .col,
+.card-header .col-auto {
+display: flex;
+align-items: center;
+}
+
+/* Fix form controls alignment in rows */
+.row .form-select,
+.row .btn {
+height: 38px;
+}
+
+/* Ensure consistent button sizing in button groups */
+.btn-group .btn,
+.row .btn {
+vertical-align: middle;
+}
+
+@media (max-width: 768px) {
+.sidebar {
+min-height: auto;
+}
+
+main.col-md-9 {
+padding-left: 1rem;
+padding-right: 1rem;
+}
+}
+
+.chart-container {
+position: relative;
+height: 400px;
+width: 100%;
+}
+
+.loading-spinner {
+display: none;
+position: fixed;
+top: 50%;
+left: 50%;
+transform: translate(-50%, -50%);
+z-index: 9999;
+}
+
+.loading-spinner.active {
+display: block;
+}
+
+.toast-container {
+position: fixed;
+top: 80px;
+right: 20px;
+z-index: 9999;
+}
+
+/* Transaction row highlighting for payment methods */
+.transaction-highlighted {
+font-weight: 500;
+}
+
+.transaction-highlighted td {
+border-color: rgba(0,0,0,0.1) !important;
+}
+
+/* Hover effect - slightly darker for both themes */
+[data-theme="light"] .transaction-highlighted:hover td {
+filter: brightness(0.95) !important;
+}
+
+[data-theme="dark"] .transaction-highlighted:hover td {
+filter: brightness(0.95) !important;
+}
+
+/* List Groups */
+.list-group-item {
+background-color: var(--card-bg);
+border-color: var(--border-color);
+color: var(--text-primary);
+}
+
+.list-group-item:hover {
+background-color: var(--table-hover);
+}
+
+.list-group-item-action:hover {
+background-color: var(--table-hover);
+color: var(--primary-color);
+}
+
+/* Alerts */
+[data-theme="light"] .alert-info {
+background-color: #d1ecf1;
+border-color: #bee5eb;
+color: #0c5460;
+}
+
+[data-theme="dark"] .alert-info {
+background-color: #1a3a42;
+border-color: var(--primary-color);
+color: var(--text-primary);
+}
+
+[data-theme="light"] .alert-warning {
+background-color: #fff3cd;
+border-color: #ffeaa7;
+color: #856404;
+}
+
+[data-theme="dark"] .alert-warning {
+background-color: #3d2800;
+border-color: var(--warning-color);
+color: var(--text-primary);
+}
+
+[data-theme="light"] .alert-danger {
+background-color: #f8d7da;
+border-color: #f5c6cb;
+color: #721c24;
+}
+
+[data-theme="dark"] .alert-danger {
+background-color: #3d0800;
+border-color: var(--danger-color);
+color: var(--text-primary);
+}
+
+[data-theme="light"] .alert-success {
+background-color: #d4edda;
+border-color: #c3e6cb;
+color: #155724;
+}
+
+[data-theme="dark"] .alert-success {
+background-color: #0d3d1f;
+border-color: var(--success-color);
+color: var(--text-primary);
+}
+
+.payment-method-list-item {
+cursor: pointer;
+transition: all 0.2s;
+}
+
+.payment-method-list-item:hover {
+background-color: var(--table-hover);
+transform: translateX(5px);
+}
+
+.payment-method-color-indicator {
+width: 30px;
+height: 30px;
+border-radius: 5px;
+display: inline-block;
+margin-right: 10px;
+}
+
+.credit-card-item {
+display: flex;
+align-items: center;
+padding: 10px;
+border: 1px solid var(--border-color);
+border-radius: 5px;
+margin-bottom: 10px;
+background-color: var(--card-bg);
+color: var(--text-primary);
+}
+
+.credit-card-color {
+width: 40px;
+height: 40px;
+border-radius: 5px;
+margin-right: 15px;
+}
+
+/* Dropdown */
+.dropdown-menu {
+background-color: var(--card-bg);
+border-color: var(--border-color);
+}
+
+.dropdown-item {
+color: var(--text-primary);
+}
+
+.dropdown-item:hover {
+background-color: var(--table-hover);
+color: var(--primary-color);
+}
+
+/* Theme Toggle Icon */
+.theme-toggle-icon {
+cursor: pointer;
+transition: transform 0.3s;
+}
+
+.theme-toggle-icon:hover {
+transform: rotate(20deg);
+}

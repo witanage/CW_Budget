@@ -1,0 +1,17 @@
+.table-hover tbody tr:hover {
+background-color: var(--table-hover) !important;
+}
+
+.btn-group-sm > .btn {
+padding: 0.25rem 0.5rem;
+font-size: 0.875rem;
+}
+
+.card {
+margin-bottom: 1.5rem;
+}
+
+.badge {
+padding: 0.35em 0.65em;
+font-size: 0.875em;
+}
