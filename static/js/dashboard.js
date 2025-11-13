@@ -963,9 +963,9 @@ function loadAllReports(year, month, rangeType) {
             .then(response => response.json())
             .then(data => updateMonthlyReportChart(data)),
 
-        fetch(`/api/reports/category-breakdown?year=${year}&month=${month}`)
+        fetch(`/api/reports/category-breakdown?range=${rangeType}&year=${year}&month=${month}`)
             .then(response => response.json())
-            .then(data => updateCategoryReportChart(data)),
+            .then(data => updateCategoryReportChart(data, rangeType)),
 
         fetch(`/api/reports/cash-flow?range=${rangeType}&year=${year}&month=${month}`)
             .then(response => response.json())
@@ -1124,7 +1124,7 @@ function updateMonthlyReportChart(data) {
     });
 }
 
-function updateCategoryReportChart(data) {
+function updateCategoryReportChart(data, rangeType) {
     const ctx = document.getElementById('categoryReportChart');
     if (!ctx || !data) return;
 
@@ -1132,44 +1132,285 @@ function updateCategoryReportChart(data) {
         charts.categoryReport.destroy();
     }
 
-    const expenseData = data.filter(d => d.type === 'expense');
-    const labels = expenseData.map(d => d.category);
-    const amounts = expenseData.map(d => d.amount);
+    // Update summary table
+    updateCategoryReportTable(data);
 
-    charts.categoryReport = new Chart(ctx, {
-        type: 'pie',
-        data: {
-            labels: labels,
-            datasets: [{
-                data: amounts,
-                backgroundColor: [
-                    'rgba(255, 99, 132, 0.8)',
-                    'rgba(54, 162, 235, 0.8)',
-                    'rgba(255, 206, 86, 0.8)',
-                    'rgba(75, 192, 192, 0.8)',
-                    'rgba(153, 102, 255, 0.8)',
-                    'rgba(255, 159, 64, 0.8)',
-                    'rgba(201, 203, 207, 0.8)',
-                    'rgba(255, 99, 71, 0.8)',
-                    'rgba(144, 238, 144, 0.8)',
-                    'rgba(135, 206, 250, 0.8)'
-                ]
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: { position: 'right' },
-                tooltip: {
-                    callbacks: {
-                        label: ctx => {
-                            return ctx.label + ': LKR ' + ctx.parsed.toLocaleString();
+    // Process data based on range type
+    if (rangeType === 'weekly') {
+        // Group by week and category
+        const weeklyData = {};
+        data.forEach(item => {
+            const weekKey = `Week ${item.week_num} (${item.week_start} to ${item.week_end})`;
+            if (!weeklyData[weekKey]) {
+                weeklyData[weekKey] = { income: {}, expense: {} };
+            }
+            if (item.type === 'income' && item.income > 0) {
+                weeklyData[weekKey].income[item.category] = parseFloat(item.income);
+            } else if (item.type === 'expense' && item.expense > 0) {
+                weeklyData[weekKey].expense[item.category] = parseFloat(item.expense);
+            }
+        });
+
+        // Get all unique categories
+        const allCategories = [...new Set(data.map(d => d.category))];
+        const weeks = Object.keys(weeklyData);
+
+        // Create datasets for each category
+        const datasets = allCategories.map((category, index) => {
+            const categoryData = weeks.map(week => {
+                const expense = weeklyData[week].expense[category] || 0;
+                const income = weeklyData[week].income[category] || 0;
+                return expense > 0 ? expense : income;
+            });
+
+            return {
+                label: category,
+                data: categoryData,
+                backgroundColor: getColorForIndex(index),
+                stack: 'stack1'
+            };
+        });
+
+        charts.categoryReport = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: weeks,
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top' },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => {
+                                return ctx.dataset.label + ': LKR ' + ctx.parsed.y.toLocaleString();
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: { stacked: true },
+                    y: {
+                        stacked: true,
+                        beginAtZero: true,
+                        ticks: {
+                            callback: value => 'LKR ' + value.toLocaleString()
                         }
                     }
                 }
             }
+        });
+    } else if (rangeType === 'yearly') {
+        // Group by year and category
+        const yearlyData = {};
+        data.forEach(item => {
+            const yearKey = item.year.toString();
+            if (!yearlyData[yearKey]) {
+                yearlyData[yearKey] = { income: {}, expense: {} };
+            }
+            if (item.type === 'income' && item.income > 0) {
+                yearlyData[yearKey].income[item.category] = parseFloat(item.income);
+            } else if (item.type === 'expense' && item.expense > 0) {
+                yearlyData[yearKey].expense[item.category] = parseFloat(item.expense);
+            }
+        });
+
+        // Get all unique categories
+        const allCategories = [...new Set(data.map(d => d.category))];
+        const years = Object.keys(yearlyData).sort();
+
+        // Create datasets for each category
+        const datasets = allCategories.map((category, index) => {
+            const categoryData = years.map(year => {
+                const expense = yearlyData[year].expense[category] || 0;
+                const income = yearlyData[year].income[category] || 0;
+                return expense > 0 ? expense : income;
+            });
+
+            return {
+                label: category,
+                data: categoryData,
+                backgroundColor: getColorForIndex(index),
+                stack: 'stack1'
+            };
+        });
+
+        charts.categoryReport = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: years,
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top' },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => {
+                                return ctx.dataset.label + ': LKR ' + ctx.parsed.y.toLocaleString();
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: { stacked: true },
+                    y: {
+                        stacked: true,
+                        beginAtZero: true,
+                        ticks: {
+                            callback: value => 'LKR ' + value.toLocaleString()
+                        }
+                    }
+                }
+            }
+        });
+    } else {
+        // Monthly view - Group by month and category
+        const monthlyData = {};
+        data.forEach(item => {
+            const monthKey = `${item.month_name} ${item.year}`;
+            if (!monthlyData[monthKey]) {
+                monthlyData[monthKey] = { income: {}, expense: {}, monthNum: item.month };
+            }
+            if (item.type === 'income' && item.income > 0) {
+                monthlyData[monthKey].income[item.category] = parseFloat(item.income);
+            } else if (item.type === 'expense' && item.expense > 0) {
+                monthlyData[monthKey].expense[item.category] = parseFloat(item.expense);
+            }
+        });
+
+        // Get all unique categories
+        const allCategories = [...new Set(data.map(d => d.category))];
+        const months = Object.keys(monthlyData).sort((a, b) =>
+            monthlyData[a].monthNum - monthlyData[b].monthNum
+        );
+
+        // Create datasets for each category
+        const datasets = allCategories.map((category, index) => {
+            const categoryData = months.map(month => {
+                const expense = monthlyData[month].expense[category] || 0;
+                const income = monthlyData[month].income[category] || 0;
+                return expense > 0 ? expense : income;
+            });
+
+            return {
+                label: category,
+                data: categoryData,
+                backgroundColor: getColorForIndex(index),
+                stack: 'stack1'
+            };
+        });
+
+        charts.categoryReport = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: months,
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top' },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => {
+                                return ctx.dataset.label + ': LKR ' + ctx.parsed.y.toLocaleString();
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: { stacked: true },
+                    y: {
+                        stacked: true,
+                        beginAtZero: true,
+                        ticks: {
+                            callback: value => 'LKR ' + value.toLocaleString()
+                        }
+                    }
+                }
+            }
+        });
+    }
+}
+
+// Helper function to get consistent colors for categories
+function getColorForIndex(index) {
+    const colors = [
+        'rgba(255, 99, 132, 0.8)',
+        'rgba(54, 162, 235, 0.8)',
+        'rgba(255, 206, 86, 0.8)',
+        'rgba(75, 192, 192, 0.8)',
+        'rgba(153, 102, 255, 0.8)',
+        'rgba(255, 159, 64, 0.8)',
+        'rgba(201, 203, 207, 0.8)',
+        'rgba(255, 99, 71, 0.8)',
+        'rgba(144, 238, 144, 0.8)',
+        'rgba(135, 206, 250, 0.8)',
+        'rgba(255, 182, 193, 0.8)',
+        'rgba(176, 224, 230, 0.8)',
+        'rgba(221, 160, 221, 0.8)',
+        'rgba(240, 230, 140, 0.8)',
+        'rgba(189, 183, 107, 0.8)'
+    ];
+    return colors[index % colors.length];
+}
+
+// Update category report summary table
+function updateCategoryReportTable(data) {
+    const tableBody = document.getElementById('categoryReportTableBody');
+    const totalElement = document.getElementById('categoryReportTotal');
+
+    if (!tableBody || !data || data.length === 0) return;
+
+    // Aggregate by category across all time periods
+    const categoryTotals = {};
+    data.forEach(item => {
+        if (!categoryTotals[item.category]) {
+            categoryTotals[item.category] = {
+                type: item.type,
+                income: 0,
+                expense: 0
+            };
         }
+        categoryTotals[item.category].income += parseFloat(item.income || 0);
+        categoryTotals[item.category].expense += parseFloat(item.expense || 0);
     });
+
+    // Calculate total and prepare rows
+    let grandTotal = 0;
+    const rows = Object.entries(categoryTotals).map(([category, data]) => {
+        const amount = data.expense > 0 ? data.expense : data.income;
+        grandTotal += amount;
+        return { category, type: data.type, amount };
+    });
+
+    // Sort by amount descending
+    rows.sort((a, b) => b.amount - a.amount);
+
+    // Build table HTML
+    tableBody.innerHTML = rows.map(row => {
+        const percentage = grandTotal > 0 ? ((row.amount / grandTotal) * 100).toFixed(1) : 0;
+        const typeClass = row.type === 'income' ? 'text-success' : 'text-danger';
+        const typeLabel = row.type === 'income' ? 'Income' : 'Expense';
+
+        return `
+            <tr>
+                <td>${row.category}</td>
+                <td><span class="${typeClass}">${typeLabel}</span></td>
+                <td class="text-end">LKR ${row.amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td class="text-end">${percentage}%</td>
+            </tr>
+        `;
+    }).join('');
+
+    // Update total
+    totalElement.textContent = `LKR ${grandTotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
 }
 
 function updateCashFlowChart(data, rangeType) {

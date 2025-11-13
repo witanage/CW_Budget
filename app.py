@@ -933,51 +933,78 @@ def monthly_summary_report():
 @app.route('/api/reports/category-breakdown')
 @login_required
 def category_breakdown_report():
-    """Get category breakdown report."""
+    """Get category breakdown report with weekly, monthly, or yearly views."""
     connection = get_db_connection()
     if connection:
         cursor = connection.cursor(dictionary=True)
         try:
             user_id = session['user_id']
+            range_type = request.args.get('range', 'monthly')  # weekly, monthly, yearly
             year = request.args.get('year', datetime.now().year, type=int)
-            month = request.args.get('month', type=int)
+            month = request.args.get('month', datetime.now().month, type=int)
 
-            if month:
+            if range_type == 'weekly':
+                # Get category spending by week for the specified month
                 cursor.execute("""
                     SELECT
+                        WEEK(t.transaction_date, 1) as week_num,
+                        DATE_FORMAT(MIN(t.transaction_date), '%%Y-%%m-%%d') as week_start,
+                        DATE_FORMAT(MAX(t.transaction_date), '%%Y-%%m-%%d') as week_end,
                         c.name as category,
                         c.type,
-                        SUM(CASE WHEN c.type = 'income' THEN t.debit ELSE t.credit END) as amount
+                        SUM(CASE WHEN c.type = 'income' THEN t.debit ELSE 0 END) as income,
+                        SUM(CASE WHEN c.type = 'expense' THEN t.credit ELSE 0 END) as expense
                     FROM transactions t
                     JOIN monthly_records mr ON t.monthly_record_id = mr.id
                     LEFT JOIN categories c ON t.category_id = c.id
                     WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s
-                    GROUP BY c.id, c.name, c.type
-                    ORDER BY amount DESC
+                    GROUP BY WEEK(t.transaction_date, 1), c.id, c.name, c.type
+                    ORDER BY week_num, c.type, expense DESC, income DESC
                 """, (user_id, year, month))
-            else:
+            elif range_type == 'yearly':
+                # Get category spending by year
                 cursor.execute("""
                     SELECT
+                        mr.year,
                         c.name as category,
                         c.type,
-                        SUM(CASE WHEN c.type = 'income' THEN t.debit ELSE t.credit END) as amount
+                        SUM(CASE WHEN c.type = 'income' THEN t.debit ELSE 0 END) as income,
+                        SUM(CASE WHEN c.type = 'expense' THEN t.credit ELSE 0 END) as expense
+                    FROM transactions t
+                    JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                    LEFT JOIN categories c ON t.category_id = c.id
+                    WHERE mr.user_id = %s
+                    GROUP BY mr.year, c.id, c.name, c.type
+                    ORDER BY mr.year, c.type, expense DESC, income DESC
+                """, (user_id,))
+            else:  # monthly (default)
+                # Get category spending by month for the specified year
+                cursor.execute("""
+                    SELECT
+                        mr.year,
+                        mr.month,
+                        mr.month_name,
+                        c.name as category,
+                        c.type,
+                        SUM(CASE WHEN c.type = 'income' THEN t.debit ELSE 0 END) as income,
+                        SUM(CASE WHEN c.type = 'expense' THEN t.credit ELSE 0 END) as expense
                     FROM transactions t
                     JOIN monthly_records mr ON t.monthly_record_id = mr.id
                     LEFT JOIN categories c ON t.category_id = c.id
                     WHERE mr.user_id = %s AND mr.year = %s
-                    GROUP BY c.id, c.name, c.type
-                    ORDER BY amount DESC
+                    GROUP BY mr.year, mr.month, mr.month_name, c.id, c.name, c.type
+                    ORDER BY mr.month, c.type, expense DESC, income DESC
                 """, (user_id, year))
 
             breakdown = cursor.fetchall()
             return jsonify(breakdown)
-            
+
         except Error as e:
             return jsonify({'error': str(e)}), 500
         finally:
             cursor.close()
             connection.close()
-    
+
     return jsonify({'error': 'Database connection failed'}), 500
 
 @app.route('/api/reports/cash-flow')
