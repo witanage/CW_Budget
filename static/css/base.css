@@ -560,6 +560,12 @@ padding: 10px 14px;
 transition: all 0.3s ease;
 }
 
+/* Reduce font size for dropdowns to prevent text clipping */
+.form-select {
+font-size: 0.875rem;
+line-height: 1.5;
+}
+
 .form-control:focus, .form-select:focus {
 background-color: var(--input-bg);
 border-color: var(--primary-color);

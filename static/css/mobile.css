@@ -467,6 +467,12 @@ border: 1px solid #555555;
 color: #ffffff;
 }
 
+/* Reduce font size for dropdowns to prevent text clipping */
+.form-select {
+font-size: 0.875rem;
+line-height: 1.5;
+}
+
 .form-control:focus, .form-select:focus {
 background-color: #3d3d3d;
 border-color: #007acc;
