@@ -282,8 +282,97 @@
                                         </div>
                                     </div>
                                     <div class="tab-pane fade" id="categoryReport">
-                                        <div style="height: 500px; position: relative;">
-                                            <canvas id="categoryReportChart"></canvas>
+                                        <!-- Income and Expense Charts Side by Side -->
+                                        <div class="row mb-4">
+                                            <div class="col-md-6">
+                                                <div class="card border-success">
+                                                    <div class="card-header bg-success text-white">
+                                                        <h6 class="mb-0"><i class="fas fa-arrow-up me-2"></i>Income by Category</h6>
+                                                    </div>
+                                                    <div class="card-body">
+                                                        <div style="height: 300px; position: relative;">
+                                                            <canvas id="categoryIncomeChart"></canvas>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="card border-danger">
+                                                    <div class="card-header bg-danger text-white">
+                                                        <h6 class="mb-0"><i class="fas fa-arrow-down me-2"></i>Expenses by Category</h6>
+                                                    </div>
+                                                    <div class="card-body">
+                                                        <div style="height: 300px; position: relative;">
+                                                            <canvas id="categoryExpenseChart"></canvas>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Summary Tables -->
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <h6 class="text-success"><i class="fas fa-table me-2"></i>Income Summary</h6>
+                                                <div class="table-responsive">
+                                                    <table class="table table-sm table-striped">
+                                                        <thead class="table-success">
+                                                            <tr>
+                                                                <th>Category</th>
+                                                                <th class="text-end">Amount</th>
+                                                                <th class="text-end">%</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="incomeTableBody">
+                                                            <!-- Populated by JS -->
+                                                        </tbody>
+                                                        <tfoot class="fw-bold">
+                                                            <tr>
+                                                                <td>Total Income</td>
+                                                                <td class="text-end" id="totalIncome">LKR 0.00</td>
+                                                                <td class="text-end">100%</td>
+                                                            </tr>
+                                                        </tfoot>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <h6 class="text-danger"><i class="fas fa-table me-2"></i>Expense Summary</h6>
+                                                <div class="table-responsive">
+                                                    <table class="table table-sm table-striped">
+                                                        <thead class="table-danger">
+                                                            <tr>
+                                                                <th>Category</th>
+                                                                <th class="text-end">Amount</th>
+                                                                <th class="text-end">%</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="expenseTableBody">
+                                                            <!-- Populated by JS -->
+                                                        </tbody>
+                                                        <tfoot class="fw-bold">
+                                                            <tr>
+                                                                <td>Total Expenses</td>
+                                                                <td class="text-end" id="totalExpenses">LKR 0.00</td>
+                                                                <td class="text-end">100%</td>
+                                                            </tr>
+                                                        </tfoot>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Net Savings Card -->
+                                        <div class="row mt-3">
+                                            <div class="col-md-12">
+                                                <div class="card" id="netSavingsCard">
+                                                    <div class="card-body text-center">
+                                                        <h5 class="mb-2">Net Savings</h5>
+                                                        <h3 class="mb-0" id="netSavings">LKR 0.00</h3>
+                                                        <small class="text-muted" id="savingsPercentage">0% savings rate</small>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                     <div class="tab-pane fade" id="cashFlowReport">
