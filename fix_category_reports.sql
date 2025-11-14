@@ -100,26 +100,31 @@ GROUP BY mr.user_id, mr.year, c.id, c.name, c.type;
 -- Replace 1 with your actual user_id
 -- ============================================================
 
--- Test monthly category breakdown for current year
+-- Test category breakdown for a SPECIFIC month (e.g., November 2025)
+-- This matches what the "Monthly" view shows in the UI
+-- SELECT
+--     c.name as category,
+--     c.type,
+--     COALESCE(SUM(CASE WHEN c.type = 'income' THEN t.debit ELSE 0 END), 0) as income,
+--     COALESCE(SUM(CASE WHEN c.type = 'expense' THEN t.credit ELSE 0 END), 0) as expense
+-- FROM transactions t
+-- INNER JOIN monthly_records mr ON t.monthly_record_id = mr.id
+-- INNER JOIN categories c ON t.category_id = c.id
+-- WHERE mr.user_id = 1 AND mr.year = 2025 AND mr.month = 11
+--     AND t.category_id IS NOT NULL
+-- GROUP BY c.id, c.name, c.type
+-- HAVING income > 0 OR expense > 0
+-- ORDER BY c.type, expense DESC, income DESC;
+
+-- Test monthly category breakdown for entire year (all months)
 -- SELECT * FROM v_category_breakdown_monthly
 -- WHERE user_id = 1 AND year = YEAR(CURDATE())
 -- ORDER BY month, type, total_expense DESC, total_income DESC;
 
--- Test yearly category breakdown
+-- Test yearly category breakdown (all years)
 -- SELECT * FROM v_category_breakdown_yearly
 -- WHERE user_id = 1
 -- ORDER BY year DESC, type, total_expense DESC, total_income DESC;
-
--- Test category totals for specific month
--- SELECT
---     category,
---     type,
---     total_income,
---     total_expense,
---     transaction_count
--- FROM v_category_breakdown_monthly
--- WHERE user_id = 1 AND year = 2024 AND month = 11
--- ORDER BY type, total_expense DESC, total_income DESC;
 
 -- ============================================================
 -- VERIFICATION QUERIES
@@ -227,6 +232,17 @@ GROUP BY mr.user_id, mr.year, c.id, c.name, c.type;
 -- 4. Wrapped SUM() in COALESCE(..., 0)
 --    - Ensures NULL sums become 0 instead of NULL
 --    - Prevents JavaScript errors with undefined values
+--
+-- 5. Fixed Monthly view to filter by SPECIFIC month
+--    - Was: WHERE user_id = X AND year = Y (returned ALL months)
+--    - Now: WHERE user_id = X AND year = Y AND month = Z (returns ONE month)
+--    - This ensures "Monthly, 2025, November" shows ONLY November 2025 data
+--    - Not the sum of all months in 2025
+--
+-- Date Range Behavior:
+-- - Weekly: Shows categories for selected month, grouped by week
+-- - Monthly: Shows categories for selected SPECIFIC month
+-- - Yearly: Shows categories aggregated across ALL years
 --
 -- Frontend Changes (dashboard.js):
 -- 1. Now correctly aggregates by category across time periods

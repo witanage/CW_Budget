@@ -982,7 +982,7 @@ def category_breakdown_report():
                     ORDER BY mr.year DESC, c.type, expense DESC, income DESC
                 """, (user_id,))
             else:  # monthly (default)
-                # Get category spending by month for the specified year
+                # Get category spending for the specific selected month
                 cursor.execute("""
                     SELECT
                         mr.year,
@@ -995,12 +995,12 @@ def category_breakdown_report():
                     FROM transactions t
                     INNER JOIN monthly_records mr ON t.monthly_record_id = mr.id
                     INNER JOIN categories c ON t.category_id = c.id
-                    WHERE mr.user_id = %s AND mr.year = %s
+                    WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s
                         AND t.category_id IS NOT NULL
                     GROUP BY mr.year, mr.month, mr.month_name, c.id, c.name, c.type
                     HAVING income > 0 OR expense > 0
-                    ORDER BY mr.month, c.type, expense DESC, income DESC
-                """, (user_id, year))
+                    ORDER BY c.type, expense DESC, income DESC
+                """, (user_id, year, month))
 
             breakdown = cursor.fetchall()
             return jsonify(breakdown)
