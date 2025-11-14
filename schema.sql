@@ -11,8 +11,10 @@
 -- - Payment methods management
 -- - Monthly financial records
 -- - Audit logging for admin actions
+-- - Performance views for reporting
+-- - Category spending analysis (weekly, monthly, yearly)
 --
--- Date: 2025-11-09
+-- Date: 2025-11-14
 -- ============================================================
 
 -- ============================================================
@@ -154,10 +156,10 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
--- Performance Views for New Reports Only
+-- Performance Views for Reports
 -- ============================================================
--- These views optimize the NEW report queries (cash flow, top spending, forecast)
--- Existing reports remain unchanged
+-- These views optimize report queries and provide pre-aggregated data
+-- for cash flow analysis, spending patterns, and category breakdowns
 -- ============================================================
 
 -- Cash Flow View
@@ -177,6 +179,7 @@ GROUP BY mr.user_id, mr.year, mr.month, mr.month_name;
 
 -- Top Spending View
 -- Pre-aggregates expense categories for top spending analysis
+-- Uses INNER JOIN to exclude transactions without categories
 CREATE OR REPLACE VIEW v_top_spending AS
 SELECT
     mr.user_id,
@@ -189,10 +192,50 @@ SELECT
     COUNT(t.id) as transaction_count,
     AVG(t.credit) as avg_amount
 FROM transactions t
-JOIN monthly_records mr ON t.monthly_record_id = mr.id
-LEFT JOIN categories c ON t.category_id = c.id
+INNER JOIN monthly_records mr ON t.monthly_record_id = mr.id
+INNER JOIN categories c ON t.category_id = c.id
 WHERE c.type = 'expense' AND t.credit > 0
 GROUP BY mr.user_id, mr.year, mr.month, c.id, c.name, c.type;
+
+-- Category Breakdown by Month View
+-- Pre-aggregates category totals (income and expense) by month
+-- Excludes transactions without categories for accurate reporting
+CREATE OR REPLACE VIEW v_category_breakdown_monthly AS
+SELECT
+    mr.user_id,
+    mr.year,
+    mr.month,
+    mr.month_name,
+    c.id as category_id,
+    c.name as category,
+    c.type,
+    COALESCE(SUM(CASE WHEN c.type = 'income' THEN t.debit ELSE 0 END), 0) as total_income,
+    COALESCE(SUM(CASE WHEN c.type = 'expense' THEN t.credit ELSE 0 END), 0) as total_expense,
+    COUNT(t.id) as transaction_count
+FROM transactions t
+INNER JOIN monthly_records mr ON t.monthly_record_id = mr.id
+INNER JOIN categories c ON t.category_id = c.id
+WHERE t.category_id IS NOT NULL
+GROUP BY mr.user_id, mr.year, mr.month, mr.month_name, c.id, c.name, c.type;
+
+-- Category Breakdown by Year View
+-- Pre-aggregates category totals (income and expense) by year
+-- Excludes transactions without categories for accurate reporting
+CREATE OR REPLACE VIEW v_category_breakdown_yearly AS
+SELECT
+    mr.user_id,
+    mr.year,
+    c.id as category_id,
+    c.name as category,
+    c.type,
+    COALESCE(SUM(CASE WHEN c.type = 'income' THEN t.debit ELSE 0 END), 0) as total_income,
+    COALESCE(SUM(CASE WHEN c.type = 'expense' THEN t.credit ELSE 0 END), 0) as total_expense,
+    COUNT(t.id) as transaction_count
+FROM transactions t
+INNER JOIN monthly_records mr ON t.monthly_record_id = mr.id
+INNER JOIN categories c ON t.category_id = c.id
+WHERE t.category_id IS NOT NULL
+GROUP BY mr.user_id, mr.year, c.id, c.name, c.type;
 
 -- Default Categories
 -- ============================================================
@@ -232,4 +275,20 @@ INSERT IGNORE INTO categories (name, type) VALUES
 --    and require admin approval before they can log in.
 --
 -- 3. Admins can manage users through the Admin Panel at /admin
+--
+-- 4. All transactions should have a category assigned for accurate reporting.
+--    Transactions without categories are excluded from category reports.
+--    To assign categories to transactions without one:
+--    -- For income transactions:
+--    UPDATE transactions SET category_id = (SELECT id FROM categories WHERE name = 'Other Income' LIMIT 1)
+--    WHERE category_id IS NULL AND debit > 0;
+--    -- For expense transactions:
+--    UPDATE transactions SET category_id = (SELECT id FROM categories WHERE name = 'Other Expense' LIMIT 1)
+--    WHERE category_id IS NULL AND credit > 0;
+--
+-- 5. The following views are available for optimized reporting:
+--    - v_cash_flow: Monthly cash in/out analysis
+--    - v_top_spending: Top expense categories
+--    - v_category_breakdown_monthly: Category totals by month
+--    - v_category_breakdown_yearly: Category totals by year
 -- ============================================================
