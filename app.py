@@ -952,30 +952,34 @@ def category_breakdown_report():
                         DATE_FORMAT(MAX(t.transaction_date), '%%Y-%%m-%%d') as week_end,
                         c.name as category,
                         c.type,
-                        SUM(CASE WHEN c.type = 'income' THEN t.debit ELSE 0 END) as income,
-                        SUM(CASE WHEN c.type = 'expense' THEN t.credit ELSE 0 END) as expense
+                        COALESCE(SUM(CASE WHEN c.type = 'income' THEN t.debit ELSE 0 END), 0) as income,
+                        COALESCE(SUM(CASE WHEN c.type = 'expense' THEN t.credit ELSE 0 END), 0) as expense
                     FROM transactions t
-                    JOIN monthly_records mr ON t.monthly_record_id = mr.id
-                    LEFT JOIN categories c ON t.category_id = c.id
+                    INNER JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                    INNER JOIN categories c ON t.category_id = c.id
                     WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s
+                        AND t.category_id IS NOT NULL
                     GROUP BY WEEK(t.transaction_date, 1), c.id, c.name, c.type
+                    HAVING income > 0 OR expense > 0
                     ORDER BY week_num, c.type, expense DESC, income DESC
                 """, (user_id, year, month))
             elif range_type == 'yearly':
-                # Get category spending by year
+                # Get category spending by year (all years)
                 cursor.execute("""
                     SELECT
                         mr.year,
                         c.name as category,
                         c.type,
-                        SUM(CASE WHEN c.type = 'income' THEN t.debit ELSE 0 END) as income,
-                        SUM(CASE WHEN c.type = 'expense' THEN t.credit ELSE 0 END) as expense
+                        COALESCE(SUM(CASE WHEN c.type = 'income' THEN t.debit ELSE 0 END), 0) as income,
+                        COALESCE(SUM(CASE WHEN c.type = 'expense' THEN t.credit ELSE 0 END), 0) as expense
                     FROM transactions t
-                    JOIN monthly_records mr ON t.monthly_record_id = mr.id
-                    LEFT JOIN categories c ON t.category_id = c.id
+                    INNER JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                    INNER JOIN categories c ON t.category_id = c.id
                     WHERE mr.user_id = %s
+                        AND t.category_id IS NOT NULL
                     GROUP BY mr.year, c.id, c.name, c.type
-                    ORDER BY mr.year, c.type, expense DESC, income DESC
+                    HAVING income > 0 OR expense > 0
+                    ORDER BY mr.year DESC, c.type, expense DESC, income DESC
                 """, (user_id,))
             else:  # monthly (default)
                 # Get category spending by month for the specified year
@@ -986,13 +990,15 @@ def category_breakdown_report():
                         mr.month_name,
                         c.name as category,
                         c.type,
-                        SUM(CASE WHEN c.type = 'income' THEN t.debit ELSE 0 END) as income,
-                        SUM(CASE WHEN c.type = 'expense' THEN t.credit ELSE 0 END) as expense
+                        COALESCE(SUM(CASE WHEN c.type = 'income' THEN t.debit ELSE 0 END), 0) as income,
+                        COALESCE(SUM(CASE WHEN c.type = 'expense' THEN t.credit ELSE 0 END), 0) as expense
                     FROM transactions t
-                    JOIN monthly_records mr ON t.monthly_record_id = mr.id
-                    LEFT JOIN categories c ON t.category_id = c.id
+                    INNER JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                    INNER JOIN categories c ON t.category_id = c.id
                     WHERE mr.user_id = %s AND mr.year = %s
+                        AND t.category_id IS NOT NULL
                     GROUP BY mr.year, mr.month, mr.month_name, c.id, c.name, c.type
+                    HAVING income > 0 OR expense > 0
                     ORDER BY mr.month, c.type, expense DESC, income DESC
                 """, (user_id, year))
 
