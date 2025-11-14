@@ -7,6 +7,8 @@ let charts = {
     category: null,
     monthlyReport: null,
     categoryReport: null,
+    categoryIncome: null,
+    categoryExpense: null,
     yearlyReport: null,
     cashFlowReport: null,
     topSpendingReport: null,
@@ -1125,218 +1127,147 @@ function updateMonthlyReportChart(data) {
 }
 
 function updateCategoryReportChart(data, rangeType) {
-    const ctx = document.getElementById('categoryReportChart');
-    if (!ctx || !data) return;
+    if (!data) return;
 
-    if (charts.categoryReport) {
-        charts.categoryReport.destroy();
+    // Destroy old charts if they exist
+    if (charts.categoryIncome) {
+        charts.categoryIncome.destroy();
+    }
+    if (charts.categoryExpense) {
+        charts.categoryExpense.destroy();
     }
 
-    // Update summary table
-    updateCategoryReportTable(data);
-
-    // Process data based on range type
-    if (rangeType === 'weekly') {
-        // Group by week and category
-        const weeklyData = {};
-        data.forEach(item => {
-            const weekKey = `Week ${item.week_num} (${item.week_start} to ${item.week_end})`;
-            if (!weeklyData[weekKey]) {
-                weeklyData[weekKey] = { income: {}, expense: {} };
-            }
-            if (item.type === 'income' && item.income > 0) {
-                weeklyData[weekKey].income[item.category] = parseFloat(item.income);
-            } else if (item.type === 'expense' && item.expense > 0) {
-                weeklyData[weekKey].expense[item.category] = parseFloat(item.expense);
-            }
-        });
-
-        // Get all unique categories
-        const allCategories = [...new Set(data.map(d => d.category))];
-        const weeks = Object.keys(weeklyData);
-
-        // Create datasets for each category
-        const datasets = allCategories.map((category, index) => {
-            const categoryData = weeks.map(week => {
-                const expense = weeklyData[week].expense[category] || 0;
-                const income = weeklyData[week].income[category] || 0;
-                return expense > 0 ? expense : income;
-            });
-
-            return {
-                label: category,
-                data: categoryData,
-                backgroundColor: getColorForIndex(index),
-                stack: 'stack1'
+    // Aggregate data by category across all time periods
+    const categoryTotals = {};
+    data.forEach(item => {
+        if (!categoryTotals[item.category]) {
+            categoryTotals[item.category] = {
+                type: item.type,
+                income: 0,
+                expense: 0
             };
-        });
+        }
+        categoryTotals[item.category].income += parseFloat(item.income || 0);
+        categoryTotals[item.category].expense += parseFloat(item.expense || 0);
+    });
 
-        charts.categoryReport = new Chart(ctx, {
-            type: 'bar',
+    // Separate income and expense categories
+    const incomeCategories = [];
+    const incomeAmounts = [];
+    const expenseCategories = [];
+    const expenseAmounts = [];
+    let totalIncome = 0;
+    let totalExpense = 0;
+
+    Object.entries(categoryTotals).forEach(([category, data]) => {
+        if (data.type === 'income' && data.income > 0) {
+            incomeCategories.push(category);
+            incomeAmounts.push(data.income);
+            totalIncome += data.income;
+        } else if (data.type === 'expense' && data.expense > 0) {
+            expenseCategories.push(category);
+            expenseAmounts.push(data.expense);
+            totalExpense += data.expense;
+        }
+    });
+
+    // Create Income Chart (Horizontal Bar Chart)
+    const incomeCtx = document.getElementById('categoryIncomeChart');
+    if (incomeCtx && incomeCategories.length > 0) {
+        charts.categoryIncome = new Chart(incomeCtx, {
+            type: 'doughnut',
             data: {
-                labels: weeks,
-                datasets: datasets
+                labels: incomeCategories,
+                datasets: [{
+                    data: incomeAmounts,
+                    backgroundColor: [
+                        'rgba(75, 192, 192, 0.8)',
+                        'rgba(54, 162, 235, 0.8)',
+                        'rgba(153, 102, 255, 0.8)',
+                        'rgba(144, 238, 144, 0.8)',
+                        'rgba(135, 206, 250, 0.8)',
+                        'rgba(176, 224, 230, 0.8)'
+                    ],
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { position: 'top' },
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            font: { size: 11 }
+                        }
+                    },
                     tooltip: {
                         callbacks: {
                             label: ctx => {
-                                return ctx.dataset.label + ': LKR ' + ctx.parsed.y.toLocaleString();
+                                const percentage = ((ctx.parsed / totalIncome) * 100).toFixed(1);
+                                return ctx.label + ': LKR ' + ctx.parsed.toLocaleString() + ' (' + percentage + '%)';
                             }
-                        }
-                    }
-                },
-                scales: {
-                    x: { stacked: true },
-                    y: {
-                        stacked: true,
-                        beginAtZero: true,
-                        ticks: {
-                            callback: value => 'LKR ' + value.toLocaleString()
-                        }
-                    }
-                }
-            }
-        });
-    } else if (rangeType === 'yearly') {
-        // Group by year and category
-        const yearlyData = {};
-        data.forEach(item => {
-            const yearKey = item.year.toString();
-            if (!yearlyData[yearKey]) {
-                yearlyData[yearKey] = { income: {}, expense: {} };
-            }
-            if (item.type === 'income' && item.income > 0) {
-                yearlyData[yearKey].income[item.category] = parseFloat(item.income);
-            } else if (item.type === 'expense' && item.expense > 0) {
-                yearlyData[yearKey].expense[item.category] = parseFloat(item.expense);
-            }
-        });
-
-        // Get all unique categories
-        const allCategories = [...new Set(data.map(d => d.category))];
-        const years = Object.keys(yearlyData).sort();
-
-        // Create datasets for each category
-        const datasets = allCategories.map((category, index) => {
-            const categoryData = years.map(year => {
-                const expense = yearlyData[year].expense[category] || 0;
-                const income = yearlyData[year].income[category] || 0;
-                return expense > 0 ? expense : income;
-            });
-
-            return {
-                label: category,
-                data: categoryData,
-                backgroundColor: getColorForIndex(index),
-                stack: 'stack1'
-            };
-        });
-
-        charts.categoryReport = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: years,
-                datasets: datasets
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'top' },
-                    tooltip: {
-                        callbacks: {
-                            label: ctx => {
-                                return ctx.dataset.label + ': LKR ' + ctx.parsed.y.toLocaleString();
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    x: { stacked: true },
-                    y: {
-                        stacked: true,
-                        beginAtZero: true,
-                        ticks: {
-                            callback: value => 'LKR ' + value.toLocaleString()
-                        }
-                    }
-                }
-            }
-        });
-    } else {
-        // Monthly view - Group by month and category
-        const monthlyData = {};
-        data.forEach(item => {
-            const monthKey = `${item.month_name} ${item.year}`;
-            if (!monthlyData[monthKey]) {
-                monthlyData[monthKey] = { income: {}, expense: {}, monthNum: item.month };
-            }
-            if (item.type === 'income' && item.income > 0) {
-                monthlyData[monthKey].income[item.category] = parseFloat(item.income);
-            } else if (item.type === 'expense' && item.expense > 0) {
-                monthlyData[monthKey].expense[item.category] = parseFloat(item.expense);
-            }
-        });
-
-        // Get all unique categories
-        const allCategories = [...new Set(data.map(d => d.category))];
-        const months = Object.keys(monthlyData).sort((a, b) =>
-            monthlyData[a].monthNum - monthlyData[b].monthNum
-        );
-
-        // Create datasets for each category
-        const datasets = allCategories.map((category, index) => {
-            const categoryData = months.map(month => {
-                const expense = monthlyData[month].expense[category] || 0;
-                const income = monthlyData[month].income[category] || 0;
-                return expense > 0 ? expense : income;
-            });
-
-            return {
-                label: category,
-                data: categoryData,
-                backgroundColor: getColorForIndex(index),
-                stack: 'stack1'
-            };
-        });
-
-        charts.categoryReport = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: months,
-                datasets: datasets
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'top' },
-                    tooltip: {
-                        callbacks: {
-                            label: ctx => {
-                                return ctx.dataset.label + ': LKR ' + ctx.parsed.y.toLocaleString();
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    x: { stacked: true },
-                    y: {
-                        stacked: true,
-                        beginAtZero: true,
-                        ticks: {
-                            callback: value => 'LKR ' + value.toLocaleString()
                         }
                     }
                 }
             }
         });
     }
+
+    // Create Expense Chart (Horizontal Bar Chart)
+    const expenseCtx = document.getElementById('categoryExpenseChart');
+    if (expenseCtx && expenseCategories.length > 0) {
+        charts.categoryExpense = new Chart(expenseCtx, {
+            type: 'doughnut',
+            data: {
+                labels: expenseCategories,
+                datasets: [{
+                    data: expenseAmounts,
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.8)',
+                        'rgba(255, 159, 64, 0.8)',
+                        'rgba(255, 206, 86, 0.8)',
+                        'rgba(255, 99, 71, 0.8)',
+                        'rgba(201, 203, 207, 0.8)',
+                        'rgba(240, 230, 140, 0.8)',
+                        'rgba(189, 183, 107, 0.8)',
+                        'rgba(255, 182, 193, 0.8)',
+                        'rgba(221, 160, 221, 0.8)',
+                        'rgba(255, 228, 181, 0.8)'
+                    ],
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            font: { size: 11 }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => {
+                                const percentage = ((ctx.parsed / totalExpense) * 100).toFixed(1);
+                                return ctx.label + ': LKR ' + ctx.parsed.toLocaleString() + ' (' + percentage + '%)';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Update summary tables
+    updateCategorySummaryTables(categoryTotals, totalIncome, totalExpense);
+
+    // Update net savings
+    updateNetSavings(totalIncome, totalExpense);
 }
 
 // Helper function to get consistent colors for categories
@@ -1361,56 +1292,87 @@ function getColorForIndex(index) {
     return colors[index % colors.length];
 }
 
-// Update category report summary table
-function updateCategoryReportTable(data) {
-    const tableBody = document.getElementById('categoryReportTableBody');
-    const totalElement = document.getElementById('categoryReportTotal');
+// Update category summary tables (separate income and expense)
+function updateCategorySummaryTables(categoryTotals, totalIncome, totalExpense) {
+    const incomeTableBody = document.getElementById('incomeTableBody');
+    const expenseTableBody = document.getElementById('expenseTableBody');
+    const totalIncomeElement = document.getElementById('totalIncome');
+    const totalExpensesElement = document.getElementById('totalExpenses');
 
-    if (!tableBody || !data || data.length === 0) return;
+    if (!incomeTableBody || !expenseTableBody) return;
 
-    // Aggregate by category across all time periods
-    const categoryTotals = {};
-    data.forEach(item => {
-        if (!categoryTotals[item.category]) {
-            categoryTotals[item.category] = {
-                type: item.type,
-                income: 0,
-                expense: 0
-            };
+    // Prepare income rows
+    const incomeRows = [];
+    const expenseRows = [];
+
+    Object.entries(categoryTotals).forEach(([category, data]) => {
+        if (data.type === 'income' && data.income > 0) {
+            incomeRows.push({ category, amount: data.income });
+        } else if (data.type === 'expense' && data.expense > 0) {
+            expenseRows.push({ category, amount: data.expense });
         }
-        categoryTotals[item.category].income += parseFloat(item.income || 0);
-        categoryTotals[item.category].expense += parseFloat(item.expense || 0);
-    });
-
-    // Calculate total and prepare rows
-    let grandTotal = 0;
-    const rows = Object.entries(categoryTotals).map(([category, data]) => {
-        const amount = data.expense > 0 ? data.expense : data.income;
-        grandTotal += amount;
-        return { category, type: data.type, amount };
     });
 
     // Sort by amount descending
-    rows.sort((a, b) => b.amount - a.amount);
+    incomeRows.sort((a, b) => b.amount - a.amount);
+    expenseRows.sort((a, b) => b.amount - a.amount);
 
-    // Build table HTML
-    tableBody.innerHTML = rows.map(row => {
-        const percentage = grandTotal > 0 ? ((row.amount / grandTotal) * 100).toFixed(1) : 0;
-        const typeClass = row.type === 'income' ? 'text-success' : 'text-danger';
-        const typeLabel = row.type === 'income' ? 'Income' : 'Expense';
-
+    // Build income table HTML
+    incomeTableBody.innerHTML = incomeRows.map(row => {
+        const percentage = totalIncome > 0 ? ((row.amount / totalIncome) * 100).toFixed(1) : 0;
         return `
             <tr>
                 <td>${row.category}</td>
-                <td><span class="${typeClass}">${typeLabel}</span></td>
                 <td class="text-end">LKR ${row.amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td class="text-end">${percentage}%</td>
             </tr>
         `;
     }).join('');
 
-    // Update total
-    totalElement.textContent = `LKR ${grandTotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    // Build expense table HTML
+    expenseTableBody.innerHTML = expenseRows.map(row => {
+        const percentage = totalExpense > 0 ? ((row.amount / totalExpense) * 100).toFixed(1) : 0;
+        return `
+            <tr>
+                <td>${row.category}</td>
+                <td class="text-end">LKR ${row.amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td class="text-end">${percentage}%</td>
+            </tr>
+        `;
+    }).join('');
+
+    // Update totals
+    totalIncomeElement.textContent = `LKR ${totalIncome.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    totalExpensesElement.textContent = `LKR ${totalExpense.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+}
+
+// Update net savings display
+function updateNetSavings(totalIncome, totalExpense) {
+    const netSavingsElement = document.getElementById('netSavings');
+    const savingsPercentageElement = document.getElementById('savingsPercentage');
+    const netSavingsCard = document.getElementById('netSavingsCard');
+
+    if (!netSavingsElement || !savingsPercentageElement || !netSavingsCard) return;
+
+    const netSavings = totalIncome - totalExpense;
+    const savingsRate = totalIncome > 0 ? ((netSavings / totalIncome) * 100).toFixed(1) : 0;
+
+    // Update text
+    netSavingsElement.textContent = `LKR ${netSavings.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    savingsPercentageElement.textContent = `${savingsRate}% savings rate`;
+
+    // Update card styling based on savings
+    netSavingsCard.className = 'card';
+    if (netSavings > 0) {
+        netSavingsCard.classList.add('border-success');
+        netSavingsElement.classList.add('text-success');
+    } else if (netSavings < 0) {
+        netSavingsCard.classList.add('border-danger');
+        netSavingsElement.classList.add('text-danger');
+    } else {
+        netSavingsCard.classList.add('border-secondary');
+        netSavingsElement.classList.add('text-secondary');
+    }
 }
 
 function updateCashFlowChart(data, rangeType) {
