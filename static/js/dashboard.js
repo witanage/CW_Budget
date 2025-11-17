@@ -401,6 +401,9 @@ function loadTransactions(applyActiveFilters = false) {
 
     // Add filter parameters if requested
     if (applyActiveFilters) {
+        // When filters are active, search across all months/years
+        queryParams += `&searchAll=true`;
+
         if (activeFilters.description) {
             queryParams += `&description=${encodeURIComponent(activeFilters.description)}`;
         }
