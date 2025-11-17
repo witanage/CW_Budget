@@ -20,13 +20,10 @@ let currentTransactionId = null;
 let allTransactions = [];
 let activeFilters = {
     description: '',
-    categories: [],
-    paymentMethods: [],
+    category: '',
+    paymentMethod: '',
     type: '',
-    showDone: true,
-    showNotDone: true,
-    showPaid: true,
-    showUnpaid: true,
+    status: '',
     minAmount: null,
     maxAmount: null,
     startDate: null,
@@ -865,13 +862,7 @@ function populateFilterDropdowns() {
     // Populate categories
     const categoryFilter = document.getElementById('filterCategory');
     if (categoryFilter) {
-        // Keep the "All Categories" option
-        const allOption = categoryFilter.querySelector('option[value=""]');
-        categoryFilter.innerHTML = '';
-        if (allOption) {
-            categoryFilter.appendChild(allOption);
-        }
-
+        categoryFilter.innerHTML = '<option value="">All Categories</option>';
         currentCategories.forEach(cat => {
             const option = document.createElement('option');
             option.value = cat.id;
@@ -883,13 +874,7 @@ function populateFilterDropdowns() {
     // Populate payment methods
     const paymentFilter = document.getElementById('filterPaymentMethod');
     if (paymentFilter && Array.isArray(paymentMethods)) {
-        // Keep the "All Methods" option
-        const allOption = paymentFilter.querySelector('option[value=""]');
-        paymentFilter.innerHTML = '';
-        if (allOption) {
-            paymentFilter.appendChild(allOption);
-        }
-
+        paymentFilter.innerHTML = '<option value="">All Methods</option>';
         paymentMethods.forEach(method => {
             const option = document.createElement('option');
             option.value = method.id;
@@ -903,31 +888,10 @@ function applyFilters() {
     // Get filter values
     activeFilters.description = document.getElementById('filterDescription')?.value.toLowerCase().trim() || '';
     activeFilters.notes = document.getElementById('filterNotes')?.value.toLowerCase().trim() || '';
+    activeFilters.category = document.getElementById('filterCategory')?.value || '';
+    activeFilters.paymentMethod = document.getElementById('filterPaymentMethod')?.value || '';
     activeFilters.type = document.getElementById('filterType')?.value || '';
-    activeFilters.showDone = document.getElementById('filterShowDone')?.checked || false;
-    activeFilters.showNotDone = document.getElementById('filterShowNotDone')?.checked || false;
-    activeFilters.showPaid = document.getElementById('filterShowPaid')?.checked || false;
-    activeFilters.showUnpaid = document.getElementById('filterShowUnpaid')?.checked || false;
-
-    // Get selected categories (multiple)
-    const categorySelect = document.getElementById('filterCategory');
-    activeFilters.categories = [];
-    if (categorySelect) {
-        const selectedOptions = Array.from(categorySelect.selectedOptions);
-        activeFilters.categories = selectedOptions
-            .map(opt => opt.value)
-            .filter(val => val !== ''); // Exclude empty "All Categories" option
-    }
-
-    // Get selected payment methods (multiple)
-    const paymentSelect = document.getElementById('filterPaymentMethod');
-    activeFilters.paymentMethods = [];
-    if (paymentSelect) {
-        const selectedOptions = Array.from(paymentSelect.selectedOptions);
-        activeFilters.paymentMethods = selectedOptions
-            .map(opt => opt.value)
-            .filter(val => val !== ''); // Exclude empty "All Methods" option
-    }
+    activeFilters.status = document.getElementById('filterStatus')?.value || '';
 
     // Get amount range
     const minAmount = document.getElementById('filterMinAmount')?.value;
@@ -957,13 +921,10 @@ function clearFilters() {
     // Reset filter values
     activeFilters = {
         description: '',
-        categories: [],
-        paymentMethods: [],
+        category: '',
+        paymentMethod: '',
         type: '',
-        showDone: true,
-        showNotDone: true,
-        showPaid: true,
-        showUnpaid: true,
+        status: '',
         minAmount: null,
         maxAmount: null,
         startDate: null,
@@ -974,26 +935,14 @@ function clearFilters() {
     // Clear form inputs
     document.getElementById('filterDescription').value = '';
     document.getElementById('filterNotes').value = '';
+    document.getElementById('filterCategory').value = '';
+    document.getElementById('filterPaymentMethod').value = '';
     document.getElementById('filterType').value = '';
-    document.getElementById('filterShowDone').checked = true;
-    document.getElementById('filterShowNotDone').checked = true;
-    document.getElementById('filterShowPaid').checked = true;
-    document.getElementById('filterShowUnpaid').checked = true;
+    document.getElementById('filterStatus').value = '';
     document.getElementById('filterMinAmount').value = '';
     document.getElementById('filterMaxAmount').value = '';
     document.getElementById('filterStartDate').value = '';
     document.getElementById('filterEndDate').value = '';
-
-    // Clear multi-selects
-    const categorySelect = document.getElementById('filterCategory');
-    if (categorySelect) {
-        Array.from(categorySelect.options).forEach(opt => opt.selected = false);
-    }
-
-    const paymentSelect = document.getElementById('filterPaymentMethod');
-    if (paymentSelect) {
-        Array.from(paymentSelect.options).forEach(opt => opt.selected = false);
-    }
 
     // Re-display all transactions
     applyFiltersAndDisplay();
@@ -1022,16 +971,14 @@ function applyFiltersAndDisplay() {
             return false;
         }
 
-        // Category filter (multiple selection)
-        if (activeFilters.categories.length > 0) {
-            const categoryMatch = activeFilters.categories.includes(String(t.category_id));
-            if (!categoryMatch) return false;
+        // Category filter (single selection)
+        if (activeFilters.category && String(t.category_id) !== activeFilters.category) {
+            return false;
         }
 
-        // Payment method filter (multiple selection)
-        if (activeFilters.paymentMethods.length > 0) {
-            const paymentMatch = activeFilters.paymentMethods.includes(String(t.payment_method_id));
-            if (!paymentMatch) return false;
+        // Payment method filter (single selection)
+        if (activeFilters.paymentMethod && String(t.payment_method_id) !== activeFilters.paymentMethod) {
+            return false;
         }
 
         // Transaction type filter
@@ -1043,15 +990,16 @@ function applyFiltersAndDisplay() {
             if (activeFilters.type === 'expense' && credit === 0) return false;
         }
 
-        // Status filters (is_done)
-        const isDone = t.is_done === true || t.is_done === 1;
-        if (isDone && !activeFilters.showDone) return false;
-        if (!isDone && !activeFilters.showNotDone) return false;
+        // Status filter
+        if (activeFilters.status) {
+            const isDone = t.is_done === true || t.is_done === 1;
+            const isPaid = t.is_paid === true || t.is_paid === 1;
 
-        // Status filters (is_paid)
-        const isPaid = t.is_paid === true || t.is_paid === 1;
-        if (isPaid && !activeFilters.showPaid) return false;
-        if (!isPaid && !activeFilters.showUnpaid) return false;
+            if (activeFilters.status === 'done' && !isDone) return false;
+            if (activeFilters.status === 'not_done' && isDone) return false;
+            if (activeFilters.status === 'paid' && !isPaid) return false;
+            if (activeFilters.status === 'unpaid' && isPaid) return false;
+        }
 
         // Amount range filter
         const amount = parseFloat(t.debit || t.credit || 0);
@@ -1091,23 +1039,19 @@ function displayActiveFilters() {
     }
 
     // Category filter
-    if (activeFilters.categories.length > 0) {
+    if (activeFilters.category) {
         hasActiveFilters = true;
-        const categoryNames = activeFilters.categories.map(catId => {
-            const cat = currentCategories.find(c => c.id == catId);
-            return cat ? cat.name : catId;
-        }).join(', ');
-        listEl.innerHTML += `<span class="badge bg-info">Categories: ${categoryNames}</span>`;
+        const cat = currentCategories.find(c => c.id == activeFilters.category);
+        const categoryName = cat ? cat.name : activeFilters.category;
+        listEl.innerHTML += `<span class="badge bg-info">Category: ${categoryName}</span>`;
     }
 
     // Payment method filter
-    if (activeFilters.paymentMethods.length > 0) {
+    if (activeFilters.paymentMethod) {
         hasActiveFilters = true;
-        const methodNames = activeFilters.paymentMethods.map(methodId => {
-            const method = paymentMethods.find(m => m.id == methodId);
-            return method ? method.name : methodId;
-        }).join(', ');
-        listEl.innerHTML += `<span class="badge bg-info">Payment Methods: ${methodNames}</span>`;
+        const method = paymentMethods.find(m => m.id == activeFilters.paymentMethod);
+        const methodName = method ? method.name : activeFilters.paymentMethod;
+        listEl.innerHTML += `<span class="badge bg-info">Payment Method: ${methodName}</span>`;
     }
 
     // Type filter
@@ -1117,23 +1061,15 @@ function displayActiveFilters() {
         listEl.innerHTML += `<span class="badge bg-success">Type: ${typeLabel}</span>`;
     }
 
-    // Status filters
-    if (!activeFilters.showDone || !activeFilters.showNotDone) {
+    // Status filter
+    if (activeFilters.status) {
         hasActiveFilters = true;
-        if (activeFilters.showDone && !activeFilters.showNotDone) {
-            listEl.innerHTML += `<span class="badge bg-warning">Only Done</span>`;
-        } else if (!activeFilters.showDone && activeFilters.showNotDone) {
-            listEl.innerHTML += `<span class="badge bg-warning">Only Not Done</span>`;
-        }
-    }
-
-    if (!activeFilters.showPaid || !activeFilters.showUnpaid) {
-        hasActiveFilters = true;
-        if (activeFilters.showPaid && !activeFilters.showUnpaid) {
-            listEl.innerHTML += `<span class="badge bg-warning">Only Paid</span>`;
-        } else if (!activeFilters.showPaid && activeFilters.showUnpaid) {
-            listEl.innerHTML += `<span class="badge bg-warning">Only Unpaid</span>`;
-        }
+        let statusLabel = '';
+        if (activeFilters.status === 'done') statusLabel = 'Done Only';
+        else if (activeFilters.status === 'not_done') statusLabel = 'Not Done Only';
+        else if (activeFilters.status === 'paid') statusLabel = 'Paid Only';
+        else if (activeFilters.status === 'unpaid') statusLabel = 'Unpaid Only';
+        listEl.innerHTML += `<span class="badge bg-warning">Status: ${statusLabel}</span>`;
     }
 
     // Amount range
@@ -1175,11 +1111,10 @@ function displayActiveFilters() {
             let filterCount = 0;
             if (activeFilters.description) filterCount++;
             if (activeFilters.notes) filterCount++;
-            if (activeFilters.categories.length > 0) filterCount++;
-            if (activeFilters.paymentMethods.length > 0) filterCount++;
+            if (activeFilters.category) filterCount++;
+            if (activeFilters.paymentMethod) filterCount++;
             if (activeFilters.type) filterCount++;
-            if (!activeFilters.showDone || !activeFilters.showNotDone) filterCount++;
-            if (!activeFilters.showPaid || !activeFilters.showUnpaid) filterCount++;
+            if (activeFilters.status) filterCount++;
             if (activeFilters.minAmount !== null || activeFilters.maxAmount !== null) filterCount++;
             if (activeFilters.startDate || activeFilters.endDate) filterCount++;
 
