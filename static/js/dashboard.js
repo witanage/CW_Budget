@@ -18,6 +18,7 @@ let currentCategories = [];
 let paymentMethods = [];
 let currentTransactionId = null;
 let reportFiltersInitialized = false; // Flag to prevent duplicate event listeners
+let activeFilters = null; // Store active filter criteria
 
 // Geolocation helper function
 function getGeolocation() {
@@ -227,6 +228,22 @@ function setupFormButtons() {
     if (creditCardForm) {
         creditCardForm.addEventListener('submit', saveCreditCard);
     }
+
+    // Filter buttons
+    const applyFiltersBtn = document.getElementById('applyFiltersBtn');
+    if (applyFiltersBtn) {
+        applyFiltersBtn.addEventListener('click', applyAdvancedFilters);
+    }
+
+    const resetFiltersBtn = document.getElementById('resetFiltersBtn');
+    if (resetFiltersBtn) {
+        resetFiltersBtn.addEventListener('click', resetFilters);
+    }
+
+    const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+    if (clearFiltersBtn) {
+        clearFiltersBtn.addEventListener('click', clearActiveFilters);
+    }
 }
 
 // ================================
@@ -257,6 +274,15 @@ function populateCategoryDropdowns(categories) {
             });
         }
     });
+
+    // Also populate filter dropdown
+    const filterDropdown = document.getElementById('filterCategory');
+    if (filterDropdown) {
+        filterDropdown.innerHTML = '<option value="">All Categories</option>';
+        categories.forEach(cat => {
+            filterDropdown.innerHTML += `<option value="${cat.id}">${cat.name} (${cat.type})</option>`;
+        });
+    }
 }
 
 // ================================
@@ -349,6 +375,103 @@ function updateRecentTransactions(transactions) {
 // ================================
 // TRANSACTIONS PAGE
 // ================================
+
+// Advanced Filter Functions
+function applyAdvancedFilters() {
+    const filters = {
+        dateFrom: document.getElementById('filterDateFrom').value,
+        dateTo: document.getElementById('filterDateTo').value,
+        category: document.getElementById('filterCategory').value,
+        paymentMethod: document.getElementById('filterPaymentMethod').value,
+        amountMin: document.getElementById('filterAmountMin').value,
+        amountMax: document.getElementById('filterAmountMax').value,
+        transactionType: document.getElementById('filterTransactionType').value,
+        searchText: document.getElementById('filterSearchText').value,
+        doneStatus: document.getElementById('filterDoneStatus').value,
+        paidStatus: document.getElementById('filterPaidStatus').value
+    };
+
+    // Check if any filters are applied
+    const hasFilters = Object.values(filters).some(val => val !== '' && val !== null);
+
+    if (!hasFilters) {
+        showToast('Please select at least one filter', 'warning');
+        return;
+    }
+
+    // Store active filters
+    activeFilters = filters;
+
+    // Close modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById('filterModal'));
+    modal.hide();
+
+    // Load filtered transactions
+    loadFilteredTransactions();
+
+    // Show clear filters button and active filters text
+    document.getElementById('clearFiltersBtn').style.display = 'inline-block';
+    updateActiveFiltersText(filters);
+}
+
+function loadFilteredTransactions() {
+    if (!activeFilters) return;
+
+    showLoading();
+
+    // Build query string
+    const params = new URLSearchParams();
+    Object.keys(activeFilters).forEach(key => {
+        if (activeFilters[key]) {
+            params.append(key, activeFilters[key]);
+        }
+    });
+
+    fetch(`/api/transactions/filter?${params.toString()}`)
+        .then(response => response.json())
+        .then(data => {
+            console.log('Filtered transactions received:', data);
+            displayTransactions(data);
+            hideLoading();
+        })
+        .catch(error => {
+            console.error('Error loading filtered transactions:', error);
+            showToast('Error applying filters', 'danger');
+            hideLoading();
+        });
+}
+
+function resetFilters() {
+    // Clear all filter form fields
+    document.getElementById('filterDateFrom').value = '';
+    document.getElementById('filterDateTo').value = '';
+    document.getElementById('filterCategory').value = '';
+    document.getElementById('filterPaymentMethod').value = '';
+    document.getElementById('filterAmountMin').value = '';
+    document.getElementById('filterAmountMax').value = '';
+    document.getElementById('filterTransactionType').value = '';
+    document.getElementById('filterSearchText').value = '';
+    document.getElementById('filterDoneStatus').value = '';
+    document.getElementById('filterPaidStatus').value = '';
+}
+
+function clearActiveFilters() {
+    activeFilters = null;
+    document.getElementById('clearFiltersBtn').style.display = 'none';
+    document.getElementById('activeFiltersText').style.display = 'none';
+
+    // Reload normal transactions for current month
+    loadTransactions();
+
+    showToast('Filters cleared', 'success');
+}
+
+function updateActiveFiltersText(filters) {
+    const text = document.getElementById('activeFiltersText');
+    const filterCount = Object.values(filters).filter(val => val !== '' && val !== null).length;
+    text.textContent = `${filterCount} filter${filterCount > 1 ? 's' : ''} active`;
+    text.style.display = 'inline-block';
+}
 
 function loadTransactions() {
     const year = document.getElementById('yearSelect')?.value || new Date().getFullYear();
@@ -1669,6 +1792,15 @@ function loadPaymentMethods() {
             // Ensure we always have an array
             paymentMethods = Array.isArray(methods) ? methods : [];
             console.log('✓ Loaded', paymentMethods.length, 'payment methods');
+
+            // Populate filter dropdown
+            const filterDropdown = document.getElementById('filterPaymentMethod');
+            if (filterDropdown) {
+                filterDropdown.innerHTML = '<option value="">All Payment Methods</option>';
+                paymentMethods.forEach(method => {
+                    filterDropdown.innerHTML += `<option value="${method.id}">${method.name}</option>`;
+                });
+            }
         })
         .catch(error => {
             console.error('✗ Error loading payment methods:', error);
