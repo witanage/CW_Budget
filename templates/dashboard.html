@@ -674,41 +674,41 @@
                     <!-- Category Filter -->
                     <div class="col-md-6">
                         <label for="filterCategory" class="form-label">Category</label>
-                        <select class="form-select" id="filterCategory">
-                            <option value="">All Categories</option>
+                        <select class="form-select" id="filterCategory" multiple size="5">
                             <!-- Categories will be populated here -->
                         </select>
+                        <small class="text-muted">Hold Ctrl/Cmd to select multiple</small>
                     </div>
 
                     <!-- Payment Method Filter -->
                     <div class="col-md-6">
                         <label for="filterPaymentMethod" class="form-label">Payment Method</label>
-                        <select class="form-select" id="filterPaymentMethod">
-                            <option value="">All Methods</option>
+                        <select class="form-select" id="filterPaymentMethod" multiple size="5">
                             <!-- Payment methods will be populated here -->
                         </select>
+                        <small class="text-muted">Hold Ctrl/Cmd to select multiple</small>
                     </div>
 
                     <!-- Transaction Type -->
                     <div class="col-md-6">
                         <label for="filterType" class="form-label">Transaction Type</label>
-                        <select class="form-select" id="filterType">
-                            <option value="">All Types</option>
+                        <select class="form-select" id="filterType" multiple size="3">
                             <option value="income">Income (Debit)</option>
                             <option value="expense">Expense (Credit)</option>
                         </select>
+                        <small class="text-muted">Hold Ctrl/Cmd to select multiple</small>
                     </div>
 
                     <!-- Status Filter -->
                     <div class="col-md-6">
                         <label for="filterStatus" class="form-label">Status</label>
-                        <select class="form-select" id="filterStatus">
-                            <option value="">All Statuses</option>
-                            <option value="done">Done Only</option>
-                            <option value="not_done">Not Done Only</option>
-                            <option value="paid">Paid Only</option>
-                            <option value="unpaid">Unpaid Only</option>
+                        <select class="form-select" id="filterStatus" multiple size="4">
+                            <option value="done">Done</option>
+                            <option value="not_done">Not Done</option>
+                            <option value="paid">Paid</option>
+                            <option value="unpaid">Unpaid</option>
                         </select>
+                        <small class="text-muted">Hold Ctrl/Cmd to select multiple</small>
                     </div>
 
                     <!-- Amount Range -->
