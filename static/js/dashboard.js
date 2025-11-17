@@ -293,6 +293,15 @@ function populateCategoryDropdowns(categories) {
             });
         }
     });
+
+    // Also populate filter dropdown
+    const filterDropdown = document.getElementById('filterCategory');
+    if (filterDropdown) {
+        filterDropdown.innerHTML = '<option value="">All Categories</option>';
+        categories.forEach(cat => {
+            filterDropdown.innerHTML += `<option value="${cat.id}">${cat.name} (${cat.type})</option>`;
+        });
+    }
 }
 
 // ================================
@@ -1338,36 +1347,40 @@ function initializeReportFilters(year, month) {
     // Set current month
     monthSelect.value = month;
 
-    // Add event listeners
-    yearSelect.addEventListener('change', () => {
-        const selectedYear = yearSelect.value;
-        const selectedMonth = monthSelect.value;
-        const selectedRange = rangeSelect.value;
-        loadAllReports(selectedYear, selectedMonth, selectedRange);
-    });
+    // Add event listeners only once
+    if (!reportFiltersInitialized) {
+        yearSelect.addEventListener('change', () => {
+            const selectedYear = yearSelect.value;
+            const selectedMonth = monthSelect.value;
+            const selectedRange = rangeSelect.value;
+            loadAllReports(selectedYear, selectedMonth, selectedRange);
+        });
 
-    monthSelect.addEventListener('change', () => {
-        const selectedYear = yearSelect.value;
-        const selectedMonth = monthSelect.value;
-        const selectedRange = rangeSelect.value;
-        loadAllReports(selectedYear, selectedMonth, selectedRange);
-    });
+        monthSelect.addEventListener('change', () => {
+            const selectedYear = yearSelect.value;
+            const selectedMonth = monthSelect.value;
+            const selectedRange = rangeSelect.value;
+            loadAllReports(selectedYear, selectedMonth, selectedRange);
+        });
 
-    rangeSelect.addEventListener('change', () => {
-        const selectedYear = yearSelect.value;
-        const selectedMonth = monthSelect.value;
-        const selectedRange = rangeSelect.value;
+        rangeSelect.addEventListener('change', () => {
+            const selectedYear = yearSelect.value;
+            const selectedMonth = monthSelect.value;
+            const selectedRange = rangeSelect.value;
 
-        // Show/hide month selector based on range type
-        const monthContainer = document.getElementById('reportMonthContainer');
-        if (selectedRange === 'yearly') {
-            monthContainer.style.display = 'none';
-        } else {
-            monthContainer.style.display = 'block';
-        }
+            // Show/hide month selector based on range type
+            const monthContainer = document.getElementById('reportMonthContainer');
+            if (selectedRange === 'yearly') {
+                monthContainer.style.display = 'none';
+            } else {
+                monthContainer.style.display = 'block';
+            }
 
-        loadAllReports(selectedYear, selectedMonth, selectedRange);
-    });
+            loadAllReports(selectedYear, selectedMonth, selectedRange);
+        });
+
+        reportFiltersInitialized = true;
+    }
 }
 
 function loadAllReports(year, month, rangeType) {
@@ -2077,6 +2090,15 @@ function loadPaymentMethods() {
             // Ensure we always have an array
             paymentMethods = Array.isArray(methods) ? methods : [];
             console.log('✓ Loaded', paymentMethods.length, 'payment methods');
+
+            // Populate filter dropdown
+            const filterDropdown = document.getElementById('filterPaymentMethod');
+            if (filterDropdown) {
+                filterDropdown.innerHTML = '<option value="">All Payment Methods</option>';
+                paymentMethods.forEach(method => {
+                    filterDropdown.innerHTML += `<option value="${method.id}">${method.name}</option>`;
+                });
+            }
         })
         .catch(error => {
             console.error('✗ Error loading payment methods:', error);

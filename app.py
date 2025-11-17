@@ -862,6 +862,145 @@ def transactions():
         cursor.close()
         connection.close()
 
+@app.route('/api/transactions/filter', methods=['GET'])
+@login_required
+def filter_transactions():
+    """Filter transactions across all data with advanced criteria."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    try:
+        cursor = connection.cursor(dictionary=True)
+        user_id = session.get('user_id')
+
+        # Get filter parameters
+        date_from = request.args.get('dateFrom')
+        date_to = request.args.get('dateTo')
+        category_id = request.args.get('category')
+        payment_method_id = request.args.get('paymentMethod')
+        amount_min = request.args.get('amountMin')
+        amount_max = request.args.get('amountMax')
+        transaction_type = request.args.get('transactionType')  # 'debit' or 'credit'
+        search_text = request.args.get('searchText')
+        done_status = request.args.get('doneStatus')  # 'done', 'not_done', or empty
+        paid_status = request.args.get('paidStatus')  # 'paid', 'not_paid', or empty
+
+        # Build SQL query with filters
+        query = """
+            SELECT t.*,
+                   c.name as category_name,
+                   pm.name as payment_method_name,
+                   pm.type as payment_method_type,
+                   pm.color as payment_method_color,
+                   mr.year,
+                   mr.month,
+                   mr.month_name
+            FROM transactions t
+            LEFT JOIN categories c ON t.category_id = c.id
+            LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id
+            INNER JOIN monthly_records mr ON t.monthly_record_id = mr.id
+            WHERE mr.user_id = %s
+        """
+
+        params = [user_id]
+
+        # Add date range filter
+        if date_from:
+            query += " AND t.transaction_date >= %s"
+            params.append(date_from)
+
+        if date_to:
+            query += " AND t.transaction_date <= %s"
+            params.append(date_to)
+
+        # Add category filter
+        if category_id:
+            query += " AND t.category_id = %s"
+            params.append(int(category_id))
+
+        # Add payment method filter
+        if payment_method_id:
+            query += " AND t.payment_method_id = %s"
+            params.append(int(payment_method_id))
+
+        # Add amount filter based on transaction type
+        if transaction_type == 'debit':
+            # Income transactions (debit > 0)
+            query += " AND t.debit > 0"
+            if amount_min:
+                query += " AND t.debit >= %s"
+                params.append(float(amount_min))
+            if amount_max:
+                query += " AND t.debit <= %s"
+                params.append(float(amount_max))
+        elif transaction_type == 'credit':
+            # Expense transactions (credit > 0)
+            query += " AND t.credit > 0"
+            if amount_min:
+                query += " AND t.credit >= %s"
+                params.append(float(amount_min))
+            if amount_max:
+                query += " AND t.credit <= %s"
+                params.append(float(amount_max))
+        else:
+            # Both types - check either debit or credit
+            if amount_min or amount_max:
+                amount_conditions = []
+                if amount_min:
+                    amount_conditions.append("(t.debit >= %s OR t.credit >= %s)")
+                    params.extend([float(amount_min), float(amount_min)])
+                if amount_max:
+                    amount_conditions.append("(t.debit <= %s OR t.credit <= %s)")
+                    params.extend([float(amount_max), float(amount_max)])
+                if amount_conditions:
+                    query += " AND " + " AND ".join(amount_conditions)
+
+        # Add text search filter (search in description and notes)
+        if search_text:
+            query += " AND (t.description LIKE %s OR t.notes LIKE %s)"
+            search_pattern = f"%{search_text}%"
+            params.extend([search_pattern, search_pattern])
+
+        # Add done status filter
+        if done_status == 'done':
+            query += " AND t.is_done = 1"
+        elif done_status == 'not_done':
+            query += " AND t.is_done = 0"
+
+        # Add paid status filter
+        if paid_status == 'paid':
+            query += " AND t.is_paid = 1"
+        elif paid_status == 'not_paid':
+            query += " AND t.is_paid = 0"
+
+        # Order by date descending (most recent first)
+        query += " ORDER BY t.transaction_date DESC, t.id DESC"
+
+        # Limit results to prevent overload (max 500 transactions)
+        query += " LIMIT 500"
+
+        cursor.execute(query, params)
+        transactions = cursor.fetchall()
+
+        # Calculate running balance for filtered transactions
+        running_balance = 0
+        for trans in reversed(transactions):
+            running_balance += (trans['debit'] or 0) - (trans['credit'] or 0)
+            trans['balance'] = running_balance
+
+        # Reverse back to show most recent first
+        transactions.reverse()
+
+        return jsonify(transactions)
+
+    except Exception as e:
+        print(f"Error filtering transactions: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
 @app.route('/api/transactions/<int:transaction_id>', methods=['PUT', 'DELETE'])
 @login_required
 def manage_transaction(transaction_id):
