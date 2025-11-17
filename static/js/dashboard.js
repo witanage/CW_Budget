@@ -1131,6 +1131,9 @@ function clearFiltersWithoutReload() {
 function clearFilters() {
     clearFiltersWithoutReload();
 
+    // Close the modal
+    closeModal('filterModal');
+
     // Reload transactions from backend without filters
     loadTransactions(false);
 
