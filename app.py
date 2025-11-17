@@ -798,11 +798,11 @@ def transactions():
 
                 # Date range filter
                 if start_date:
-                    where_clauses.append("t.transaction_date >= %s")
+                    where_clauses.append("DATE(t.transaction_date) >= %s")
                     params.append(start_date)
 
                 if end_date:
-                    where_clauses.append("t.transaction_date <= %s")
+                    where_clauses.append("DATE(t.transaction_date) <= %s")
                     params.append(end_date)
 
                 # Combine WHERE clauses
@@ -942,11 +942,11 @@ def filter_transactions():
 
         # Add date range filter
         if date_from:
-            query += " AND t.transaction_date >= %s"
+            query += " AND DATE(t.transaction_date) >= %s"
             params.append(date_from)
 
         if date_to:
-            query += " AND t.transaction_date <= %s"
+            query += " AND DATE(t.transaction_date) <= %s"
             params.append(date_to)
 
         # Add category filter
