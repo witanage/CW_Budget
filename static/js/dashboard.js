@@ -386,18 +386,55 @@ function updateRecentTransactions(transactions) {
 // TRANSACTIONS PAGE
 // ================================
 
-function loadTransactions() {
+function loadTransactions(applyActiveFilters = false) {
     const year = document.getElementById('yearSelect')?.value || new Date().getFullYear();
     const month = document.getElementById('monthSelect')?.value || (new Date().getMonth() + 1);
 
     showLoading();
 
-    fetch(`/api/transactions?year=${year}&month=${month}`)
+    // Build query parameters
+    let queryParams = `year=${year}&month=${month}`;
+
+    // Add filter parameters if requested
+    if (applyActiveFilters) {
+        if (activeFilters.description) {
+            queryParams += `&description=${encodeURIComponent(activeFilters.description)}`;
+        }
+        if (activeFilters.notes) {
+            queryParams += `&notes=${encodeURIComponent(activeFilters.notes)}`;
+        }
+        if (activeFilters.categories.length > 0) {
+            queryParams += `&categories=${activeFilters.categories.join(',')}`;
+        }
+        if (activeFilters.paymentMethods.length > 0) {
+            queryParams += `&paymentMethods=${activeFilters.paymentMethods.join(',')}`;
+        }
+        if (activeFilters.types.length > 0) {
+            queryParams += `&types=${activeFilters.types.join(',')}`;
+        }
+        if (activeFilters.statuses.length > 0) {
+            queryParams += `&statuses=${activeFilters.statuses.join(',')}`;
+        }
+        if (activeFilters.minAmount !== null) {
+            queryParams += `&minAmount=${activeFilters.minAmount}`;
+        }
+        if (activeFilters.maxAmount !== null) {
+            queryParams += `&maxAmount=${activeFilters.maxAmount}`;
+        }
+        if (activeFilters.startDate) {
+            queryParams += `&startDate=${activeFilters.startDate}`;
+        }
+        if (activeFilters.endDate) {
+            queryParams += `&endDate=${activeFilters.endDate}`;
+        }
+    }
+
+    fetch(`/api/transactions?${queryParams}`)
         .then(response => response.json())
         .then(data => {
             console.log('Transactions received:', data);
             allTransactions = data; // Store all transactions globally
-            applyFiltersAndDisplay(); // Apply filters and display
+            displayTransactions(data); // Display transactions directly
             hideLoading();
         })
         .catch(error => {
@@ -981,8 +1018,8 @@ function updateStatusLabel() {
 
 function applyFilters() {
     // Get filter values
-    activeFilters.description = document.getElementById('filterDescription')?.value.toLowerCase().trim() || '';
-    activeFilters.notes = document.getElementById('filterNotes')?.value.toLowerCase().trim() || '';
+    activeFilters.description = document.getElementById('filterDescription')?.value.trim() || '';
+    activeFilters.notes = document.getElementById('filterNotes')?.value.trim() || '';
 
     // Get selected categories (from checkboxes)
     activeFilters.categories = [];
@@ -1020,14 +1057,14 @@ function applyFilters() {
 
     console.log('Active filters:', activeFilters);
 
-    // Apply filters and display
-    applyFiltersAndDisplay();
-
     // Update active filters display
     displayActiveFilters();
 
     // Close modal
     closeModal('filterModal');
+
+    // Load transactions from backend with filters
+    loadTransactions(true);
 
     showToast('Filters applied successfully', 'success');
 }
@@ -1075,85 +1112,13 @@ function clearFilters() {
     updateTypeLabel();
     updateStatusLabel();
 
-    // Re-display all transactions
-    applyFiltersAndDisplay();
-
     // Update active filters display and badge
     displayActiveFilters();
 
+    // Reload transactions from backend without filters
+    loadTransactions(false);
+
     showToast('All filters cleared', 'info');
-}
-
-function applyFiltersAndDisplay() {
-    if (!allTransactions || allTransactions.length === 0) {
-        displayTransactions([]);
-        return;
-    }
-
-    // Filter transactions based on active filters
-    const filtered = allTransactions.filter(t => {
-        // Description filter
-        if (activeFilters.description && !t.description.toLowerCase().includes(activeFilters.description)) {
-            return false;
-        }
-
-        // Notes filter
-        if (activeFilters.notes && (!t.notes || !t.notes.toLowerCase().includes(activeFilters.notes))) {
-            return false;
-        }
-
-        // Category filter (multiple selection)
-        if (activeFilters.categories.length > 0) {
-            const categoryMatch = activeFilters.categories.includes(String(t.category_id));
-            if (!categoryMatch) return false;
-        }
-
-        // Payment method filter (multiple selection)
-        if (activeFilters.paymentMethods.length > 0) {
-            const paymentMatch = activeFilters.paymentMethods.includes(String(t.payment_method_id));
-            if (!paymentMatch) return false;
-        }
-
-        // Transaction type filter (multiple selection)
-        if (activeFilters.types.length > 0) {
-            const debit = parseFloat(t.debit) || 0;
-            const credit = parseFloat(t.credit) || 0;
-
-            let typeMatch = false;
-            if (activeFilters.types.includes('income') && debit > 0) typeMatch = true;
-            if (activeFilters.types.includes('expense') && credit > 0) typeMatch = true;
-
-            if (!typeMatch) return false;
-        }
-
-        // Status filter (multiple selection)
-        if (activeFilters.statuses.length > 0) {
-            const isDone = t.is_done === true || t.is_done === 1;
-            const isPaid = t.is_paid === true || t.is_paid === 1;
-
-            let statusMatch = false;
-            if (activeFilters.statuses.includes('done') && isDone) statusMatch = true;
-            if (activeFilters.statuses.includes('not_done') && !isDone) statusMatch = true;
-            if (activeFilters.statuses.includes('paid') && isPaid) statusMatch = true;
-            if (activeFilters.statuses.includes('unpaid') && !isPaid) statusMatch = true;
-
-            if (!statusMatch) return false;
-        }
-
-        // Amount range filter
-        const amount = parseFloat(t.debit || t.credit || 0);
-        if (activeFilters.minAmount !== null && amount < activeFilters.minAmount) return false;
-        if (activeFilters.maxAmount !== null && amount > activeFilters.maxAmount) return false;
-
-        // Date range filter
-        if (activeFilters.startDate && t.transaction_date < activeFilters.startDate) return false;
-        if (activeFilters.endDate && t.transaction_date > activeFilters.endDate) return false;
-
-        return true;
-    });
-
-    console.log(`Filtered ${filtered.length} of ${allTransactions.length} transactions`);
-    displayTransactions(filtered);
 }
 
 function displayActiveFilters() {
