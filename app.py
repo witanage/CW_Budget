@@ -801,7 +801,7 @@ def filter_transactions():
             SELECT t.*,
                    c.name as category_name,
                    pm.name as payment_method_name,
-                   pm.icon as payment_method_icon,
+                   pm.type as payment_method_type,
                    pm.color as payment_method_color,
                    mr.year,
                    mr.month,
