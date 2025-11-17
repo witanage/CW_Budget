@@ -17,6 +17,7 @@ let charts = {
 let currentCategories = [];
 let paymentMethods = [];
 let currentTransactionId = null;
+let reportFiltersInitialized = false; // Flag to prevent duplicate event listeners
 
 // Geolocation helper function
 function getGeolocation() {
@@ -925,36 +926,40 @@ function initializeReportFilters(year, month) {
     // Set current month
     monthSelect.value = month;
 
-    // Add event listeners
-    yearSelect.addEventListener('change', () => {
-        const selectedYear = yearSelect.value;
-        const selectedMonth = monthSelect.value;
-        const selectedRange = rangeSelect.value;
-        loadAllReports(selectedYear, selectedMonth, selectedRange);
-    });
+    // Add event listeners only once
+    if (!reportFiltersInitialized) {
+        yearSelect.addEventListener('change', () => {
+            const selectedYear = yearSelect.value;
+            const selectedMonth = monthSelect.value;
+            const selectedRange = rangeSelect.value;
+            loadAllReports(selectedYear, selectedMonth, selectedRange);
+        });
 
-    monthSelect.addEventListener('change', () => {
-        const selectedYear = yearSelect.value;
-        const selectedMonth = monthSelect.value;
-        const selectedRange = rangeSelect.value;
-        loadAllReports(selectedYear, selectedMonth, selectedRange);
-    });
+        monthSelect.addEventListener('change', () => {
+            const selectedYear = yearSelect.value;
+            const selectedMonth = monthSelect.value;
+            const selectedRange = rangeSelect.value;
+            loadAllReports(selectedYear, selectedMonth, selectedRange);
+        });
 
-    rangeSelect.addEventListener('change', () => {
-        const selectedYear = yearSelect.value;
-        const selectedMonth = monthSelect.value;
-        const selectedRange = rangeSelect.value;
+        rangeSelect.addEventListener('change', () => {
+            const selectedYear = yearSelect.value;
+            const selectedMonth = monthSelect.value;
+            const selectedRange = rangeSelect.value;
 
-        // Show/hide month selector based on range type
-        const monthContainer = document.getElementById('reportMonthContainer');
-        if (selectedRange === 'yearly') {
-            monthContainer.style.display = 'none';
-        } else {
-            monthContainer.style.display = 'block';
-        }
+            // Show/hide month selector based on range type
+            const monthContainer = document.getElementById('reportMonthContainer');
+            if (selectedRange === 'yearly') {
+                monthContainer.style.display = 'none';
+            } else {
+                monthContainer.style.display = 'block';
+            }
 
-        loadAllReports(selectedYear, selectedMonth, selectedRange);
-    });
+            loadAllReports(selectedYear, selectedMonth, selectedRange);
+        });
+
+        reportFiltersInitialized = true;
+    }
 }
 
 function loadAllReports(year, month, rangeType) {
