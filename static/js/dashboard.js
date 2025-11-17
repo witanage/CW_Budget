@@ -30,6 +30,8 @@ let activeFilters = {
     endDate: null,
     notes: ''
 };
+let reportFiltersInitialized = false;
+let filterDropdownsInitialized = false;
 
 // Geolocation helper function
 function getGeolocation() {
@@ -958,14 +960,18 @@ function populateFilterDropdowns() {
         });
     }
 
-    // Add event listeners for type and status checkboxes
-    document.querySelectorAll('.filter-type-checkbox').forEach(checkbox => {
-        checkbox.addEventListener('change', updateTypeLabel);
-    });
+    // Add event listeners for type and status checkboxes (only once)
+    if (!filterDropdownsInitialized) {
+        document.querySelectorAll('.filter-type-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', updateTypeLabel);
+        });
 
-    document.querySelectorAll('.filter-status-checkbox').forEach(checkbox => {
-        checkbox.addEventListener('change', updateStatusLabel);
-    });
+        document.querySelectorAll('.filter-status-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', updateStatusLabel);
+        });
+
+        filterDropdownsInitialized = true;
+    }
 }
 
 // Update label functions
