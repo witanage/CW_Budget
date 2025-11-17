@@ -17,8 +17,19 @@ let charts = {
 let currentCategories = [];
 let paymentMethods = [];
 let currentTransactionId = null;
-let reportFiltersInitialized = false; // Flag to prevent duplicate event listeners
-let activeFilters = null; // Store active filter criteria
+let allTransactions = [];
+let activeFilters = {
+    description: '',
+    categories: [],
+    paymentMethods: [],
+    types: [],
+    statuses: [],
+    minAmount: null,
+    maxAmount: null,
+    startDate: null,
+    endDate: null,
+    notes: ''
+};
 
 // Geolocation helper function
 function getGeolocation() {
@@ -232,18 +243,26 @@ function setupFormButtons() {
     // Filter buttons
     const applyFiltersBtn = document.getElementById('applyFiltersBtn');
     if (applyFiltersBtn) {
-        applyFiltersBtn.addEventListener('click', applyAdvancedFilters);
-    }
-
-    const resetFiltersBtn = document.getElementById('resetFiltersBtn');
-    if (resetFiltersBtn) {
-        resetFiltersBtn.addEventListener('click', resetFilters);
+        applyFiltersBtn.addEventListener('click', applyFilters);
     }
 
     const clearFiltersBtn = document.getElementById('clearFiltersBtn');
     if (clearFiltersBtn) {
-        clearFiltersBtn.addEventListener('click', clearActiveFilters);
+        clearFiltersBtn.addEventListener('click', clearFilters);
     }
+
+    // Setup filter modal to populate dropdowns when shown
+    const filterModal = document.getElementById('filterModal');
+    if (filterModal) {
+        filterModal.addEventListener('shown.bs.modal', populateFilterDropdowns);
+    }
+
+    // Prevent dropdown from closing when clicking on dropdown items (for checkboxes)
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.dropdown-item')) {
+            e.stopPropagation();
+        }
+    });
 }
 
 // ================================
@@ -376,114 +395,55 @@ function updateRecentTransactions(transactions) {
 // TRANSACTIONS PAGE
 // ================================
 
-// Advanced Filter Functions
-function applyAdvancedFilters() {
-    const filters = {
-        dateFrom: document.getElementById('filterDateFrom').value,
-        dateTo: document.getElementById('filterDateTo').value,
-        category: document.getElementById('filterCategory').value,
-        paymentMethod: document.getElementById('filterPaymentMethod').value,
-        amountMin: document.getElementById('filterAmountMin').value,
-        amountMax: document.getElementById('filterAmountMax').value,
-        transactionType: document.getElementById('filterTransactionType').value,
-        searchText: document.getElementById('filterSearchText').value,
-        doneStatus: document.getElementById('filterDoneStatus').value,
-        paidStatus: document.getElementById('filterPaidStatus').value
-    };
-
-    // Check if any filters are applied
-    const hasFilters = Object.values(filters).some(val => val !== '' && val !== null);
-
-    if (!hasFilters) {
-        showToast('Please select at least one filter', 'warning');
-        return;
-    }
-
-    // Store active filters
-    activeFilters = filters;
-
-    // Close modal
-    const modal = bootstrap.Modal.getInstance(document.getElementById('filterModal'));
-    modal.hide();
-
-    // Load filtered transactions
-    loadFilteredTransactions();
-
-    // Show clear filters button and active filters text
-    document.getElementById('clearFiltersBtn').style.display = 'inline-block';
-    updateActiveFiltersText(filters);
-}
-
-function loadFilteredTransactions() {
-    if (!activeFilters) return;
-
-    showLoading();
-
-    // Build query string
-    const params = new URLSearchParams();
-    Object.keys(activeFilters).forEach(key => {
-        if (activeFilters[key]) {
-            params.append(key, activeFilters[key]);
-        }
-    });
-
-    fetch(`/api/transactions/filter?${params.toString()}`)
-        .then(response => response.json())
-        .then(data => {
-            console.log('Filtered transactions received:', data);
-            displayTransactions(data);
-            hideLoading();
-        })
-        .catch(error => {
-            console.error('Error loading filtered transactions:', error);
-            showToast('Error applying filters', 'danger');
-            hideLoading();
-        });
-}
-
-function resetFilters() {
-    // Clear all filter form fields
-    document.getElementById('filterDateFrom').value = '';
-    document.getElementById('filterDateTo').value = '';
-    document.getElementById('filterCategory').value = '';
-    document.getElementById('filterPaymentMethod').value = '';
-    document.getElementById('filterAmountMin').value = '';
-    document.getElementById('filterAmountMax').value = '';
-    document.getElementById('filterTransactionType').value = '';
-    document.getElementById('filterSearchText').value = '';
-    document.getElementById('filterDoneStatus').value = '';
-    document.getElementById('filterPaidStatus').value = '';
-}
-
-function clearActiveFilters() {
-    activeFilters = null;
-    document.getElementById('clearFiltersBtn').style.display = 'none';
-    document.getElementById('activeFiltersText').style.display = 'none';
-
-    // Reload normal transactions for current month
-    loadTransactions();
-
-    showToast('Filters cleared', 'success');
-}
-
-function updateActiveFiltersText(filters) {
-    const text = document.getElementById('activeFiltersText');
-    const filterCount = Object.values(filters).filter(val => val !== '' && val !== null).length;
-    text.textContent = `${filterCount} filter${filterCount > 1 ? 's' : ''} active`;
-    text.style.display = 'inline-block';
-}
-
-function loadTransactions() {
+function loadTransactions(applyActiveFilters = false) {
     const year = document.getElementById('yearSelect')?.value || new Date().getFullYear();
     const month = document.getElementById('monthSelect')?.value || (new Date().getMonth() + 1);
 
     showLoading();
 
-    fetch(`/api/transactions?year=${year}&month=${month}`)
+    // Build query parameters
+    let queryParams = `year=${year}&month=${month}`;
+
+    // Add filter parameters if requested
+    if (applyActiveFilters) {
+        if (activeFilters.description) {
+            queryParams += `&description=${encodeURIComponent(activeFilters.description)}`;
+        }
+        if (activeFilters.notes) {
+            queryParams += `&notes=${encodeURIComponent(activeFilters.notes)}`;
+        }
+        if (activeFilters.categories.length > 0) {
+            queryParams += `&categories=${activeFilters.categories.join(',')}`;
+        }
+        if (activeFilters.paymentMethods.length > 0) {
+            queryParams += `&paymentMethods=${activeFilters.paymentMethods.join(',')}`;
+        }
+        if (activeFilters.types.length > 0) {
+            queryParams += `&types=${activeFilters.types.join(',')}`;
+        }
+        if (activeFilters.statuses.length > 0) {
+            queryParams += `&statuses=${activeFilters.statuses.join(',')}`;
+        }
+        if (activeFilters.minAmount !== null) {
+            queryParams += `&minAmount=${activeFilters.minAmount}`;
+        }
+        if (activeFilters.maxAmount !== null) {
+            queryParams += `&maxAmount=${activeFilters.maxAmount}`;
+        }
+        if (activeFilters.startDate) {
+            queryParams += `&startDate=${activeFilters.startDate}`;
+        }
+        if (activeFilters.endDate) {
+            queryParams += `&endDate=${activeFilters.endDate}`;
+        }
+    }
+
+    fetch(`/api/transactions?${queryParams}`)
         .then(response => response.json())
         .then(data => {
             console.log('Transactions received:', data);
-            displayTransactions(data);
+            allTransactions = data; // Store all transactions globally
+            displayTransactions(data); // Display transactions directly
             hideLoading();
         })
         .catch(error => {
@@ -945,6 +905,344 @@ function deleteTransaction(id) {
         'Delete',
         'btn-danger'
     );
+}
+
+// ================================
+// TRANSACTION FILTERS
+// ================================
+
+function populateFilterDropdowns() {
+    // Populate categories
+    const categoryMenu = document.getElementById('filterCategoryMenu');
+    if (categoryMenu) {
+        categoryMenu.innerHTML = '';
+        currentCategories.forEach(cat => {
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <div class="dropdown-item">
+                    <div class="form-check">
+                        <input class="form-check-input filter-category-checkbox" type="checkbox" value="${cat.id}" id="filterCat${cat.id}">
+                        <label class="form-check-label" for="filterCat${cat.id}">${cat.name} (${cat.type})</label>
+                    </div>
+                </div>
+            `;
+            categoryMenu.appendChild(li);
+        });
+
+        // Add event listeners to update label
+        categoryMenu.querySelectorAll('.filter-category-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', updateCategoryLabel);
+        });
+    }
+
+    // Populate payment methods
+    const paymentMenu = document.getElementById('filterPaymentMethodMenu');
+    if (paymentMenu && Array.isArray(paymentMethods)) {
+        paymentMenu.innerHTML = '';
+        paymentMethods.forEach(method => {
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <div class="dropdown-item">
+                    <div class="form-check">
+                        <input class="form-check-input filter-payment-checkbox" type="checkbox" value="${method.id}" id="filterPay${method.id}">
+                        <label class="form-check-label" for="filterPay${method.id}">${method.name} (${method.type === 'cash' ? 'Cash' : 'Credit Card'})</label>
+                    </div>
+                </div>
+            `;
+            paymentMenu.appendChild(li);
+        });
+
+        // Add event listeners to update label
+        paymentMenu.querySelectorAll('.filter-payment-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', updatePaymentMethodLabel);
+        });
+    }
+
+    // Add event listeners for type and status checkboxes
+    document.querySelectorAll('.filter-type-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', updateTypeLabel);
+    });
+
+    document.querySelectorAll('.filter-status-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', updateStatusLabel);
+    });
+}
+
+// Update label functions
+function updateCategoryLabel() {
+    const checkboxes = document.querySelectorAll('.filter-category-checkbox:checked');
+    const label = document.getElementById('filterCategoryLabel');
+    if (checkboxes.length === 0) {
+        label.textContent = 'All Categories';
+    } else if (checkboxes.length === 1) {
+        const catId = checkboxes[0].value;
+        const cat = currentCategories.find(c => c.id == catId);
+        label.textContent = cat ? cat.name : 'Selected';
+    } else {
+        label.textContent = `${checkboxes.length} selected`;
+    }
+}
+
+function updatePaymentMethodLabel() {
+    const checkboxes = document.querySelectorAll('.filter-payment-checkbox:checked');
+    const label = document.getElementById('filterPaymentMethodLabel');
+    if (checkboxes.length === 0) {
+        label.textContent = 'All Methods';
+    } else if (checkboxes.length === 1) {
+        const methodId = checkboxes[0].value;
+        const method = paymentMethods.find(m => m.id == methodId);
+        label.textContent = method ? method.name : 'Selected';
+    } else {
+        label.textContent = `${checkboxes.length} selected`;
+    }
+}
+
+function updateTypeLabel() {
+    const checkboxes = document.querySelectorAll('.filter-type-checkbox:checked');
+    const label = document.getElementById('filterTypeLabel');
+    if (checkboxes.length === 0) {
+        label.textContent = 'All Types';
+    } else if (checkboxes.length === 1) {
+        label.textContent = checkboxes[0].value === 'income' ? 'Income' : 'Expense';
+    } else {
+        label.textContent = `${checkboxes.length} selected`;
+    }
+}
+
+function updateStatusLabel() {
+    const checkboxes = document.querySelectorAll('.filter-status-checkbox:checked');
+    const label = document.getElementById('filterStatusLabel');
+    if (checkboxes.length === 0) {
+        label.textContent = 'All Statuses';
+    } else if (checkboxes.length === 1) {
+        const status = checkboxes[0].value;
+        if (status === 'done') label.textContent = 'Done';
+        else if (status === 'not_done') label.textContent = 'Not Done';
+        else if (status === 'paid') label.textContent = 'Paid';
+        else if (status === 'unpaid') label.textContent = 'Unpaid';
+    } else {
+        label.textContent = `${checkboxes.length} selected`;
+    }
+}
+
+function applyFilters() {
+    // Get filter values
+    activeFilters.description = document.getElementById('filterDescription')?.value.trim() || '';
+    activeFilters.notes = document.getElementById('filterNotes')?.value.trim() || '';
+
+    // Get selected categories (from checkboxes)
+    activeFilters.categories = [];
+    document.querySelectorAll('.filter-category-checkbox:checked').forEach(checkbox => {
+        activeFilters.categories.push(checkbox.value);
+    });
+
+    // Get selected payment methods (from checkboxes)
+    activeFilters.paymentMethods = [];
+    document.querySelectorAll('.filter-payment-checkbox:checked').forEach(checkbox => {
+        activeFilters.paymentMethods.push(checkbox.value);
+    });
+
+    // Get selected types (from checkboxes)
+    activeFilters.types = [];
+    document.querySelectorAll('.filter-type-checkbox:checked').forEach(checkbox => {
+        activeFilters.types.push(checkbox.value);
+    });
+
+    // Get selected statuses (from checkboxes)
+    activeFilters.statuses = [];
+    document.querySelectorAll('.filter-status-checkbox:checked').forEach(checkbox => {
+        activeFilters.statuses.push(checkbox.value);
+    });
+
+    // Get amount range
+    const minAmount = document.getElementById('filterMinAmount')?.value;
+    const maxAmount = document.getElementById('filterMaxAmount')?.value;
+    activeFilters.minAmount = minAmount ? parseFloat(minAmount) : null;
+    activeFilters.maxAmount = maxAmount ? parseFloat(maxAmount) : null;
+
+    // Get date range
+    activeFilters.startDate = document.getElementById('filterStartDate')?.value || null;
+    activeFilters.endDate = document.getElementById('filterEndDate')?.value || null;
+
+    console.log('Active filters:', activeFilters);
+
+    // Update active filters display
+    displayActiveFilters();
+
+    // Close modal
+    closeModal('filterModal');
+
+    // Load transactions from backend with filters
+    loadTransactions(true);
+
+    showToast('Filters applied successfully', 'success');
+}
+
+function clearFilters() {
+    // Reset filter values
+    activeFilters = {
+        description: '',
+        categories: [],
+        paymentMethods: [],
+        types: [],
+        statuses: [],
+        minAmount: null,
+        maxAmount: null,
+        startDate: null,
+        endDate: null,
+        notes: ''
+    };
+
+    // Clear form inputs
+    document.getElementById('filterDescription').value = '';
+    document.getElementById('filterNotes').value = '';
+    document.getElementById('filterMinAmount').value = '';
+    document.getElementById('filterMaxAmount').value = '';
+    document.getElementById('filterStartDate').value = '';
+    document.getElementById('filterEndDate').value = '';
+
+    // Uncheck all filter checkboxes
+    document.querySelectorAll('.filter-category-checkbox').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    document.querySelectorAll('.filter-payment-checkbox').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    document.querySelectorAll('.filter-type-checkbox').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    document.querySelectorAll('.filter-status-checkbox').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+
+    // Reset dropdown labels
+    updateCategoryLabel();
+    updatePaymentMethodLabel();
+    updateTypeLabel();
+    updateStatusLabel();
+
+    // Update active filters display and badge
+    displayActiveFilters();
+
+    // Reload transactions from backend without filters
+    loadTransactions(false);
+
+    showToast('All filters cleared', 'info');
+}
+
+function displayActiveFilters() {
+    const container = document.getElementById('activeFiltersDisplay');
+    const listEl = document.getElementById('activeFiltersList');
+
+    if (!container || !listEl) return;
+
+    listEl.innerHTML = '';
+    let hasActiveFilters = false;
+
+    // Description filter
+    if (activeFilters.description) {
+        hasActiveFilters = true;
+        listEl.innerHTML += `<span class="badge bg-primary">Description: "${activeFilters.description}"</span>`;
+    }
+
+    // Notes filter
+    if (activeFilters.notes) {
+        hasActiveFilters = true;
+        listEl.innerHTML += `<span class="badge bg-primary">Notes: "${activeFilters.notes}"</span>`;
+    }
+
+    // Category filter (multiple)
+    if (activeFilters.categories.length > 0) {
+        hasActiveFilters = true;
+        const categoryNames = activeFilters.categories.map(catId => {
+            const cat = currentCategories.find(c => c.id == catId);
+            return cat ? cat.name : catId;
+        }).join(', ');
+        listEl.innerHTML += `<span class="badge bg-info">Categories: ${categoryNames}</span>`;
+    }
+
+    // Payment method filter (multiple)
+    if (activeFilters.paymentMethods.length > 0) {
+        hasActiveFilters = true;
+        const methodNames = activeFilters.paymentMethods.map(methodId => {
+            const method = paymentMethods.find(m => m.id == methodId);
+            return method ? method.name : methodId;
+        }).join(', ');
+        listEl.innerHTML += `<span class="badge bg-info">Payment Methods: ${methodNames}</span>`;
+    }
+
+    // Type filter (multiple)
+    if (activeFilters.types.length > 0) {
+        hasActiveFilters = true;
+        const typeLabels = activeFilters.types.map(type => type === 'income' ? 'Income' : 'Expense').join(', ');
+        listEl.innerHTML += `<span class="badge bg-success">Types: ${typeLabels}</span>`;
+    }
+
+    // Status filter (multiple)
+    if (activeFilters.statuses.length > 0) {
+        hasActiveFilters = true;
+        const statusLabels = activeFilters.statuses.map(status => {
+            if (status === 'done') return 'Done';
+            if (status === 'not_done') return 'Not Done';
+            if (status === 'paid') return 'Paid';
+            if (status === 'unpaid') return 'Unpaid';
+            return status;
+        }).join(', ');
+        listEl.innerHTML += `<span class="badge bg-warning">Statuses: ${statusLabels}</span>`;
+    }
+
+    // Amount range
+    if (activeFilters.minAmount !== null || activeFilters.maxAmount !== null) {
+        hasActiveFilters = true;
+        let amountText = 'Amount: ';
+        if (activeFilters.minAmount !== null && activeFilters.maxAmount !== null) {
+            amountText += `${formatCurrency(activeFilters.minAmount)} - ${formatCurrency(activeFilters.maxAmount)}`;
+        } else if (activeFilters.minAmount !== null) {
+            amountText += `≥ ${formatCurrency(activeFilters.minAmount)}`;
+        } else {
+            amountText += `≤ ${formatCurrency(activeFilters.maxAmount)}`;
+        }
+        listEl.innerHTML += `<span class="badge bg-secondary">${amountText}</span>`;
+    }
+
+    // Date range
+    if (activeFilters.startDate || activeFilters.endDate) {
+        hasActiveFilters = true;
+        let dateText = 'Date: ';
+        if (activeFilters.startDate && activeFilters.endDate) {
+            dateText += `${activeFilters.startDate} to ${activeFilters.endDate}`;
+        } else if (activeFilters.startDate) {
+            dateText += `From ${activeFilters.startDate}`;
+        } else {
+            dateText += `Until ${activeFilters.endDate}`;
+        }
+        listEl.innerHTML += `<span class="badge bg-secondary">${dateText}</span>`;
+    }
+
+    // Show/hide container
+    container.style.display = hasActiveFilters ? 'block' : 'none';
+
+    // Update filter button badge
+    const filterBadge = document.getElementById('filterBadge');
+    if (filterBadge) {
+        if (hasActiveFilters) {
+            // Count active filters
+            let filterCount = 0;
+            if (activeFilters.description) filterCount++;
+            if (activeFilters.notes) filterCount++;
+            if (activeFilters.categories.length > 0) filterCount++;
+            if (activeFilters.paymentMethods.length > 0) filterCount++;
+            if (activeFilters.types.length > 0) filterCount++;
+            if (activeFilters.statuses.length > 0) filterCount++;
+            if (activeFilters.minAmount !== null || activeFilters.maxAmount !== null) filterCount++;
+            if (activeFilters.startDate || activeFilters.endDate) filterCount++;
+
+            filterBadge.textContent = filterCount;
+            filterBadge.style.display = 'inline-block';
+        } else {
+            filterBadge.style.display = 'none';
+        }
+    }
 }
 
 function executeCloneMonth() {

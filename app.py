@@ -674,17 +674,106 @@ def transactions():
             # Get query parameters
             year = request.args.get('year', datetime.now().year, type=int)
             month = request.args.get('month', datetime.now().month, type=int)
-            
+
+            # Get filter parameters
+            description = request.args.get('description', '')
+            notes_filter = request.args.get('notes', '')
+            categories = request.args.get('categories', '')  # comma-separated IDs
+            payment_methods = request.args.get('paymentMethods', '')  # comma-separated IDs
+            types = request.args.get('types', '')  # comma-separated: income,expense
+            statuses = request.args.get('statuses', '')  # comma-separated: done,not_done,paid,unpaid
+            min_amount = request.args.get('minAmount', type=float)
+            max_amount = request.args.get('maxAmount', type=float)
+            start_date = request.args.get('startDate', '')
+            end_date = request.args.get('endDate', '')
+
             # Get monthly record
             cursor.execute("""
-                SELECT id FROM monthly_records 
+                SELECT id FROM monthly_records
                 WHERE user_id = %s AND year = %s AND month = %s
             """, (user_id, year, month))
-            
+
             monthly_record = cursor.fetchone()
 
             if monthly_record:
-                cursor.execute("""
+                # Build dynamic WHERE clause
+                where_clauses = ["t.monthly_record_id = %s"]
+                params = [monthly_record['id']]
+
+                # Description filter
+                if description:
+                    where_clauses.append("LOWER(t.description) LIKE %s")
+                    params.append(f"%{description.lower()}%")
+
+                # Notes filter
+                if notes_filter:
+                    where_clauses.append("LOWER(t.notes) LIKE %s")
+                    params.append(f"%{notes_filter.lower()}%")
+
+                # Category filter
+                if categories:
+                    cat_ids = [int(cid) for cid in categories.split(',') if cid.strip()]
+                    if cat_ids:
+                        placeholders = ','.join(['%s'] * len(cat_ids))
+                        where_clauses.append(f"t.category_id IN ({placeholders})")
+                        params.extend(cat_ids)
+
+                # Payment method filter
+                if payment_methods:
+                    pm_ids = [int(pmid) for pmid in payment_methods.split(',') if pmid.strip()]
+                    if pm_ids:
+                        placeholders = ','.join(['%s'] * len(pm_ids))
+                        where_clauses.append(f"t.payment_method_id IN ({placeholders})")
+                        params.extend(pm_ids)
+
+                # Transaction type filter
+                if types:
+                    type_list = [t.strip() for t in types.split(',') if t.strip()]
+                    type_conditions = []
+                    if 'income' in type_list:
+                        type_conditions.append("t.debit > 0")
+                    if 'expense' in type_list:
+                        type_conditions.append("t.credit > 0")
+                    if type_conditions:
+                        where_clauses.append(f"({' OR '.join(type_conditions)})")
+
+                # Status filter
+                if statuses:
+                    status_list = [s.strip() for s in statuses.split(',') if s.strip()]
+                    status_conditions = []
+                    if 'done' in status_list:
+                        status_conditions.append("t.is_done = TRUE")
+                    if 'not_done' in status_list:
+                        status_conditions.append("t.is_done = FALSE OR t.is_done IS NULL")
+                    if 'paid' in status_list:
+                        status_conditions.append("t.is_paid = TRUE")
+                    if 'unpaid' in status_list:
+                        status_conditions.append("t.is_paid = FALSE OR t.is_paid IS NULL")
+                    if status_conditions:
+                        where_clauses.append(f"({' OR '.join(status_conditions)})")
+
+                # Amount range filter
+                if min_amount is not None:
+                    where_clauses.append("(COALESCE(t.debit, 0) >= %s OR COALESCE(t.credit, 0) >= %s)")
+                    params.extend([min_amount, min_amount])
+
+                if max_amount is not None:
+                    where_clauses.append("(COALESCE(t.debit, 0) <= %s OR COALESCE(t.credit, 0) <= %s)")
+                    params.extend([max_amount, max_amount])
+
+                # Date range filter
+                if start_date:
+                    where_clauses.append("t.transaction_date >= %s")
+                    params.append(start_date)
+
+                if end_date:
+                    where_clauses.append("t.transaction_date <= %s")
+                    params.append(end_date)
+
+                # Combine WHERE clauses
+                where_sql = " AND ".join(where_clauses)
+
+                query = f"""
                     SELECT
                         t.*,
                         c.name as category_name,
@@ -695,10 +784,11 @@ def transactions():
                     FROM transactions t
                     LEFT JOIN categories c ON t.category_id = c.id
                     LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id
-                    WHERE t.monthly_record_id = %s
+                    WHERE {where_sql}
                     ORDER BY t.id DESC
-                """, (monthly_record['id'],))
+                """
 
+                cursor.execute(query, params)
                 transactions = cursor.fetchall()
                 return jsonify(transactions)
             else:
