@@ -17,6 +17,22 @@ let charts = {
 let currentCategories = [];
 let paymentMethods = [];
 let currentTransactionId = null;
+let allTransactions = [];
+let activeFilters = {
+    description: '',
+    categories: [],
+    paymentMethods: [],
+    type: '',
+    showDone: true,
+    showNotDone: true,
+    showPaid: true,
+    showUnpaid: true,
+    minAmount: null,
+    maxAmount: null,
+    startDate: null,
+    endDate: null,
+    notes: ''
+};
 
 // Geolocation helper function
 function getGeolocation() {
@@ -226,6 +242,23 @@ function setupFormButtons() {
     if (creditCardForm) {
         creditCardForm.addEventListener('submit', saveCreditCard);
     }
+
+    // Filter buttons
+    const applyFiltersBtn = document.getElementById('applyFiltersBtn');
+    if (applyFiltersBtn) {
+        applyFiltersBtn.addEventListener('click', applyFilters);
+    }
+
+    const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+    if (clearFiltersBtn) {
+        clearFiltersBtn.addEventListener('click', clearFilters);
+    }
+
+    // Setup filter modal to populate dropdowns when shown
+    const filterModal = document.getElementById('filterModal');
+    if (filterModal) {
+        filterModal.addEventListener('shown.bs.modal', populateFilterDropdowns);
+    }
 }
 
 // ================================
@@ -359,7 +392,8 @@ function loadTransactions() {
         .then(response => response.json())
         .then(data => {
             console.log('Transactions received:', data);
-            displayTransactions(data);
+            allTransactions = data; // Store all transactions globally
+            applyFiltersAndDisplay(); // Apply filters and display
             hideLoading();
         })
         .catch(error => {
@@ -821,6 +855,340 @@ function deleteTransaction(id) {
         'Delete',
         'btn-danger'
     );
+}
+
+// ================================
+// TRANSACTION FILTERS
+// ================================
+
+function populateFilterDropdowns() {
+    // Populate categories
+    const categoryFilter = document.getElementById('filterCategory');
+    if (categoryFilter) {
+        // Keep the "All Categories" option
+        const allOption = categoryFilter.querySelector('option[value=""]');
+        categoryFilter.innerHTML = '';
+        if (allOption) {
+            categoryFilter.appendChild(allOption);
+        }
+
+        currentCategories.forEach(cat => {
+            const option = document.createElement('option');
+            option.value = cat.id;
+            option.textContent = `${cat.name} (${cat.type})`;
+            categoryFilter.appendChild(option);
+        });
+    }
+
+    // Populate payment methods
+    const paymentFilter = document.getElementById('filterPaymentMethod');
+    if (paymentFilter && Array.isArray(paymentMethods)) {
+        // Keep the "All Methods" option
+        const allOption = paymentFilter.querySelector('option[value=""]');
+        paymentFilter.innerHTML = '';
+        if (allOption) {
+            paymentFilter.appendChild(allOption);
+        }
+
+        paymentMethods.forEach(method => {
+            const option = document.createElement('option');
+            option.value = method.id;
+            option.textContent = `${method.name} (${method.type === 'cash' ? 'Cash' : 'Credit Card'})`;
+            paymentFilter.appendChild(option);
+        });
+    }
+}
+
+function applyFilters() {
+    // Get filter values
+    activeFilters.description = document.getElementById('filterDescription')?.value.toLowerCase().trim() || '';
+    activeFilters.notes = document.getElementById('filterNotes')?.value.toLowerCase().trim() || '';
+    activeFilters.type = document.getElementById('filterType')?.value || '';
+    activeFilters.showDone = document.getElementById('filterShowDone')?.checked || false;
+    activeFilters.showNotDone = document.getElementById('filterShowNotDone')?.checked || false;
+    activeFilters.showPaid = document.getElementById('filterShowPaid')?.checked || false;
+    activeFilters.showUnpaid = document.getElementById('filterShowUnpaid')?.checked || false;
+
+    // Get selected categories (multiple)
+    const categorySelect = document.getElementById('filterCategory');
+    activeFilters.categories = [];
+    if (categorySelect) {
+        const selectedOptions = Array.from(categorySelect.selectedOptions);
+        activeFilters.categories = selectedOptions
+            .map(opt => opt.value)
+            .filter(val => val !== ''); // Exclude empty "All Categories" option
+    }
+
+    // Get selected payment methods (multiple)
+    const paymentSelect = document.getElementById('filterPaymentMethod');
+    activeFilters.paymentMethods = [];
+    if (paymentSelect) {
+        const selectedOptions = Array.from(paymentSelect.selectedOptions);
+        activeFilters.paymentMethods = selectedOptions
+            .map(opt => opt.value)
+            .filter(val => val !== ''); // Exclude empty "All Methods" option
+    }
+
+    // Get amount range
+    const minAmount = document.getElementById('filterMinAmount')?.value;
+    const maxAmount = document.getElementById('filterMaxAmount')?.value;
+    activeFilters.minAmount = minAmount ? parseFloat(minAmount) : null;
+    activeFilters.maxAmount = maxAmount ? parseFloat(maxAmount) : null;
+
+    // Get date range
+    activeFilters.startDate = document.getElementById('filterStartDate')?.value || null;
+    activeFilters.endDate = document.getElementById('filterEndDate')?.value || null;
+
+    console.log('Active filters:', activeFilters);
+
+    // Apply filters and display
+    applyFiltersAndDisplay();
+
+    // Update active filters display
+    displayActiveFilters();
+
+    // Close modal
+    closeModal('filterModal');
+
+    showToast('Filters applied successfully', 'success');
+}
+
+function clearFilters() {
+    // Reset filter values
+    activeFilters = {
+        description: '',
+        categories: [],
+        paymentMethods: [],
+        type: '',
+        showDone: true,
+        showNotDone: true,
+        showPaid: true,
+        showUnpaid: true,
+        minAmount: null,
+        maxAmount: null,
+        startDate: null,
+        endDate: null,
+        notes: ''
+    };
+
+    // Clear form inputs
+    document.getElementById('filterDescription').value = '';
+    document.getElementById('filterNotes').value = '';
+    document.getElementById('filterType').value = '';
+    document.getElementById('filterShowDone').checked = true;
+    document.getElementById('filterShowNotDone').checked = true;
+    document.getElementById('filterShowPaid').checked = true;
+    document.getElementById('filterShowUnpaid').checked = true;
+    document.getElementById('filterMinAmount').value = '';
+    document.getElementById('filterMaxAmount').value = '';
+    document.getElementById('filterStartDate').value = '';
+    document.getElementById('filterEndDate').value = '';
+
+    // Clear multi-selects
+    const categorySelect = document.getElementById('filterCategory');
+    if (categorySelect) {
+        Array.from(categorySelect.options).forEach(opt => opt.selected = false);
+    }
+
+    const paymentSelect = document.getElementById('filterPaymentMethod');
+    if (paymentSelect) {
+        Array.from(paymentSelect.options).forEach(opt => opt.selected = false);
+    }
+
+    // Re-display all transactions
+    applyFiltersAndDisplay();
+
+    // Update active filters display and badge
+    displayActiveFilters();
+
+    showToast('All filters cleared', 'info');
+}
+
+function applyFiltersAndDisplay() {
+    if (!allTransactions || allTransactions.length === 0) {
+        displayTransactions([]);
+        return;
+    }
+
+    // Filter transactions based on active filters
+    const filtered = allTransactions.filter(t => {
+        // Description filter
+        if (activeFilters.description && !t.description.toLowerCase().includes(activeFilters.description)) {
+            return false;
+        }
+
+        // Notes filter
+        if (activeFilters.notes && (!t.notes || !t.notes.toLowerCase().includes(activeFilters.notes))) {
+            return false;
+        }
+
+        // Category filter (multiple selection)
+        if (activeFilters.categories.length > 0) {
+            const categoryMatch = activeFilters.categories.includes(String(t.category_id));
+            if (!categoryMatch) return false;
+        }
+
+        // Payment method filter (multiple selection)
+        if (activeFilters.paymentMethods.length > 0) {
+            const paymentMatch = activeFilters.paymentMethods.includes(String(t.payment_method_id));
+            if (!paymentMatch) return false;
+        }
+
+        // Transaction type filter
+        if (activeFilters.type) {
+            const debit = parseFloat(t.debit) || 0;
+            const credit = parseFloat(t.credit) || 0;
+
+            if (activeFilters.type === 'income' && debit === 0) return false;
+            if (activeFilters.type === 'expense' && credit === 0) return false;
+        }
+
+        // Status filters (is_done)
+        const isDone = t.is_done === true || t.is_done === 1;
+        if (isDone && !activeFilters.showDone) return false;
+        if (!isDone && !activeFilters.showNotDone) return false;
+
+        // Status filters (is_paid)
+        const isPaid = t.is_paid === true || t.is_paid === 1;
+        if (isPaid && !activeFilters.showPaid) return false;
+        if (!isPaid && !activeFilters.showUnpaid) return false;
+
+        // Amount range filter
+        const amount = parseFloat(t.debit || t.credit || 0);
+        if (activeFilters.minAmount !== null && amount < activeFilters.minAmount) return false;
+        if (activeFilters.maxAmount !== null && amount > activeFilters.maxAmount) return false;
+
+        // Date range filter
+        if (activeFilters.startDate && t.transaction_date < activeFilters.startDate) return false;
+        if (activeFilters.endDate && t.transaction_date > activeFilters.endDate) return false;
+
+        return true;
+    });
+
+    console.log(`Filtered ${filtered.length} of ${allTransactions.length} transactions`);
+    displayTransactions(filtered);
+}
+
+function displayActiveFilters() {
+    const container = document.getElementById('activeFiltersDisplay');
+    const listEl = document.getElementById('activeFiltersList');
+
+    if (!container || !listEl) return;
+
+    listEl.innerHTML = '';
+    let hasActiveFilters = false;
+
+    // Description filter
+    if (activeFilters.description) {
+        hasActiveFilters = true;
+        listEl.innerHTML += `<span class="badge bg-primary">Description: "${activeFilters.description}"</span>`;
+    }
+
+    // Notes filter
+    if (activeFilters.notes) {
+        hasActiveFilters = true;
+        listEl.innerHTML += `<span class="badge bg-primary">Notes: "${activeFilters.notes}"</span>`;
+    }
+
+    // Category filter
+    if (activeFilters.categories.length > 0) {
+        hasActiveFilters = true;
+        const categoryNames = activeFilters.categories.map(catId => {
+            const cat = currentCategories.find(c => c.id == catId);
+            return cat ? cat.name : catId;
+        }).join(', ');
+        listEl.innerHTML += `<span class="badge bg-info">Categories: ${categoryNames}</span>`;
+    }
+
+    // Payment method filter
+    if (activeFilters.paymentMethods.length > 0) {
+        hasActiveFilters = true;
+        const methodNames = activeFilters.paymentMethods.map(methodId => {
+            const method = paymentMethods.find(m => m.id == methodId);
+            return method ? method.name : methodId;
+        }).join(', ');
+        listEl.innerHTML += `<span class="badge bg-info">Payment Methods: ${methodNames}</span>`;
+    }
+
+    // Type filter
+    if (activeFilters.type) {
+        hasActiveFilters = true;
+        const typeLabel = activeFilters.type === 'income' ? 'Income' : 'Expense';
+        listEl.innerHTML += `<span class="badge bg-success">Type: ${typeLabel}</span>`;
+    }
+
+    // Status filters
+    if (!activeFilters.showDone || !activeFilters.showNotDone) {
+        hasActiveFilters = true;
+        if (activeFilters.showDone && !activeFilters.showNotDone) {
+            listEl.innerHTML += `<span class="badge bg-warning">Only Done</span>`;
+        } else if (!activeFilters.showDone && activeFilters.showNotDone) {
+            listEl.innerHTML += `<span class="badge bg-warning">Only Not Done</span>`;
+        }
+    }
+
+    if (!activeFilters.showPaid || !activeFilters.showUnpaid) {
+        hasActiveFilters = true;
+        if (activeFilters.showPaid && !activeFilters.showUnpaid) {
+            listEl.innerHTML += `<span class="badge bg-warning">Only Paid</span>`;
+        } else if (!activeFilters.showPaid && activeFilters.showUnpaid) {
+            listEl.innerHTML += `<span class="badge bg-warning">Only Unpaid</span>`;
+        }
+    }
+
+    // Amount range
+    if (activeFilters.minAmount !== null || activeFilters.maxAmount !== null) {
+        hasActiveFilters = true;
+        let amountText = 'Amount: ';
+        if (activeFilters.minAmount !== null && activeFilters.maxAmount !== null) {
+            amountText += `${formatCurrency(activeFilters.minAmount)} - ${formatCurrency(activeFilters.maxAmount)}`;
+        } else if (activeFilters.minAmount !== null) {
+            amountText += `≥ ${formatCurrency(activeFilters.minAmount)}`;
+        } else {
+            amountText += `≤ ${formatCurrency(activeFilters.maxAmount)}`;
+        }
+        listEl.innerHTML += `<span class="badge bg-secondary">${amountText}</span>`;
+    }
+
+    // Date range
+    if (activeFilters.startDate || activeFilters.endDate) {
+        hasActiveFilters = true;
+        let dateText = 'Date: ';
+        if (activeFilters.startDate && activeFilters.endDate) {
+            dateText += `${activeFilters.startDate} to ${activeFilters.endDate}`;
+        } else if (activeFilters.startDate) {
+            dateText += `From ${activeFilters.startDate}`;
+        } else {
+            dateText += `Until ${activeFilters.endDate}`;
+        }
+        listEl.innerHTML += `<span class="badge bg-secondary">${dateText}</span>`;
+    }
+
+    // Show/hide container
+    container.style.display = hasActiveFilters ? 'block' : 'none';
+
+    // Update filter button badge
+    const filterBadge = document.getElementById('filterBadge');
+    if (filterBadge) {
+        if (hasActiveFilters) {
+            // Count active filters
+            let filterCount = 0;
+            if (activeFilters.description) filterCount++;
+            if (activeFilters.notes) filterCount++;
+            if (activeFilters.categories.length > 0) filterCount++;
+            if (activeFilters.paymentMethods.length > 0) filterCount++;
+            if (activeFilters.type) filterCount++;
+            if (!activeFilters.showDone || !activeFilters.showNotDone) filterCount++;
+            if (!activeFilters.showPaid || !activeFilters.showUnpaid) filterCount++;
+            if (activeFilters.minAmount !== null || activeFilters.maxAmount !== null) filterCount++;
+            if (activeFilters.startDate || activeFilters.endDate) filterCount++;
+
+            filterBadge.textContent = filterCount;
+            filterBadge.style.display = 'inline-block';
+        } else {
+            filterBadge.style.display = 'none';
+        }
+    }
 }
 
 function executeCloneMonth() {
