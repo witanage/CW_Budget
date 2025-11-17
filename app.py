@@ -674,6 +674,7 @@ def transactions():
             # Get query parameters
             year = request.args.get('year', datetime.now().year, type=int)
             month = request.args.get('month', datetime.now().month, type=int)
+            search_all = request.args.get('searchAll', 'false').lower() == 'true'
 
             # Get filter parameters
             description = request.args.get('description', '')
@@ -687,18 +688,52 @@ def transactions():
             start_date = request.args.get('startDate', '')
             end_date = request.args.get('endDate', '')
 
-            # Get monthly record
-            cursor.execute("""
-                SELECT id FROM monthly_records
-                WHERE user_id = %s AND year = %s AND month = %s
-            """, (user_id, year, month))
+            # Check if any filters are active
+            has_filters = any([
+                description, notes_filter, categories, payment_methods,
+                types, statuses, min_amount is not None, max_amount is not None,
+                start_date, end_date
+            ])
 
-            monthly_record = cursor.fetchone()
+            # Build dynamic WHERE clause
+            where_clauses = []
+            params = []
 
-            if monthly_record:
-                # Build dynamic WHERE clause
-                where_clauses = ["t.monthly_record_id = %s"]
-                params = [monthly_record['id']]
+            # If searching all or filters are active, search across all user's transactions
+            # Otherwise, limit to specific month
+            if search_all or has_filters:
+                # Get all monthly records for this user to join with
+                cursor.execute("""
+                    SELECT id FROM monthly_records
+                    WHERE user_id = %s
+                """, (user_id,))
+                monthly_records = cursor.fetchall()
+
+                if monthly_records:
+                    monthly_record_ids = [record['id'] for record in monthly_records]
+                    placeholders = ','.join(['%s'] * len(monthly_record_ids))
+                    where_clauses.append(f"t.monthly_record_id IN ({placeholders})")
+                    params.extend(monthly_record_ids)
+                else:
+                    # No records found, return empty
+                    return jsonify([])
+            else:
+                # Normal behavior - get specific monthly record
+                cursor.execute("""
+                    SELECT id FROM monthly_records
+                    WHERE user_id = %s AND year = %s AND month = %s
+                """, (user_id, year, month))
+
+                monthly_record = cursor.fetchone()
+
+                if not monthly_record:
+                    return jsonify([])
+
+                where_clauses.append("t.monthly_record_id = %s")
+                params.append(monthly_record['id'])
+
+            # Continue with filter building only if we have WHERE clauses
+            if where_clauses:
 
                 # Description filter
                 if description:

@@ -30,6 +30,8 @@ let activeFilters = {
     endDate: null,
     notes: ''
 };
+let reportFiltersInitialized = false;
+let filterDropdownsInitialized = false;
 
 // Geolocation helper function
 function getGeolocation() {
@@ -251,18 +253,11 @@ function setupFormButtons() {
         clearFiltersBtn.addEventListener('click', clearFilters);
     }
 
-    // Setup filter modal to populate dropdowns when shown
+    // Setup filter modal to populate checkboxes when shown
     const filterModal = document.getElementById('filterModal');
     if (filterModal) {
         filterModal.addEventListener('shown.bs.modal', populateFilterDropdowns);
     }
-
-    // Prevent dropdown from closing when clicking on dropdown items (for checkboxes)
-    document.addEventListener('click', function(e) {
-        if (e.target.closest('.dropdown-item')) {
-            e.stopPropagation();
-        }
-    });
 }
 
 // ================================
@@ -406,6 +401,9 @@ function loadTransactions(applyActiveFilters = false) {
 
     // Add filter parameters if requested
     if (applyActiveFilters) {
+        // When filters are active, search across all months/years
+        queryParams += `&searchAll=true`;
+
         if (activeFilters.description) {
             queryParams += `&description=${encodeURIComponent(activeFilters.description)}`;
         }
@@ -911,118 +909,122 @@ function deleteTransaction(id) {
 // TRANSACTION FILTERS
 // ================================
 
-function populateFilterDropdowns() {
-    // Populate categories
-    const categoryMenu = document.getElementById('filterCategoryMenu');
-    if (categoryMenu) {
-        categoryMenu.innerHTML = '';
-        currentCategories.forEach(cat => {
-            const li = document.createElement('li');
-            li.innerHTML = `
-                <div class="dropdown-item">
-                    <div class="form-check">
-                        <input class="form-check-input filter-category-checkbox" type="checkbox" value="${cat.id}" id="filterCat${cat.id}">
-                        <label class="form-check-label" for="filterCat${cat.id}">${cat.name} (${cat.type})</label>
-                    </div>
-                </div>
-            `;
-            categoryMenu.appendChild(li);
-        });
+// ================================
+// FILTER FUNCTIONS - REVAMPED
+// ================================
 
-        // Add event listeners to update label
-        categoryMenu.querySelectorAll('.filter-category-checkbox').forEach(checkbox => {
-            checkbox.addEventListener('change', updateCategoryLabel);
+function populateFilterDropdowns() {
+    // Only initialize once to prevent duplicate event listeners
+    if (filterDropdownsInitialized) {
+        return;
+    }
+
+    // Populate categories
+    const categoryContainer = document.getElementById('filterCategoryCheckboxes');
+    if (categoryContainer && currentCategories.length > 0) {
+        categoryContainer.innerHTML = '';
+        currentCategories.forEach(cat => {
+            const iconClass = cat.type === 'income' ? 'fa-arrow-down text-success' : 'fa-arrow-up text-danger';
+            const checkbox = document.createElement('div');
+            checkbox.className = 'form-check';
+            checkbox.innerHTML = `
+                <input class="form-check-input filter-category-checkbox" type="checkbox" value="${cat.id}" id="filterCat${cat.id}">
+                <label class="form-check-label" for="filterCat${cat.id}">
+                    <i class="fas ${iconClass} me-1"></i>${cat.name}
+                </label>
+            `;
+            categoryContainer.appendChild(checkbox);
         });
     }
 
     // Populate payment methods
-    const paymentMenu = document.getElementById('filterPaymentMethodMenu');
-    if (paymentMenu && Array.isArray(paymentMethods)) {
-        paymentMenu.innerHTML = '';
+    const paymentContainer = document.getElementById('filterPaymentMethodCheckboxes');
+    if (paymentContainer && Array.isArray(paymentMethods) && paymentMethods.length > 0) {
+        paymentContainer.innerHTML = '';
         paymentMethods.forEach(method => {
-            const li = document.createElement('li');
-            li.innerHTML = `
-                <div class="dropdown-item">
-                    <div class="form-check">
-                        <input class="form-check-input filter-payment-checkbox" type="checkbox" value="${method.id}" id="filterPay${method.id}">
-                        <label class="form-check-label" for="filterPay${method.id}">${method.name} (${method.type === 'cash' ? 'Cash' : 'Credit Card'})</label>
-                    </div>
-                </div>
+            const iconClass = method.type === 'cash' ? 'fa-money-bill-wave' : 'fa-credit-card';
+            const checkbox = document.createElement('div');
+            checkbox.className = 'form-check';
+            checkbox.innerHTML = `
+                <input class="form-check-input filter-payment-checkbox" type="checkbox" value="${method.id}" id="filterPay${method.id}">
+                <label class="form-check-label" for="filterPay${method.id}">
+                    <i class="fas ${iconClass} me-1"></i>${method.name}
+                </label>
             `;
-            paymentMenu.appendChild(li);
-        });
-
-        // Add event listeners to update label
-        paymentMenu.querySelectorAll('.filter-payment-checkbox').forEach(checkbox => {
-            checkbox.addEventListener('change', updatePaymentMethodLabel);
+            paymentContainer.appendChild(checkbox);
         });
     }
 
-    // Add event listeners for type and status checkboxes
-    document.querySelectorAll('.filter-type-checkbox').forEach(checkbox => {
-        checkbox.addEventListener('change', updateTypeLabel);
-    });
-
-    document.querySelectorAll('.filter-status-checkbox').forEach(checkbox => {
-        checkbox.addEventListener('change', updateStatusLabel);
-    });
+    filterDropdownsInitialized = true;
 }
 
-// Update label functions
-function updateCategoryLabel() {
-    const checkboxes = document.querySelectorAll('.filter-category-checkbox:checked');
-    const label = document.getElementById('filterCategoryLabel');
-    if (checkboxes.length === 0) {
-        label.textContent = 'All Categories';
-    } else if (checkboxes.length === 1) {
-        const catId = checkboxes[0].value;
-        const cat = currentCategories.find(c => c.id == catId);
-        label.textContent = cat ? cat.name : 'Selected';
-    } else {
-        label.textContent = `${checkboxes.length} selected`;
+// Quick Filter Functions
+function applyQuickFilter(filterType) {
+    // Clear all filters first
+    clearFiltersWithoutReload();
+
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const todayStr = `${yyyy}-${mm}-${dd}`;
+
+    switch(filterType) {
+        case 'today':
+            document.getElementById('filterStartDate').value = todayStr;
+            document.getElementById('filterEndDate').value = todayStr;
+            break;
+
+        case 'last7days':
+            const last7days = new Date(today);
+            last7days.setDate(last7days.getDate() - 7);
+            const yyyy7 = last7days.getFullYear();
+            const mm7 = String(last7days.getMonth() + 1).padStart(2, '0');
+            const dd7 = String(last7days.getDate()).padStart(2, '0');
+            document.getElementById('filterStartDate').value = `${yyyy7}-${mm7}-${dd7}`;
+            document.getElementById('filterEndDate').value = todayStr;
+            break;
+
+        case 'thisMonth':
+            const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+            const yyyyFirst = firstDay.getFullYear();
+            const mmFirst = String(firstDay.getMonth() + 1).padStart(2, '0');
+            document.getElementById('filterStartDate').value = `${yyyyFirst}-${mmFirst}-01`;
+            document.getElementById('filterEndDate').value = todayStr;
+            break;
+
+        case 'income':
+            document.getElementById('filterTypeIncome').checked = true;
+            break;
+
+        case 'expense':
+            document.getElementById('filterTypeExpense').checked = true;
+            break;
+
+        case 'unpaid':
+            document.getElementById('filterStatusUnpaid').checked = true;
+            break;
     }
+
+    // Apply the filters
+    applyFilters();
 }
 
-function updatePaymentMethodLabel() {
-    const checkboxes = document.querySelectorAll('.filter-payment-checkbox:checked');
-    const label = document.getElementById('filterPaymentMethodLabel');
-    if (checkboxes.length === 0) {
-        label.textContent = 'All Methods';
-    } else if (checkboxes.length === 1) {
-        const methodId = checkboxes[0].value;
-        const method = paymentMethods.find(m => m.id == methodId);
-        label.textContent = method ? method.name : 'Selected';
-    } else {
-        label.textContent = `${checkboxes.length} selected`;
-    }
+// Select/Deselect All Functions
+function selectAllCategories() {
+    document.querySelectorAll('.filter-category-checkbox').forEach(cb => cb.checked = true);
 }
 
-function updateTypeLabel() {
-    const checkboxes = document.querySelectorAll('.filter-type-checkbox:checked');
-    const label = document.getElementById('filterTypeLabel');
-    if (checkboxes.length === 0) {
-        label.textContent = 'All Types';
-    } else if (checkboxes.length === 1) {
-        label.textContent = checkboxes[0].value === 'income' ? 'Income' : 'Expense';
-    } else {
-        label.textContent = `${checkboxes.length} selected`;
-    }
+function deselectAllCategories() {
+    document.querySelectorAll('.filter-category-checkbox').forEach(cb => cb.checked = false);
 }
 
-function updateStatusLabel() {
-    const checkboxes = document.querySelectorAll('.filter-status-checkbox:checked');
-    const label = document.getElementById('filterStatusLabel');
-    if (checkboxes.length === 0) {
-        label.textContent = 'All Statuses';
-    } else if (checkboxes.length === 1) {
-        const status = checkboxes[0].value;
-        if (status === 'done') label.textContent = 'Done';
-        else if (status === 'not_done') label.textContent = 'Not Done';
-        else if (status === 'paid') label.textContent = 'Paid';
-        else if (status === 'unpaid') label.textContent = 'Unpaid';
-    } else {
-        label.textContent = `${checkboxes.length} selected`;
-    }
+function selectAllPaymentMethods() {
+    document.querySelectorAll('.filter-payment-checkbox').forEach(cb => cb.checked = true);
+}
+
+function deselectAllPaymentMethods() {
+    document.querySelectorAll('.filter-payment-checkbox').forEach(cb => cb.checked = false);
 }
 
 function applyFilters() {
@@ -1078,7 +1080,7 @@ function applyFilters() {
     showToast('Filters applied successfully', 'success');
 }
 
-function clearFilters() {
+function clearFiltersWithoutReload() {
     // Reset filter values
     activeFilters = {
         description: '',
@@ -1094,12 +1096,19 @@ function clearFilters() {
     };
 
     // Clear form inputs
-    document.getElementById('filterDescription').value = '';
-    document.getElementById('filterNotes').value = '';
-    document.getElementById('filterMinAmount').value = '';
-    document.getElementById('filterMaxAmount').value = '';
-    document.getElementById('filterStartDate').value = '';
-    document.getElementById('filterEndDate').value = '';
+    const descInput = document.getElementById('filterDescription');
+    const notesInput = document.getElementById('filterNotes');
+    const minAmountInput = document.getElementById('filterMinAmount');
+    const maxAmountInput = document.getElementById('filterMaxAmount');
+    const startDateInput = document.getElementById('filterStartDate');
+    const endDateInput = document.getElementById('filterEndDate');
+
+    if (descInput) descInput.value = '';
+    if (notesInput) notesInput.value = '';
+    if (minAmountInput) minAmountInput.value = '';
+    if (maxAmountInput) maxAmountInput.value = '';
+    if (startDateInput) startDateInput.value = '';
+    if (endDateInput) endDateInput.value = '';
 
     // Uncheck all filter checkboxes
     document.querySelectorAll('.filter-category-checkbox').forEach(checkbox => {
@@ -1115,14 +1124,15 @@ function clearFilters() {
         checkbox.checked = false;
     });
 
-    // Reset dropdown labels
-    updateCategoryLabel();
-    updatePaymentMethodLabel();
-    updateTypeLabel();
-    updateStatusLabel();
-
     // Update active filters display and badge
     displayActiveFilters();
+}
+
+function clearFilters() {
+    clearFiltersWithoutReload();
+
+    // Close the modal
+    closeModal('filterModal');
 
     // Reload transactions from backend without filters
     loadTransactions(false);
@@ -1142,13 +1152,19 @@ function displayActiveFilters() {
     // Description filter
     if (activeFilters.description) {
         hasActiveFilters = true;
-        listEl.innerHTML += `<span class="badge bg-primary">Description: "${activeFilters.description}"</span>`;
+        listEl.innerHTML += `
+            <span class="badge bg-primary rounded-pill">
+                <i class="fas fa-file-alt me-1"></i>Description: "${activeFilters.description}"
+            </span>`;
     }
 
     // Notes filter
     if (activeFilters.notes) {
         hasActiveFilters = true;
-        listEl.innerHTML += `<span class="badge bg-primary">Notes: "${activeFilters.notes}"</span>`;
+        listEl.innerHTML += `
+            <span class="badge bg-primary rounded-pill">
+                <i class="fas fa-sticky-note me-1"></i>Notes: "${activeFilters.notes}"
+            </span>`;
     }
 
     // Category filter (multiple)
@@ -1158,7 +1174,10 @@ function displayActiveFilters() {
             const cat = currentCategories.find(c => c.id == catId);
             return cat ? cat.name : catId;
         }).join(', ');
-        listEl.innerHTML += `<span class="badge bg-info">Categories: ${categoryNames}</span>`;
+        listEl.innerHTML += `
+            <span class="badge bg-info text-dark rounded-pill">
+                <i class="fas fa-tags me-1"></i>Categories: ${categoryNames}
+            </span>`;
     }
 
     // Payment method filter (multiple)
@@ -1168,55 +1187,72 @@ function displayActiveFilters() {
             const method = paymentMethods.find(m => m.id == methodId);
             return method ? method.name : methodId;
         }).join(', ');
-        listEl.innerHTML += `<span class="badge bg-info">Payment Methods: ${methodNames}</span>`;
+        listEl.innerHTML += `
+            <span class="badge bg-info text-dark rounded-pill">
+                <i class="fas fa-credit-card me-1"></i>Payment: ${methodNames}
+            </span>`;
     }
 
     // Type filter (multiple)
     if (activeFilters.types.length > 0) {
         hasActiveFilters = true;
-        const typeLabels = activeFilters.types.map(type => type === 'income' ? 'Income' : 'Expense').join(', ');
-        listEl.innerHTML += `<span class="badge bg-success">Types: ${typeLabels}</span>`;
+        const typeLabels = activeFilters.types.map(type =>
+            type === 'income' ? '<i class="fas fa-arrow-down"></i> Income' : '<i class="fas fa-arrow-up"></i> Expense'
+        ).join(', ');
+        listEl.innerHTML += `
+            <span class="badge bg-success rounded-pill">
+                <i class="fas fa-exchange-alt me-1"></i>${typeLabels}
+            </span>`;
     }
 
     // Status filter (multiple)
     if (activeFilters.statuses.length > 0) {
         hasActiveFilters = true;
         const statusLabels = activeFilters.statuses.map(status => {
-            if (status === 'done') return 'Done';
-            if (status === 'not_done') return 'Not Done';
-            if (status === 'paid') return 'Paid';
-            if (status === 'unpaid') return 'Unpaid';
+            if (status === 'done') return '<i class="fas fa-check"></i> Done';
+            if (status === 'not_done') return '<i class="fas fa-times"></i> Not Done';
+            if (status === 'paid') return '<i class="fas fa-dollar-sign"></i> Paid';
+            if (status === 'unpaid') return '<i class="fas fa-exclamation"></i> Unpaid';
             return status;
         }).join(', ');
-        listEl.innerHTML += `<span class="badge bg-warning">Statuses: ${statusLabels}</span>`;
+        listEl.innerHTML += `
+            <span class="badge bg-warning text-dark rounded-pill">
+                ${statusLabels}
+            </span>`;
     }
 
     // Amount range
     if (activeFilters.minAmount !== null || activeFilters.maxAmount !== null) {
         hasActiveFilters = true;
-        let amountText = 'Amount: ';
+        let amountText = '';
         if (activeFilters.minAmount !== null && activeFilters.maxAmount !== null) {
-            amountText += `${formatCurrency(activeFilters.minAmount)} - ${formatCurrency(activeFilters.maxAmount)}`;
+            amountText = `${formatCurrency(activeFilters.minAmount)} - ${formatCurrency(activeFilters.maxAmount)}`;
         } else if (activeFilters.minAmount !== null) {
-            amountText += `≥ ${formatCurrency(activeFilters.minAmount)}`;
+            amountText = `≥ ${formatCurrency(activeFilters.minAmount)}`;
         } else {
-            amountText += `≤ ${formatCurrency(activeFilters.maxAmount)}`;
+            amountText = `≤ ${formatCurrency(activeFilters.maxAmount)}`;
         }
-        listEl.innerHTML += `<span class="badge bg-secondary">${amountText}</span>`;
+        listEl.innerHTML += `
+            <span class="badge bg-secondary rounded-pill">
+                <i class="fas fa-dollar-sign me-1"></i>${amountText}
+            </span>`;
     }
 
     // Date range
     if (activeFilters.startDate || activeFilters.endDate) {
         hasActiveFilters = true;
-        let dateText = 'Date: ';
+        let dateText = '';
         if (activeFilters.startDate && activeFilters.endDate) {
-            dateText += `${activeFilters.startDate} to ${activeFilters.endDate}`;
+            dateText = `${activeFilters.startDate} to ${activeFilters.endDate}`;
         } else if (activeFilters.startDate) {
-            dateText += `From ${activeFilters.startDate}`;
+            dateText = `From ${activeFilters.startDate}`;
         } else {
-            dateText += `Until ${activeFilters.endDate}`;
+            dateText = `Until ${activeFilters.endDate}`;
         }
-        listEl.innerHTML += `<span class="badge bg-secondary">${dateText}</span>`;
+        listEl.innerHTML += `
+            <span class="badge bg-secondary rounded-pill">
+                <i class="fas fa-calendar me-1"></i>${dateText}
+            </span>`;
     }
 
     // Show/hide container

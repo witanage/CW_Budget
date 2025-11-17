@@ -598,159 +598,6 @@
         </div>
     </div>
 </div>
-
-<!-- Advanced Filter Modal -->
-<div class="modal fade" id="filterModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="fas fa-filter me-2"></i>Advanced Filters
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle me-2"></i>
-                    Search across all transactions in your history. Leave fields empty to ignore that filter.
-                </div>
-
-                <form id="advancedFilterForm">
-                    <!-- Date Range -->
-                    <div class="row mb-3">
-                        <div class="col-md-12">
-                            <h6 class="text-muted mb-2">
-                                <i class="fas fa-calendar me-1"></i>Date Range
-                            </h6>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">From Date</label>
-                            <input type="date" class="form-control" id="filterDateFrom">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">To Date</label>
-                            <input type="date" class="form-control" id="filterDateTo">
-                        </div>
-                    </div>
-
-                    <hr>
-
-                    <!-- Category & Payment Method -->
-                    <div class="row mb-3">
-                        <div class="col-md-12">
-                            <h6 class="text-muted mb-2">
-                                <i class="fas fa-tags me-1"></i>Category & Payment
-                            </h6>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Category</label>
-                            <select class="form-select" id="filterCategory">
-                                <option value="">All Categories</option>
-                                <!-- Categories will be populated -->
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Payment Method</label>
-                            <select class="form-select" id="filterPaymentMethod">
-                                <option value="">All Payment Methods</option>
-                                <!-- Payment methods will be populated -->
-                            </select>
-                        </div>
-                    </div>
-
-                    <hr>
-
-                    <!-- Amount Range -->
-                    <div class="row mb-3">
-                        <div class="col-md-12">
-                            <h6 class="text-muted mb-2">
-                                <i class="fas fa-dollar-sign me-1"></i>Amount Range
-                            </h6>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Min Amount</label>
-                            <input type="number" step="0.01" class="form-control" id="filterAmountMin" placeholder="0.00">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Max Amount</label>
-                            <input type="number" step="0.01" class="form-control" id="filterAmountMax" placeholder="0.00">
-                        </div>
-                    </div>
-
-                    <hr>
-
-                    <!-- Transaction Type -->
-                    <div class="row mb-3">
-                        <div class="col-md-12">
-                            <h6 class="text-muted mb-2">
-                                <i class="fas fa-exchange-alt me-1"></i>Transaction Type
-                            </h6>
-                        </div>
-                        <div class="col-md-12">
-                            <select class="form-select" id="filterTransactionType">
-                                <option value="">All Types</option>
-                                <option value="debit">Income (Debit)</option>
-                                <option value="credit">Expense (Credit)</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <hr>
-
-                    <!-- Description/Notes Search -->
-                    <div class="row mb-3">
-                        <div class="col-md-12">
-                            <h6 class="text-muted mb-2">
-                                <i class="fas fa-search me-1"></i>Text Search
-                            </h6>
-                        </div>
-                        <div class="col-md-12">
-                            <label class="form-label">Search in Description or Notes</label>
-                            <input type="text" class="form-control" id="filterSearchText" placeholder="Enter keywords...">
-                        </div>
-                    </div>
-
-                    <hr>
-
-                    <!-- Status Filters -->
-                    <div class="row mb-3">
-                        <div class="col-md-12">
-                            <h6 class="text-muted mb-2">
-                                <i class="fas fa-check-circle me-1"></i>Status
-                            </h6>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Done Status</label>
-                            <select class="form-select" id="filterDoneStatus">
-                                <option value="">All</option>
-                                <option value="done">Done Only</option>
-                                <option value="not_done">Not Done Only</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Paid Status</label>
-                            <select class="form-select" id="filterPaidStatus">
-                                <option value="">All</option>
-                                <option value="paid">Paid Only</option>
-                                <option value="not_paid">Not Paid Only</option>
-                            </select>
-                        </div>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-outline-danger" id="resetFiltersBtn">
-                    <i class="fas fa-undo me-1"></i>Reset
-                </button>
-                <button type="button" class="btn btn-primary" id="applyFiltersBtn">
-                    <i class="fas fa-check me-1"></i>Apply Filters
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- Clone Month Modal -->
 <div class="modal fade" id="cloneMonthModal" tabindex="-1">
     <div class="modal-dialog">
@@ -818,163 +665,341 @@
     </div>
 </div>
 
-<!-- Filter Modal -->
+<!-- Filter Modal - Revamped Design -->
 <div class="modal fade" id="filterModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Filter Transactions</h5>
+                <h5 class="modal-title">
+                    <i class="fas fa-filter me-2"></i>Advanced Filters
+                </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <div class="row g-3">
-                    <!-- Search by Description -->
-                    <div class="col-md-12">
-                        <label for="filterDescription" class="form-label">Search Description</label>
-                        <input type="text" class="form-control" id="filterDescription" placeholder="Search in transaction descriptions...">
+                <!-- Quick Filter Presets -->
+                <div class="mb-4">
+                    <h6 class="text-muted mb-3"><i class="fas fa-bolt me-2"></i>Quick Filters</h6>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="applyQuickFilter('today')">
+                            <i class="fas fa-calendar-day me-1"></i>Today
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="applyQuickFilter('last7days')">
+                            <i class="fas fa-calendar-week me-1"></i>Last 7 Days
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="applyQuickFilter('thisMonth')">
+                            <i class="fas fa-calendar-alt me-1"></i>This Month
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-success" onclick="applyQuickFilter('income')">
+                            <i class="fas fa-arrow-down me-1"></i>Income Only
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="applyQuickFilter('expense')">
+                            <i class="fas fa-arrow-up me-1"></i>Expenses Only
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-warning" onclick="applyQuickFilter('unpaid')">
+                            <i class="fas fa-exclamation-triangle me-1"></i>Unpaid
+                        </button>
                     </div>
+                </div>
 
-                    <!-- Category Filter -->
-                    <div class="col-md-6">
-                        <label class="form-label">Category</label>
-                        <div class="dropdown w-100">
-                            <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start" type="button" id="filterCategoryBtn" data-bs-toggle="dropdown" aria-expanded="false">
-                                <span id="filterCategoryLabel">All Categories</span>
-                            </button>
-                            <ul class="dropdown-menu w-100" id="filterCategoryMenu" style="max-height: 300px; overflow-y: auto;">
-                                <!-- Categories will be populated here -->
-                            </ul>
-                        </div>
-                    </div>
+                <hr>
 
-                    <!-- Payment Method Filter -->
-                    <div class="col-md-6">
-                        <label class="form-label">Payment Method</label>
-                        <div class="dropdown w-100">
-                            <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start" type="button" id="filterPaymentMethodBtn" data-bs-toggle="dropdown" aria-expanded="false">
-                                <span id="filterPaymentMethodLabel">All Methods</span>
-                            </button>
-                            <ul class="dropdown-menu w-100" id="filterPaymentMethodMenu" style="max-height: 300px; overflow-y: auto;">
-                                <!-- Payment methods will be populated here -->
-                            </ul>
-                        </div>
-                    </div>
-
-                    <!-- Transaction Type -->
-                    <div class="col-md-6">
-                        <label class="form-label">Transaction Type</label>
-                        <div class="dropdown w-100">
-                            <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start" type="button" id="filterTypeBtn" data-bs-toggle="dropdown" aria-expanded="false">
-                                <span id="filterTypeLabel">All Types</span>
-                            </button>
-                            <ul class="dropdown-menu w-100" id="filterTypeMenu">
-                                <li>
-                                    <div class="dropdown-item">
-                                        <div class="form-check">
-                                            <input class="form-check-input filter-type-checkbox" type="checkbox" value="income" id="filterTypeIncome">
-                                            <label class="form-check-label" for="filterTypeIncome">Income (Debit)</label>
+                <div class="row g-4">
+                    <!-- Search Filters -->
+                    <div class="col-12">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-body">
+                                <h6 class="card-title mb-3">
+                                    <i class="fas fa-search me-2"></i>Search
+                                </h6>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="fas fa-file-alt"></i></span>
+                                            <input type="text" class="form-control" id="filterDescription" placeholder="Search description...">
                                         </div>
                                     </div>
-                                </li>
-                                <li>
-                                    <div class="dropdown-item">
-                                        <div class="form-check">
-                                            <input class="form-check-input filter-type-checkbox" type="checkbox" value="expense" id="filterTypeExpense">
-                                            <label class="form-check-label" for="filterTypeExpense">Expense (Credit)</label>
+                                    <div class="col-md-6">
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="fas fa-sticky-note"></i></span>
+                                            <input type="text" class="form-control" id="filterNotes" placeholder="Search notes...">
                                         </div>
                                     </div>
-                                </li>
-                            </ul>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Status Filter -->
+                    <!-- Categories & Payment Methods -->
                     <div class="col-md-6">
-                        <label class="form-label">Status</label>
-                        <div class="dropdown w-100">
-                            <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start" type="button" id="filterStatusBtn" data-bs-toggle="dropdown" aria-expanded="false">
-                                <span id="filterStatusLabel">All Statuses</span>
-                            </button>
-                            <ul class="dropdown-menu w-100" id="filterStatusMenu">
-                                <li>
-                                    <div class="dropdown-item">
-                                        <div class="form-check">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body">
+                                <h6 class="card-title mb-3">
+                                    <i class="fas fa-tags me-2"></i>Categories
+                                </h6>
+                                <div class="mb-2">
+                                    <button type="button" class="btn btn-sm btn-link text-decoration-none p-0" onclick="selectAllCategories()">
+                                        Select All
+                                    </button>
+                                    <span class="text-muted mx-2">|</span>
+                                    <button type="button" class="btn btn-sm btn-link text-decoration-none p-0" onclick="deselectAllCategories()">
+                                        Clear
+                                    </button>
+                                </div>
+                                <div id="filterCategoryCheckboxes" class="filter-checkbox-container">
+                                    <!-- Categories will be populated here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body">
+                                <h6 class="card-title mb-3">
+                                    <i class="fas fa-credit-card me-2"></i>Payment Methods
+                                </h6>
+                                <div class="mb-2">
+                                    <button type="button" class="btn btn-sm btn-link text-decoration-none p-0" onclick="selectAllPaymentMethods()">
+                                        Select All
+                                    </button>
+                                    <span class="text-muted mx-2">|</span>
+                                    <button type="button" class="btn btn-sm btn-link text-decoration-none p-0" onclick="deselectAllPaymentMethods()">
+                                        Clear
+                                    </button>
+                                </div>
+                                <div id="filterPaymentMethodCheckboxes" class="filter-checkbox-container">
+                                    <!-- Payment methods will be populated here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Transaction Type & Status -->
+                    <div class="col-md-6">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-body">
+                                <h6 class="card-title mb-3">
+                                    <i class="fas fa-exchange-alt me-2"></i>Transaction Type
+                                </h6>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input filter-type-checkbox" type="checkbox" value="income" id="filterTypeIncome">
+                                    <label class="form-check-label" for="filterTypeIncome">
+                                        <i class="fas fa-arrow-down text-success me-1"></i>Income (Debit)
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input filter-type-checkbox" type="checkbox" value="expense" id="filterTypeExpense">
+                                    <label class="form-check-label" for="filterTypeExpense">
+                                        <i class="fas fa-arrow-up text-danger me-1"></i>Expense (Credit)
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-body">
+                                <h6 class="card-title mb-3">
+                                    <i class="fas fa-check-circle me-2"></i>Status
+                                </h6>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <div class="form-check mb-2">
                                             <input class="form-check-input filter-status-checkbox" type="checkbox" value="done" id="filterStatusDone">
-                                            <label class="form-check-label" for="filterStatusDone">Done</label>
+                                            <label class="form-check-label" for="filterStatusDone">
+                                                <i class="fas fa-check text-success me-1"></i>Done
+                                            </label>
                                         </div>
-                                    </div>
-                                </li>
-                                <li>
-                                    <div class="dropdown-item">
                                         <div class="form-check">
                                             <input class="form-check-input filter-status-checkbox" type="checkbox" value="not_done" id="filterStatusNotDone">
-                                            <label class="form-check-label" for="filterStatusNotDone">Not Done</label>
+                                            <label class="form-check-label" for="filterStatusNotDone">
+                                                <i class="fas fa-times text-muted me-1"></i>Not Done
+                                            </label>
                                         </div>
                                     </div>
-                                </li>
-                                <li>
-                                    <div class="dropdown-item">
-                                        <div class="form-check">
+                                    <div class="col-6">
+                                        <div class="form-check mb-2">
                                             <input class="form-check-input filter-status-checkbox" type="checkbox" value="paid" id="filterStatusPaid">
-                                            <label class="form-check-label" for="filterStatusPaid">Paid</label>
+                                            <label class="form-check-label" for="filterStatusPaid">
+                                                <i class="fas fa-dollar-sign text-success me-1"></i>Paid
+                                            </label>
                                         </div>
-                                    </div>
-                                </li>
-                                <li>
-                                    <div class="dropdown-item">
                                         <div class="form-check">
                                             <input class="form-check-input filter-status-checkbox" type="checkbox" value="unpaid" id="filterStatusUnpaid">
-                                            <label class="form-check-label" for="filterStatusUnpaid">Unpaid</label>
+                                            <label class="form-check-label" for="filterStatusUnpaid">
+                                                <i class="fas fa-exclamation text-warning me-1"></i>Unpaid
+                                            </label>
                                         </div>
                                     </div>
-                                </li>
-                            </ul>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
                     <!-- Amount Range -->
-                    <div class="col-md-6">
-                        <label for="filterMinAmount" class="form-label">Minimum Amount</label>
-                        <input type="number" class="form-control" id="filterMinAmount" placeholder="0.00" step="0.01" min="0">
-                    </div>
-                    <div class="col-md-6">
-                        <label for="filterMaxAmount" class="form-label">Maximum Amount</label>
-                        <input type="number" class="form-control" id="filterMaxAmount" placeholder="Any" step="0.01" min="0">
+                    <div class="col-12">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-body">
+                                <h6 class="card-title mb-3">
+                                    <i class="fas fa-dollar-sign me-2"></i>Amount Range
+                                </h6>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <div class="input-group">
+                                            <span class="input-group-text">Min</span>
+                                            <input type="number" class="form-control" id="filterMinAmount" placeholder="0.00" step="0.01" min="0">
+                                            <span class="input-group-text"><i class="fas fa-dollar-sign"></i></span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="input-group">
+                                            <span class="input-group-text">Max</span>
+                                            <input type="number" class="form-control" id="filterMaxAmount" placeholder="No limit" step="0.01" min="0">
+                                            <span class="input-group-text"><i class="fas fa-dollar-sign"></i></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Date Range -->
-                    <div class="col-md-6">
-                        <label for="filterStartDate" class="form-label">Start Date</label>
-                        <input type="date" class="form-control" id="filterStartDate">
-                    </div>
-                    <div class="col-md-6">
-                        <label for="filterEndDate" class="form-label">End Date</label>
-                        <input type="date" class="form-control" id="filterEndDate">
-                    </div>
-
-                    <!-- Notes Filter -->
-                    <div class="col-md-12">
-                        <label for="filterNotes" class="form-label">Search Notes</label>
-                        <input type="text" class="form-control" id="filterNotes" placeholder="Search in notes...">
+                    <div class="col-12">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-body">
+                                <h6 class="card-title mb-3">
+                                    <i class="fas fa-calendar me-2"></i>Date Range
+                                </h6>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <div class="input-group">
+                                            <span class="input-group-text">From</span>
+                                            <input type="date" class="form-control" id="filterStartDate">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="input-group">
+                                            <span class="input-group-text">To</span>
+                                            <input type="date" class="form-control" id="filterEndDate">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Active Filters Display -->
-                <div id="activeFiltersDisplay" class="mt-3" style="display: none;">
-                    <hr>
-                    <h6>Active Filters:</h6>
-                    <div id="activeFiltersList" class="d-flex flex-wrap gap-2">
-                        <!-- Active filter badges will be displayed here -->
+                <div id="activeFiltersDisplay" class="mt-4" style="display: none;">
+                    <div class="alert alert-info mb-0">
+                        <h6 class="alert-heading">
+                            <i class="fas fa-filter me-2"></i>Active Filters:
+                        </h6>
+                        <div id="activeFiltersList" class="d-flex flex-wrap gap-2 mt-2">
+                            <!-- Active filter badges will be displayed here -->
+                        </div>
                     </div>
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" id="clearFiltersBtn">Clear All</button>
-                <button type="button" class="btn btn-primary" id="applyFiltersBtn">Apply Filters</button>
+                <button type="button" class="btn btn-outline-secondary" id="clearFiltersBtn">
+                    <i class="fas fa-eraser me-1"></i>Clear All
+                </button>
+                <button type="button" class="btn btn-primary" id="applyFiltersBtn">
+                    <i class="fas fa-check me-1"></i>Apply Filters
+                </button>
             </div>
         </div>
     </div>
 </div>
+
+<style>
+/* Filter Modal Styling - Using Base Template Colors */
+#filterModal .modal-content {
+    background-color: var(--modal-bg);
+    color: var(--text-primary);
+}
+
+#filterModal .modal-header {
+    background: var(--card-header-bg);
+    border-bottom: 1px solid var(--border-color);
+}
+
+#filterModal .modal-footer {
+    background: var(--card-header-bg);
+    border-top: 1px solid var(--border-color);
+}
+
+#filterModal .card {
+    background-color: var(--card-bg);
+    border-color: var(--border-color);
+}
+
+#filterModal .card-title {
+    color: var(--text-primary);
+}
+
+#filterModal .input-group-text {
+    background-color: var(--bg-tertiary);
+    border-color: var(--input-border);
+    color: var(--text-primary);
+}
+
+.filter-checkbox-container {
+    max-height: 250px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    padding: 0.75rem;
+    background-color: var(--bg-secondary);
+}
+
+.filter-checkbox-container .form-check {
+    margin-bottom: 0.5rem;
+}
+
+.filter-checkbox-container .form-check:last-child {
+    margin-bottom: 0;
+}
+
+.filter-checkbox-container .form-check-label {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.filter-checkbox-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.filter-checkbox-container::-webkit-scrollbar-track {
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+}
+
+.filter-checkbox-container::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+}
+
+.filter-checkbox-container::-webkit-scrollbar-thumb:hover {
+    background: var(--text-secondary);
+}
+
+/* Make all filter labels use theme colors */
+#filterModal .form-check-label {
+    color: var(--text-primary);
+}
+
+#filterModal .text-muted {
+    color: var(--text-secondary) !important;
+}
+
+#filterModal hr {
+    border-color: var(--border-color);
+    opacity: 1;
+}
+</style>
 
 {% endblock %}
 
