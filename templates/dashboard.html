@@ -460,9 +460,47 @@
                     </div>
                     <div class="mb-3">
                         <label for="transCategory" class="form-label">Category</label>
-                        <select class="form-select" id="transCategory">
-                            <!-- Categories will be loaded here -->
-                        </select>
+                        <div class="d-flex gap-2 align-items-start">
+                            <select class="form-select" id="transCategory">
+                                <!-- Categories will be loaded here -->
+                            </select>
+                            <button type="button" class="btn btn-outline-primary btn-sm" id="toggleNewCategoryBtn" style="white-space: nowrap;">
+                                <i class="fas fa-plus"></i> New
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#manageCategoriesModal" style="white-space: nowrap;">
+                                <i class="fas fa-cog"></i> Manage
+                            </button>
+                        </div>
+
+                        <!-- Inline category creation form (initially hidden) -->
+                        <div id="newCategoryForm" class="mt-2" style="display: none;">
+                            <div class="card border-primary">
+                                <div class="card-body p-2">
+                                    <h6 class="card-title mb-2" style="font-size: 0.875rem;">
+                                        <i class="fas fa-plus-circle me-1"></i>Add New Category
+                                    </h6>
+                                    <div class="mb-2">
+                                        <input type="text" class="form-control form-control-sm" id="newCategoryName" placeholder="Category name" maxlength="255">
+                                    </div>
+                                    <div class="mb-2">
+                                        <select class="form-select form-select-sm" id="newCategoryType">
+                                            <option value="">Select type...</option>
+                                            <option value="income">Income</option>
+                                            <option value="expense">Expense</option>
+                                        </select>
+                                    </div>
+                                    <div class="d-flex gap-2">
+                                        <button type="button" class="btn btn-primary btn-sm flex-fill" id="saveNewCategoryBtn">
+                                            <i class="fas fa-check me-1"></i>Save
+                                        </button>
+                                        <button type="button" class="btn btn-secondary btn-sm flex-fill" id="cancelNewCategoryBtn">
+                                            <i class="fas fa-times me-1"></i>Cancel
+                                        </button>
+                                    </div>
+                                    <div id="newCategoryMessage" class="mt-2" style="display: none;"></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
@@ -571,6 +609,114 @@
     </div>
 </div>
 
+<!-- Manage Categories Modal -->
+<div class="modal fade" id="manageCategoriesModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Manage Categories</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Categories that are being used in transactions cannot be deleted.
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col">
+                        <h6>Your Categories</h6>
+                    </div>
+                </div>
+
+                <!-- Edit Category Form (initially hidden) -->
+                <div id="editCategoryForm" class="mb-3" style="display: none;">
+                    <div class="card border-warning">
+                        <div class="card-body">
+                            <h6 class="card-title">
+                                <i class="fas fa-edit me-2"></i>Edit Category
+                            </h6>
+                            <form id="categoryEditForm">
+                                <input type="hidden" id="editCategoryId">
+                                <div class="row">
+                                    <div class="col-md-6 mb-2">
+                                        <label for="editCategoryName" class="form-label">Category Name</label>
+                                        <input type="text" class="form-control form-control-sm" id="editCategoryName" maxlength="255" required>
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <label for="editCategoryType" class="form-label">Type</label>
+                                        <select class="form-select form-select-sm" id="editCategoryType" required>
+                                            <option value="income">Income</option>
+                                            <option value="expense">Expense</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-2 mt-2">
+                                    <button type="button" class="btn btn-success btn-sm" id="saveEditCategoryBtn">
+                                        <i class="fas fa-save me-1"></i>Save Changes
+                                    </button>
+                                    <button type="button" class="btn btn-secondary btn-sm" id="cancelEditCategoryBtn">
+                                        <i class="fas fa-times me-1"></i>Cancel
+                                    </button>
+                                </div>
+                                <div id="editCategoryMessage" class="mt-2" style="display: none;"></div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- Income Categories -->
+                    <div class="col-md-6 mb-3">
+                        <h6 class="text-success"><i class="fas fa-arrow-down me-2"></i>Income Categories</h6>
+                        <div id="incomeCategoriesList" class="list-group">
+                            <!-- Income categories will be loaded here -->
+                        </div>
+                    </div>
+
+                    <!-- Expense Categories -->
+                    <div class="col-md-6 mb-3">
+                        <h6 class="text-danger"><i class="fas fa-arrow-up me-2"></i>Expense Categories</h6>
+                        <div id="expenseCategoriesList" class="list-group">
+                            <!-- Expense categories will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Category Confirmation Modal -->
+<div class="modal fade" id="deleteCategoryConfirmModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-exclamation-triangle text-warning me-2"></i>Confirm Delete
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="deleteCategoryConfirmMessage"></p>
+                <div class="alert alert-warning mb-0">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Note:</strong> Categories that are being used in transactions cannot be deleted.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteCategoryBtn">
+                    <i class="fas fa-trash me-1"></i>Delete Category
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Payment Totals Modal -->
 <div class="modal fade" id="paymentTotalsModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
@@ -664,7 +810,7 @@
 
 <!-- Filter Modal - Revamped Design -->
 <div class="modal fade" id="filterModal" tabindex="-1">
-    <div class="modal-dialog modal-xl">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h6 class="modal-title">
@@ -672,9 +818,9 @@
                 </h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body" style="padding: 0.75rem;">
                 <!-- Quick Filter Presets -->
-                <div class="mb-3">
+                <div class="mb-2">
                     <h6 class="text-muted mb-2" style="font-size: 0.875rem;"><i class="fas fa-bolt me-2"></i>Quick Filters</h6>
                     <div class="d-flex flex-wrap gap-2">
                         <button type="button" class="btn btn-sm btn-outline-primary filter-quick-btn" onclick="applyQuickFilter('today')">
@@ -700,11 +846,11 @@
 
                 <hr>
 
-                <div class="row g-3">
+                <div class="row g-2">
                     <!-- Search Filters -->
                     <div class="col-12">
                         <div class="card border-0 shadow-sm">
-                            <div class="card-body" style="padding: 0.75rem;">
+                            <div class="card-body" style="padding: 0.5rem;">
                                 <h6 class="card-title mb-2" style="font-size: 0.875rem;">
                                     <i class="fas fa-search me-2"></i>Search
                                 </h6>
@@ -729,7 +875,7 @@
                     <!-- Categories & Payment Methods -->
                     <div class="col-md-6">
                         <div class="card border-0 shadow-sm h-100">
-                            <div class="card-body" style="padding: 0.75rem;">
+                            <div class="card-body" style="padding: 0.5rem;">
                                 <h6 class="card-title mb-2" style="font-size: 0.875rem;">
                                     <i class="fas fa-tags me-2"></i>Categories
                                 </h6>
@@ -751,7 +897,7 @@
 
                     <div class="col-md-6">
                         <div class="card border-0 shadow-sm h-100">
-                            <div class="card-body" style="padding: 0.75rem;">
+                            <div class="card-body" style="padding: 0.5rem;">
                                 <h6 class="card-title mb-2" style="font-size: 0.875rem;">
                                     <i class="fas fa-credit-card me-2"></i>Payment Methods
                                 </h6>
@@ -774,7 +920,7 @@
                     <!-- Transaction Type & Status -->
                     <div class="col-md-6">
                         <div class="card border-0 shadow-sm">
-                            <div class="card-body" style="padding: 0.75rem;">
+                            <div class="card-body" style="padding: 0.5rem;">
                                 <h6 class="card-title mb-2" style="font-size: 0.875rem;">
                                     <i class="fas fa-exchange-alt me-2"></i>Transaction Type
                                 </h6>
@@ -796,7 +942,7 @@
 
                     <div class="col-md-6">
                         <div class="card border-0 shadow-sm">
-                            <div class="card-body" style="padding: 0.75rem;">
+                            <div class="card-body" style="padding: 0.5rem;">
                                 <h6 class="card-title mb-2" style="font-size: 0.875rem;">
                                     <i class="fas fa-check-circle me-2"></i>Status
                                 </h6>
@@ -837,7 +983,7 @@
                     <!-- Amount Range -->
                     <div class="col-12">
                         <div class="card border-0 shadow-sm">
-                            <div class="card-body" style="padding: 0.75rem;">
+                            <div class="card-body" style="padding: 0.5rem;">
                                 <h6 class="card-title mb-2" style="font-size: 0.875rem;">
                                     <i class="fas fa-dollar-sign me-2"></i>Amount Range
                                 </h6>
@@ -864,7 +1010,7 @@
                     <!-- Date Range -->
                     <div class="col-12">
                         <div class="card border-0 shadow-sm">
-                            <div class="card-body" style="padding: 0.75rem;">
+                            <div class="card-body" style="padding: 0.5rem;">
                                 <h6 class="card-title mb-2" style="font-size: 0.875rem;">
                                     <i class="fas fa-calendar me-2"></i>Date Range
                                 </h6>
@@ -888,7 +1034,7 @@
                 </div>
 
                 <!-- Active Filters Display -->
-                <div id="activeFiltersDisplay" class="mt-4" style="display: none;">
+                <div id="activeFiltersDisplay" class="mt-2" style="display: none;">
                     <div class="alert alert-info mb-0">
                         <h6 class="alert-heading">
                             <i class="fas fa-filter me-2"></i>Active Filters:
@@ -944,7 +1090,7 @@
 }
 
 .filter-checkbox-container {
-    max-height: 200px;
+    max-height: 140px;
     overflow-y: auto;
     border: 1px solid var(--border-color);
     border-radius: 0.375rem;

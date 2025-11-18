@@ -265,6 +265,56 @@ function setupFormButtons() {
     if (filterModal) {
         filterModal.addEventListener('shown.bs.modal', populateFilterDropdowns);
     }
+
+    // Setup manage categories modal to load categories when shown
+    const manageCategoriesModal = document.getElementById('manageCategoriesModal');
+    if (manageCategoriesModal) {
+        manageCategoriesModal.addEventListener('shown.bs.modal', loadCategoriesForManagement);
+    }
+
+    // New category inline creation
+    const toggleNewCategoryBtn = document.getElementById('toggleNewCategoryBtn');
+    if (toggleNewCategoryBtn) {
+        toggleNewCategoryBtn.addEventListener('click', toggleNewCategoryForm);
+    }
+
+    const saveNewCategoryBtn = document.getElementById('saveNewCategoryBtn');
+    if (saveNewCategoryBtn) {
+        saveNewCategoryBtn.addEventListener('click', saveNewCategory);
+    }
+
+    const cancelNewCategoryBtn = document.getElementById('cancelNewCategoryBtn');
+    if (cancelNewCategoryBtn) {
+        cancelNewCategoryBtn.addEventListener('click', hideNewCategoryForm);
+    }
+
+    // Allow pressing Enter to save new category
+    const newCategoryName = document.getElementById('newCategoryName');
+    if (newCategoryName) {
+        newCategoryName.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                saveNewCategory();
+            }
+        });
+    }
+
+    // Category edit form buttons
+    const saveEditCategoryBtn = document.getElementById('saveEditCategoryBtn');
+    if (saveEditCategoryBtn) {
+        saveEditCategoryBtn.addEventListener('click', saveEditCategory);
+    }
+
+    const cancelEditCategoryBtn = document.getElementById('cancelEditCategoryBtn');
+    if (cancelEditCategoryBtn) {
+        cancelEditCategoryBtn.addEventListener('click', hideEditCategoryForm);
+    }
+
+    // Delete category confirmation
+    const confirmDeleteCategoryBtn = document.getElementById('confirmDeleteCategoryBtn');
+    if (confirmDeleteCategoryBtn) {
+        confirmDeleteCategoryBtn.addEventListener('click', deleteCategory);
+    }
 }
 
 // ================================
@@ -303,6 +353,362 @@ function populateCategoryDropdowns(categories) {
         categories.forEach(cat => {
             filterDropdown.innerHTML += `<option value="${cat.id}">${cat.name} (${cat.type})</option>`;
         });
+    }
+}
+
+function toggleNewCategoryForm() {
+    const form = document.getElementById('newCategoryForm');
+    if (form) {
+        if (form.style.display === 'none') {
+            showNewCategoryForm();
+        } else {
+            hideNewCategoryForm();
+        }
+    }
+}
+
+function showNewCategoryForm() {
+    const form = document.getElementById('newCategoryForm');
+    const message = document.getElementById('newCategoryMessage');
+
+    if (form) {
+        form.style.display = 'block';
+        // Clear previous values
+        document.getElementById('newCategoryName').value = '';
+        document.getElementById('newCategoryType').value = '';
+        if (message) {
+            message.style.display = 'none';
+        }
+        // Focus on name input
+        document.getElementById('newCategoryName').focus();
+    }
+}
+
+function hideNewCategoryForm() {
+    const form = document.getElementById('newCategoryForm');
+    if (form) {
+        form.style.display = 'none';
+        // Clear form
+        document.getElementById('newCategoryName').value = '';
+        document.getElementById('newCategoryType').value = '';
+        const message = document.getElementById('newCategoryMessage');
+        if (message) {
+            message.style.display = 'none';
+        }
+    }
+}
+
+function saveNewCategory() {
+    const nameInput = document.getElementById('newCategoryName');
+    const typeInput = document.getElementById('newCategoryType');
+    const message = document.getElementById('newCategoryMessage');
+    const saveBtn = document.getElementById('saveNewCategoryBtn');
+
+    const name = nameInput.value.trim();
+    const type = typeInput.value;
+
+    // Validate inputs
+    if (!name) {
+        showCategoryMessage('Please enter a category name', 'danger');
+        return;
+    }
+
+    if (!type) {
+        showCategoryMessage('Please select a category type', 'danger');
+        return;
+    }
+
+    // Disable button during save
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
+
+    // Send to API
+    fetch('/api/categories', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            name: name,
+            type: type
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(err => {
+                throw new Error(err.error || 'Failed to create category');
+            });
+        }
+        return response.json();
+    })
+    .then(newCategory => {
+        // Success!
+        showCategoryMessage('Category created successfully!', 'success');
+
+        // Reload categories to update all dropdowns
+        loadCategories();
+
+        // Wait a moment, then hide form and select the new category
+        setTimeout(() => {
+            hideNewCategoryForm();
+            // Select the newly created category
+            const transCategorySelect = document.getElementById('transCategory');
+            if (transCategorySelect) {
+                transCategorySelect.value = newCategory.id;
+            }
+        }, 1000);
+    })
+    .catch(error => {
+        console.error('Error creating category:', error);
+        showCategoryMessage(error.message || 'Failed to create category', 'danger');
+    })
+    .finally(() => {
+        // Re-enable button
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<i class="fas fa-check me-1"></i>Save';
+    });
+}
+
+function showCategoryMessage(text, type) {
+    const message = document.getElementById('newCategoryMessage');
+    if (message) {
+        message.className = `alert alert-${type} mb-0`;
+        message.style.fontSize = '0.875rem';
+        message.style.padding = '0.5rem';
+        message.textContent = text;
+        message.style.display = 'block';
+    }
+}
+
+function loadCategoriesForManagement() {
+    const incomeList = document.getElementById('incomeCategoriesList');
+    const expenseList = document.getElementById('expenseCategoriesList');
+
+    if (!incomeList || !expenseList) return;
+
+    // Hide edit form when reloading categories
+    hideEditCategoryForm();
+
+    // Show loading state
+    incomeList.innerHTML = '<div class="text-center p-3"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
+    expenseList.innerHTML = '<div class="text-center p-3"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
+
+    fetch('/api/categories')
+        .then(response => response.json())
+        .then(categories => {
+            // Separate categories by type
+            const incomeCategories = categories.filter(cat => cat.type === 'income');
+            const expenseCategories = categories.filter(cat => cat.type === 'expense');
+
+            // Display income categories
+            if (incomeCategories.length > 0) {
+                incomeList.innerHTML = incomeCategories.map(cat => `
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-tag me-2"></i>${cat.name}</span>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-primary" onclick="editCategory(${cat.id}, '${cat.name.replace(/'/g, "\\'")}', '${cat.type}')" title="Edit">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-outline-danger" onclick="showDeleteCategoryConfirm(${cat.id}, '${cat.name.replace(/'/g, "\\'")}')">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                incomeList.innerHTML = '<div class="text-muted text-center p-3">No income categories</div>';
+            }
+
+            // Display expense categories
+            if (expenseCategories.length > 0) {
+                expenseList.innerHTML = expenseCategories.map(cat => `
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-tag me-2"></i>${cat.name}</span>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-primary" onclick="editCategory(${cat.id}, '${cat.name.replace(/'/g, "\\'")}', '${cat.type}')" title="Edit">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-outline-danger" onclick="showDeleteCategoryConfirm(${cat.id}, '${cat.name.replace(/'/g, "\\'")}')">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                expenseList.innerHTML = '<div class="text-muted text-center p-3">No expense categories</div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error loading categories:', error);
+            incomeList.innerHTML = '<div class="alert alert-danger">Failed to load categories</div>';
+            expenseList.innerHTML = '<div class="alert alert-danger">Failed to load categories</div>';
+        });
+}
+
+let categoryToDelete = null;
+
+function showDeleteCategoryConfirm(categoryId, categoryName) {
+    categoryToDelete = categoryId;
+    const message = document.getElementById('deleteCategoryConfirmMessage');
+    if (message) {
+        message.textContent = `Are you sure you want to delete the category "${categoryName}"?`;
+    }
+
+    const modal = new bootstrap.Modal(document.getElementById('deleteCategoryConfirmModal'));
+    modal.show();
+}
+
+function deleteCategory() {
+    if (!categoryToDelete) return;
+
+    const categoryId = categoryToDelete;
+    categoryToDelete = null;
+
+    // Close confirmation modal
+    const confirmModal = bootstrap.Modal.getInstance(document.getElementById('deleteCategoryConfirmModal'));
+    if (confirmModal) {
+        confirmModal.hide();
+    }
+
+    fetch(`/api/categories/${categoryId}`, {
+        method: 'DELETE'
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(err => {
+                throw new Error(err.error || 'Failed to delete category');
+            });
+        }
+        return response.json();
+    })
+    .then(result => {
+        // Success!
+        showToast('Category deleted successfully', 'success');
+
+        // Reload categories in the management modal
+        loadCategoriesForManagement();
+
+        // Reload categories in all dropdowns
+        loadCategories();
+    })
+    .catch(error => {
+        console.error('Error deleting category:', error);
+        showToast(error.message || 'Failed to delete category', 'danger');
+    });
+}
+
+function editCategory(categoryId, categoryName, categoryType) {
+    // Show edit form
+    const editForm = document.getElementById('editCategoryForm');
+    if (editForm) {
+        editForm.style.display = 'block';
+    }
+
+    // Populate form fields
+    document.getElementById('editCategoryId').value = categoryId;
+    document.getElementById('editCategoryName').value = categoryName;
+    document.getElementById('editCategoryType').value = categoryType;
+
+    // Hide message
+    const message = document.getElementById('editCategoryMessage');
+    if (message) {
+        message.style.display = 'none';
+    }
+
+    // Scroll to edit form
+    editForm.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function hideEditCategoryForm() {
+    const editForm = document.getElementById('editCategoryForm');
+    if (editForm) {
+        editForm.style.display = 'none';
+    }
+
+    // Clear form
+    document.getElementById('editCategoryId').value = '';
+    document.getElementById('editCategoryName').value = '';
+    document.getElementById('editCategoryType').value = '';
+
+    // Hide message
+    const message = document.getElementById('editCategoryMessage');
+    if (message) {
+        message.style.display = 'none';
+    }
+}
+
+function saveEditCategory() {
+    const categoryId = document.getElementById('editCategoryId').value;
+    const name = document.getElementById('editCategoryName').value.trim();
+    const type = document.getElementById('editCategoryType').value;
+    const saveBtn = document.getElementById('saveEditCategoryBtn');
+    const message = document.getElementById('editCategoryMessage');
+
+    // Validate
+    if (!name) {
+        showEditCategoryMessage('Please enter a category name', 'danger');
+        return;
+    }
+
+    if (!type) {
+        showEditCategoryMessage('Please select a category type', 'danger');
+        return;
+    }
+
+    // Disable button during save
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
+
+    fetch(`/api/categories/${categoryId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            name: name,
+            type: type
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(err => {
+                throw new Error(err.error || 'Failed to update category');
+            });
+        }
+        return response.json();
+    })
+    .then(updatedCategory => {
+        // Success!
+        showEditCategoryMessage('Category updated successfully!', 'success');
+        showToast('Category updated successfully', 'success');
+
+        // Reload categories in the management modal
+        setTimeout(() => {
+            loadCategoriesForManagement();
+        }, 1000);
+
+        // Reload categories in all dropdowns
+        loadCategories();
+    })
+    .catch(error => {
+        console.error('Error updating category:', error);
+        showEditCategoryMessage(error.message || 'Failed to update category', 'danger');
+    })
+    .finally(() => {
+        // Re-enable button
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<i class="fas fa-save me-1"></i>Save Changes';
+    });
+}
+
+function showEditCategoryMessage(text, type) {
+    const message = document.getElementById('editCategoryMessage');
+    if (message) {
+        message.className = `alert alert-${type} mb-0`;
+        message.style.fontSize = '0.875rem';
+        message.style.padding = '0.5rem';
+        message.textContent = text;
+        message.style.display = 'block';
     }
 }
 

@@ -285,6 +285,130 @@ select.innerHTML += `<option value="${cat.id}">${cat.name} (${cat.type})</option
 .catch(error => console.error('Error loading categories:', error));
 }
 
+function toggleNewCategoryForm() {
+const form = document.getElementById('newCategoryForm');
+if (form) {
+if (form.style.display === 'none') {
+showNewCategoryForm();
+} else {
+hideNewCategoryForm();
+}
+}
+}
+
+function showNewCategoryForm() {
+const form = document.getElementById('newCategoryForm');
+const message = document.getElementById('newCategoryMessage');
+
+if (form) {
+form.style.display = 'block';
+// Clear previous values
+document.getElementById('newCategoryName').value = '';
+document.getElementById('newCategoryType').value = '';
+if (message) {
+message.style.display = 'none';
+}
+// Focus on name input
+document.getElementById('newCategoryName').focus();
+}
+}
+
+function hideNewCategoryForm() {
+const form = document.getElementById('newCategoryForm');
+if (form) {
+form.style.display = 'none';
+// Clear form
+document.getElementById('newCategoryName').value = '';
+document.getElementById('newCategoryType').value = '';
+const message = document.getElementById('newCategoryMessage');
+if (message) {
+message.style.display = 'none';
+}
+}
+}
+
+function saveNewCategory() {
+const nameInput = document.getElementById('newCategoryName');
+const typeInput = document.getElementById('newCategoryType');
+const message = document.getElementById('newCategoryMessage');
+const saveBtn = document.getElementById('saveNewCategoryBtn');
+
+const name = nameInput.value.trim();
+const type = typeInput.value;
+
+// Validate inputs
+if (!name) {
+showCategoryMessage('Please enter a category name', 'danger');
+return;
+}
+
+if (!type) {
+showCategoryMessage('Please select a category type', 'danger');
+return;
+}
+
+// Disable button during save
+saveBtn.disabled = true;
+saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
+
+// Send to API
+fetch('/api/categories', {
+method: 'POST',
+headers: {
+'Content-Type': 'application/json'
+},
+body: JSON.stringify({
+name: name,
+type: type
+})
+})
+.then(response => {
+if (!response.ok) {
+return response.json().then(err => {
+throw new Error(err.error || 'Failed to create category');
+});
+}
+return response.json();
+})
+.then(newCategory => {
+// Success!
+showCategoryMessage('Category created successfully!', 'success');
+
+// Reload categories to update all dropdowns
+loadCategories();
+
+// Wait a moment, then hide form and select the new category
+setTimeout(() => {
+hideNewCategoryForm();
+// Select the newly created category
+const transCategorySelect = document.getElementById('transCategory');
+if (transCategorySelect) {
+transCategorySelect.value = newCategory.id;
+}
+}, 1000);
+})
+.catch(error => {
+console.error('Error creating category:', error);
+showCategoryMessage(error.message || 'Failed to create category', 'danger');
+})
+.finally(() => {
+// Re-enable button
+saveBtn.disabled = false;
+saveBtn.innerHTML = '<i class="fas fa-check me-1"></i>Save';
+});
+}
+
+function showCategoryMessage(text, type) {
+const message = document.getElementById('newCategoryMessage');
+if (message) {
+message.className = `alert alert-${type} mb-0`;
+message.style.fontSize = '0.875rem';
+message.style.padding = '0.5rem';
+message.textContent = text;
+message.style.display = 'block';
+}
+}
+
 // Current month and year
 let currentYear = new Date().getFullYear();
 let currentMonth = new Date().getMonth() + 1;
@@ -1034,6 +1158,33 @@ loadTransactions();
 
 // Save button
 document.getElementById('saveTransactionBtn').addEventListener('click', saveTransaction);
+
+// New category inline creation
+const toggleNewCategoryBtn = document.getElementById('toggleNewCategoryBtn');
+if (toggleNewCategoryBtn) {
+toggleNewCategoryBtn.addEventListener('click', toggleNewCategoryForm);
+}
+
+const saveNewCategoryBtn = document.getElementById('saveNewCategoryBtn');
+if (saveNewCategoryBtn) {
+saveNewCategoryBtn.addEventListener('click', saveNewCategory);
+}
+
+const cancelNewCategoryBtn = document.getElementById('cancelNewCategoryBtn');
+if (cancelNewCategoryBtn) {
+cancelNewCategoryBtn.addEventListener('click', hideNewCategoryForm);
+}
+
+// Allow pressing Enter to save new category
+const newCategoryName = document.getElementById('newCategoryName');
+if (newCategoryName) {
+newCategoryName.addEventListener('keypress', function(e) {
+if (e.key === 'Enter') {
+e.preventDefault();
+saveNewCategory();
+}
+});
+}
 
 // Load payment totals when modal is shown
 const paymentTotalsModal = document.getElementById('paymentTotalsModal');
