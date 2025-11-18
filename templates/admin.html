@@ -14,7 +14,8 @@
     .admin-header {
         margin-bottom: 30px;
         padding-bottom: 15px;
-        border-bottom: 2px solid #dee2e6;
+        border-bottom: 2px solid var(--border-color);
+        color: var(--text-primary);
     }
     .stats-cards {
         display: flex;
@@ -26,43 +27,53 @@
         flex: 1;
         min-width: 200px;
         padding: 20px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
+        background: var(--bg-tertiary) !important;
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
         border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        box-shadow: var(--card-shadow);
+        position: relative;
+        overflow: hidden;
+    }
+    .stat-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: -50px;
+        width: 100px;
+        height: 100%;
+        background: rgba(255,255,255,0.03);
+        transform: skewX(-25deg);
     }
     .stat-card h3 {
         margin: 0;
         font-size: 2rem;
         font-weight: bold;
+        color: var(--text-primary);
     }
     .stat-card p {
         margin: 5px 0 0 0;
         opacity: 0.9;
+        color: var(--text-secondary);
     }
     .section-card {
-        background: white;
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
         border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        box-shadow: var(--card-shadow);
         margin-bottom: 30px;
         overflow: hidden;
     }
-    [data-theme="dark"] .section-card {
-        background: #2d2d2d;
-    }
     .section-header {
         padding: 20px;
-        background: #f8f9fa;
-        border-bottom: 1px solid #dee2e6;
+        background: var(--card-header-bg);
+        border-bottom: 1px solid var(--border-color);
         display: flex;
         justify-content: space-between;
         align-items: center;
         flex-wrap: wrap;
         gap: 10px;
-    }
-    [data-theme="dark"] .section-header {
-        background: #1a1a1a;
-        border-bottom-color: #444;
+        color: var(--text-primary);
     }
     .section-body {
         padding: 20px;
@@ -78,33 +89,25 @@
     .user-table, .audit-table {
         width: 100%;
         border-collapse: collapse;
+        color: var(--text-primary);
     }
     .user-table th, .audit-table th {
-        background: #f8f9fa;
+        background: var(--card-bg);
         padding: 12px;
         text-align: left;
         font-weight: 600;
-        border-bottom: 2px solid #dee2e6;
-    }
-    [data-theme="dark"] .user-table th,
-    [data-theme="dark"] .audit-table th {
-        background: #1a1a1a;
-        border-bottom-color: #444;
+        border-bottom: 2px solid var(--border-color);
+        color: var(--text-primary);
     }
     .user-table td, .audit-table td {
         padding: 12px;
-        border-bottom: 1px solid #dee2e6;
+        border-bottom: 1px solid var(--border-color);
     }
-    [data-theme="dark"] .user-table td,
-    [data-theme="dark"] .audit-table td {
-        border-bottom-color: #444;
+    .user-table tbody tr, .audit-table tbody tr {
+        background: var(--table-bg);
     }
     .user-table tbody tr:hover, .audit-table tbody tr:hover {
-        background: #f8f9fa;
-    }
-    [data-theme="dark"] .user-table tbody tr:hover,
-    [data-theme="dark"] .audit-table tbody tr:hover {
-        background: #3a3a3a;
+        background: var(--table-hover);
     }
     .badge {
         display: inline-block;
@@ -264,15 +267,15 @@
             <h3>{{ users|length }}</h3>
             <p><i class="fas fa-users"></i> Total Users</p>
         </div>
-        <div class="stat-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+        <div class="stat-card">
             <h3>{{ users|selectattr('is_active')|list|length }}</h3>
             <p><i class="fas fa-user-check"></i> Active Users</p>
         </div>
-        <div class="stat-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+        <div class="stat-card">
             <h3>{{ users|selectattr('is_admin')|list|length }}</h3>
             <p><i class="fas fa-shield-alt"></i> Administrators</p>
         </div>
-        <div class="stat-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+        <div class="stat-card">
             <h3>{{ audit_logs|length }}</h3>
             <p><i class="fas fa-history"></i> Recent Actions</p>
         </div>
