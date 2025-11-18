@@ -1079,8 +1079,22 @@ z-index: auto !important;
 
 /* Ensure navbar doesn't clip dropdown */
 .navbar,
-.navbar .navbar-collapse {
+.navbar .navbar-collapse,
+.navbar .container-fluid {
 overflow: visible !important;
+}
+
+/* Ensure navbar parent containers don't clip dropdown on dashboard */
+body:not(.admin-page) {
+overflow-y: hidden;
+overflow-x: hidden;
+}
+
+/* Allow dropdown to escape body overflow on dashboard */
+body:not(.admin-page) .navbar {
+position: relative;
+overflow: visible !important;
+z-index: 1100;
 }
 
 .navbar .dropdown-toggle {
