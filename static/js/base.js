@@ -176,3 +176,9 @@ if (document.getElementById('themeIcon')) {
 updateThemeButton(savedTheme);
 }
 })();
+
+// Initialize Bootstrap dropdowns properly
+document.addEventListener('DOMContentLoaded', function() {
+// Let Bootstrap handle dropdowns automatically via data-bs-toggle
+// No manual intervention needed - Bootstrap 5 handles it
+});
