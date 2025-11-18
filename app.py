@@ -1203,6 +1203,67 @@ def add_category():
 
     return jsonify({'error': 'Database connection failed'}), 500
 
+@app.route('/api/categories/<int:category_id>', methods=['PUT'])
+@login_required
+def update_category(category_id):
+    """Update a category."""
+    data = request.get_json()
+
+    # Validate input
+    if not data or 'name' not in data or 'type' not in data:
+        return jsonify({'error': 'Missing required fields: name and type'}), 400
+
+    name = data['name'].strip()
+    category_type = data['type'].strip().lower()
+
+    if not name:
+        return jsonify({'error': 'Category name cannot be empty'}), 400
+
+    if category_type not in ['income', 'expense']:
+        return jsonify({'error': 'Category type must be either "income" or "expense"'}), 400
+
+    connection = get_db_connection()
+    if connection:
+        cursor = connection.cursor(dictionary=True)
+        try:
+            # Check if category exists
+            cursor.execute("SELECT * FROM categories WHERE id = %s", (category_id,))
+            category = cursor.fetchone()
+
+            if not category:
+                return jsonify({'error': 'Category not found'}), 404
+
+            # Check if another category with same name and type already exists (excluding current category)
+            cursor.execute(
+                "SELECT id FROM categories WHERE name = %s AND type = %s AND id != %s",
+                (name, category_type, category_id)
+            )
+            existing = cursor.fetchone()
+
+            if existing:
+                return jsonify({'error': 'Another category with this name and type already exists'}), 409
+
+            # Update the category
+            cursor.execute(
+                "UPDATE categories SET name = %s, type = %s WHERE id = %s",
+                (name, category_type, category_id)
+            )
+            connection.commit()
+
+            # Get the updated category
+            cursor.execute("SELECT * FROM categories WHERE id = %s", (category_id,))
+            updated_category = cursor.fetchone()
+
+            return jsonify(updated_category), 200
+        except Error as e:
+            connection.rollback()
+            return jsonify({'error': str(e)}), 500
+        finally:
+            cursor.close()
+            connection.close()
+
+    return jsonify({'error': 'Database connection failed'}), 500
+
 @app.route('/api/categories/<int:category_id>', methods=['DELETE'])
 @login_required
 def delete_category(category_id):
