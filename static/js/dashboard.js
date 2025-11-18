@@ -266,6 +266,12 @@ function setupFormButtons() {
         filterModal.addEventListener('shown.bs.modal', populateFilterDropdowns);
     }
 
+    // Setup manage categories modal to load categories when shown
+    const manageCategoriesModal = document.getElementById('manageCategoriesModal');
+    if (manageCategoriesModal) {
+        manageCategoriesModal.addEventListener('shown.bs.modal', loadCategoriesForManagement);
+    }
+
     // New category inline creation
     const toggleNewCategoryBtn = document.getElementById('toggleNewCategoryBtn');
     if (toggleNewCategoryBtn) {
@@ -455,6 +461,91 @@ function showCategoryMessage(text, type) {
         message.textContent = text;
         message.style.display = 'block';
     }
+}
+
+function loadCategoriesForManagement() {
+    const incomeList = document.getElementById('incomeCategoriesList');
+    const expenseList = document.getElementById('expenseCategoriesList');
+
+    if (!incomeList || !expenseList) return;
+
+    // Show loading state
+    incomeList.innerHTML = '<div class="text-center p-3"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
+    expenseList.innerHTML = '<div class="text-center p-3"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
+
+    fetch('/api/categories')
+        .then(response => response.json())
+        .then(categories => {
+            // Separate categories by type
+            const incomeCategories = categories.filter(cat => cat.type === 'income');
+            const expenseCategories = categories.filter(cat => cat.type === 'expense');
+
+            // Display income categories
+            if (incomeCategories.length > 0) {
+                incomeList.innerHTML = incomeCategories.map(cat => `
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-tag me-2"></i>${cat.name}</span>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteCategory(${cat.id}, '${cat.name}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                `).join('');
+            } else {
+                incomeList.innerHTML = '<div class="text-muted text-center p-3">No income categories</div>';
+            }
+
+            // Display expense categories
+            if (expenseCategories.length > 0) {
+                expenseList.innerHTML = expenseCategories.map(cat => `
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-tag me-2"></i>${cat.name}</span>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteCategory(${cat.id}, '${cat.name}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                `).join('');
+            } else {
+                expenseList.innerHTML = '<div class="text-muted text-center p-3">No expense categories</div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error loading categories:', error);
+            incomeList.innerHTML = '<div class="alert alert-danger">Failed to load categories</div>';
+            expenseList.innerHTML = '<div class="alert alert-danger">Failed to load categories</div>';
+        });
+}
+
+function deleteCategory(categoryId, categoryName) {
+    // Confirm deletion
+    if (!confirm(`Are you sure you want to delete the category "${categoryName}"?\n\nNote: Categories that are being used in transactions cannot be deleted.`)) {
+        return;
+    }
+
+    fetch(`/api/categories/${categoryId}`, {
+        method: 'DELETE'
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(err => {
+                throw new Error(err.error || 'Failed to delete category');
+            });
+        }
+        return response.json();
+    })
+    .then(result => {
+        // Success!
+        showToast('Category deleted successfully', 'success');
+
+        // Reload categories in the management modal
+        loadCategoriesForManagement();
+
+        // Reload categories in all dropdowns
+        loadCategories();
+    })
+    .catch(error => {
+        console.error('Error deleting category:', error);
+        showToast(error.message || 'Failed to delete category', 'danger');
+    });
 }
 
 // ================================

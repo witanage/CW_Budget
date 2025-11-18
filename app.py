@@ -1203,6 +1203,48 @@ def add_category():
 
     return jsonify({'error': 'Database connection failed'}), 500
 
+@app.route('/api/categories/<int:category_id>', methods=['DELETE'])
+@login_required
+def delete_category(category_id):
+    """Delete a category."""
+    connection = get_db_connection()
+    if connection:
+        cursor = connection.cursor(dictionary=True)
+        try:
+            # Check if category exists
+            cursor.execute("SELECT * FROM categories WHERE id = %s", (category_id,))
+            category = cursor.fetchone()
+
+            if not category:
+                return jsonify({'error': 'Category not found'}), 404
+
+            # Check if category is being used in transactions
+            cursor.execute(
+                "SELECT COUNT(*) as count FROM transactions WHERE category_id = %s",
+                (category_id,)
+            )
+            result = cursor.fetchone()
+
+            if result and result['count'] > 0:
+                return jsonify({
+                    'error': f'Cannot delete category. It is being used by {result["count"]} transaction(s).',
+                    'transaction_count': result['count']
+                }), 409
+
+            # Delete the category
+            cursor.execute("DELETE FROM categories WHERE id = %s", (category_id,))
+            connection.commit()
+
+            return jsonify({'message': 'Category deleted successfully'}), 200
+        except Error as e:
+            connection.rollback()
+            return jsonify({'error': str(e)}), 500
+        finally:
+            cursor.close()
+            connection.close()
+
+    return jsonify({'error': 'Database connection failed'}), 500
+
 @app.route('/api/recalculate-balances', methods=['POST'])
 @login_required
 def recalculate_balances():

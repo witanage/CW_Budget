@@ -467,6 +467,9 @@
                             <button type="button" class="btn btn-outline-primary btn-sm" id="toggleNewCategoryBtn" style="white-space: nowrap;">
                                 <i class="fas fa-plus"></i> New
                             </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#manageCategoriesModal" style="white-space: nowrap;">
+                                <i class="fas fa-cog"></i> Manage
+                            </button>
                         </div>
 
                         <!-- Inline category creation form (initially hidden) -->
@@ -597,6 +600,51 @@
                             <button type="button" class="btn btn-secondary" id="cancelAddCardBtn">Cancel</button>
                         </div>
                     </form>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Manage Categories Modal -->
+<div class="modal fade" id="manageCategoriesModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Manage Categories</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Categories that are being used in transactions cannot be deleted.
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col">
+                        <h6>Your Categories</h6>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- Income Categories -->
+                    <div class="col-md-6 mb-3">
+                        <h6 class="text-success"><i class="fas fa-arrow-down me-2"></i>Income Categories</h6>
+                        <div id="incomeCategoriesList" class="list-group">
+                            <!-- Income categories will be loaded here -->
+                        </div>
+                    </div>
+
+                    <!-- Expense Categories -->
+                    <div class="col-md-6 mb-3">
+                        <h6 class="text-danger"><i class="fas fa-arrow-up me-2"></i>Expense Categories</h6>
+                        <div id="expenseCategoriesList" class="list-group">
+                            <!-- Expense categories will be loaded here -->
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
