@@ -121,6 +121,13 @@ overflow: hidden;
 height: 100vh;
 }
 
+/* Admin page: allow normal scrolling */
+body.admin-page {
+overflow: auto;
+height: auto;
+min-height: 100vh;
+}
+
 .navbar {
 background: var(--navbar-bg);
 box-shadow: 0 2px 10px rgba(0,0,0,0.5);
@@ -141,6 +148,7 @@ padding-top: 0;
 /* Fix navbar collapse */
 .navbar-collapse {
 max-height: none;
+position: static;
 }
 
 .navbar-nav {
@@ -735,11 +743,23 @@ height: calc(100vh - 50px);
 overflow: hidden;
 }
 
+/* Admin page: reset container-fluid constraints */
+body.admin-page .container-fluid {
+height: auto;
+overflow: visible;
+}
+
 /* Dashboard row fills height */
 .container-fluid > .row {
 height: 100%;
 overflow: hidden;
 margin: 0;
+}
+
+/* Admin page: reset row constraints */
+body.admin-page .container-fluid > .row {
+height: auto;
+overflow: visible;
 }
 
 /* Fix controller bar button alignment */
