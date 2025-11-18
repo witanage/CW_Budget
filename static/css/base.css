@@ -1036,6 +1036,13 @@ margin-right: 15px;
 background-color: var(--card-bg);
 border-color: var(--border-color);
 z-index: 1050;
+display: none;
+}
+
+.dropdown-menu.show {
+display: block !important;
+visibility: visible !important;
+opacity: 1 !important;
 }
 
 .dropdown-item {
@@ -1054,6 +1061,12 @@ position: absolute;
 pointer-events: auto;
 }
 
+.navbar .dropdown-menu.show {
+display: block !important;
+visibility: visible !important;
+opacity: 1 !important;
+}
+
 .navbar .dropdown {
 position: relative;
 z-index: auto;
@@ -1062,6 +1075,12 @@ z-index: auto;
 .navbar .nav-item.dropdown {
 position: relative;
 z-index: auto !important;
+}
+
+/* Ensure navbar doesn't clip dropdown */
+.navbar,
+.navbar .navbar-collapse {
+overflow: visible !important;
 }
 
 .navbar .dropdown-toggle {
@@ -1144,12 +1163,13 @@ white-space: nowrap;
 .user-dropdown-menu {
 min-width: 280px;
 padding: 0;
-border: none;
+border: 1px solid var(--border-color) !important;
 border-radius: 12px;
 box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
 margin-top: 8px !important;
 overflow: hidden;
 animation: dropdownSlideIn 0.2s ease-out;
+background-color: var(--card-bg) !important;
 }
 
 @keyframes dropdownSlideIn {
