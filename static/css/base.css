@@ -445,6 +445,27 @@ right: 15px;
 top: 15px;
 }
 
+/* Stat card color overrides - align with base theme */
+.stat-card.bg-primary {
+background: var(--bg-tertiary) !important;
+border: 1px solid var(--border-color);
+}
+
+.stat-card.bg-success {
+background: var(--bg-tertiary) !important;
+border: 1px solid var(--border-color);
+}
+
+.stat-card.bg-danger {
+background: var(--bg-tertiary) !important;
+border: 1px solid var(--border-color);
+}
+
+.stat-card.bg-info {
+background: var(--bg-tertiary) !important;
+border: 1px solid var(--border-color);
+}
+
 /* Overview page scrolling */
 #overviewPage {
 overflow-y: auto !important;
