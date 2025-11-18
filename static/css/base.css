@@ -1047,9 +1047,9 @@ background-color: var(--table-hover);
 color: var(--primary-color);
 }
 
-/* Fix navbar dropdown clickability */
+/* Fix navbar dropdown clickability - ensure it appears above modals */
 .navbar .dropdown-menu {
-z-index: 1110 !important;
+z-index: 1210 !important;
 position: absolute;
 pointer-events: auto;
 }
