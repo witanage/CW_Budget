@@ -176,3 +176,26 @@ if (document.getElementById('themeIcon')) {
 updateThemeButton(savedTheme);
 }
 })();
+
+// Fix dropdown menu behavior - prevent immediate closing
+document.addEventListener('DOMContentLoaded', function() {
+const userDropdown = document.getElementById('userDropdown');
+if (userDropdown) {
+// Prevent click event from bubbling and closing dropdown immediately
+userDropdown.addEventListener('click', function(e) {
+e.stopPropagation();
+});
+
+// Ensure dropdown menu items are clickable
+const dropdownMenu = userDropdown.nextElementSibling;
+if (dropdownMenu && dropdownMenu.classList.contains('dropdown-menu')) {
+dropdownMenu.addEventListener('click', function(e) {
+// Allow clicks on dropdown items (links) to work
+// Only stop propagation for the menu container itself
+if (e.target === this) {
+e.stopPropagation();
+}
+});
+}
+}
+});

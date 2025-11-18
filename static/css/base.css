@@ -1168,10 +1168,10 @@ border-radius: 12px;
 box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
 margin-top: 8px !important;
 overflow: hidden;
-animation: dropdownSlideIn 0.2s ease-out;
 background-color: var(--card-bg) !important;
 }
 
+/* Remove animation initially to test if it's causing the flash
 @keyframes dropdownSlideIn {
 from {
 opacity: 0;
@@ -1182,6 +1182,7 @@ opacity: 1;
 transform: translateY(0);
 }
 }
+*/
 
 /* User Info Header */
 .user-info-header {
