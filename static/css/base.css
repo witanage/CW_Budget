@@ -136,7 +136,7 @@ min-height: 50px;
 max-height: 50px;
 flex-shrink: 0;
 position: relative;
-z-index: 100;
+z-index: 1100;
 }
 
 /* Ensure all navbar links and buttons are clickable */
@@ -190,7 +190,7 @@ align-items: center;
 .navbar-collapse {
 position: static;
 pointer-events: auto;
-z-index: 150;
+z-index: auto;
 }
 
 .navbar-collapse.show,
@@ -201,22 +201,22 @@ position: static;
 /* Ensure nav items are clickable */
 .navbar-nav .nav-item {
 position: relative;
-z-index: 150;
+z-index: auto;
 }
 
 .navbar-nav .nav-link {
 position: relative;
-z-index: 150;
+z-index: auto;
 pointer-events: auto;
 }
 
 /* Specifically ensure dropdown items are on top */
 .navbar-nav .nav-item.dropdown {
-z-index: 200;
+z-index: auto;
 }
 
 .navbar-nav .dropdown-toggle {
-z-index: 200;
+z-index: auto;
 pointer-events: auto;
 cursor: pointer;
 }
@@ -233,7 +233,7 @@ padding: 1rem;
 box-shadow: 0 4px 10px rgba(0,0,0,0.3);
 max-height: 70vh;
 overflow-y: auto;
-z-index: 101;
+z-index: 1101;
 }
 }
 
@@ -808,6 +808,8 @@ padding-left: 0;
 padding-right: 0;
 height: calc(100vh - 50px);
 overflow: hidden;
+position: relative;
+z-index: 1;
 }
 
 /* Admin page: reset container-fluid constraints */
@@ -1026,24 +1028,24 @@ color: var(--primary-color);
 
 /* Fix navbar dropdown clickability */
 .navbar .dropdown-menu {
-z-index: 1060 !important;
+z-index: 1110 !important;
 position: absolute;
 pointer-events: auto;
 }
 
 .navbar .dropdown {
 position: relative;
-z-index: 200;
+z-index: auto;
 }
 
 .navbar .nav-item.dropdown {
 position: relative;
-z-index: 200 !important;
+z-index: auto !important;
 }
 
 .navbar .dropdown-toggle {
 position: relative;
-z-index: 200 !important;
+z-index: auto !important;
 pointer-events: auto !important;
 cursor: pointer !important;
 }
@@ -1051,7 +1053,7 @@ cursor: pointer !important;
 @media (min-width: 992px) {
 .navbar .nav-item.dropdown {
 position: relative;
-z-index: 200 !important;
+z-index: auto !important;
 }
 }
 
