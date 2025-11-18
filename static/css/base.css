@@ -148,11 +148,22 @@ padding-top: 0;
 /* Fix navbar collapse */
 .navbar-collapse {
 max-height: none;
-position: static;
 }
 
 .navbar-nav {
 align-items: center;
+}
+
+/* Ensure navbar collapse doesn't block dropdowns on desktop */
+@media (min-width: 992px) {
+.navbar-collapse {
+position: static;
+}
+
+.navbar-collapse.show,
+.navbar-collapse.collapsing {
+position: static;
+}
 }
 
 @media (max-width: 991.98px) {
@@ -959,8 +970,23 @@ color: var(--primary-color);
 
 /* Fix navbar dropdown clickability */
 .navbar .dropdown-menu {
-z-index: 1050;
+z-index: 1060;
 position: absolute;
+pointer-events: auto;
+}
+
+.navbar .dropdown {
+position: relative;
+}
+
+.navbar .nav-item.dropdown {
+position: static;
+}
+
+@media (min-width: 992px) {
+.navbar .nav-item.dropdown {
+position: relative;
+}
 }
 
 /* Theme Toggle Icon */
