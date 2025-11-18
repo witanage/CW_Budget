@@ -1,5 +1,33 @@
 /* Admin Dashboard Styles - Supplementary to inline styles */
 
+/* CRITICAL: Ensure no overlays block interactions */
+* {
+    -webkit-tap-highlight-color: transparent;
+}
+
+body.admin-page {
+    pointer-events: auto !important;
+}
+
+.admin-container * {
+    pointer-events: auto;
+}
+
+/* Remove any accidental overlays */
+.modal-backdrop.show {
+    pointer-events: auto;
+}
+
+/* Ensure all interactive elements are clickable */
+a, button, input, select, textarea, [onclick], [role="button"] {
+    pointer-events: auto !important;
+    cursor: pointer;
+}
+
+input:disabled, button:disabled, select:disabled, textarea:disabled {
+    cursor: not-allowed;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
     .admin-container {

@@ -185,10 +185,61 @@
         color: #6c757d;
         font-style: italic;
     }
+
+    /* CRITICAL: Fix for overlay/layer blocking clicks */
+    .admin-container {
+        position: relative;
+        z-index: 1;
+        pointer-events: auto;
+    }
+
+    /* Ensure buttons are clickable */
+    button, .btn, .btn-sm {
+        position: relative;
+        z-index: 2;
+        pointer-events: auto;
+    }
+
+    /* Ensure modals appear above everything */
+    .modal {
+        z-index: 10000 !important;
+    }
+
+    .modal-backdrop {
+        z-index: 9999 !important;
+    }
+
+    /* Ensure tables don't block buttons */
+    .user-table, .audit-table {
+        position: relative;
+        z-index: 1;
+    }
+
+    .action-buttons {
+        position: relative;
+        z-index: 3;
+    }
+
+    /* Fix for navbar not overlapping */
+    .navbar {
+        z-index: 100;
+    }
+
+    /* Ensure no pseudo-elements block content */
+    body::before,
+    body::after,
+    .admin-container::before,
+    .admin-container::after {
+        display: none !important;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
+<script>
+    // Add admin-page class to body for specific styling
+    document.body.classList.add('admin-page');
+</script>
 <div class="admin-container">
     <!-- Header -->
     <div class="admin-header">
@@ -411,6 +462,40 @@
     document.addEventListener('DOMContentLoaded', function() {
         console.log('DOM Content Loaded');
         deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+
+        // CRITICAL FIX: Remove any lingering modal backdrops or overlays
+        clearModalBackdrops();
+
+        // Remove any bootstrap modal-open class that might block scrolling
+        document.body.classList.remove('modal-open');
+
+        // Remove inline styles that might block interaction
+        document.body.style.overflow = '';
+        document.body.style.paddingRight = '';
+
+        console.log('Admin page initialized and cleared of overlays');
+    });
+
+    // Function to clear all modal backdrops and overlays
+    function clearModalBackdrops() {
+        // Remove all modal backdrops
+        const backdrops = document.querySelectorAll('.modal-backdrop');
+        backdrops.forEach(backdrop => {
+            console.log('Removing modal backdrop');
+            backdrop.remove();
+        });
+
+        // Ensure body doesn't have modal-open class
+        document.body.classList.remove('modal-open');
+
+        // Reset body overflow
+        document.body.style.overflow = '';
+        document.body.style.paddingRight = '';
+    }
+
+    // Clear backdrops when modal is hidden
+    document.getElementById('deleteModal').addEventListener('hidden.bs.modal', function() {
+        setTimeout(clearModalBackdrops, 100);
     });
 
     // Filter users based on search input
@@ -555,6 +640,24 @@
         setTimeout(() => location.reload(), 500);
     }
 
-    console.log('Admin Dashboard fully initialized');
+    // Debug helper: Log if any element is blocking clicks
+    window.addEventListener('click', function(e) {
+        const target = e.target;
+        const computedStyle = window.getComputedStyle(target);
+        if (computedStyle.pointerEvents === 'none') {
+            console.warn('Click blocked on element:', target, 'pointer-events:', computedStyle.pointerEvents);
+        }
+    });
+
+    // Periodic check to remove any rouge overlays (safety net)
+    setInterval(function() {
+        const backdrops = document.querySelectorAll('.modal-backdrop');
+        if (backdrops.length > 0 && !document.querySelector('.modal.show')) {
+            console.log('Found rouge modal backdrop, removing...');
+            clearModalBackdrops();
+        }
+    }, 2000);
+
+    console.log('Admin Dashboard fully initialized - All overlays cleared');
 </script>
 {% endblock %}
