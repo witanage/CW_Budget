@@ -1058,12 +1058,12 @@
     color: var(--text-primary);
 }
 
-/* Ensure modal is on top of navbar */
-#filterModal {
+/* Ensure ALL modals are on top of navbar */
+.modal {
     z-index: 1200 !important;
 }
 
-#filterModal ~ .modal-backdrop {
+.modal-backdrop {
     z-index: 1199 !important;
 }
 
