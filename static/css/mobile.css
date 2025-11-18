@@ -317,7 +317,7 @@ text-align: right;
 
 .mobile-content {
 position: fixed;
-top: 115px; /* Position below the fixed header */
+top: 130px; /* Position below the fixed header */
 left: 0;
 right: 0;
 bottom: 0;
