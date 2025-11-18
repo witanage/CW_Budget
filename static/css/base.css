@@ -720,15 +720,12 @@ z-index: 10;
 padding-top: 1rem;
 height: calc(100vh - 50px);
 overflow: hidden;
-position: relative;
-z-index: 1;
 }
 
 /* Dashboard row fills height */
 .container-fluid > .row {
 height: 100%;
 overflow: hidden;
-position: relative;
 }
 
 /* Fix controller bar button alignment */
