@@ -1145,7 +1145,62 @@ def get_categories():
         finally:
             cursor.close()
             connection.close()
-    
+
+    return jsonify({'error': 'Database connection failed'}), 500
+
+@app.route('/api/categories', methods=['POST'])
+@login_required
+def add_category():
+    """Add a new category."""
+    data = request.get_json()
+
+    # Validate input
+    if not data or 'name' not in data or 'type' not in data:
+        return jsonify({'error': 'Missing required fields: name and type'}), 400
+
+    name = data['name'].strip()
+    category_type = data['type'].strip().lower()
+
+    if not name:
+        return jsonify({'error': 'Category name cannot be empty'}), 400
+
+    if category_type not in ['income', 'expense']:
+        return jsonify({'error': 'Category type must be either "income" or "expense"'}), 400
+
+    connection = get_db_connection()
+    if connection:
+        cursor = connection.cursor(dictionary=True)
+        try:
+            # Check if category with same name and type already exists
+            cursor.execute(
+                "SELECT id FROM categories WHERE name = %s AND type = %s",
+                (name, category_type)
+            )
+            existing = cursor.fetchone()
+
+            if existing:
+                return jsonify({'error': 'Category with this name and type already exists', 'id': existing['id']}), 409
+
+            # Insert new category
+            cursor.execute(
+                "INSERT INTO categories (name, type) VALUES (%s, %s)",
+                (name, category_type)
+            )
+            connection.commit()
+
+            # Get the newly created category
+            category_id = cursor.lastrowid
+            cursor.execute("SELECT * FROM categories WHERE id = %s", (category_id,))
+            new_category = cursor.fetchone()
+
+            return jsonify(new_category), 201
+        except Error as e:
+            connection.rollback()
+            return jsonify({'error': str(e)}), 500
+        finally:
+            cursor.close()
+            connection.close()
+
     return jsonify({'error': 'Database connection failed'}), 500
 
 @app.route('/api/recalculate-balances', methods=['POST'])
