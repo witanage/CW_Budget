@@ -117,7 +117,7 @@ input:disabled, button:disabled, select:disabled, textarea:disabled {
 /* Accessibility improvements */
 button:focus,
 input:focus {
-    outline: 2px solid #007bff;
+    outline: 2px solid #007acc;
     outline-offset: 2px;
 }
 
