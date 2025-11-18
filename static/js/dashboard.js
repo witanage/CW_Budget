@@ -248,9 +248,16 @@ function setupFormButtons() {
         applyFiltersBtn.addEventListener('click', applyFilters);
     }
 
+    // Clear filters button in modal
     const clearFiltersBtn = document.getElementById('clearFiltersBtn');
     if (clearFiltersBtn) {
         clearFiltersBtn.addEventListener('click', clearFilters);
+    }
+
+    // Clear filters button on page
+    const clearFiltersPageBtn = document.getElementById('clearFiltersPageBtn');
+    if (clearFiltersPageBtn) {
+        clearFiltersPageBtn.addEventListener('click', clearFilters);
     }
 
     // Setup filter modal to populate checkboxes when shown
@@ -1278,6 +1285,12 @@ function displayActiveFilters() {
         } else {
             filterBadge.style.display = 'none';
         }
+    }
+
+    // Show/hide page clear button
+    const clearFiltersPageBtn = document.getElementById('clearFiltersPageBtn');
+    if (clearFiltersPageBtn) {
+        clearFiltersPageBtn.style.display = hasActiveFilters ? 'inline-block' : 'none';
     }
 }
 
