@@ -153,12 +153,27 @@ align-items: center;
 height: 100%;
 padding-top: 0;
 position: relative;
+z-index: auto;
+}
+
+/* Prevent navbar toggler from blocking elements */
+.navbar-toggler {
+position: relative;
+z-index: 2;
 }
 
 /* Ensure buttons don't block dropdown */
 .navbar .d-flex {
 position: relative;
 z-index: 1;
+pointer-events: auto;
+}
+
+/* Ensure buttons are clickable but don't block other elements */
+.navbar .d-flex .btn {
+position: relative;
+z-index: 2;
+pointer-events: auto;
 }
 
 /* Fix navbar collapse */
@@ -175,6 +190,7 @@ align-items: center;
 .navbar-collapse {
 position: static;
 pointer-events: auto;
+z-index: 150;
 }
 
 .navbar-collapse.show,
@@ -185,13 +201,24 @@ position: static;
 /* Ensure nav items are clickable */
 .navbar-nav .nav-item {
 position: relative;
-z-index: 10;
+z-index: 150;
 }
 
 .navbar-nav .nav-link {
 position: relative;
-z-index: 10;
+z-index: 150;
 pointer-events: auto;
+}
+
+/* Specifically ensure dropdown items are on top */
+.navbar-nav .nav-item.dropdown {
+z-index: 200;
+}
+
+.navbar-nav .dropdown-toggle {
+z-index: 200;
+pointer-events: auto;
+cursor: pointer;
 }
 }
 
@@ -999,32 +1026,32 @@ color: var(--primary-color);
 
 /* Fix navbar dropdown clickability */
 .navbar .dropdown-menu {
-z-index: 1060;
+z-index: 1060 !important;
 position: absolute;
 pointer-events: auto;
 }
 
 .navbar .dropdown {
 position: relative;
-z-index: 100;
+z-index: 200;
 }
 
 .navbar .nav-item.dropdown {
 position: relative;
-z-index: 100;
+z-index: 200 !important;
 }
 
 .navbar .dropdown-toggle {
 position: relative;
-z-index: 100;
-pointer-events: auto;
-cursor: pointer;
+z-index: 200 !important;
+pointer-events: auto !important;
+cursor: pointer !important;
 }
 
 @media (min-width: 992px) {
 .navbar .nav-item.dropdown {
 position: relative;
-z-index: 100;
+z-index: 200 !important;
 }
 }
 
