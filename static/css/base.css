@@ -1092,7 +1092,7 @@ transform: translateY(-1px);
 width: 32px;
 height: 32px;
 border-radius: 50%;
-background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+background: linear-gradient(135deg, #3d3d3d 0%, #2d2d2d 100%);
 display: flex;
 align-items: center;
 justify-content: center;
@@ -1103,7 +1103,7 @@ transition: all 0.3s ease;
 
 .user-profile-toggle:hover .user-avatar {
 transform: scale(1.05);
-box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+box-shadow: 0 4px 12px rgba(0, 122, 204, 0.4);
 }
 
 .user-initials {
@@ -1145,7 +1145,7 @@ transform: translateY(0);
 /* User Info Header */
 .user-info-header {
 padding: 20px 16px !important;
-background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+background: linear-gradient(135deg, #3d3d3d 0%, #2d2d2d 100%);
 display: flex;
 align-items: center;
 gap: 12px;
@@ -1153,7 +1153,7 @@ white-space: normal !important;
 }
 
 [data-theme="dark"] .user-info-header {
-background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+background: linear-gradient(135deg, #3d3d3d 0%, #2d2d2d 100%);
 }
 
 .user-avatar-large {
