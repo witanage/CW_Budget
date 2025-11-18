@@ -273,7 +273,7 @@ showToast('Error marking transaction as unpaid', 'danger');
 
 // Load categories
 function loadCategories() {
-fetch('/api/categories')
+return fetch('/api/categories')
 .then(response => response.json())
 .then(data => {
 const select = document.getElementById('transCategory');
@@ -281,8 +281,12 @@ select.innerHTML = '<option value="">Select Category</option>';
 data.forEach(cat => {
 select.innerHTML += `<option value="${cat.id}">${cat.name} (${cat.type})</option>`;
 });
+return data;
 })
-.catch(error => console.error('Error loading categories:', error));
+.catch(error => {
+console.error('Error loading categories:', error);
+throw error;
+});
 }
 
 function toggleNewCategoryForm() {
@@ -374,18 +378,21 @@ return response.json();
 // Success!
 showCategoryMessage('Category created successfully!', 'success');
 
-// Reload categories to update all dropdowns
-loadCategories();
-
-// Wait a moment, then hide form and select the new category
+// Reload categories to update all dropdowns, then select the new category
+loadCategories().then(() => {
+// Hide form after a brief delay to show success message
 setTimeout(() => {
 hideNewCategoryForm();
-// Select the newly created category
+}, 800);
+
+// Select the newly created category in the dropdown
 const transCategorySelect = document.getElementById('transCategory');
 if (transCategorySelect) {
 transCategorySelect.value = newCategory.id;
 }
-}, 1000);
+}).catch(error => {
+console.error('Error reloading categories:', error);
+});
 })
 .catch(error => {
 console.error('Error creating category:', error);
