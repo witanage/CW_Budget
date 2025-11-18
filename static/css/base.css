@@ -945,6 +945,7 @@ margin-right: 15px;
 .dropdown-menu {
 background-color: var(--card-bg);
 border-color: var(--border-color);
+z-index: 1050;
 }
 
 .dropdown-item {
@@ -954,6 +955,12 @@ color: var(--text-primary);
 .dropdown-item:hover {
 background-color: var(--table-hover);
 color: var(--primary-color);
+}
+
+/* Fix navbar dropdown clickability */
+.navbar .dropdown-menu {
+z-index: 1050;
+position: absolute;
 }
 
 /* Theme Toggle Icon */
