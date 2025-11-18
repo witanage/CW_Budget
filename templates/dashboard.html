@@ -667,32 +667,32 @@
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">
+                <h6 class="modal-title">
                     <i class="fas fa-filter me-2"></i>Advanced Filters
-                </h5>
+                </h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <!-- Quick Filter Presets -->
-                <div class="mb-4">
-                    <h6 class="text-muted mb-3"><i class="fas fa-bolt me-2"></i>Quick Filters</h6>
+                <div class="mb-3">
+                    <h6 class="text-muted mb-2" style="font-size: 0.875rem;"><i class="fas fa-bolt me-2"></i>Quick Filters</h6>
                     <div class="d-flex flex-wrap gap-2">
-                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="applyQuickFilter('today')">
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="applyQuickFilter('today')" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;">
                             <i class="fas fa-calendar-day me-1"></i>Today
                         </button>
-                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="applyQuickFilter('last7days')">
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="applyQuickFilter('last7days')" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;">
                             <i class="fas fa-calendar-week me-1"></i>Last 7 Days
                         </button>
-                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="applyQuickFilter('thisMonth')">
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="applyQuickFilter('thisMonth')" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;">
                             <i class="fas fa-calendar-alt me-1"></i>This Month
                         </button>
-                        <button type="button" class="btn btn-sm btn-outline-success" onclick="applyQuickFilter('income')">
+                        <button type="button" class="btn btn-sm btn-outline-success" onclick="applyQuickFilter('income')" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;">
                             <i class="fas fa-arrow-down me-1"></i>Income Only
                         </button>
-                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="applyQuickFilter('expense')">
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="applyQuickFilter('expense')" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;">
                             <i class="fas fa-arrow-up me-1"></i>Expenses Only
                         </button>
-                        <button type="button" class="btn btn-sm btn-outline-warning" onclick="applyQuickFilter('unpaid')">
+                        <button type="button" class="btn btn-sm btn-outline-warning" onclick="applyQuickFilter('unpaid')" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;">
                             <i class="fas fa-exclamation-triangle me-1"></i>Unpaid
                         </button>
                     </div>
@@ -700,23 +700,23 @@
 
                 <hr>
 
-                <div class="row g-4">
+                <div class="row g-3">
                     <!-- Search Filters -->
                     <div class="col-12">
                         <div class="card border-0 shadow-sm">
-                            <div class="card-body">
-                                <h6 class="card-title mb-3">
+                            <div class="card-body" style="padding: 0.75rem;">
+                                <h6 class="card-title mb-2" style="font-size: 0.875rem;">
                                     <i class="fas fa-search me-2"></i>Search
                                 </h6>
-                                <div class="row g-3">
+                                <div class="row g-2">
                                     <div class="col-md-6">
-                                        <div class="input-group">
+                                        <div class="input-group input-group-sm">
                                             <span class="input-group-text"><i class="fas fa-file-alt"></i></span>
                                             <input type="text" class="form-control" id="filterDescription" placeholder="Search description...">
                                         </div>
                                     </div>
                                     <div class="col-md-6">
-                                        <div class="input-group">
+                                        <div class="input-group input-group-sm">
                                             <span class="input-group-text"><i class="fas fa-sticky-note"></i></span>
                                             <input type="text" class="form-control" id="filterNotes" placeholder="Search notes...">
                                         </div>
@@ -729,16 +729,16 @@
                     <!-- Categories & Payment Methods -->
                     <div class="col-md-6">
                         <div class="card border-0 shadow-sm h-100">
-                            <div class="card-body">
-                                <h6 class="card-title mb-3">
+                            <div class="card-body" style="padding: 0.75rem;">
+                                <h6 class="card-title mb-2" style="font-size: 0.875rem;">
                                     <i class="fas fa-tags me-2"></i>Categories
                                 </h6>
-                                <div class="mb-2">
-                                    <button type="button" class="btn btn-sm btn-link text-decoration-none p-0" onclick="selectAllCategories()">
+                                <div class="mb-2" style="font-size: 0.75rem;">
+                                    <button type="button" class="btn btn-sm btn-link text-decoration-none p-0" onclick="selectAllCategories()" style="font-size: 0.75rem;">
                                         Select All
                                     </button>
                                     <span class="text-muted mx-2">|</span>
-                                    <button type="button" class="btn btn-sm btn-link text-decoration-none p-0" onclick="deselectAllCategories()">
+                                    <button type="button" class="btn btn-sm btn-link text-decoration-none p-0" onclick="deselectAllCategories()" style="font-size: 0.75rem;">
                                         Clear
                                     </button>
                                 </div>
@@ -751,16 +751,16 @@
 
                     <div class="col-md-6">
                         <div class="card border-0 shadow-sm h-100">
-                            <div class="card-body">
-                                <h6 class="card-title mb-3">
+                            <div class="card-body" style="padding: 0.75rem;">
+                                <h6 class="card-title mb-2" style="font-size: 0.875rem;">
                                     <i class="fas fa-credit-card me-2"></i>Payment Methods
                                 </h6>
-                                <div class="mb-2">
-                                    <button type="button" class="btn btn-sm btn-link text-decoration-none p-0" onclick="selectAllPaymentMethods()">
+                                <div class="mb-2" style="font-size: 0.75rem;">
+                                    <button type="button" class="btn btn-sm btn-link text-decoration-none p-0" onclick="selectAllPaymentMethods()" style="font-size: 0.75rem;">
                                         Select All
                                     </button>
                                     <span class="text-muted mx-2">|</span>
-                                    <button type="button" class="btn btn-sm btn-link text-decoration-none p-0" onclick="deselectAllPaymentMethods()">
+                                    <button type="button" class="btn btn-sm btn-link text-decoration-none p-0" onclick="deselectAllPaymentMethods()" style="font-size: 0.75rem;">
                                         Clear
                                     </button>
                                 </div>
@@ -774,17 +774,17 @@
                     <!-- Transaction Type & Status -->
                     <div class="col-md-6">
                         <div class="card border-0 shadow-sm">
-                            <div class="card-body">
-                                <h6 class="card-title mb-3">
+                            <div class="card-body" style="padding: 0.75rem;">
+                                <h6 class="card-title mb-2" style="font-size: 0.875rem;">
                                     <i class="fas fa-exchange-alt me-2"></i>Transaction Type
                                 </h6>
-                                <div class="form-check mb-2">
+                                <div class="form-check mb-1" style="font-size: 0.85rem;">
                                     <input class="form-check-input filter-type-checkbox" type="checkbox" value="income" id="filterTypeIncome">
                                     <label class="form-check-label" for="filterTypeIncome">
                                         <i class="fas fa-arrow-down text-success me-1"></i>Income (Debit)
                                     </label>
                                 </div>
-                                <div class="form-check">
+                                <div class="form-check" style="font-size: 0.85rem;">
                                     <input class="form-check-input filter-type-checkbox" type="checkbox" value="expense" id="filterTypeExpense">
                                     <label class="form-check-label" for="filterTypeExpense">
                                         <i class="fas fa-arrow-up text-danger me-1"></i>Expense (Credit)
@@ -796,19 +796,19 @@
 
                     <div class="col-md-6">
                         <div class="card border-0 shadow-sm">
-                            <div class="card-body">
-                                <h6 class="card-title mb-3">
+                            <div class="card-body" style="padding: 0.75rem;">
+                                <h6 class="card-title mb-2" style="font-size: 0.875rem;">
                                     <i class="fas fa-check-circle me-2"></i>Status
                                 </h6>
                                 <div class="row">
                                     <div class="col-6">
-                                        <div class="form-check mb-2">
+                                        <div class="form-check mb-1" style="font-size: 0.85rem;">
                                             <input class="form-check-input filter-status-checkbox" type="checkbox" value="done" id="filterStatusDone">
                                             <label class="form-check-label" for="filterStatusDone">
                                                 <i class="fas fa-check text-success me-1"></i>Done
                                             </label>
                                         </div>
-                                        <div class="form-check">
+                                        <div class="form-check" style="font-size: 0.85rem;">
                                             <input class="form-check-input filter-status-checkbox" type="checkbox" value="not_done" id="filterStatusNotDone">
                                             <label class="form-check-label" for="filterStatusNotDone">
                                                 <i class="fas fa-times text-muted me-1"></i>Not Done
@@ -816,13 +816,13 @@
                                         </div>
                                     </div>
                                     <div class="col-6">
-                                        <div class="form-check mb-2">
+                                        <div class="form-check mb-1" style="font-size: 0.85rem;">
                                             <input class="form-check-input filter-status-checkbox" type="checkbox" value="paid" id="filterStatusPaid">
                                             <label class="form-check-label" for="filterStatusPaid">
                                                 <i class="fas fa-dollar-sign text-success me-1"></i>Paid
                                             </label>
                                         </div>
-                                        <div class="form-check">
+                                        <div class="form-check" style="font-size: 0.85rem;">
                                             <input class="form-check-input filter-status-checkbox" type="checkbox" value="unpaid" id="filterStatusUnpaid">
                                             <label class="form-check-label" for="filterStatusUnpaid">
                                                 <i class="fas fa-exclamation text-warning me-1"></i>Unpaid
@@ -837,20 +837,20 @@
                     <!-- Amount Range -->
                     <div class="col-12">
                         <div class="card border-0 shadow-sm">
-                            <div class="card-body">
-                                <h6 class="card-title mb-3">
+                            <div class="card-body" style="padding: 0.75rem;">
+                                <h6 class="card-title mb-2" style="font-size: 0.875rem;">
                                     <i class="fas fa-dollar-sign me-2"></i>Amount Range
                                 </h6>
-                                <div class="row g-3">
+                                <div class="row g-2">
                                     <div class="col-md-6">
-                                        <div class="input-group">
+                                        <div class="input-group input-group-sm">
                                             <span class="input-group-text">Min</span>
                                             <input type="number" class="form-control" id="filterMinAmount" placeholder="0.00" step="0.01" min="0">
                                             <span class="input-group-text"><i class="fas fa-dollar-sign"></i></span>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
-                                        <div class="input-group">
+                                        <div class="input-group input-group-sm">
                                             <span class="input-group-text">Max</span>
                                             <input type="number" class="form-control" id="filterMaxAmount" placeholder="No limit" step="0.01" min="0">
                                             <span class="input-group-text"><i class="fas fa-dollar-sign"></i></span>
@@ -864,19 +864,19 @@
                     <!-- Date Range -->
                     <div class="col-12">
                         <div class="card border-0 shadow-sm">
-                            <div class="card-body">
-                                <h6 class="card-title mb-3">
+                            <div class="card-body" style="padding: 0.75rem;">
+                                <h6 class="card-title mb-2" style="font-size: 0.875rem;">
                                     <i class="fas fa-calendar me-2"></i>Date Range
                                 </h6>
-                                <div class="row g-3">
+                                <div class="row g-2">
                                     <div class="col-md-6">
-                                        <div class="input-group">
+                                        <div class="input-group input-group-sm">
                                             <span class="input-group-text">From</span>
                                             <input type="date" class="form-control" id="filterStartDate">
                                         </div>
                                     </div>
                                     <div class="col-md-6">
-                                        <div class="input-group">
+                                        <div class="input-group input-group-sm">
                                             <span class="input-group-text">To</span>
                                             <input type="date" class="form-control" id="filterEndDate">
                                         </div>
@@ -944,16 +944,17 @@
 }
 
 .filter-checkbox-container {
-    max-height: 250px;
+    max-height: 200px;
     overflow-y: auto;
     border: 1px solid var(--border-color);
     border-radius: 0.375rem;
-    padding: 0.75rem;
+    padding: 0.5rem;
     background-color: var(--bg-secondary);
 }
 
 .filter-checkbox-container .form-check {
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.25rem;
+    font-size: 0.85rem;
 }
 
 .filter-checkbox-container .form-check:last-child {
@@ -962,7 +963,7 @@
 
 .filter-checkbox-container .form-check-label {
     color: var(--text-primary);
-    font-weight: 500;
+    font-weight: normal;
 }
 
 .filter-checkbox-container::-webkit-scrollbar {

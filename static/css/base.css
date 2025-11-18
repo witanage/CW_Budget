@@ -185,6 +185,12 @@ box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 
 box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.7), 0 10px 10px -5px rgba(0, 0, 0, 0.5);
 }
 
+/* Disable hover transform for transactions page card */
+#transactionsPage .card:hover {
+transform: none;
+box-shadow: var(--card-shadow);
+}
+
 .card-header {
 background: var(--card-header-bg);
 color: var(--text-primary);
