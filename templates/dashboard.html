@@ -733,12 +733,12 @@
                                 <h6 class="card-title mb-2" style="font-size: 0.875rem;">
                                     <i class="fas fa-tags me-2"></i>Categories
                                 </h6>
-                                <div class="mb-2" style="font-size: 0.75rem;">
-                                    <button type="button" class="btn btn-sm btn-link text-decoration-none p-0" onclick="selectAllCategories()" style="font-size: 0.75rem;">
+                                <div class="mb-2">
+                                    <button type="button" class="btn btn-sm btn-link text-decoration-none filter-toggle-btn" onclick="selectAllCategories()">
                                         Select All
                                     </button>
-                                    <span class="text-muted mx-2">|</span>
-                                    <button type="button" class="btn btn-sm btn-link text-decoration-none p-0" onclick="deselectAllCategories()" style="font-size: 0.75rem;">
+                                    <span class="text-muted mx-1">|</span>
+                                    <button type="button" class="btn btn-sm btn-link text-decoration-none filter-toggle-btn" onclick="deselectAllCategories()">
                                         Clear
                                     </button>
                                 </div>
@@ -755,12 +755,12 @@
                                 <h6 class="card-title mb-2" style="font-size: 0.875rem;">
                                     <i class="fas fa-credit-card me-2"></i>Payment Methods
                                 </h6>
-                                <div class="mb-2" style="font-size: 0.75rem;">
-                                    <button type="button" class="btn btn-sm btn-link text-decoration-none p-0" onclick="selectAllPaymentMethods()" style="font-size: 0.75rem;">
+                                <div class="mb-2">
+                                    <button type="button" class="btn btn-sm btn-link text-decoration-none filter-toggle-btn" onclick="selectAllPaymentMethods()">
                                         Select All
                                     </button>
-                                    <span class="text-muted mx-2">|</span>
-                                    <button type="button" class="btn btn-sm btn-link text-decoration-none p-0" onclick="deselectAllPaymentMethods()" style="font-size: 0.75rem;">
+                                    <span class="text-muted mx-1">|</span>
+                                    <button type="button" class="btn btn-sm btn-link text-decoration-none filter-toggle-btn" onclick="deselectAllPaymentMethods()">
                                         Clear
                                     </button>
                                 </div>
@@ -1018,6 +1018,12 @@
     border-radius: 6px;
     font-weight: 500;
     min-width: 120px;
+}
+
+.filter-toggle-btn {
+    font-size: 0.75rem;
+    padding: 0.125rem 0.5rem;
+    white-space: nowrap;
 }
 </style>
 

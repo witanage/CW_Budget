@@ -209,6 +209,7 @@ padding: 20px;
 height: calc(100vh - 80px);
 display: flex;
 flex-direction: column;
+overflow: hidden;
 }
 
 #transactionsPage .card {
@@ -218,6 +219,7 @@ flex-direction: column;
 margin: 0;
 height: 100%;
 max-height: calc(100vh - 80px);
+overflow: hidden;
 }
 
 #transactionsPage .card-header {
@@ -653,6 +655,16 @@ padding-left: 2rem;
 padding-right: 2rem;
 padding-top: 1rem;
 padding-bottom: 1rem;
+}
+
+/* Prevent page scrolling on transactions page */
+#transactionsPage ~ * {
+overflow: hidden;
+}
+
+main:has(#transactionsPage) {
+overflow: hidden;
+max-height: calc(100vh - 60px);
 }
 
 /* Prevent content overlap with navbar */
