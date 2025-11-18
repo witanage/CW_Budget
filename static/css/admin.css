@@ -1,17 +1,159 @@
+/* Table Styling */
 .table-hover tbody tr:hover {
-background-color: var(--table-hover) !important;
+    background-color: var(--table-hover) !important;
+    transition: background-color 0.2s ease;
 }
 
+.user-row {
+    transition: all 0.2s ease;
+}
+
+/* Button Styling */
 .btn-group-sm > .btn {
-padding: 0.25rem 0.5rem;
-font-size: 0.875rem;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
 }
 
+.btn-group-sm > .btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+/* Card Styling */
 .card {
-margin-bottom: 1.5rem;
+    margin-bottom: 1.5rem;
+    transition: box-shadow 0.3s ease;
 }
 
+.card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+}
+
+/* Badge Styling */
 .badge {
-padding: 0.35em 0.65em;
-font-size: 0.875em;
+    padding: 0.35em 0.65em;
+    font-size: 0.875em;
+    font-weight: 500;
+}
+
+/* Search Input Styling */
+#userSearch {
+    transition: all 0.3s ease;
+}
+
+#userSearch:focus {
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+    border-color: #80bdff;
+}
+
+/* Loading State */
+.spinner-border {
+    width: 2rem;
+    height: 2rem;
+    margin: 1rem auto;
+}
+
+/* Alert Positioning */
+.alert.position-fixed {
+    top: 20px;
+    z-index: 9999;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        transform: translate(-50%, -100%);
+        opacity: 0;
+    }
+    to {
+        transform: translate(-50%, 0);
+        opacity: 1;
+    }
+}
+
+/* Modal Styling */
+.modal-content {
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+}
+
+.modal-header {
+    border-bottom: 1px solid var(--border-color);
+    padding: 1rem 1.5rem;
+}
+
+.modal-footer {
+    border-top: 1px solid var(--border-color);
+    padding: 1rem 1.5rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .btn-group-sm > .btn {
+        padding: 0.2rem 0.4rem;
+        font-size: 0.75rem;
+    }
+
+    .table {
+        font-size: 0.85rem;
+    }
+
+    .badge {
+        font-size: 0.75em;
+    }
+
+    #userSearch {
+        min-width: 200px !important;
+    }
+}
+
+/* Table Action Buttons */
+.btn-group .btn {
+    border-radius: 0;
+}
+
+.btn-group .btn:first-child {
+    border-top-left-radius: 0.25rem;
+    border-bottom-left-radius: 0.25rem;
+}
+
+.btn-group .btn:last-child {
+    border-top-right-radius: 0.25rem;
+    border-bottom-right-radius: 0.25rem;
+}
+
+/* Empty State */
+.text-muted {
+    font-style: italic;
+}
+
+/* Audit Log Table */
+.table-sm th {
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+}
+
+/* Status Indicators */
+.bg-success {
+    background-color: #28a745 !important;
+}
+
+.bg-danger {
+    background-color: #dc3545 !important;
+}
+
+.bg-primary {
+    background-color: #007bff !important;
+}
+
+.bg-secondary {
+    background-color: #6c757d !important;
+}
+
+.bg-info {
+    background-color: #17a2b8 !important;
 }
