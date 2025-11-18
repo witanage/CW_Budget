@@ -121,6 +121,13 @@ overflow: hidden;
 height: 100vh;
 }
 
+/* Admin page: allow normal scrolling */
+body.admin-page {
+overflow: auto;
+height: auto;
+min-height: 100vh;
+}
+
 .navbar {
 background: var(--navbar-bg);
 box-shadow: 0 2px 10px rgba(0,0,0,0.5);
@@ -128,6 +135,15 @@ padding: 0.5rem 1rem;
 min-height: 50px;
 max-height: 50px;
 flex-shrink: 0;
+position: relative;
+z-index: 100;
+}
+
+/* Ensure all navbar links and buttons are clickable */
+.navbar a,
+.navbar button {
+pointer-events: auto;
+position: relative;
 }
 
 /* Ensure navbar items are vertically centered */
@@ -136,6 +152,13 @@ display: flex;
 align-items: center;
 height: 100%;
 padding-top: 0;
+position: relative;
+}
+
+/* Ensure buttons don't block dropdown */
+.navbar .d-flex {
+position: relative;
+z-index: 1;
 }
 
 /* Fix navbar collapse */
@@ -145,6 +168,31 @@ max-height: none;
 
 .navbar-nav {
 align-items: center;
+}
+
+/* Ensure navbar collapse doesn't block dropdowns on desktop */
+@media (min-width: 992px) {
+.navbar-collapse {
+position: static;
+pointer-events: auto;
+}
+
+.navbar-collapse.show,
+.navbar-collapse.collapsing {
+position: static;
+}
+
+/* Ensure nav items are clickable */
+.navbar-nav .nav-item {
+position: relative;
+z-index: 10;
+}
+
+.navbar-nav .nav-link {
+position: relative;
+z-index: 10;
+pointer-events: auto;
+}
 }
 
 @media (max-width: 991.98px) {
@@ -735,11 +783,23 @@ height: calc(100vh - 50px);
 overflow: hidden;
 }
 
+/* Admin page: reset container-fluid constraints */
+body.admin-page .container-fluid {
+height: auto;
+overflow: visible;
+}
+
 /* Dashboard row fills height */
 .container-fluid > .row {
 height: 100%;
 overflow: hidden;
 margin: 0;
+}
+
+/* Admin page: reset row constraints */
+body.admin-page .container-fluid > .row {
+height: auto;
+overflow: visible;
 }
 
 /* Fix controller bar button alignment */
@@ -925,6 +985,7 @@ margin-right: 15px;
 .dropdown-menu {
 background-color: var(--card-bg);
 border-color: var(--border-color);
+z-index: 1050;
 }
 
 .dropdown-item {
@@ -934,6 +995,37 @@ color: var(--text-primary);
 .dropdown-item:hover {
 background-color: var(--table-hover);
 color: var(--primary-color);
+}
+
+/* Fix navbar dropdown clickability */
+.navbar .dropdown-menu {
+z-index: 1060;
+position: absolute;
+pointer-events: auto;
+}
+
+.navbar .dropdown {
+position: relative;
+z-index: 100;
+}
+
+.navbar .nav-item.dropdown {
+position: relative;
+z-index: 100;
+}
+
+.navbar .dropdown-toggle {
+position: relative;
+z-index: 100;
+pointer-events: auto;
+cursor: pointer;
+}
+
+@media (min-width: 992px) {
+.navbar .nav-item.dropdown {
+position: relative;
+z-index: 100;
+}
 }
 
 /* Theme Toggle Icon */
