@@ -136,7 +136,7 @@ min-height: 50px;
 max-height: 50px;
 flex-shrink: 0;
 position: relative;
-z-index: 100;
+z-index: 1100;
 }
 
 /* Ensure all navbar links and buttons are clickable */
@@ -153,12 +153,27 @@ align-items: center;
 height: 100%;
 padding-top: 0;
 position: relative;
+z-index: auto;
+}
+
+/* Prevent navbar toggler from blocking elements */
+.navbar-toggler {
+position: relative;
+z-index: 2;
 }
 
 /* Ensure buttons don't block dropdown */
 .navbar .d-flex {
 position: relative;
 z-index: 1;
+pointer-events: auto;
+}
+
+/* Ensure buttons are clickable but don't block other elements */
+.navbar .d-flex .btn {
+position: relative;
+z-index: 2;
+pointer-events: auto;
 }
 
 /* Fix navbar collapse */
@@ -175,6 +190,7 @@ align-items: center;
 .navbar-collapse {
 position: static;
 pointer-events: auto;
+z-index: auto;
 }
 
 .navbar-collapse.show,
@@ -185,13 +201,24 @@ position: static;
 /* Ensure nav items are clickable */
 .navbar-nav .nav-item {
 position: relative;
-z-index: 10;
+z-index: auto;
 }
 
 .navbar-nav .nav-link {
 position: relative;
-z-index: 10;
+z-index: auto;
 pointer-events: auto;
+}
+
+/* Specifically ensure dropdown items are on top */
+.navbar-nav .nav-item.dropdown {
+z-index: auto;
+}
+
+.navbar-nav .dropdown-toggle {
+z-index: auto;
+pointer-events: auto;
+cursor: pointer;
 }
 }
 
@@ -206,7 +233,7 @@ padding: 1rem;
 box-shadow: 0 4px 10px rgba(0,0,0,0.3);
 max-height: 70vh;
 overflow-y: auto;
-z-index: 101;
+z-index: 1101;
 }
 }
 
@@ -781,6 +808,8 @@ padding-left: 0;
 padding-right: 0;
 height: calc(100vh - 50px);
 overflow: hidden;
+position: relative;
+z-index: 1;
 }
 
 /* Admin page: reset container-fluid constraints */
@@ -999,32 +1028,32 @@ color: var(--primary-color);
 
 /* Fix navbar dropdown clickability */
 .navbar .dropdown-menu {
-z-index: 1060;
+z-index: 1110 !important;
 position: absolute;
 pointer-events: auto;
 }
 
 .navbar .dropdown {
 position: relative;
-z-index: 100;
+z-index: auto;
 }
 
 .navbar .nav-item.dropdown {
 position: relative;
-z-index: 100;
+z-index: auto !important;
 }
 
 .navbar .dropdown-toggle {
 position: relative;
-z-index: 100;
-pointer-events: auto;
-cursor: pointer;
+z-index: auto !important;
+pointer-events: auto !important;
+cursor: pointer !important;
 }
 
 @media (min-width: 992px) {
 .navbar .nav-item.dropdown {
 position: relative;
-z-index: 100;
+z-index: auto !important;
 }
 }
 
@@ -1036,4 +1065,223 @@ transition: transform 0.3s;
 
 .theme-toggle-icon:hover {
 transform: rotate(20deg);
+}
+
+/* ========================================
+   Enhanced User Profile Menu
+   ======================================== */
+
+/* User Profile Toggle Button */
+.user-profile-toggle {
+display: flex !important;
+align-items: center;
+gap: 8px;
+padding: 6px 12px !important;
+border-radius: 50px;
+transition: all 0.3s ease;
+background-color: rgba(255, 255, 255, 0.1);
+}
+
+.user-profile-toggle:hover {
+background-color: rgba(255, 255, 255, 0.2);
+transform: translateY(-1px);
+}
+
+/* User Avatar Circle */
+.user-avatar {
+width: 32px;
+height: 32px;
+border-radius: 50%;
+background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+display: flex;
+align-items: center;
+justify-content: center;
+flex-shrink: 0;
+box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+transition: all 0.3s ease;
+}
+
+.user-profile-toggle:hover .user-avatar {
+transform: scale(1.05);
+box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.user-initials {
+color: #ffffff;
+font-weight: 600;
+font-size: 14px;
+text-transform: uppercase;
+}
+
+.user-name-display {
+font-weight: 500;
+color: #ffffff;
+white-space: nowrap;
+}
+
+/* User Dropdown Menu */
+.user-dropdown-menu {
+min-width: 280px;
+padding: 0;
+border: none;
+border-radius: 12px;
+box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+margin-top: 8px !important;
+overflow: hidden;
+animation: dropdownSlideIn 0.2s ease-out;
+}
+
+@keyframes dropdownSlideIn {
+from {
+opacity: 0;
+transform: translateY(-10px);
+}
+to {
+opacity: 1;
+transform: translateY(0);
+}
+}
+
+/* User Info Header */
+.user-info-header {
+padding: 20px 16px !important;
+background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+display: flex;
+align-items: center;
+gap: 12px;
+white-space: normal !important;
+}
+
+[data-theme="dark"] .user-info-header {
+background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.user-avatar-large {
+width: 48px;
+height: 48px;
+border-radius: 50%;
+background: rgba(255, 255, 255, 0.2);
+display: flex;
+align-items: center;
+justify-content: center;
+flex-shrink: 0;
+border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.user-initials-large {
+color: #ffffff;
+font-weight: 700;
+font-size: 20px;
+text-transform: uppercase;
+}
+
+.user-info-text {
+flex: 1;
+overflow: hidden;
+}
+
+.user-display-name {
+color: #ffffff;
+font-weight: 600;
+font-size: 16px;
+margin-bottom: 4px;
+white-space: nowrap;
+overflow: hidden;
+text-overflow: ellipsis;
+}
+
+.user-role-badge {
+color: rgba(255, 255, 255, 0.9);
+font-size: 12px;
+font-weight: 500;
+display: inline-flex;
+align-items: center;
+background: rgba(255, 255, 255, 0.2);
+padding: 2px 8px;
+border-radius: 10px;
+}
+
+/* Dropdown Item Label */
+.dropdown-item-label {
+padding: 8px 16px 4px 16px;
+font-size: 11px;
+font-weight: 600;
+text-transform: uppercase;
+letter-spacing: 0.5px;
+color: var(--text-secondary);
+opacity: 0.7;
+}
+
+/* Enhanced Dropdown Items */
+.user-dropdown-menu .dropdown-item {
+padding: 10px 16px;
+transition: all 0.2s ease;
+display: flex;
+align-items: center;
+font-size: 14px;
+}
+
+.user-dropdown-menu .dropdown-item i {
+width: 20px;
+text-align: center;
+opacity: 0.7;
+transition: opacity 0.2s ease;
+}
+
+.user-dropdown-menu .dropdown-item:hover {
+background-color: var(--table-hover);
+padding-left: 20px;
+}
+
+.user-dropdown-menu .dropdown-item:hover i {
+opacity: 1;
+}
+
+/* Logout Item - Special Styling */
+.dropdown-item-logout {
+color: var(--danger-color) !important;
+font-weight: 500;
+}
+
+.dropdown-item-logout:hover {
+background-color: rgba(220, 53, 69, 0.1) !important;
+}
+
+.dropdown-item-logout i {
+color: var(--danger-color);
+opacity: 1 !important;
+}
+
+/* Divider Styling */
+.user-dropdown-menu .dropdown-divider {
+margin: 8px 0;
+opacity: 0.5;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+.user-name-display {
+display: none;
+}
+
+.user-profile-toggle {
+padding: 6px 8px !important;
+}
+
+.user-dropdown-menu {
+min-width: 260px;
+}
+}
+
+/* Light Theme Adjustments */
+[data-theme="light"] .user-profile-toggle {
+background-color: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .user-profile-toggle:hover {
+background-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .user-name-display {
+color: #ffffff;
 }
