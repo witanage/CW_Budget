@@ -45,15 +45,45 @@
                 <ul class="navbar-nav ms-auto">
                     {% if session.username %}
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-user-circle me-1"></i>{{ session.username }}
+                        <a class="nav-link dropdown-toggle user-profile-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <div class="user-avatar">
+                                <span class="user-initials">{{ session.username[0]|upper }}</span>
+                            </div>
+                            <span class="user-name-display">{{ session.username }}</span>
                         </a>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="{{ url_for('dashboard') }}"><i class="fas fa-tachometer-alt me-2"></i>Dashboard</a></li>
+                        <ul class="dropdown-menu dropdown-menu-end user-dropdown-menu">
+                            <!-- User Info Header -->
+                            <li class="dropdown-header user-info-header">
+                                <div class="user-avatar-large">
+                                    <span class="user-initials-large">{{ session.username[0]|upper }}</span>
+                                </div>
+                                <div class="user-info-text">
+                                    <div class="user-display-name">{{ session.username }}</div>
+                                    <div class="user-role-badge">
+                                        {% if session.is_admin %}
+                                        <i class="fas fa-user-shield me-1"></i>Administrator
+                                        {% else %}
+                                        <i class="fas fa-user me-1"></i>User
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+
+                            <!-- Navigation -->
+                            <li class="dropdown-item-label">Navigation</li>
+                            <li><a class="dropdown-item" href="{{ url_for('dashboard') }}">
+                                <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+                            </a></li>
                             {% if session.is_admin %}
-                            <li><a class="dropdown-item" href="{{ url_for('admin_dashboard') }}"><i class="fas fa-user-shield me-2"></i>Admin Panel</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin_dashboard') }}">
+                                <i class="fas fa-user-shield me-2"></i>Admin Panel
+                            </a></li>
                             {% endif %}
                             <li><hr class="dropdown-divider"></li>
+
+                            <!-- Settings -->
+                            <li class="dropdown-item-label">Settings</li>
                             <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
                                 <i class="fas fa-key me-2"></i>Change Password
                             </a></li>
@@ -62,7 +92,11 @@
                                 <span id="themeText">Light Theme</span>
                             </a></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+
+                            <!-- Logout -->
+                            <li><a class="dropdown-item dropdown-item-logout" href="{{ url_for('logout') }}">
+                                <i class="fas fa-sign-out-alt me-2"></i>Logout
+                            </a></li>
                         </ul>
                     </li>
                     {% else %}

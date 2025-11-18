@@ -30,10 +30,32 @@
                 </a>
                 <div class="mobile-user-dropdown">
                     <button class="mobile-user-btn" id="mobileUserBtn">
-                        <i class="fas fa-user-circle"></i>
-                        <i class="fas fa-chevron-down" style="font-size: 0.6rem;"></i>
+                        <div class="mobile-user-avatar">
+                            <span class="mobile-user-initials">{{ session.username[0]|upper }}</span>
+                        </div>
+                        <i class="fas fa-chevron-down" style="font-size: 0.6rem; margin-left: 4px;"></i>
                     </button>
                     <div class="mobile-dropdown-menu" id="mobileUserDropdown">
+                        <!-- User Info Header -->
+                        <div class="mobile-user-header">
+                            <div class="mobile-user-avatar-large">
+                                <span class="mobile-user-initials-large">{{ session.username[0]|upper }}</span>
+                            </div>
+                            <div class="mobile-user-info">
+                                <div class="mobile-user-name">{{ session.username }}</div>
+                                <div class="mobile-user-role">
+                                    {% if session.is_admin %}
+                                    <i class="fas fa-user-shield me-1"></i>Administrator
+                                    {% else %}
+                                    <i class="fas fa-user me-1"></i>User
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mobile-dropdown-divider"></div>
+
+                        <!-- Navigation Section -->
+                        <div class="mobile-dropdown-label">Navigation</div>
                         <a href="/dashboard" class="mobile-dropdown-item">
                             <i class="fas fa-tachometer-alt"></i>Dashboard
                         </a>
@@ -43,6 +65,9 @@
                         </a>
                         {% endif %}
                         <div class="mobile-dropdown-divider"></div>
+
+                        <!-- Settings Section -->
+                        <div class="mobile-dropdown-label">Settings</div>
                         <a href="#" class="mobile-dropdown-item" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
                             <i class="fas fa-key"></i>Change Password
                         </a>
@@ -51,7 +76,9 @@
                             <span id="mobileThemeText">Light Theme</span>
                         </a>
                         <div class="mobile-dropdown-divider"></div>
-                        <a href="/logout" class="mobile-dropdown-item">
+
+                        <!-- Logout -->
+                        <a href="/logout" class="mobile-dropdown-item mobile-dropdown-item-logout">
                             <i class="fas fa-sign-out-alt"></i>Logout
                         </a>
                     </div>
