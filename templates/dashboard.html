@@ -664,7 +664,7 @@
 
 <!-- Filter Modal - Revamped Design -->
 <div class="modal fade" id="filterModal" tabindex="-1">
-    <div class="modal-dialog modal-xl">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h6 class="modal-title">
@@ -672,9 +672,9 @@
                 </h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body" style="padding: 0.75rem;">
                 <!-- Quick Filter Presets -->
-                <div class="mb-3">
+                <div class="mb-2">
                     <h6 class="text-muted mb-2" style="font-size: 0.875rem;"><i class="fas fa-bolt me-2"></i>Quick Filters</h6>
                     <div class="d-flex flex-wrap gap-2">
                         <button type="button" class="btn btn-sm btn-outline-primary filter-quick-btn" onclick="applyQuickFilter('today')">
@@ -700,11 +700,11 @@
 
                 <hr>
 
-                <div class="row g-3">
+                <div class="row g-2">
                     <!-- Search Filters -->
                     <div class="col-12">
                         <div class="card border-0 shadow-sm">
-                            <div class="card-body" style="padding: 0.75rem;">
+                            <div class="card-body" style="padding: 0.5rem;">
                                 <h6 class="card-title mb-2" style="font-size: 0.875rem;">
                                     <i class="fas fa-search me-2"></i>Search
                                 </h6>
@@ -729,7 +729,7 @@
                     <!-- Categories & Payment Methods -->
                     <div class="col-md-6">
                         <div class="card border-0 shadow-sm h-100">
-                            <div class="card-body" style="padding: 0.75rem;">
+                            <div class="card-body" style="padding: 0.5rem;">
                                 <h6 class="card-title mb-2" style="font-size: 0.875rem;">
                                     <i class="fas fa-tags me-2"></i>Categories
                                 </h6>
@@ -751,7 +751,7 @@
 
                     <div class="col-md-6">
                         <div class="card border-0 shadow-sm h-100">
-                            <div class="card-body" style="padding: 0.75rem;">
+                            <div class="card-body" style="padding: 0.5rem;">
                                 <h6 class="card-title mb-2" style="font-size: 0.875rem;">
                                     <i class="fas fa-credit-card me-2"></i>Payment Methods
                                 </h6>
@@ -774,7 +774,7 @@
                     <!-- Transaction Type & Status -->
                     <div class="col-md-6">
                         <div class="card border-0 shadow-sm">
-                            <div class="card-body" style="padding: 0.75rem;">
+                            <div class="card-body" style="padding: 0.5rem;">
                                 <h6 class="card-title mb-2" style="font-size: 0.875rem;">
                                     <i class="fas fa-exchange-alt me-2"></i>Transaction Type
                                 </h6>
@@ -796,7 +796,7 @@
 
                     <div class="col-md-6">
                         <div class="card border-0 shadow-sm">
-                            <div class="card-body" style="padding: 0.75rem;">
+                            <div class="card-body" style="padding: 0.5rem;">
                                 <h6 class="card-title mb-2" style="font-size: 0.875rem;">
                                     <i class="fas fa-check-circle me-2"></i>Status
                                 </h6>
@@ -837,7 +837,7 @@
                     <!-- Amount Range -->
                     <div class="col-12">
                         <div class="card border-0 shadow-sm">
-                            <div class="card-body" style="padding: 0.75rem;">
+                            <div class="card-body" style="padding: 0.5rem;">
                                 <h6 class="card-title mb-2" style="font-size: 0.875rem;">
                                     <i class="fas fa-dollar-sign me-2"></i>Amount Range
                                 </h6>
@@ -864,7 +864,7 @@
                     <!-- Date Range -->
                     <div class="col-12">
                         <div class="card border-0 shadow-sm">
-                            <div class="card-body" style="padding: 0.75rem;">
+                            <div class="card-body" style="padding: 0.5rem;">
                                 <h6 class="card-title mb-2" style="font-size: 0.875rem;">
                                     <i class="fas fa-calendar me-2"></i>Date Range
                                 </h6>
@@ -888,7 +888,7 @@
                 </div>
 
                 <!-- Active Filters Display -->
-                <div id="activeFiltersDisplay" class="mt-4" style="display: none;">
+                <div id="activeFiltersDisplay" class="mt-2" style="display: none;">
                     <div class="alert alert-info mb-0">
                         <h6 class="alert-heading">
                             <i class="fas fa-filter me-2"></i>Active Filters:
@@ -944,7 +944,7 @@
 }
 
 .filter-checkbox-container {
-    max-height: 200px;
+    max-height: 140px;
     overflow-y: auto;
     border: 1px solid var(--border-color);
     border-radius: 0.375rem;
