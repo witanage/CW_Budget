@@ -4,119 +4,434 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+<style>
+    /* Inline critical styles for immediate rendering */
+    .admin-container {
+        padding: 20px;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+    .admin-header {
+        margin-bottom: 30px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid #dee2e6;
+    }
+    .stats-cards {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 30px;
+        flex-wrap: wrap;
+    }
+    .stat-card {
+        flex: 1;
+        min-width: 200px;
+        padding: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .stat-card h3 {
+        margin: 0;
+        font-size: 2rem;
+        font-weight: bold;
+    }
+    .stat-card p {
+        margin: 5px 0 0 0;
+        opacity: 0.9;
+    }
+    .section-card {
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 30px;
+        overflow: hidden;
+    }
+    [data-theme="dark"] .section-card {
+        background: #2d2d2d;
+    }
+    .section-header {
+        padding: 20px;
+        background: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    [data-theme="dark"] .section-header {
+        background: #1a1a1a;
+        border-bottom-color: #444;
+    }
+    .section-body {
+        padding: 20px;
+    }
+    .error-banner {
+        background: #f8d7da;
+        color: #721c24;
+        padding: 15px 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        border: 1px solid #f5c6cb;
+    }
+    .user-table, .audit-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .user-table th, .audit-table th {
+        background: #f8f9fa;
+        padding: 12px;
+        text-align: left;
+        font-weight: 600;
+        border-bottom: 2px solid #dee2e6;
+    }
+    [data-theme="dark"] .user-table th,
+    [data-theme="dark"] .audit-table th {
+        background: #1a1a1a;
+        border-bottom-color: #444;
+    }
+    .user-table td, .audit-table td {
+        padding: 12px;
+        border-bottom: 1px solid #dee2e6;
+    }
+    [data-theme="dark"] .user-table td,
+    [data-theme="dark"] .audit-table td {
+        border-bottom-color: #444;
+    }
+    .user-table tbody tr:hover, .audit-table tbody tr:hover {
+        background: #f8f9fa;
+    }
+    [data-theme="dark"] .user-table tbody tr:hover,
+    [data-theme="dark"] .audit-table tbody tr:hover {
+        background: #3a3a3a;
+    }
+    .badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+    .badge-success {
+        background: #28a745;
+        color: white;
+    }
+    .badge-danger {
+        background: #dc3545;
+        color: white;
+    }
+    .badge-primary {
+        background: #007bff;
+        color: white;
+    }
+    .badge-secondary {
+        background: #6c757d;
+        color: white;
+    }
+    .badge-info {
+        background: #17a2b8;
+        color: white;
+    }
+    .action-buttons {
+        display: flex;
+        gap: 5px;
+    }
+    .btn-sm {
+        padding: 5px 10px;
+        font-size: 0.875rem;
+        border-radius: 4px;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .btn-sm:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .btn-warning {
+        background: #ffc107;
+        color: #212529;
+    }
+    .btn-success {
+        background: #28a745;
+        color: white;
+    }
+    .btn-primary {
+        background: #007bff;
+        color: white;
+    }
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+    }
+    .btn-danger {
+        background: #dc3545;
+        color: white;
+    }
+    .search-box {
+        padding: 10px;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        font-size: 0.95rem;
+        min-width: 250px;
+    }
+    [data-theme="dark"] .search-box {
+        background: #1a1a1a;
+        border-color: #444;
+        color: white;
+    }
+    .text-muted {
+        color: #6c757d;
+        font-style: italic;
+    }
+
+    /* CRITICAL: Fix for overlay/layer blocking clicks */
+    .admin-container {
+        position: relative;
+        z-index: 1;
+        pointer-events: auto;
+    }
+
+    /* Ensure buttons are clickable */
+    button, .btn, .btn-sm {
+        position: relative;
+        z-index: 2;
+        pointer-events: auto;
+    }
+
+    /* Ensure modals appear above everything */
+    .modal {
+        z-index: 10000 !important;
+    }
+
+    .modal-backdrop {
+        z-index: 9999 !important;
+    }
+
+    /* Ensure tables don't block buttons */
+    .user-table, .audit-table {
+        position: relative;
+        z-index: 1;
+    }
+
+    .action-buttons {
+        position: relative;
+        z-index: 3;
+    }
+
+    /* Fix for navbar not overlapping */
+    .navbar {
+        z-index: 100;
+    }
+
+    /* Ensure no pseudo-elements block content */
+    body::before,
+    body::after,
+    .admin-container::before,
+    .admin-container::after {
+        display: none !important;
+    }
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid mt-4">
-    <div class="row mb-4">
-        <div class="col-12">
-            <h2 class="text-white">
-                <i class="fas fa-user-shield"></i> Admin Dashboard
-            </h2>
-            <p class="text-muted">Manage users and view system audit logs</p>
+<script>
+    // Add admin-page class to body for specific styling
+    document.body.classList.add('admin-page');
+</script>
+<div class="admin-container">
+    <!-- Header -->
+    <div class="admin-header">
+        <h1 style="margin: 0; color: var(--text-primary);">
+            <i class="fas fa-user-shield"></i> Admin Dashboard
+        </h1>
+        <p style="margin: 5px 0 0 0; color: var(--text-secondary);">
+            Manage users, permissions, and view system audit logs
+        </p>
+    </div>
+
+    {% if error_message %}
+    <div class="error-banner">
+        <i class="fas fa-exclamation-triangle"></i>
+        <strong>Error:</strong> {{ error_message }}
+    </div>
+    {% endif %}
+
+    <!-- Stats Cards -->
+    <div class="stats-cards">
+        <div class="stat-card">
+            <h3>{{ users|length }}</h3>
+            <p><i class="fas fa-users"></i> Total Users</p>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+            <h3>{{ users|selectattr('is_active')|list|length }}</h3>
+            <p><i class="fas fa-user-check"></i> Active Users</p>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+            <h3>{{ users|selectattr('is_admin')|list|length }}</h3>
+            <p><i class="fas fa-shield-alt"></i> Administrators</p>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+            <h3>{{ audit_logs|length }}</h3>
+            <p><i class="fas fa-history"></i> Recent Actions</p>
         </div>
     </div>
 
     <!-- User Management Section -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card shadow-sm" style="background: var(--card-bg); border: 1px solid var(--border-color);">
-                <div class="card-header" style="background: var(--card-header-bg); color: var(--text-primary);">
-                    <h5 class="mb-0">
-                        <i class="fas fa-users"></i> User Management
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-hover" id="usersTable" style="color: var(--text-primary);">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Username</th>
-                                    <th>Email</th>
-                                    <th>Status</th>
-                                    <th>Role</th>
-                                    <th>Last Login</th>
-                                    <th>Created</th>
-                                    <th>Records</th>
-                                    <th>Transactions</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="usersTableBody">
-                                <tr>
-                                    <td colspan="10" class="text-center">
-                                        <div class="spinner-border text-primary" role="status">
-                                            <span class="visually-hidden">Loading...</span>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+    <div class="section-card">
+        <div class="section-header">
+            <h2 style="margin: 0; font-size: 1.5rem; color: var(--text-primary);">
+                <i class="fas fa-users"></i> User Management
+            </h2>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <input type="text"
+                       id="userSearch"
+                       class="search-box"
+                       placeholder="Search by username, email, or ID..."
+                       onkeyup="filterUsers()">
+                <button class="btn-sm btn-primary" onclick="refreshData()">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
             </div>
+        </div>
+        <div class="section-body" style="overflow-x: auto;">
+            {% if users %}
+            <table class="user-table" id="userTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Status</th>
+                        <th>Role</th>
+                        <th>Last Login</th>
+                        <th>Created</th>
+                        <th>Records</th>
+                        <th>Transactions</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="userTableBody">
+                    {% for user in users %}
+                    <tr class="user-row" data-user-id="{{ user.id }}" data-username="{{ user.username }}" data-email="{{ user.email }}">
+                        <td>{{ user.id }}</td>
+                        <td><strong>{{ user.username }}</strong></td>
+                        <td>{{ user.email }}</td>
+                        <td>
+                            {% if user.is_active %}
+                            <span class="badge badge-success">Active</span>
+                            {% else %}
+                            <span class="badge badge-danger">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if user.is_admin %}
+                            <span class="badge badge-primary">Admin</span>
+                            {% else %}
+                            <span class="badge badge-secondary">User</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else 'Never' }}</td>
+                        <td>{{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else 'N/A' }}</td>
+                        <td>{{ user.monthly_records_count or 0 }}</td>
+                        <td>{{ user.transactions_count or 0 }}</td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn-sm {{ 'btn-warning' if user.is_active else 'btn-success' }}"
+                                        onclick="toggleUserActive({{ user.id }}, '{{ user.username }}')"
+                                        title="{{ 'Deactivate' if user.is_active else 'Activate' }} user"
+                                        {% if user.id == current_user_id %}disabled{% endif %}>
+                                    <i class="fas fa-{{ 'ban' if user.is_active else 'check' }}"></i>
+                                </button>
+                                <button class="btn-sm {{ 'btn-secondary' if user.is_admin else 'btn-primary' }}"
+                                        onclick="toggleUserAdmin({{ user.id }}, '{{ user.username }}')"
+                                        title="{{ 'Revoke' if user.is_admin else 'Grant' }} admin"
+                                        {% if user.id == current_user_id %}disabled{% endif %}>
+                                    <i class="fas fa-user-shield"></i>
+                                </button>
+                                <button class="btn-sm btn-danger"
+                                        onclick="showDeleteModal({{ user.id }}, '{{ user.username }}')"
+                                        title="Delete user"
+                                        {% if user.id == current_user_id %}disabled{% endif %}>
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="text-muted" style="text-align: center; padding: 40px;">No users found in the database.</p>
+            {% endif %}
         </div>
     </div>
 
     <!-- Audit Logs Section -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card shadow-sm" style="background: var(--card-bg); border: 1px solid var(--border-color);">
-                <div class="card-header" style="background: var(--card-header-bg); color: var(--text-primary);">
-                    <h5 class="mb-0">
-                        <i class="fas fa-history"></i> Audit Logs
-                        <button class="btn btn-sm btn-outline-primary float-end" onclick="loadAuditLogs()">
-                            <i class="fas fa-sync-alt"></i> Refresh
-                        </button>
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-sm" style="color: var(--text-primary);">
-                            <thead>
-                                <tr>
-                                    <th>Time</th>
-                                    <th>Admin</th>
-                                    <th>Action</th>
-                                    <th>Target User</th>
-                                    <th>Details</th>
-                                </tr>
-                            </thead>
-                            <tbody id="auditLogsTableBody">
-                                <tr>
-                                    <td colspan="5" class="text-center">
-                                        <div class="spinner-border text-primary" role="status">
-                                            <span class="visually-hidden">Loading...</span>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+    <div class="section-card">
+        <div class="section-header">
+            <h2 style="margin: 0; font-size: 1.5rem; color: var(--text-primary);">
+                <i class="fas fa-history"></i> Audit Logs
+                <span class="badge badge-secondary" style="font-size: 0.75rem; margin-left: 10px;">Last 50</span>
+            </h2>
+            <button class="btn-sm btn-primary" onclick="refreshAuditLogs()">
+                <i class="fas fa-sync-alt"></i> Refresh
+            </button>
+        </div>
+        <div class="section-body" style="overflow-x: auto;">
+            {% if audit_logs %}
+            <table class="audit-table" id="auditTable">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Admin</th>
+                        <th>Action</th>
+                        <th>Target User</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in audit_logs %}
+                    <tr>
+                        <td>{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') if log.created_at else 'N/A' }}</td>
+                        <td><strong>{{ log.admin_username }}</strong></td>
+                        <td><span class="badge badge-info">{{ log.action }}</span></td>
+                        <td>{{ log.target_username or 'N/A' }}</td>
+                        <td>{{ log.details or '' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="text-muted" style="text-align: center; padding: 40px;">No audit logs available.</p>
+            {% endif %}
         </div>
     </div>
 </div>
 
-<!-- Confirm Delete Modal -->
-<div class="modal fade" id="confirmDeleteModal" tabindex="-1">
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
-        <div class="modal-content" style="background: var(--modal-bg); color: var(--text-primary);">
-            <div class="modal-header" style="border-bottom: 1px solid var(--border-color);">
+        <div class="modal-content" style="background: var(--card-bg); color: var(--text-primary);">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border-color, #dee2e6);">
                 <h5 class="modal-title">
-                    <i class="fas fa-exclamation-triangle text-danger"></i> Confirm Delete
+                    <i class="fas fa-exclamation-triangle text-danger"></i> Confirm Delete User
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" style="filter: invert(1);"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <p>Are you sure you want to delete user <strong id="deleteUsername"></strong>?</p>
-                <p class="text-danger">This action cannot be undone. All user data including transactions will be permanently deleted.</p>
+                <div class="alert alert-danger" role="alert">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <strong>Warning:</strong> This action cannot be undone. All user data including transactions and records will be permanently deleted.
+                </div>
             </div>
-            <div class="modal-footer" style="border-top: 1px solid var(--border-color);">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+            <div class="modal-footer" style="border-top: 1px solid var(--border-color, #dee2e6);">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn" onclick="confirmDelete()">
                     <i class="fas fa-trash"></i> Delete User
                 </button>
             </div>
@@ -124,8 +439,225 @@
     </div>
 </div>
 
+<!-- Success/Error Alert Toast -->
+<div id="alertToast" style="position: fixed; top: 20px; right: 20px; z-index: 9999; display: none; min-width: 300px;">
+    <div class="alert alert-dismissible fade show" role="alert" id="alertContent" style="box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+        <span id="alertMessage"></span>
+        <button type="button" class="btn-close" onclick="hideAlert()"></button>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+<script>
+    console.log('Admin Dashboard JavaScript Loaded');
+    console.log('Users loaded:', {{ users|length }});
+    console.log('Audit logs loaded:', {{ audit_logs|length }});
+
+    let currentDeleteUserId = null;
+    let deleteModal = null;
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('DOM Content Loaded');
+        deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+
+        // CRITICAL FIX: Remove any lingering modal backdrops or overlays
+        clearModalBackdrops();
+
+        // Remove any bootstrap modal-open class that might block scrolling
+        document.body.classList.remove('modal-open');
+
+        // Remove inline styles that might block interaction
+        document.body.style.overflow = '';
+        document.body.style.paddingRight = '';
+
+        console.log('Admin page initialized and cleared of overlays');
+    });
+
+    // Function to clear all modal backdrops and overlays
+    function clearModalBackdrops() {
+        // Remove all modal backdrops
+        const backdrops = document.querySelectorAll('.modal-backdrop');
+        backdrops.forEach(backdrop => {
+            console.log('Removing modal backdrop');
+            backdrop.remove();
+        });
+
+        // Ensure body doesn't have modal-open class
+        document.body.classList.remove('modal-open');
+
+        // Reset body overflow
+        document.body.style.overflow = '';
+        document.body.style.paddingRight = '';
+    }
+
+    // Clear backdrops when modal is hidden
+    document.getElementById('deleteModal').addEventListener('hidden.bs.modal', function() {
+        setTimeout(clearModalBackdrops, 100);
+    });
+
+    // Filter users based on search input
+    function filterUsers() {
+        const searchTerm = document.getElementById('userSearch').value.toLowerCase();
+        const rows = document.querySelectorAll('.user-row');
+
+        rows.forEach(row => {
+            const userId = row.getAttribute('data-user-id');
+            const username = row.getAttribute('data-username').toLowerCase();
+            const email = row.getAttribute('data-email').toLowerCase();
+
+            if (userId.includes(searchTerm) || username.includes(searchTerm) || email.includes(searchTerm)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+
+    // Show alert message
+    function showAlert(message, type = 'success') {
+        const alertToast = document.getElementById('alertToast');
+        const alertContent = document.getElementById('alertContent');
+        const alertMessage = document.getElementById('alertMessage');
+
+        alertContent.className = `alert alert-${type} alert-dismissible fade show`;
+        alertMessage.textContent = message;
+        alertToast.style.display = 'block';
+
+        setTimeout(() => {
+            hideAlert();
+        }, 5000);
+    }
+
+    // Hide alert
+    function hideAlert() {
+        document.getElementById('alertToast').style.display = 'none';
+    }
+
+    // Toggle user active status
+    async function toggleUserActive(userId, username) {
+        if (!confirm(`Are you sure you want to toggle ${username}'s account status?`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/admin/users/${userId}/toggle-active`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                showAlert(data.message, 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showAlert(data.error || 'Failed to update user', 'danger');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showAlert('Network error: ' + error.message, 'danger');
+        }
+    }
+
+    // Toggle user admin status
+    async function toggleUserAdmin(userId, username) {
+        if (!confirm(`Are you sure you want to modify ${username}'s admin privileges?`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/admin/users/${userId}/toggle-admin`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                showAlert(data.message, 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showAlert(data.error || 'Failed to update user', 'danger');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showAlert('Network error: ' + error.message, 'danger');
+        }
+    }
+
+    // Show delete confirmation modal
+    function showDeleteModal(userId, username) {
+        currentDeleteUserId = userId;
+        document.getElementById('deleteUsername').textContent = username;
+        deleteModal.show();
+    }
+
+    // Confirm and execute delete
+    async function confirmDelete() {
+        if (!currentDeleteUserId) return;
+
+        const deleteBtn = document.getElementById('confirmDeleteBtn');
+        const originalText = deleteBtn.innerHTML;
+        deleteBtn.disabled = true;
+        deleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+
+        try {
+            const response = await fetch(`/api/admin/users/${currentDeleteUserId}`, {
+                method: 'DELETE'
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                deleteModal.hide();
+                showAlert(data.message, 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showAlert(data.error || 'Failed to delete user', 'danger');
+                deleteBtn.disabled = false;
+                deleteBtn.innerHTML = originalText;
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showAlert('Network error: ' + error.message, 'danger');
+            deleteBtn.disabled = false;
+            deleteBtn.innerHTML = originalText;
+        }
+    }
+
+    // Refresh all data
+    function refreshData() {
+        showAlert('Refreshing data...', 'info');
+        setTimeout(() => location.reload(), 500);
+    }
+
+    // Refresh audit logs
+    function refreshAuditLogs() {
+        showAlert('Refreshing audit logs...', 'info');
+        setTimeout(() => location.reload(), 500);
+    }
+
+    // Debug helper: Log if any element is blocking clicks
+    window.addEventListener('click', function(e) {
+        const target = e.target;
+        const computedStyle = window.getComputedStyle(target);
+        if (computedStyle.pointerEvents === 'none') {
+            console.warn('Click blocked on element:', target, 'pointer-events:', computedStyle.pointerEvents);
+        }
+    });
+
+    // Periodic check to remove any rouge overlays (safety net)
+    setInterval(function() {
+        const backdrops = document.querySelectorAll('.modal-backdrop');
+        if (backdrops.length > 0 && !document.querySelector('.modal.show')) {
+            console.log('Found rouge modal backdrop, removing...');
+            clearModalBackdrops();
+        }
+    }, 2000);
+
+    console.log('Admin Dashboard fully initialized - All overlays cleared');
+</script>
 {% endblock %}

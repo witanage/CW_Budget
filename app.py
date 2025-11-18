@@ -335,8 +335,67 @@ def mobile():
 @app.route('/admin')
 @admin_required
 def admin_dashboard():
-    """Admin dashboard."""
-    return render_template('admin.html', username=session.get('username'))
+    """Admin dashboard with server-side data."""
+    connection = get_db_connection()
+    users = []
+    audit_logs = []
+    error_message = None
+
+    if connection:
+        cursor = connection.cursor(dictionary=True)
+        try:
+            # Fetch users
+            cursor.execute("""
+                SELECT
+                    u.id,
+                    u.username,
+                    u.email,
+                    u.is_admin,
+                    u.is_active,
+                    u.last_login,
+                    u.created_at,
+                    COUNT(DISTINCT mr.id) as monthly_records_count,
+                    COUNT(DISTINCT t.id) as transactions_count
+                FROM users u
+                LEFT JOIN monthly_records mr ON u.id = mr.user_id
+                LEFT JOIN transactions t ON mr.id = t.monthly_record_id
+                GROUP BY u.id, u.username, u.email, u.is_admin, u.is_active, u.last_login, u.created_at
+                ORDER BY u.created_at DESC
+            """)
+            users = cursor.fetchall()
+
+            # Fetch audit logs
+            cursor.execute("""
+                SELECT
+                    al.id,
+                    al.action,
+                    al.details,
+                    al.created_at,
+                    au.username as admin_username,
+                    tu.username as target_username
+                FROM audit_logs al
+                JOIN users au ON al.admin_user_id = au.id
+                LEFT JOIN users tu ON al.target_user_id = tu.id
+                ORDER BY al.created_at DESC
+                LIMIT 50
+            """)
+            audit_logs = cursor.fetchall()
+
+        except Error as e:
+            logger.error(f"Error fetching admin data: {str(e)}")
+            error_message = str(e)
+        finally:
+            cursor.close()
+            connection.close()
+    else:
+        error_message = "Database connection failed"
+
+    return render_template('admin.html',
+                         username=session.get('username'),
+                         users=users,
+                         audit_logs=audit_logs,
+                         error_message=error_message,
+                         current_user_id=session.get('user_id'))
 
 @app.route('/api/admin/users', methods=['GET'])
 @admin_required

@@ -1,17 +1,149 @@
-.table-hover tbody tr:hover {
-background-color: var(--table-hover) !important;
+/* Admin Dashboard Styles - Supplementary to inline styles */
+
+/* CRITICAL: Ensure no overlays block interactions */
+* {
+    -webkit-tap-highlight-color: transparent;
 }
 
-.btn-group-sm > .btn {
-padding: 0.25rem 0.5rem;
-font-size: 0.875rem;
+body.admin-page {
+    pointer-events: auto !important;
 }
 
-.card {
-margin-bottom: 1.5rem;
+.admin-container * {
+    pointer-events: auto;
 }
 
-.badge {
-padding: 0.35em 0.65em;
-font-size: 0.875em;
+/* Remove any accidental overlays */
+.modal-backdrop.show {
+    pointer-events: auto;
+}
+
+/* Ensure all interactive elements are clickable */
+a, button, input, select, textarea, [onclick], [role="button"] {
+    pointer-events: auto !important;
+    cursor: pointer;
+}
+
+input:disabled, button:disabled, select:disabled, textarea:disabled {
+    cursor: not-allowed;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .admin-container {
+        padding: 10px !important;
+    }
+
+    .stats-cards {
+        flex-direction: column;
+    }
+
+    .stat-card {
+        min-width: 100% !important;
+    }
+
+    .section-header {
+        flex-direction: column;
+        align-items: flex-start !important;
+    }
+
+    .search-box {
+        min-width: 100% !important;
+        width: 100%;
+    }
+
+    .user-table, .audit-table {
+        font-size: 0.85rem;
+    }
+
+    .user-table th, .audit-table th,
+    .user-table td, .audit-table td {
+        padding: 8px !important;
+    }
+
+    .action-buttons {
+        flex-direction: column;
+    }
+
+    .btn-sm {
+        width: 100%;
+    }
+}
+
+@media (max-width: 576px) {
+    .stat-card h3 {
+        font-size: 1.5rem !important;
+    }
+
+    .stat-card p {
+        font-size: 0.85rem;
+    }
+}
+
+/* Print styles */
+@media print {
+    .action-buttons,
+    .search-box,
+    button {
+        display: none !important;
+    }
+
+    .section-card {
+        box-shadow: none !important;
+        break-inside: avoid;
+    }
+
+    .stats-cards {
+        break-inside: avoid;
+    }
+}
+
+/* Animation utilities */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.section-card {
+    animation: fadeIn 0.3s ease;
+}
+
+/* Accessibility improvements */
+button:focus,
+input:focus {
+    outline: 2px solid #007bff;
+    outline-offset: 2px;
+}
+
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed !important;
+}
+
+/* Better scrollbar for tables */
+.section-body::-webkit-scrollbar {
+    height: 8px;
+}
+
+.section-body::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+[data-theme="dark"] .section-body::-webkit-scrollbar-track {
+    background: #1a1a1a;
+}
+
+.section-body::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.section-body::-webkit-scrollbar-thumb:hover {
+    background: #555;
 }
