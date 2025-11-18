@@ -130,9 +130,21 @@ max-height: 50px;
 flex-shrink: 0;
 }
 
+/* Ensure navbar items are vertically centered */
+.navbar .container-fluid {
+display: flex;
+align-items: center;
+height: 100%;
+padding-top: 0;
+}
+
 /* Fix navbar collapse */
 .navbar-collapse {
 max-height: none;
+}
+
+.navbar-nav {
+align-items: center;
 }
 
 @media (max-width: 991.98px) {
@@ -153,18 +165,23 @@ z-index: 101;
 .navbar-brand {
 font-weight: bold;
 font-size: 1.1rem;
+display: flex;
+align-items: center;
 }
 
 .navbar .btn-sm {
 padding: 0.25rem 0.5rem;
 font-size: 0.8rem;
+display: inline-flex;
+align-items: center;
+justify-content: center;
 }
 
 .sidebar {
 height: calc(100vh - 50px);
 background: var(--sidebar-bg);
 box-shadow: 2px 0 20px rgba(0,0,0,0.15);
-padding: 20px 0;
+padding: 1rem 0;
 border-right: 1px solid var(--border-color);
 overflow-y: auto;
 overflow-x: hidden;
@@ -172,11 +189,15 @@ overflow-x: hidden;
 
 .sidebar .nav-link {
 color: var(--text-primary);
-padding: 14px 24px;
-margin: 4px 12px;
+padding: 12px 24px;
+margin: 0 12px 4px 12px;
 border-radius: 8px;
 transition: all 0.3s ease;
 font-weight: 500;
+}
+
+.sidebar .nav-link:first-child {
+margin-top: 0;
 }
 
 .sidebar .nav-link:hover {
@@ -695,8 +716,8 @@ font-weight: bold;
 
 /* Fix main content alignment */
 main.col-md-9 {
-padding-left: 2rem;
-padding-right: 2rem;
+padding-left: 1rem;
+padding-right: 1rem;
 padding-top: 1rem;
 padding-bottom: 1rem;
 overflow: hidden;
@@ -707,7 +728,9 @@ flex-direction: column;
 
 /* Prevent content overlap with navbar */
 .container-fluid {
-padding-top: 1rem;
+padding-top: 0;
+padding-left: 0;
+padding-right: 0;
 height: calc(100vh - 50px);
 overflow: hidden;
 }
@@ -716,6 +739,7 @@ overflow: hidden;
 .container-fluid > .row {
 height: 100%;
 overflow: hidden;
+margin: 0;
 }
 
 /* Fix controller bar button alignment */
