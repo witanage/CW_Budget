@@ -761,11 +761,40 @@ def transactions():
             # If searching all or filters are active, search across all user's transactions
             # Otherwise, limit to specific month
             if search_all or has_filters:
-                # Get all monthly records for this user to join with
-                cursor.execute("""
-                    SELECT id FROM monthly_records
-                    WHERE user_id = %s
-                """, (user_id,))
+                # Parse date range to extract year and month if provided
+                start_year, start_month = None, None
+                end_year, end_month = None, None
+
+                if start_date:
+                    try:
+                        start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+                        start_year = start_dt.year
+                        start_month = start_dt.month
+                    except ValueError:
+                        pass
+
+                if end_date:
+                    try:
+                        end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+                        end_year = end_dt.year
+                        end_month = end_dt.month
+                    except ValueError:
+                        pass
+
+                # Get all monthly records for this user, filtered by date range if provided
+                monthly_records_query = "SELECT id FROM monthly_records WHERE user_id = %s"
+                monthly_records_params = [user_id]
+
+                # Add date range filter on monthly_records year/month
+                if start_year and start_month:
+                    monthly_records_query += " AND (year > %s OR (year = %s AND month >= %s))"
+                    monthly_records_params.extend([start_year, start_year, start_month])
+
+                if end_year and end_month:
+                    monthly_records_query += " AND (year < %s OR (year = %s AND month <= %s))"
+                    monthly_records_params.extend([end_year, end_year, end_month])
+
+                cursor.execute(monthly_records_query, monthly_records_params)
                 monthly_records = cursor.fetchall()
 
                 if monthly_records:
@@ -855,14 +884,8 @@ def transactions():
                     where_clauses.append("(COALESCE(t.debit, 0) <= %s OR COALESCE(t.credit, 0) <= %s)")
                     params.extend([max_amount, max_amount])
 
-                # Date range filter
-                if start_date:
-                    where_clauses.append("DATE(t.transaction_date) >= %s")
-                    params.append(start_date)
-
-                if end_date:
-                    where_clauses.append("DATE(t.transaction_date) <= %s")
-                    params.append(end_date)
+                # Date range filter is now handled via monthly_records filtering above
+                # No need to filter on transaction dates here
 
                 # Combine WHERE clauses
                 where_sql = " AND ".join(where_clauses)
@@ -999,14 +1022,26 @@ def filter_transactions():
 
         params = [user_id]
 
-        # Add date range filter
+        # Add date range filter (based on monthly_records year/month)
         if date_from:
-            query += " AND DATE(t.transaction_date) >= %s"
-            params.append(date_from)
+            try:
+                start_dt = datetime.strptime(date_from, '%Y-%m-%d')
+                start_year = start_dt.year
+                start_month = start_dt.month
+                query += " AND (mr.year > %s OR (mr.year = %s AND mr.month >= %s))"
+                params.extend([start_year, start_year, start_month])
+            except ValueError:
+                pass
 
         if date_to:
-            query += " AND DATE(t.transaction_date) <= %s"
-            params.append(date_to)
+            try:
+                end_dt = datetime.strptime(date_to, '%Y-%m-%d')
+                end_year = end_dt.year
+                end_month = end_dt.month
+                query += " AND (mr.year < %s OR (mr.year = %s AND mr.month <= %s))"
+                params.extend([end_year, end_year, end_month])
+            except ValueError:
+                pass
 
         # Add category filter
         if category_id:

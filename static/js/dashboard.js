@@ -207,7 +207,14 @@ function setupFormButtons() {
     // Auto-load transactions when month/year changes
     const monthYearPicker = document.getElementById('monthYearPicker');
     if (monthYearPicker) {
-        monthYearPicker.addEventListener('change', loadTransactions);
+        // Use both 'change' and 'input' events for better browser compatibility
+        monthYearPicker.addEventListener('change', () => {
+            console.log('Month picker changed to:', monthYearPicker.value);
+            loadTransactions();
+        });
+        monthYearPicker.addEventListener('input', () => {
+            console.log('Month picker input:', monthYearPicker.value);
+        });
     }
 
     const viewPaymentTotalsBtn = document.getElementById('viewPaymentTotalsBtn');
@@ -812,15 +819,18 @@ function loadTransactions(applyActiveFilters = false) {
         const [yearStr, monthStr] = monthYearPicker.value.split('-');
         year = parseInt(yearStr);
         month = parseInt(monthStr);
+        console.log('📅 Loading transactions - Picker value:', monthYearPicker.value, '→ Year:', year, 'Month:', month);
     } else {
         year = new Date().getFullYear();
         month = new Date().getMonth() + 1;
+        console.log('📅 Loading transactions - Using current date → Year:', year, 'Month:', month);
     }
 
     showLoading();
 
     // Build query parameters
     let queryParams = `year=${year}&month=${month}`;
+    console.log('🔗 API Query:', `/api/transactions?${queryParams}`);
 
     // Add filter parameters if requested
     if (applyActiveFilters) {
@@ -883,6 +893,8 @@ function navigateToPreviousMonth() {
     let currentMonth = parseInt(monthStr);
     let currentYear = parseInt(yearStr);
 
+    console.log('⬅️ Previous month button - Current:', monthYearPicker.value);
+
     // Go to previous month
     currentMonth--;
 
@@ -894,6 +906,7 @@ function navigateToPreviousMonth() {
 
     // Update month picker
     monthYearPicker.value = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+    console.log('⬅️ Previous month button - New value:', monthYearPicker.value);
 
     // Load transactions for the new month
     loadTransactions();
@@ -909,6 +922,8 @@ function navigateToNextMonth() {
     let currentMonth = parseInt(monthStr);
     let currentYear = parseInt(yearStr);
 
+    console.log('➡️ Next month button - Current:', monthYearPicker.value);
+
     // Go to next month
     currentMonth++;
 
@@ -920,6 +935,7 @@ function navigateToNextMonth() {
 
     // Update month picker
     monthYearPicker.value = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+    console.log('➡️ Next month button - New value:', monthYearPicker.value);
 
     // Load transactions for the new month
     loadTransactions();
@@ -2532,21 +2548,33 @@ function populateDateSelectors() {
     // Format current date as YYYY-MM for the month picker
     const currentMonthYear = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
 
+    // Set min and max range (same as old dropdown: 2 years back to 1 year forward)
+    const minYear = currentYear - 2;
+    const maxYear = currentYear + 1;
+    const minDate = `${minYear}-01`;
+    const maxDate = `${maxYear}-12`;
+
     // Set main month/year picker
     const monthYearPicker = document.getElementById('monthYearPicker');
     if (monthYearPicker) {
         monthYearPicker.value = currentMonthYear;
+        monthYearPicker.min = minDate;
+        monthYearPicker.max = maxDate;
     }
 
     // Set clone modal month/year pickers
     const cloneFromMonthYear = document.getElementById('cloneFromMonthYear');
     if (cloneFromMonthYear) {
         cloneFromMonthYear.value = currentMonthYear;
+        cloneFromMonthYear.min = minDate;
+        cloneFromMonthYear.max = maxDate;
     }
 
     const cloneToMonthYear = document.getElementById('cloneToMonthYear');
     if (cloneToMonthYear) {
         cloneToMonthYear.value = currentMonthYear;
+        cloneToMonthYear.min = minDate;
+        cloneToMonthYear.max = maxDate;
     }
 
     // Add event listener for clone execute button
