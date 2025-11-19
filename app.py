@@ -1626,21 +1626,6 @@ def top_spending_report():
                     LIMIT %s
                 """, (user_id, year, month, limit))
             elif range_type == 'yearly':
-                # Get top spending for all time using view
-                cursor.execute("""
-                    SELECT
-                        category,
-                        type,
-                        SUM(total_spent) as total_spent,
-                        SUM(transaction_count) as transaction_count,
-                        AVG(avg_amount) as avg_amount
-                    FROM v_top_spending
-                    WHERE user_id = %s
-                    GROUP BY category_id, category, type
-                    ORDER BY total_spent DESC
-                    LIMIT %s
-                """, (user_id, limit))
-            else:  # monthly
                 # Get top spending for the specified year using view
                 cursor.execute("""
                     SELECT
@@ -1655,6 +1640,20 @@ def top_spending_report():
                     ORDER BY total_spent DESC
                     LIMIT %s
                 """, (user_id, year, limit))
+            else:  # monthly
+                # Get top spending for the specified month using view
+                cursor.execute("""
+                    SELECT
+                        category,
+                        type,
+                        total_spent,
+                        transaction_count,
+                        avg_amount
+                    FROM v_top_spending
+                    WHERE user_id = %s AND year = %s AND month = %s
+                    ORDER BY total_spent DESC
+                    LIMIT %s
+                """, (user_id, year, month, limit))
 
             top_spending = cursor.fetchall()
             return jsonify(top_spending)
