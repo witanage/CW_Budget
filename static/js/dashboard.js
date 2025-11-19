@@ -2532,21 +2532,33 @@ function populateDateSelectors() {
     // Format current date as YYYY-MM for the month picker
     const currentMonthYear = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
 
+    // Set min and max range (same as old dropdown: 2 years back to 1 year forward)
+    const minYear = currentYear - 2;
+    const maxYear = currentYear + 1;
+    const minDate = `${minYear}-01`;
+    const maxDate = `${maxYear}-12`;
+
     // Set main month/year picker
     const monthYearPicker = document.getElementById('monthYearPicker');
     if (monthYearPicker) {
         monthYearPicker.value = currentMonthYear;
+        monthYearPicker.min = minDate;
+        monthYearPicker.max = maxDate;
     }
 
     // Set clone modal month/year pickers
     const cloneFromMonthYear = document.getElementById('cloneFromMonthYear');
     if (cloneFromMonthYear) {
         cloneFromMonthYear.value = currentMonthYear;
+        cloneFromMonthYear.min = minDate;
+        cloneFromMonthYear.max = maxDate;
     }
 
     const cloneToMonthYear = document.getElementById('cloneToMonthYear');
     if (cloneToMonthYear) {
         cloneToMonthYear.value = currentMonthYear;
+        cloneToMonthYear.min = minDate;
+        cloneToMonthYear.max = maxDate;
     }
 
     // Add event listener for clone execute button
