@@ -204,15 +204,10 @@ function setupFormButtons() {
         nextMonthBtn.addEventListener('click', navigateToNextMonth);
     }
 
-    // Auto-load transactions when month or year changes
-    const monthSelect = document.getElementById('monthSelect');
-    if (monthSelect) {
-        monthSelect.addEventListener('change', loadTransactions);
-    }
-
-    const yearSelect = document.getElementById('yearSelect');
-    if (yearSelect) {
-        yearSelect.addEventListener('change', loadTransactions);
+    // Auto-load transactions when month/year changes
+    const monthYearPicker = document.getElementById('monthYearPicker');
+    if (monthYearPicker) {
+        monthYearPicker.addEventListener('change', loadTransactions);
     }
 
     const viewPaymentTotalsBtn = document.getElementById('viewPaymentTotalsBtn');
@@ -809,8 +804,18 @@ function updateRecentTransactions(transactions) {
 // ================================
 
 function loadTransactions(applyActiveFilters = false) {
-    const year = document.getElementById('yearSelect')?.value || new Date().getFullYear();
-    const month = document.getElementById('monthSelect')?.value || (new Date().getMonth() + 1);
+    // Parse month/year from the month picker (format: YYYY-MM)
+    const monthYearPicker = document.getElementById('monthYearPicker');
+    let year, month;
+
+    if (monthYearPicker && monthYearPicker.value) {
+        const [yearStr, monthStr] = monthYearPicker.value.split('-');
+        year = parseInt(yearStr);
+        month = parseInt(monthStr);
+    } else {
+        year = new Date().getFullYear();
+        month = new Date().getMonth() + 1;
+    }
 
     showLoading();
 
@@ -869,13 +874,14 @@ function loadTransactions(applyActiveFilters = false) {
 }
 
 function navigateToPreviousMonth() {
-    const monthSelect = document.getElementById('monthSelect');
-    const yearSelect = document.getElementById('yearSelect');
+    const monthYearPicker = document.getElementById('monthYearPicker');
 
-    if (!monthSelect || !yearSelect) return;
+    if (!monthYearPicker) return;
 
-    let currentMonth = parseInt(monthSelect.value);
-    let currentYear = parseInt(yearSelect.value);
+    // Parse current value (format: YYYY-MM)
+    const [yearStr, monthStr] = monthYearPicker.value.split('-');
+    let currentMonth = parseInt(monthStr);
+    let currentYear = parseInt(yearStr);
 
     // Go to previous month
     currentMonth--;
@@ -886,22 +892,22 @@ function navigateToPreviousMonth() {
         currentYear--;
     }
 
-    // Update selectors
-    monthSelect.value = currentMonth;
-    yearSelect.value = currentYear;
+    // Update month picker
+    monthYearPicker.value = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
 
     // Load transactions for the new month
     loadTransactions();
 }
 
 function navigateToNextMonth() {
-    const monthSelect = document.getElementById('monthSelect');
-    const yearSelect = document.getElementById('yearSelect');
+    const monthYearPicker = document.getElementById('monthYearPicker');
 
-    if (!monthSelect || !yearSelect) return;
+    if (!monthYearPicker) return;
 
-    let currentMonth = parseInt(monthSelect.value);
-    let currentYear = parseInt(yearSelect.value);
+    // Parse current value (format: YYYY-MM)
+    const [yearStr, monthStr] = monthYearPicker.value.split('-');
+    let currentMonth = parseInt(monthStr);
+    let currentYear = parseInt(yearStr);
 
     // Go to next month
     currentMonth++;
@@ -912,17 +918,26 @@ function navigateToNextMonth() {
         currentYear++;
     }
 
-    // Update selectors
-    monthSelect.value = currentMonth;
-    yearSelect.value = currentYear;
+    // Update month picker
+    monthYearPicker.value = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
 
     // Load transactions for the new month
     loadTransactions();
 }
 
 function recalculateAndRefresh() {
-    const year = document.getElementById('yearSelect')?.value || new Date().getFullYear();
-    const month = document.getElementById('monthSelect')?.value || (new Date().getMonth() + 1);
+    // Parse month/year from the month picker (format: YYYY-MM)
+    const monthYearPicker = document.getElementById('monthYearPicker');
+    let year, month;
+
+    if (monthYearPicker && monthYearPicker.value) {
+        const [yearStr, monthStr] = monthYearPicker.value.split('-');
+        year = parseInt(yearStr);
+        month = parseInt(monthStr);
+    } else {
+        year = new Date().getFullYear();
+        month = new Date().getMonth() + 1;
+    }
 
     showLoading();
 
@@ -1067,8 +1082,18 @@ function displayTransactions(transactions) {
 }
 
 function loadPaymentTotals() {
-    const year = document.getElementById('yearSelect')?.value || new Date().getFullYear();
-    const month = document.getElementById('monthSelect')?.value || (new Date().getMonth() + 1);
+    // Parse month/year from the month picker (format: YYYY-MM)
+    const monthYearPicker = document.getElementById('monthYearPicker');
+    let year, month;
+
+    if (monthYearPicker && monthYearPicker.value) {
+        const [yearStr, monthStr] = monthYearPicker.value.split('-');
+        year = parseInt(yearStr);
+        month = parseInt(monthStr);
+    } else {
+        year = new Date().getFullYear();
+        month = new Date().getMonth() + 1;
+    }
 
     showLoading();
 
@@ -1188,8 +1213,18 @@ function saveTransaction() {
     const editId = document.getElementById('editTransactionId')?.value;
     const isEdit = editId && editId !== '';
 
-    const year = document.getElementById('yearSelect')?.value || new Date().getFullYear();
-    const month = document.getElementById('monthSelect')?.value || (new Date().getMonth() + 1);
+    // Parse month/year from the month picker (format: YYYY-MM)
+    const monthYearPicker = document.getElementById('monthYearPicker');
+    let year, month;
+
+    if (monthYearPicker && monthYearPicker.value) {
+        const [yearStr, monthStr] = monthYearPicker.value.split('-');
+        year = parseInt(yearStr);
+        month = parseInt(monthStr);
+    } else {
+        year = new Date().getFullYear();
+        month = new Date().getMonth() + 1;
+    }
 
     // Validate description
     const description = document.getElementById('transDescription')?.value;
@@ -1706,26 +1741,31 @@ function displayActiveFilters() {
 }
 
 function executeCloneMonth() {
-    const fromMonth = document.getElementById('cloneFromMonth')?.value;
-    const fromYear = document.getElementById('cloneFromYear')?.value;
-    const toMonth = document.getElementById('cloneToMonth')?.value;
-    const toYear = document.getElementById('cloneToYear')?.value;
+    // Parse month/year from the month pickers (format: YYYY-MM)
+    const cloneFromMonthYear = document.getElementById('cloneFromMonthYear');
+    const cloneToMonthYear = document.getElementById('cloneToMonthYear');
     const includePayments = document.getElementById('cloneWithPayments')?.checked || false;
 
     // Validation
-    if (!fromMonth || !fromYear || !toMonth || !toYear) {
+    if (!cloneFromMonthYear?.value || !cloneToMonthYear?.value) {
         showToast('Please select all date fields', 'danger');
         return;
     }
+
+    // Parse values
+    const [fromYear, fromMonth] = cloneFromMonthYear.value.split('-').map(v => parseInt(v));
+    const [toYear, toMonth] = cloneToMonthYear.value.split('-').map(v => parseInt(v));
 
     if (fromYear === toYear && fromMonth === toMonth) {
         showToast('Source and target months cannot be the same', 'danger');
         return;
     }
 
-    // Confirm action
-    const fromMonthName = document.getElementById('cloneFromMonth')?.options[document.getElementById('cloneFromMonth')?.selectedIndex]?.text;
-    const toMonthName = document.getElementById('cloneToMonth')?.options[document.getElementById('cloneToMonth')?.selectedIndex]?.text;
+    // Create month names for confirmation
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                        'July', 'August', 'September', 'October', 'November', 'December'];
+    const fromMonthName = monthNames[fromMonth - 1];
+    const toMonthName = monthNames[toMonth - 1];
 
     showConfirmModal(
         'Clone Month Transactions',
@@ -1734,33 +1774,35 @@ function executeCloneMonth() {
             showLoading();
 
             fetch('/api/clone-month-transactions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            from_year: parseInt(fromYear),
-            from_month: parseInt(fromMonth),
-            to_year: parseInt(toYear),
-            to_month: parseInt(toMonth),
-            include_payments: includePayments
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        hideLoading();
-        if (data.error) {
-            showToast(data.error, 'danger');
-        } else {
-            showToast(data.message, 'success');
-            closeModal('cloneMonthModal');
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    from_year: fromYear,
+                    from_month: fromMonth,
+                    to_year: toYear,
+                    to_month: toMonth,
+                    include_payments: includePayments
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                if (data.error) {
+                    showToast(data.error, 'danger');
+                } else {
+                    showToast(data.message, 'success');
+                    closeModal('cloneMonthModal');
 
-            // Reload transactions if viewing the target month
-            const currentMonth = document.getElementById('monthSelect')?.value;
-            const currentYear = document.getElementById('yearSelect')?.value;
-            if (currentMonth == toMonth && currentYear == toYear) {
-                loadTransactions();
-            }
-        }
-    })
+                    // Reload transactions if viewing the target month
+                    const monthYearPicker = document.getElementById('monthYearPicker');
+                    if (monthYearPicker?.value) {
+                        const [currentYear, currentMonth] = monthYearPicker.value.split('-').map(v => parseInt(v));
+                        if (currentMonth === toMonth && currentYear === toYear) {
+                            loadTransactions();
+                        }
+                    }
+                }
+            })
             .catch(error => {
                 hideLoading();
                 console.error('Error cloning transactions:', error);
@@ -2487,40 +2529,25 @@ function populateDateSelectors() {
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth() + 1;
 
-    // Month selectors
-    const monthSelects = ['monthSelect', 'cloneFromMonth', 'cloneToMonth'];
-    const months = ['January', 'February', 'March', 'April', 'May', 'June',
-                    'July', 'August', 'September', 'October', 'November', 'December'];
+    // Format current date as YYYY-MM for the month picker
+    const currentMonthYear = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
 
-    monthSelects.forEach(id => {
-        const select = document.getElementById(id);
-        if (select) {
-            select.innerHTML = '';
-            months.forEach((month, index) => {
-                const option = document.createElement('option');
-                option.value = index + 1;
-                option.textContent = month;
-                if (index + 1 === currentMonth) option.selected = true;
-                select.appendChild(option);
-            });
-        }
-    });
+    // Set main month/year picker
+    const monthYearPicker = document.getElementById('monthYearPicker');
+    if (monthYearPicker) {
+        monthYearPicker.value = currentMonthYear;
+    }
 
-    // Year selectors
-    const yearSelects = ['yearSelect', 'cloneFromYear', 'cloneToYear'];
-    yearSelects.forEach(id => {
-        const select = document.getElementById(id);
-        if (select) {
-            select.innerHTML = '';
-            for (let year = currentYear - 2; year <= currentYear + 1; year++) {
-                const option = document.createElement('option');
-                option.value = year;
-                option.textContent = year;
-                if (year === currentYear) option.selected = true;
-                select.appendChild(option);
-            }
-        }
-    });
+    // Set clone modal month/year pickers
+    const cloneFromMonthYear = document.getElementById('cloneFromMonthYear');
+    if (cloneFromMonthYear) {
+        cloneFromMonthYear.value = currentMonthYear;
+    }
+
+    const cloneToMonthYear = document.getElementById('cloneToMonthYear');
+    if (cloneToMonthYear) {
+        cloneToMonthYear.value = currentMonthYear;
+    }
 
     // Add event listener for clone execute button
     const executeCloneBtn = document.getElementById('executeCloneBtn');

@@ -152,14 +152,7 @@
                         <!-- Month/Year Selector and Control Buttons -->
                         <div class="row mb-3 align-items-center">
                             <div class="col-auto">
-                                <select class="form-select form-select-sm" id="monthSelect">
-                                    <!-- Months will be populated here -->
-                                </select>
-                            </div>
-                            <div class="col-auto">
-                                <select class="form-select form-select-sm" id="yearSelect">
-                                    <!-- Years will be populated here -->
-                                </select>
+                                <input type="month" class="form-control form-control-sm" id="monthYearPicker" style="min-width: 160px;">
                             </div>
                             <div class="col-auto">
                                 <button class="btn btn-secondary btn-sm" id="prevMonthBtn" title="Previous Month">
@@ -751,38 +744,12 @@
 
                 <div class="mb-4">
                     <label class="form-label">Copy From:</label>
-                    <div class="row g-2">
-                        <div class="col-6">
-                            <label class="form-label text-muted small">Month</label>
-                            <select class="form-select text-center" id="cloneFromMonth">
-                                <!-- Months will be populated -->
-                            </select>
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label text-muted small">Year</label>
-                            <select class="form-select text-center" id="cloneFromYear">
-                                <!-- Years will be populated -->
-                            </select>
-                        </div>
-                    </div>
+                    <input type="month" class="form-control" id="cloneFromMonthYear">
                 </div>
 
                 <div class="mb-4">
                     <label class="form-label">Copy To:</label>
-                    <div class="row g-2">
-                        <div class="col-6">
-                            <label class="form-label text-muted small">Month</label>
-                            <select class="form-select text-center" id="cloneToMonth">
-                                <!-- Months will be populated -->
-                            </select>
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label text-muted small">Year</label>
-                            <select class="form-select text-center" id="cloneToYear">
-                                <!-- Years will be populated -->
-                            </select>
-                        </div>
-                    </div>
+                    <input type="month" class="form-control" id="cloneToMonthYear">
                 </div>
 
                 <div class="form-check mb-3">
