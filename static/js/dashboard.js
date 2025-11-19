@@ -32,6 +32,8 @@ let activeFilters = {
 };
 let reportFiltersInitialized = false;
 let filterDropdownsInitialized = false;
+let loadedReportTabs = new Set(); // Track which report tabs have been loaded
+let reportTabsInitialized = false; // Track if tab listeners are initialized
 
 // Geolocation helper function
 function getGeolocation() {
@@ -1841,10 +1843,11 @@ function loadReports() {
     // Initialize year and month selectors
     initializeReportFilters(year, month);
 
-    showLoading();
+    // Initialize tab event listeners
+    initializeReportTabListeners();
 
-    // Load all reports
-    loadAllReports(year, month, 'monthly');
+    // Load only the first active tab (Monthly Summary)
+    loadReportTab('monthlyReport', year, month, 'monthly');
 }
 
 function initializeReportFilters(year, month) {
@@ -1871,14 +1874,14 @@ function initializeReportFilters(year, month) {
             const selectedYear = yearSelect.value;
             const selectedMonth = monthSelect.value;
             const selectedRange = rangeSelect.value;
-            loadAllReports(selectedYear, selectedMonth, selectedRange);
+            reloadActiveReportTab(selectedYear, selectedMonth, selectedRange);
         });
 
         monthSelect.addEventListener('change', () => {
             const selectedYear = yearSelect.value;
             const selectedMonth = monthSelect.value;
             const selectedRange = rangeSelect.value;
-            loadAllReports(selectedYear, selectedMonth, selectedRange);
+            reloadActiveReportTab(selectedYear, selectedMonth, selectedRange);
         });
 
         rangeSelect.addEventListener('change', () => {
@@ -1894,45 +1897,122 @@ function initializeReportFilters(year, month) {
                 monthContainer.style.display = 'block';
             }
 
-            loadAllReports(selectedYear, selectedMonth, selectedRange);
+            reloadActiveReportTab(selectedYear, selectedMonth, selectedRange);
         });
 
         reportFiltersInitialized = true;
     }
 }
 
-function loadAllReports(year, month, rangeType) {
+// Initialize tab event listeners for lazy loading
+function initializeReportTabListeners() {
+    if (reportTabsInitialized) return;
+
+    const reportTabs = document.querySelectorAll('#reportTabs a[data-bs-toggle="tab"]');
+    reportTabs.forEach(tab => {
+        tab.addEventListener('shown.bs.tab', (event) => {
+            const targetId = event.target.getAttribute('href').substring(1); // Remove '#' from href
+            const yearSelect = document.getElementById('reportYear');
+            const monthSelect = document.getElementById('reportMonth');
+            const rangeSelect = document.getElementById('reportRangeType');
+
+            const year = yearSelect.value;
+            const month = monthSelect.value;
+            const rangeType = rangeSelect.value;
+
+            loadReportTab(targetId, year, month, rangeType);
+        });
+    });
+
+    reportTabsInitialized = true;
+}
+
+// Load a specific report tab's data
+function loadReportTab(tabId, year, month, rangeType) {
+    // Check if this tab has already been loaded
+    if (loadedReportTabs.has(tabId)) {
+        return; // Already loaded, no need to fetch again
+    }
+
     showLoading();
 
-    Promise.all([
-        fetch(`/api/reports/monthly-summary?year=${year}`)
-            .then(response => response.json())
-            .then(data => updateMonthlyReportChart(data)),
+    let fetchPromise;
+    switch (tabId) {
+        case 'monthlyReport':
+            fetchPromise = loadMonthlyReport(year);
+            break;
+        case 'categoryReport':
+            fetchPromise = loadCategoryReport(year, month, rangeType);
+            break;
+        case 'cashFlowReport':
+            fetchPromise = loadCashFlowReport(year, month, rangeType);
+            break;
+        case 'topSpendingReport':
+            fetchPromise = loadTopSpendingReport(year, month, rangeType);
+            break;
+        case 'forecastReport':
+            fetchPromise = loadForecastReport();
+            break;
+        default:
+            hideLoading();
+            return;
+    }
 
-        fetch(`/api/reports/category-breakdown?range=${rangeType}&year=${year}&month=${month}`)
-            .then(response => response.json())
-            .then(data => updateCategoryReportChart(data, rangeType)),
+    fetchPromise
+        .then(() => {
+            loadedReportTabs.add(tabId); // Mark this tab as loaded
+            hideLoading();
+        })
+        .catch(error => {
+            hideLoading();
+            console.error(`Error loading ${tabId}:`, error);
+            showToast('Error loading report', 'danger');
+        });
+}
 
-        fetch(`/api/reports/cash-flow?range=${rangeType}&year=${year}&month=${month}`)
-            .then(response => response.json())
-            .then(data => updateCashFlowChart(data, rangeType)),
+// Reload the currently active report tab (when filters change)
+function reloadActiveReportTab(year, month, rangeType) {
+    const activeTab = document.querySelector('#reportTabs a.nav-link.active');
+    if (!activeTab) return;
 
-        fetch(`/api/reports/top-spending?range=${rangeType}&year=${year}&month=${month}&limit=10`)
-            .then(response => response.json())
-            .then(data => updateTopSpendingChart(data)),
+    const targetId = activeTab.getAttribute('href').substring(1);
 
-        fetch(`/api/reports/forecast?months=6`)
-            .then(response => response.json())
-            .then(data => updateForecastChart(data))
-    ])
-    .then(() => {
-        hideLoading();
-    })
-    .catch(error => {
-        hideLoading();
-        console.error('Error loading reports:', error);
-        showToast('Error loading reports', 'danger');
-    });
+    // Remove from loaded set to force reload
+    loadedReportTabs.delete(targetId);
+
+    // Reload the tab
+    loadReportTab(targetId, year, month, rangeType);
+}
+
+// Individual report loading functions
+function loadMonthlyReport(year) {
+    return fetch(`/api/reports/monthly-summary?year=${year}`)
+        .then(response => response.json())
+        .then(data => updateMonthlyReportChart(data));
+}
+
+function loadCategoryReport(year, month, rangeType) {
+    return fetch(`/api/reports/category-breakdown?range=${rangeType}&year=${year}&month=${month}`)
+        .then(response => response.json())
+        .then(data => updateCategoryReportChart(data, rangeType));
+}
+
+function loadCashFlowReport(year, month, rangeType) {
+    return fetch(`/api/reports/cash-flow?range=${rangeType}&year=${year}&month=${month}`)
+        .then(response => response.json())
+        .then(data => updateCashFlowChart(data, rangeType));
+}
+
+function loadTopSpendingReport(year, month, rangeType) {
+    return fetch(`/api/reports/top-spending?range=${rangeType}&year=${year}&month=${month}&limit=10`)
+        .then(response => response.json())
+        .then(data => updateTopSpendingChart(data));
+}
+
+function loadForecastReport() {
+    return fetch(`/api/reports/forecast?months=6`)
+        .then(response => response.json())
+        .then(data => updateForecastChart(data));
 }
 
 // ================================
