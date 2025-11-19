@@ -855,13 +855,13 @@ def transactions():
                     where_clauses.append("(COALESCE(t.debit, 0) <= %s OR COALESCE(t.credit, 0) <= %s)")
                     params.extend([max_amount, max_amount])
 
-                # Date range filter
+                # Date range filter (using created_at instead of transaction_date)
                 if start_date:
-                    where_clauses.append("DATE(t.transaction_date) >= %s")
+                    where_clauses.append("DATE(t.created_at) >= %s")
                     params.append(start_date)
 
                 if end_date:
-                    where_clauses.append("DATE(t.transaction_date) <= %s")
+                    where_clauses.append("DATE(t.created_at) <= %s")
                     params.append(end_date)
 
                 # Combine WHERE clauses
@@ -999,13 +999,13 @@ def filter_transactions():
 
         params = [user_id]
 
-        # Add date range filter
+        # Add date range filter (using created_at instead of transaction_date)
         if date_from:
-            query += " AND DATE(t.transaction_date) >= %s"
+            query += " AND DATE(t.created_at) >= %s"
             params.append(date_from)
 
         if date_to:
-            query += " AND DATE(t.transaction_date) <= %s"
+            query += " AND DATE(t.created_at) <= %s"
             params.append(date_to)
 
         # Add category filter
