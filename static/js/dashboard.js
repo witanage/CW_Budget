@@ -3108,8 +3108,8 @@ function populateMonthlyDataTable() {
     if (!tbody) return;
 
     const startMonthIndex = parseInt(document.getElementById('startMonth').value) || 0;
-    const defaultSalaryRate = 299;
-    const defaultSalary = 6000;
+    const defaultSalaryRate = 0;
+    const defaultSalary = 0;
 
     let html = '';
     for (let i = 0; i < 12; i++) {

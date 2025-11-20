@@ -1480,3 +1480,22 @@ color: #ffffff;
 [data-theme="light"] .calculation-item small.text-muted {
     color: #6c757d;
 }
+
+/* Tax Calculator - Load button height fix */
+#loadSavedByYearBtn {
+    height: 38px;
+    padding: 0.375rem 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Ensure proper alignment in input group */
+.input-group > #assessmentYear {
+    height: 38px;
+}
+
+.input-group > #assessmentYear + #loadSavedByYearBtn {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+}
