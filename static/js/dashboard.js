@@ -3000,6 +3000,7 @@ function loadTaxCalculator() {
     const startMonthSelect = document.getElementById('startMonth');
     const saveCalculationBtn = document.getElementById('saveCalculationBtn');
     const refreshSavedBtn = document.getElementById('refreshSavedCalculationsBtn');
+    const loadSavedByYearBtn = document.getElementById('loadSavedByYearBtn');
 
     if (calculateBtn) {
         calculateBtn.onclick = calculateMonthlyTax;
@@ -3021,11 +3022,18 @@ function loadTaxCalculator() {
         refreshSavedBtn.onclick = loadSavedCalculations;
     }
 
-    // Update year/assessment display and filter calculations
+    // Load button to filter calculations by selected year
+    if (loadSavedByYearBtn) {
+        loadSavedByYearBtn.onclick = function() {
+            console.log('Load button clicked');
+            filterCalculationsByYear();
+        };
+    }
+
+    // Update year/assessment display when year changes
     if (assessmentYearSelect) {
         assessmentYearSelect.addEventListener('change', function() {
             updateYearDisplay();
-            filterCalculationsByYear();
         });
         updateYearDisplay();
     }
@@ -3038,7 +3046,7 @@ function loadTaxCalculator() {
     // Initial table population
     populateMonthlyDataTable();
 
-    // Load saved calculations
+    // Load all saved calculations on page load
     loadSavedCalculations();
 }
 
@@ -3407,8 +3415,8 @@ function loadSavedCalculations() {
         allSavedCalculations = Array.isArray(calculations) ? calculations : [];
         console.log('Stored calculations:', allSavedCalculations.length, 'items');
 
-        // Filter by currently selected year
-        filterCalculationsByYear();
+        // Display all calculations (not filtered)
+        displaySavedCalculations(allSavedCalculations, null);
     })
     .catch(error => {
         hideLoading();

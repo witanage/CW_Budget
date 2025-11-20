@@ -456,16 +456,22 @@
                                     <div class="card-body">
                                         <form id="taxCalculatorForm">
                                             <div class="row">
-                                                <div class="col-md-4 mb-3">
+                                                <div class="col-md-6 mb-3">
                                                     <label for="assessmentYear" class="form-label">Assessment Year</label>
-                                                    <select id="assessmentYear" class="form-select">
-                                                        <option value="2025/2026">2025/2026 (Apr 2025 - Mar 2026)</option>
-                                                        <option value="2024/2025" selected>2024/2025 (Apr 2024 - Mar 2025)</option>
-                                                        <option value="2023/2024">2023/2024 (Apr 2023 - Mar 2024)</option>
-                                                    </select>
+                                                    <div class="input-group">
+                                                        <select id="assessmentYear" class="form-select">
+                                                            <option value="2025/2026">2025/2026 (Apr 2025 - Mar 2026)</option>
+                                                            <option value="2024/2025" selected>2024/2025 (Apr 2024 - Mar 2025)</option>
+                                                            <option value="2023/2024">2023/2024 (Apr 2023 - Mar 2024)</option>
+                                                        </select>
+                                                        <button type="button" class="btn btn-outline-primary" id="loadSavedByYearBtn" title="Load saved calculations for selected year">
+                                                            <i class="fas fa-download me-1"></i>Load
+                                                        </button>
+                                                    </div>
+                                                    <small class="text-muted">Select year and click Load to view saved calculations</small>
                                                 </div>
 
-                                                <div class="col-md-4 mb-3">
+                                                <div class="col-md-3 mb-3">
                                                     <label for="monthlySalaryUSD" class="form-label">Monthly Salary (USD)</label>
                                                     <div class="input-group">
                                                         <span class="input-group-text">$</span>
@@ -473,7 +479,7 @@
                                                     </div>
                                                 </div>
 
-                                                <div class="col-md-4 mb-3">
+                                                <div class="col-md-3 mb-3">
                                                     <label for="taxRate" class="form-label">Tax Rate (%)</label>
                                                     <div class="input-group">
                                                         <input type="number" class="form-control" id="taxRate" placeholder="15" value="15" step="0.1" min="0" max="100">
