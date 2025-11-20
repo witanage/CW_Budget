@@ -3081,7 +3081,7 @@ function populateMonthlyDataTable() {
 
     const startMonthIndex = parseInt(document.getElementById('startMonth').value) || 0;
     const defaultRate = 299;
-    const monthlySalary = parseFloat(document.getElementById('monthlySalaryUSD').value) || 6000;
+    const defaultIncome = 6000;
 
     let html = '';
     for (let i = 0; i < 12; i++) {
@@ -3107,8 +3107,8 @@ function populateMonthlyDataTable() {
                         <span class="input-group-text">$</span>
                         <input type="number" class="form-control month-total-income"
                                data-month="${monthIndex}"
-                               placeholder="${monthlySalary}"
-                               value="${monthlySalary}"
+                               placeholder="6000"
+                               value="${defaultIncome}"
                                step="100"
                                min="0">
                     </div>
@@ -3122,16 +3122,9 @@ function populateMonthlyDataTable() {
 
 function calculateMonthlyTax() {
     // Get form values
-    const monthlySalaryUSD = parseFloat(document.getElementById('monthlySalaryUSD').value) || 0;
     const taxRate = parseFloat(document.getElementById('taxRate').value) || 15;
     const taxFreeThreshold = parseFloat(document.getElementById('taxFreeThreshold').value) || 360000;
     const startMonthIndex = parseInt(document.getElementById('startMonth').value) || 0;
-
-    // Validate inputs
-    if (monthlySalaryUSD <= 0) {
-        showToast('Please enter a valid monthly salary', 'warning');
-        return;
-    }
 
     // Read monthly exchange rates and total income from table
     const exchangeRateInputs = document.querySelectorAll('.month-exchange-rate');
@@ -3226,7 +3219,7 @@ function calculateMonthlyTax() {
     // Store calculation data for saving
     lastCalculationData = {
         assessment_year: document.getElementById('assessmentYear').value,
-        monthly_salary_usd: monthlySalaryUSD,
+        monthly_salary_usd: 0, // Kept for backwards compatibility, no longer used
         tax_rate: taxRate,
         tax_free_threshold: taxFreeThreshold,
         start_month: startMonthIndex,
@@ -3300,7 +3293,6 @@ function updateTaxScheduleTable(monthlyData) {
 function resetTaxCalculator() {
     // Reset form fields
     document.getElementById('assessmentYear').value = '2024/2025';
-    document.getElementById('monthlySalaryUSD').value = '6000';
     document.getElementById('taxRate').value = '15';
     document.getElementById('taxFreeThreshold').value = '360000';
     document.getElementById('startMonth').value = '0';
@@ -3552,7 +3544,6 @@ function loadCalculation(calculationId) {
 
         // Load values into form
         document.getElementById('assessmentYear').value = calc.assessment_year;
-        document.getElementById('monthlySalaryUSD').value = calc.monthly_salary_usd;
         document.getElementById('taxRate').value = calc.tax_rate;
         document.getElementById('taxFreeThreshold').value = calc.tax_free_threshold;
         document.getElementById('startMonth').value = calc.start_month;
@@ -3574,7 +3565,8 @@ function loadCalculation(calculationId) {
             const actualMonthIndex = (calc.start_month + month.month_index) % 12;
             monthDataMap[actualMonthIndex] = {
                 exchange_rate: month.exchange_rate,
-                total_income_usd: month.total_income_usd || month.bonus_usd + calc.monthly_salary_usd || calc.monthly_salary_usd
+                // Use total_income_usd if available, otherwise fallback to old format (bonus + salary)
+                total_income_usd: month.total_income_usd || (month.bonus_usd || 0) + (calc.monthly_salary_usd || 6000)
             };
         });
 
