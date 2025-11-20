@@ -276,14 +276,10 @@ CREATE TABLE IF NOT EXISTS tax_calculations (
     user_id INT NOT NULL,
     calculation_name VARCHAR(255) NOT NULL,
     assessment_year VARCHAR(20) NOT NULL,
-    monthly_salary_usd DECIMAL(15, 2) NOT NULL,
     tax_rate DECIMAL(5, 2) NOT NULL,
     tax_free_threshold DECIMAL(15, 2) NOT NULL,
     start_month INT NOT NULL COMMENT '0=April, 11=March',
-    monthly_data JSON NOT NULL COMMENT 'Array of 12 months with exchange rates and bonuses',
-    total_annual_income DECIMAL(15, 2) NOT NULL,
-    total_tax_liability DECIMAL(15, 2) NOT NULL,
-    effective_tax_rate DECIMAL(5, 2) NOT NULL,
+    monthly_data JSON NOT NULL COMMENT 'Income details: array of 12 months with salaries, exchange rates and bonuses',
     is_active BOOLEAN DEFAULT FALSE COMMENT 'Indicates if this is the active calculation for the assessment year',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -292,31 +288,33 @@ CREATE TABLE IF NOT EXISTS tax_calculations (
     INDEX idx_assessment_year (assessment_year),
     INDEX idx_created_at (created_at),
     INDEX idx_user_assessment_active (user_id, assessment_year, is_active)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+COMMENT='Stores only income input data - tax calculations are computed on load';
 
 -- ============================================================
--- Tax Calculation Monthly Details Table
+-- Tax Calculation Monthly Details Table (DEPRECATED)
 -- ============================================================
--- Stores detailed monthly breakdown for each tax calculation
--- Enables granular analysis and reporting per month
+-- This table is no longer used. Tax calculations are computed on-the-fly
+-- from the income data stored in tax_calculations.monthly_data JSON field.
+-- Keeping this commented out for reference in case of rollback.
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS tax_calculation_details (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    tax_calculation_id INT NOT NULL,
-    month_index INT NOT NULL COMMENT '0-11 representing the month order',
-    month_name VARCHAR(20) NOT NULL,
-    exchange_rate DECIMAL(10, 2) NOT NULL,
-    bonus_usd DECIMAL(15, 2) DEFAULT 0,
-    fc_receipts_usd DECIMAL(15, 2) NOT NULL,
-    fc_receipts_lkr DECIMAL(15, 2) NOT NULL,
-    cumulative_income DECIMAL(15, 2) NOT NULL,
-    total_tax_liability DECIMAL(15, 2) NOT NULL,
-    monthly_payment DECIMAL(15, 2) NOT NULL,
-    FOREIGN KEY (tax_calculation_id) REFERENCES tax_calculations(id) ON DELETE CASCADE,
-    INDEX idx_tax_calculation (tax_calculation_id),
-    INDEX idx_month_index (month_index)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- CREATE TABLE IF NOT EXISTS tax_calculation_details (
+--     id INT AUTO_INCREMENT PRIMARY KEY,
+--     tax_calculation_id INT NOT NULL,
+--     month_index INT NOT NULL COMMENT '0-11 representing the month order',
+--     month_name VARCHAR(20) NOT NULL,
+--     exchange_rate DECIMAL(10, 2) NOT NULL,
+--     bonus_usd DECIMAL(15, 2) DEFAULT 0,
+--     fc_receipts_usd DECIMAL(15, 2) NOT NULL,
+--     fc_receipts_lkr DECIMAL(15, 2) NOT NULL,
+--     cumulative_income DECIMAL(15, 2) NOT NULL,
+--     total_tax_liability DECIMAL(15, 2) NOT NULL,
+--     monthly_payment DECIMAL(15, 2) NOT NULL,
+--     FOREIGN KEY (tax_calculation_id) REFERENCES tax_calculations(id) ON DELETE CASCADE,
+--     INDEX idx_tax_calculation (tax_calculation_id),
+--     INDEX idx_month_index (month_index)
+-- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
 -- Initial Setup Notes

@@ -2167,22 +2167,18 @@ def check_column_exists(connection, table_name, column_name):
 @app.route('/api/tax-calculations', methods=['POST'])
 @login_required
 def save_tax_calculation():
-    """Save a tax calculation to the database."""
+    """Save income data only (calculations are computed on load)."""
     try:
         data = request.get_json()
         user_id = session['user_id']
 
-        # Extract main calculation data
+        # Extract income data (input fields only)
         calculation_name = data.get('calculation_name')
         assessment_year = data.get('assessment_year')
-        monthly_salary_usd = Decimal(str(data.get('monthly_salary_usd', 0)))
         tax_rate = Decimal(str(data.get('tax_rate', 0)))
         tax_free_threshold = Decimal(str(data.get('tax_free_threshold', 0)))
         start_month = int(data.get('start_month', 0))
         monthly_data = data.get('monthly_data', [])
-        total_annual_income = Decimal(str(data.get('total_annual_income', 0)))
-        total_tax_liability = Decimal(str(data.get('total_tax_liability', 0)))
-        effective_tax_rate = Decimal(str(data.get('effective_tax_rate', 0)))
         is_active = data.get('is_active', False)
 
         # Validate required fields
@@ -2203,66 +2199,34 @@ def save_tax_calculation():
                 WHERE user_id = %s AND assessment_year = %s
             """, (user_id, assessment_year))
 
-        # Insert main tax calculation
+        # Insert income data only - tax calculations computed on load
         if has_is_active:
             cursor.execute("""
                 INSERT INTO tax_calculations
-                (user_id, calculation_name, assessment_year, monthly_salary_usd,
-                 tax_rate, tax_free_threshold, start_month, monthly_data,
-                 total_annual_income, total_tax_liability, effective_tax_rate, is_active)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                (user_id, calculation_name, assessment_year,
+                 tax_rate, tax_free_threshold, start_month, monthly_data, is_active)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """, (
-                user_id, calculation_name, assessment_year, monthly_salary_usd,
-                tax_rate, tax_free_threshold, start_month, json.dumps(monthly_data),
-                total_annual_income, total_tax_liability, effective_tax_rate, is_active
+                user_id, calculation_name, assessment_year,
+                tax_rate, tax_free_threshold, start_month, json.dumps(monthly_data), is_active
             ))
         else:
             # Fallback for databases without is_active column
             cursor.execute("""
                 INSERT INTO tax_calculations
-                (user_id, calculation_name, assessment_year, monthly_salary_usd,
-                 tax_rate, tax_free_threshold, start_month, monthly_data,
-                 total_annual_income, total_tax_liability, effective_tax_rate)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                (user_id, calculation_name, assessment_year,
+                 tax_rate, tax_free_threshold, start_month, monthly_data)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
             """, (
-                user_id, calculation_name, assessment_year, monthly_salary_usd,
-                tax_rate, tax_free_threshold, start_month, json.dumps(monthly_data),
-                total_annual_income, total_tax_liability, effective_tax_rate
+                user_id, calculation_name, assessment_year,
+                tax_rate, tax_free_threshold, start_month, json.dumps(monthly_data)
             ))
 
         tax_calculation_id = cursor.lastrowid
 
-        # Insert monthly details
-        for month in monthly_data:
-            # Map frontend field names to backend (salary_rate -> exchange_rate for backward compatibility)
-            exchange_rate = month.get('salary_rate', month.get('exchange_rate', 0))
-
-            # Calculate total bonus_usd from bonuses array if present, otherwise use legacy bonus_usd field
-            bonuses = month.get('bonuses', [])
-            total_bonus_usd = sum(bonus.get('amount', 0) for bonus in bonuses) if bonuses else month.get('bonus_usd', 0)
-
-            cursor.execute("""
-                INSERT INTO tax_calculation_details
-                (tax_calculation_id, month_index, month_name, exchange_rate,
-                 bonus_usd, fc_receipts_usd, fc_receipts_lkr,
-                 cumulative_income, total_tax_liability, monthly_payment)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, (
-                tax_calculation_id,
-                month['month_index'],
-                month['month'],
-                Decimal(str(exchange_rate)),
-                Decimal(str(total_bonus_usd)),
-                Decimal(str(month['fcReceiptsUSD'])),
-                Decimal(str(month['fcReceiptsLKR'])),
-                Decimal(str(month['cumulativeIncome'])),
-                Decimal(str(month['totalTaxLiability'])),
-                Decimal(str(month['monthlyPayment']))
-            ))
-
         connection.commit()
 
-        logger.info(f"Tax calculation saved successfully: ID {tax_calculation_id}")
+        logger.info(f"Income data saved successfully: ID {tax_calculation_id}")
 
         return jsonify({
             'message': 'Tax calculation saved successfully',
@@ -2300,8 +2264,7 @@ def get_tax_calculations():
             if year:
                 cursor.execute("""
                     SELECT id, calculation_name, assessment_year,
-                           monthly_salary_usd, tax_rate, tax_free_threshold,
-                           total_annual_income, total_tax_liability, effective_tax_rate,
+                           tax_rate, tax_free_threshold, start_month,
                            is_active, created_at, updated_at
                     FROM tax_calculations
                     WHERE user_id = %s AND assessment_year = %s
@@ -2310,8 +2273,7 @@ def get_tax_calculations():
             else:
                 cursor.execute("""
                     SELECT id, calculation_name, assessment_year,
-                           monthly_salary_usd, tax_rate, tax_free_threshold,
-                           total_annual_income, total_tax_liability, effective_tax_rate,
+                           tax_rate, tax_free_threshold, start_month,
                            is_active, created_at, updated_at
                     FROM tax_calculations
                     WHERE user_id = %s
@@ -2322,8 +2284,7 @@ def get_tax_calculations():
             if year:
                 cursor.execute("""
                     SELECT id, calculation_name, assessment_year,
-                           monthly_salary_usd, tax_rate, tax_free_threshold,
-                           total_annual_income, total_tax_liability, effective_tax_rate,
+                           tax_rate, tax_free_threshold, start_month,
                            created_at, updated_at
                     FROM tax_calculations
                     WHERE user_id = %s AND assessment_year = %s
@@ -2332,8 +2293,7 @@ def get_tax_calculations():
             else:
                 cursor.execute("""
                     SELECT id, calculation_name, assessment_year,
-                           monthly_salary_usd, tax_rate, tax_free_threshold,
-                           total_annual_income, total_tax_liability, effective_tax_rate,
+                           tax_rate, tax_free_threshold, start_month,
                            created_at, updated_at
                     FROM tax_calculations
                     WHERE user_id = %s
@@ -2379,18 +2339,7 @@ def get_tax_calculation(calculation_id):
         if not calculation:
             return jsonify({'error': 'Tax calculation not found'}), 404
 
-        # Get monthly details
-        cursor.execute("""
-            SELECT *
-            FROM tax_calculation_details
-            WHERE tax_calculation_id = %s
-            ORDER BY month_index
-        """, (calculation_id,))
-
-        details = cursor.fetchall()
-        calculation['details'] = details
-
-        # Parse JSON monthly_data
+        # Parse JSON monthly_data (contains all income details)
         if calculation['monthly_data']:
             calculation['monthly_data'] = json.loads(calculation['monthly_data'])
 
@@ -2510,8 +2459,7 @@ def get_tax_calculations_by_year(year):
         if has_is_active:
             cursor.execute("""
                 SELECT id, calculation_name, assessment_year,
-                       monthly_salary_usd, tax_rate, tax_free_threshold,
-                       total_annual_income, total_tax_liability, effective_tax_rate,
+                       tax_rate, tax_free_threshold, start_month,
                        is_active, created_at, updated_at
                 FROM tax_calculations
                 WHERE user_id = %s AND assessment_year = %s
@@ -2520,8 +2468,7 @@ def get_tax_calculations_by_year(year):
         else:
             cursor.execute("""
                 SELECT id, calculation_name, assessment_year,
-                       monthly_salary_usd, tax_rate, tax_free_threshold,
-                       total_annual_income, total_tax_liability, effective_tax_rate,
+                       tax_rate, tax_free_threshold, start_month,
                        created_at, updated_at
                 FROM tax_calculations
                 WHERE user_id = %s AND assessment_year = %s
@@ -2575,18 +2522,7 @@ def get_active_tax_calculation_by_year(year):
         if not calculation:
             return jsonify({'error': 'No active tax calculation found for this year'}), 404
 
-        # Get monthly details
-        cursor.execute("""
-            SELECT *
-            FROM tax_calculation_details
-            WHERE tax_calculation_id = %s
-            ORDER BY month_index
-        """, (calculation['id'],))
-
-        details = cursor.fetchall()
-        calculation['details'] = details
-
-        # Parse JSON monthly_data
+        # Parse JSON monthly_data (contains all income details)
         if calculation['monthly_data']:
             calculation['monthly_data'] = json.loads(calculation['monthly_data'])
 

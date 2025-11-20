@@ -3613,7 +3613,6 @@ function displaySavedCalculations(calculations, filterYear = null) {
     let html = headerHtml + '<div class="list-group">';
     calculations.forEach(calc => {
         const createdDate = new Date(calc.created_at).toLocaleDateString();
-        const effectiveRate = parseFloat(calc.effective_tax_rate || 0).toFixed(2);
         const isActive = calc.is_active || false;
         const activeClass = isActive ? 'border-success' : '';
 
@@ -3630,19 +3629,16 @@ function displaySavedCalculations(calculations, filterYear = null) {
                             <span class="text-muted">Saved: ${createdDate}</span>
                         </p>
                         <div class="row mt-2">
-                            <div class="col-md-4">
-                                <small class="text-muted">Annual Income:</small><br>
-                                <strong>${formatCurrency(calc.total_annual_income)}</strong>
+                            <div class="col-md-6">
+                                <small class="text-muted">Tax Rate:</small><br>
+                                <strong>${calc.tax_rate}%</strong>
                             </div>
-                            <div class="col-md-4">
-                                <small class="text-muted">Tax Liability:</small><br>
-                                <strong class="text-danger">${formatCurrency(calc.total_tax_liability)}</strong>
-                            </div>
-                            <div class="col-md-4">
-                                <small class="text-muted">Effective Rate:</small><br>
-                                <strong class="text-info">${effectiveRate}%</strong>
+                            <div class="col-md-6">
+                                <small class="text-muted">Tax-Free Threshold:</small><br>
+                                <strong>${formatCurrency(calc.tax_free_threshold)}</strong>
                             </div>
                         </div>
+                        <p class="mb-0 mt-2"><small class="text-muted"><i class="fas fa-info-circle me-1"></i>Tax totals will be calculated when you load this</small></p>
                     </div>
                     <div class="ms-3 d-flex flex-column gap-1">
                         <button class="btn btn-sm btn-outline-primary" onclick="loadCalculation(${calc.id})" title="Load this calculation">
