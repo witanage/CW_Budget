@@ -2234,6 +2234,13 @@ def save_tax_calculation():
 
         # Insert monthly details
         for month in monthly_data:
+            # Map frontend field names to backend (salary_rate -> exchange_rate for backward compatibility)
+            exchange_rate = month.get('salary_rate', month.get('exchange_rate', 0))
+
+            # Calculate total bonus_usd from bonuses array if present, otherwise use legacy bonus_usd field
+            bonuses = month.get('bonuses', [])
+            total_bonus_usd = sum(bonus.get('amount', 0) for bonus in bonuses) if bonuses else month.get('bonus_usd', 0)
+
             cursor.execute("""
                 INSERT INTO tax_calculation_details
                 (tax_calculation_id, month_index, month_name, exchange_rate,
@@ -2244,8 +2251,8 @@ def save_tax_calculation():
                 tax_calculation_id,
                 month['month_index'],
                 month['month'],
-                Decimal(str(month['exchange_rate'])),
-                Decimal(str(month.get('bonus_usd', 0))),
+                Decimal(str(exchange_rate)),
+                Decimal(str(total_bonus_usd)),
                 Decimal(str(month['fcReceiptsUSD'])),
                 Decimal(str(month['fcReceiptsLKR'])),
                 Decimal(str(month['cumulativeIncome'])),
