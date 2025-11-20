@@ -3355,21 +3355,17 @@ function calculateMonthlyTax() {
     const effectiveRate = cumulativeIncome > 0 ? (previousTaxLiability / cumulativeIncome * 100) : 0;
     document.getElementById('effectiveTaxRateSummary').textContent = `${effectiveRate.toFixed(2)}%`;
 
-    // Store calculation data for saving
+    // Store calculation data for saving (ONLY input data, calculations are computed on-the-fly)
     lastCalculationData = {
         assessment_year: document.getElementById('assessmentYear').value,
-        monthly_salary_usd: 0, // Kept for backwards compatibility, no longer used
         tax_rate: taxRate,
         tax_free_threshold: taxFreeThreshold,
         start_month: startMonthIndex,
-        total_annual_income: cumulativeIncome,
-        total_tax_liability: previousTaxLiability,
-        effective_tax_rate: effectiveRate,
         monthly_data: monthlyData.map((row, index) => {
             const actualMonthIndex = (startMonthIndex + index) % 12;
             const bonuses = monthlyBonusesData[actualMonthIndex] || [];
 
-            // Save ONLY income input data, not calculated results
+            // Save ONLY income input data (salaries, rates, bonuses)
             return {
                 month_index: index,
                 month: row.month,
@@ -3720,23 +3716,15 @@ function loadCalculation(calculationId) {
         }
 
         console.log('=== LOADING CALCULATION ===');
-        console.log('Full calculation object:', calc);
-        console.log('Assessment year:', calc.assessment_year);
-        console.log('Tax rate:', calc.tax_rate);
-        console.log('Tax-free threshold:', calc.tax_free_threshold);
+        console.log('ID:', calc.id, '| Name:', calc.calculation_name);
+        console.log('Year:', calc.assessment_year, '| Rate:', calc.tax_rate + '%', '| Threshold:', calc.tax_free_threshold);
         console.log('Start month:', calc.start_month);
+        console.log('Monthly data entries:', calc.monthly_data ? calc.monthly_data.length : 0);
 
-        // Load values into form
-        console.log('Setting assessmentYear field to:', calc.assessment_year);
+        // Load values into form fields
         document.getElementById('assessmentYear').value = calc.assessment_year;
-
-        console.log('Setting taxRate field to:', calc.tax_rate);
         document.getElementById('taxRate').value = calc.tax_rate;
-
-        console.log('Setting taxFreeThreshold field to:', calc.tax_free_threshold);
         document.getElementById('taxFreeThreshold').value = calc.tax_free_threshold;
-
-        console.log('Setting startMonth field to:', calc.start_month);
         document.getElementById('startMonth').value = calc.start_month;
 
         // Update year display
@@ -3744,10 +3732,8 @@ function loadCalculation(calculationId) {
 
         // Get monthly data (already parsed by backend)
         const monthlyData = calc.monthly_data || [];
-        console.log('Monthly data array:', monthlyData);
-        console.log('Monthly data length:', monthlyData.length);
         if (monthlyData.length > 0) {
-            console.log('First month sample:', monthlyData[0]);
+            console.log('Sample monthly entry:', monthlyData[0]);
         }
 
         // Repopulate monthly table with current start month
@@ -3759,43 +3745,14 @@ function loadCalculation(calculationId) {
             // Calculate the actual month index from start_month + month_index
             const actualMonthIndex = (calc.start_month + month.month_index) % 12;
 
-            // Handle backwards compatibility with old data formats
-            if (month.bonuses && Array.isArray(month.bonuses)) {
-                // Newest format with bonuses array
-                monthDataMap[actualMonthIndex] = {
-                    salary_usd: month.salary_usd,
-                    salary_rate: month.salary_rate,
-                    bonuses: month.bonuses // Array of {amount, rate}
-                };
-            } else if (month.salary_usd !== undefined && month.salary_rate !== undefined) {
-                // Previous format with separate salary and single bonus
-                monthDataMap[actualMonthIndex] = {
-                    salary_usd: month.salary_usd,
-                    salary_rate: month.salary_rate,
-                    bonuses: (month.bonus_usd && month.bonus_usd > 0) ?
-                        [{amount: month.bonus_usd, rate: month.bonus_rate || month.salary_rate}] : []
-                };
-            } else if (month.total_income_usd !== undefined) {
-                // Older format with total_income_usd
-                monthDataMap[actualMonthIndex] = {
-                    salary_usd: month.total_income_usd,
-                    salary_rate: month.exchange_rate || 299,
-                    bonuses: []
-                };
-            } else {
-                // Oldest format with bonus_usd and monthly_salary_usd
-                monthDataMap[actualMonthIndex] = {
-                    salary_usd: calc.monthly_salary_usd || 6000,
-                    salary_rate: month.exchange_rate || 299,
-                    bonuses: (month.bonus_usd && month.bonus_usd > 0) ?
-                        [{amount: month.bonus_usd, rate: month.exchange_rate || 299}] : []
-                };
-            }
+            monthDataMap[actualMonthIndex] = {
+                salary_usd: month.salary_usd || 0,
+                salary_rate: month.salary_rate || 0,
+                bonuses: month.bonuses || []  // Array of {amount, rate}
+            };
         });
 
-        console.log('=== MONTH DATA MAP CREATED ===');
-        console.log('Month data map:', monthDataMap);
-        console.log('Number of months in map:', Object.keys(monthDataMap).length);
+        console.log(`Loaded ${Object.keys(monthDataMap).length} months of data`);
 
         // Load salary and salary rate by matching data-month attribute
         const salaryInputs = document.querySelectorAll('.month-salary');
@@ -3805,7 +3762,6 @@ function loadCalculation(calculationId) {
             const monthIndex = parseInt(input.getAttribute('data-month'));
             if (monthDataMap[monthIndex]) {
                 input.value = monthDataMap[monthIndex].salary_usd;
-                console.log(`Set month ${monthIndex} salary to ${monthDataMap[monthIndex].salary_usd}`);
             }
         });
 
@@ -3813,25 +3769,24 @@ function loadCalculation(calculationId) {
             const monthIndex = parseInt(input.getAttribute('data-month'));
             if (monthDataMap[monthIndex]) {
                 input.value = monthDataMap[monthIndex].salary_rate;
-                console.log(`Set month ${monthIndex} salary rate to ${monthDataMap[monthIndex].salary_rate}`);
             }
         });
 
         // Load bonuses for each month
         Object.keys(monthDataMap).forEach(monthIndex => {
-            const monthData = monthDataMap[monthIndex];
-            const bonuses = monthData.bonuses || [];
+            const bonuses = monthDataMap[monthIndex].bonuses || [];
 
             // Add each bonus entry
             bonuses.forEach(bonus => {
                 if (bonus.amount > 0) {
                     addBonusEntry(parseInt(monthIndex), bonus.amount, bonus.rate);
-                    console.log(`Added bonus to month ${monthIndex}: $${bonus.amount} @ ${bonus.rate} LKR`);
                 }
             });
         });
 
-        // Recalculate
+        console.log('Form fields populated, recalculating tax schedule...');
+
+        // Recalculate tax schedule with loaded data
         calculateMonthlyTax();
 
         showToast(`Loaded: ${calc.calculation_name}`, 'success');
