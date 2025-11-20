@@ -3053,10 +3053,15 @@ function updateYearDisplay() {
 function filterCalculationsByYear() {
     const selectedYear = document.getElementById('assessmentYear').value;
 
+    console.log('Filtering calculations for year:', selectedYear);
+    console.log('All saved calculations:', allSavedCalculations);
+
     // Filter calculations for the selected year
     const filteredCalculations = allSavedCalculations.filter(calc =>
         calc.assessment_year === selectedYear
     );
+
+    console.log('Filtered calculations:', filteredCalculations);
 
     // Display filtered calculations
     displaySavedCalculations(filteredCalculations, selectedYear);
@@ -3377,21 +3382,40 @@ function saveTaxCalculation() {
 }
 
 function loadSavedCalculations() {
+    console.log('Loading saved calculations from API...');
     showLoading();
 
     fetch('/api/tax-calculations')
-    .then(response => response.json())
+    .then(response => {
+        console.log('API response status:', response.status);
+        return response.json();
+    })
     .then(calculations => {
         hideLoading();
+        console.log('Received calculations from API:', calculations);
+
+        // Check if it's an error response
+        if (calculations.error) {
+            console.error('API returned error:', calculations.error);
+            showToast('Error: ' + calculations.error, 'danger');
+            allSavedCalculations = [];
+            displaySavedCalculations([], null);
+            return;
+        }
+
         // Store all calculations globally
-        allSavedCalculations = calculations;
+        allSavedCalculations = Array.isArray(calculations) ? calculations : [];
+        console.log('Stored calculations:', allSavedCalculations.length, 'items');
+
         // Filter by currently selected year
         filterCalculationsByYear();
     })
     .catch(error => {
         hideLoading();
         console.error('Error loading calculations:', error);
-        showToast('Failed to load saved calculations', 'danger');
+        showToast('Failed to load saved calculations. Check console for details.', 'danger');
+        allSavedCalculations = [];
+        displaySavedCalculations([], null);
     });
 }
 
