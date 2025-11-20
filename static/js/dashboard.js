@@ -2989,9 +2989,9 @@ function loadTaxCalculator() {
     // Setup event listeners
     const calculateBtn = document.getElementById('calculateTaxBtn');
     const resetBtn = document.getElementById('resetTaxBtn');
-    const exchangeRateInput = document.getElementById('exchangeRate');
-    const bonusAmountInput = document.getElementById('bonusAmountUSD');
     const assessmentYearSelect = document.getElementById('assessmentYear');
+    const applyDefaultRateBtn = document.getElementById('applyDefaultRateBtn');
+    const startMonthSelect = document.getElementById('startMonth');
 
     if (calculateBtn) {
         calculateBtn.onclick = calculateMonthlyTax;
@@ -3001,13 +3001,8 @@ function loadTaxCalculator() {
         resetBtn.onclick = resetTaxCalculator;
     }
 
-    // Update bonus LKR display when exchange rate or bonus amount changes
-    if (exchangeRateInput) {
-        exchangeRateInput.addEventListener('input', updateBonusLKRDisplay);
-    }
-
-    if (bonusAmountInput) {
-        bonusAmountInput.addEventListener('input', updateBonusLKRDisplay);
+    if (applyDefaultRateBtn) {
+        applyDefaultRateBtn.onclick = applyDefaultRateToAll;
     }
 
     // Update year/assessment display
@@ -3016,8 +3011,13 @@ function loadTaxCalculator() {
         updateYearDisplay();
     }
 
-    // Initial bonus display update
-    updateBonusLKRDisplay();
+    // Update monthly data table when start month changes
+    if (startMonthSelect) {
+        startMonthSelect.addEventListener('change', populateMonthlyDataTable);
+    }
+
+    // Initial table population
+    populateMonthlyDataTable();
 }
 
 function updateYearDisplay() {
@@ -3028,39 +3028,104 @@ function updateYearDisplay() {
     }
 }
 
-function updateBonusLKRDisplay() {
-    const exchangeRate = parseFloat(document.getElementById('exchangeRate').value) || 0;
-    const bonusUSD = parseFloat(document.getElementById('bonusAmountUSD').value) || 0;
-    const bonusLKR = bonusUSD * exchangeRate;
+function populateMonthlyDataTable() {
+    const tbody = document.getElementById('monthlyDataBody');
+    if (!tbody) return;
 
-    const bonusLKRDisplay = document.getElementById('bonusLKRDisplay');
-    if (bonusLKRDisplay) {
-        bonusLKRDisplay.textContent = formatCurrency(bonusLKR);
+    const startMonthIndex = parseInt(document.getElementById('startMonth').value) || 0;
+    const defaultRate = parseFloat(document.getElementById('defaultExchangeRate').value) || 299;
+
+    let html = '';
+    for (let i = 0; i < 12; i++) {
+        const monthIndex = (startMonthIndex + i) % 12;
+        const monthName = monthNames[monthIndex];
+        const isOctober = monthIndex === 6; // October (0-indexed from April)
+
+        html += `
+            <tr>
+                <td class="align-middle"><strong>${monthName}</strong></td>
+                <td>
+                    <div class="input-group input-group-sm">
+                        <input type="number" class="form-control month-exchange-rate"
+                               data-month="${monthIndex}"
+                               placeholder="299"
+                               value="${defaultRate}"
+                               step="0.01"
+                               min="0">
+                        <span class="input-group-text">LKR</span>
+                    </div>
+                </td>
+                <td>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text">$</span>
+                        <input type="number" class="form-control month-bonus"
+                               data-month="${monthIndex}"
+                               placeholder="0"
+                               value="${isOctober ? '10000' : '0'}"
+                               step="100"
+                               min="0">
+                    </div>
+                </td>
+            </tr>
+        `;
     }
+
+    tbody.innerHTML = html;
+}
+
+function applyDefaultRateToAll() {
+    const defaultRate = parseFloat(document.getElementById('defaultExchangeRate').value) || 299;
+    const exchangeRateInputs = document.querySelectorAll('.month-exchange-rate');
+
+    exchangeRateInputs.forEach(input => {
+        input.value = defaultRate;
+    });
+
+    showToast('Default exchange rate applied to all months', 'success');
 }
 
 function calculateMonthlyTax() {
     // Get form values
     const monthlySalaryUSD = parseFloat(document.getElementById('monthlySalaryUSD').value) || 0;
-    const exchangeRate = parseFloat(document.getElementById('exchangeRate').value) || 0;
     const taxRate = parseFloat(document.getElementById('taxRate').value) || 15;
     const taxFreeThreshold = parseFloat(document.getElementById('taxFreeThreshold').value) || 360000;
     const startMonthIndex = parseInt(document.getElementById('startMonth').value) || 0;
-    const bonusMonthValue = document.getElementById('bonusMonth').value;
-    const bonusAmountUSD = parseFloat(document.getElementById('bonusAmountUSD').value) || 0;
 
     // Validate inputs
-    if (monthlySalaryUSD <= 0 || exchangeRate <= 0) {
-        showToast('Please enter valid monthly salary and exchange rate', 'warning');
+    if (monthlySalaryUSD <= 0) {
+        showToast('Please enter a valid monthly salary', 'warning');
         return;
     }
 
-    // Convert bonus month to index (or null if no bonus)
-    const bonusMonthIndex = bonusMonthValue !== '' ? parseInt(bonusMonthValue) : null;
+    // Read monthly exchange rates and bonuses from table
+    const exchangeRateInputs = document.querySelectorAll('.month-exchange-rate');
+    const bonusInputs = document.querySelectorAll('.month-bonus');
 
-    // Calculate monthly salary in LKR
-    const monthlySalaryLKR = monthlySalaryUSD * exchangeRate;
-    const bonusLKR = bonusAmountUSD * exchangeRate;
+    const monthlyRates = {};
+    const monthlyBonuses = {};
+
+    exchangeRateInputs.forEach(input => {
+        const monthIndex = parseInt(input.getAttribute('data-month'));
+        const rate = parseFloat(input.value) || 0;
+        monthlyRates[monthIndex] = rate;
+    });
+
+    bonusInputs.forEach(input => {
+        const monthIndex = parseInt(input.getAttribute('data-month'));
+        const bonus = parseFloat(input.value) || 0;
+        monthlyBonuses[monthIndex] = bonus;
+    });
+
+    // Validate that all months have exchange rates
+    let hasInvalidRates = false;
+    Object.values(monthlyRates).forEach(rate => {
+        if (rate <= 0) hasInvalidRates = true;
+    });
+
+    if (hasInvalidRates) {
+        showToast('Please enter valid exchange rates for all months', 'warning');
+        return;
+    }
 
     // Calculate for 12 months
     const monthlyData = [];
@@ -3072,16 +3137,12 @@ function calculateMonthlyTax() {
     for (let i = 0; i < 12; i++) {
         const monthIndex = (startMonthIndex + i) % 12;
         const monthName = monthNames[monthIndex];
+        const exchangeRate = monthlyRates[monthIndex];
+        const bonusUSD = monthlyBonuses[monthIndex] || 0;
 
         // Calculate FC receipts for this month
-        let fcReceiptsUSD = monthlySalaryUSD;
-        let fcReceiptsLKR = monthlySalaryLKR;
-
-        // Add bonus if this is the bonus month
-        if (bonusMonthIndex !== null && monthIndex === bonusMonthIndex) {
-            fcReceiptsUSD += bonusAmountUSD;
-            fcReceiptsLKR += bonusLKR;
-        }
+        const fcReceiptsUSD = monthlySalaryUSD + bonusUSD;
+        const fcReceiptsLKR = (monthlySalaryUSD * exchangeRate) + (bonusUSD * exchangeRate);
 
         // Update cumulative income
         cumulativeIncome += fcReceiptsLKR;
@@ -3154,14 +3215,15 @@ function resetTaxCalculator() {
     // Reset form fields
     document.getElementById('assessmentYear').value = '2024/2025';
     document.getElementById('monthlySalaryUSD').value = '6000';
-    document.getElementById('exchangeRate').value = '299';
+    document.getElementById('defaultExchangeRate').value = '299';
     document.getElementById('taxRate').value = '15';
     document.getElementById('taxFreeThreshold').value = '360000';
     document.getElementById('startMonth').value = '0';
-    document.getElementById('bonusMonth').value = '6';
-    document.getElementById('bonusAmountUSD').value = '10000';
 
-    // Reset table
+    // Repopulate monthly data table with default values
+    populateMonthlyDataTable();
+
+    // Reset results table
     const tbody = document.getElementById('taxScheduleBody');
     if (tbody) {
         tbody.innerHTML = `
@@ -3187,7 +3249,6 @@ function resetTaxCalculator() {
 
     // Update displays
     updateYearDisplay();
-    updateBonusLKRDisplay();
 
     showToast('Tax calculator reset', 'info');
 }
