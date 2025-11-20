@@ -2976,130 +2976,12 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ================================
-// TAX CALCULATOR
+// TAX CALCULATOR - Monthly Withholding Tax (Sri Lanka)
 // ================================
 
-// Tax brackets for different countries
-const taxBrackets = {
-    LK: {
-        2024: [
-            { min: 0, max: 500000, rate: 0 },
-            { min: 500000, max: 1000000, rate: 6 },
-            { min: 1000000, max: 1500000, rate: 12 },
-            { min: 1500000, max: 2000000, rate: 18 },
-            { min: 2000000, max: Infinity, rate: 24 }
-        ],
-        2025: [
-            { min: 0, max: 500000, rate: 0 },
-            { min: 500000, max: 1000000, rate: 6 },
-            { min: 1000000, max: 1500000, rate: 12 },
-            { min: 1500000, max: 2000000, rate: 18 },
-            { min: 2000000, max: Infinity, rate: 24 }
-        ],
-        2023: [
-            { min: 0, max: 500000, rate: 0 },
-            { min: 500000, max: 1000000, rate: 6 },
-            { min: 1000000, max: 1500000, rate: 12 },
-            { min: 1500000, max: 2000000, rate: 18 },
-            { min: 2000000, max: Infinity, rate: 24 }
-        ]
-    },
-    US: {
-        2024: [
-            { min: 0, max: 11000, rate: 10 },
-            { min: 11000, max: 44725, rate: 12 },
-            { min: 44725, max: 95375, rate: 22 },
-            { min: 95375, max: 182100, rate: 24 },
-            { min: 182100, max: 231250, rate: 32 },
-            { min: 231250, max: 578125, rate: 35 },
-            { min: 578125, max: Infinity, rate: 37 }
-        ],
-        2025: [
-            { min: 0, max: 11000, rate: 10 },
-            { min: 11000, max: 44725, rate: 12 },
-            { min: 44725, max: 95375, rate: 22 },
-            { min: 95375, max: 182100, rate: 24 },
-            { min: 182100, max: 231250, rate: 32 },
-            { min: 231250, max: 578125, rate: 35 },
-            { min: 578125, max: Infinity, rate: 37 }
-        ],
-        2023: [
-            { min: 0, max: 11000, rate: 10 },
-            { min: 11000, max: 44725, rate: 12 },
-            { min: 44725, max: 95375, rate: 22 },
-            { min: 95375, max: 182100, rate: 24 },
-            { min: 182100, max: 231250, rate: 32 },
-            { min: 231250, max: 578125, rate: 35 },
-            { min: 578125, max: Infinity, rate: 37 }
-        ]
-    },
-    UK: {
-        2024: [
-            { min: 0, max: 12570, rate: 0 },
-            { min: 12570, max: 50270, rate: 20 },
-            { min: 50270, max: 125140, rate: 40 },
-            { min: 125140, max: Infinity, rate: 45 }
-        ],
-        2025: [
-            { min: 0, max: 12570, rate: 0 },
-            { min: 12570, max: 50270, rate: 20 },
-            { min: 50270, max: 125140, rate: 40 },
-            { min: 125140, max: Infinity, rate: 45 }
-        ],
-        2023: [
-            { min: 0, max: 12570, rate: 0 },
-            { min: 12570, max: 50270, rate: 20 },
-            { min: 50270, max: 125140, rate: 40 },
-            { min: 125140, max: Infinity, rate: 45 }
-        ]
-    },
-    CA: {
-        2024: [
-            { min: 0, max: 53359, rate: 15 },
-            { min: 53359, max: 106717, rate: 20.5 },
-            { min: 106717, max: 165430, rate: 26 },
-            { min: 165430, max: 235675, rate: 29 },
-            { min: 235675, max: Infinity, rate: 33 }
-        ],
-        2025: [
-            { min: 0, max: 53359, rate: 15 },
-            { min: 53359, max: 106717, rate: 20.5 },
-            { min: 106717, max: 165430, rate: 26 },
-            { min: 165430, max: 235675, rate: 29 },
-            { min: 235675, max: Infinity, rate: 33 }
-        ],
-        2023: [
-            { min: 0, max: 53359, rate: 15 },
-            { min: 53359, max: 106717, rate: 20.5 },
-            { min: 106717, max: 165430, rate: 26 },
-            { min: 165430, max: 235675, rate: 29 },
-            { min: 235675, max: Infinity, rate: 33 }
-        ]
-    },
-    AU: {
-        2024: [
-            { min: 0, max: 18200, rate: 0 },
-            { min: 18200, max: 45000, rate: 19 },
-            { min: 45000, max: 120000, rate: 32.5 },
-            { min: 120000, max: 180000, rate: 37 },
-            { min: 180000, max: Infinity, rate: 45 }
-        ],
-        2025: [
-            { min: 0, max: 18200, rate: 0 },
-            { min: 18200, max: 45000, rate: 19 },
-            { min: 45000, max: 120000, rate: 32.5 },
-            { min: 120000, max: 180000, rate: 37 },
-            { min: 180000, max: Infinity, rate: 45 }
-        ],
-        2023: [
-            { min: 0, max: 18200, rate: 0 },
-            { min: 18200, max: 45000, rate: 19 },
-            { min: 45000, max: 120000, rate: 32.5 },
-            { min: 120000, max: 180000, rate: 37 },
-            { min: 180000, max: Infinity, rate: 45 }
-        ]
-    }
-};
+// Month names for display
+const monthNames = ['April', 'May', 'June', 'July', 'August', 'September',
+                   'October', 'November', 'December', 'January', 'February', 'March'];
 
 function loadTaxCalculator() {
     console.log('Loading Tax Calculator...');
@@ -3107,175 +2989,205 @@ function loadTaxCalculator() {
     // Setup event listeners
     const calculateBtn = document.getElementById('calculateTaxBtn');
     const resetBtn = document.getElementById('resetTaxBtn');
-    const countrySelect = document.getElementById('taxCountry');
-    const yearSelect = document.getElementById('taxYear');
+    const exchangeRateInput = document.getElementById('exchangeRate');
+    const bonusAmountInput = document.getElementById('bonusAmountUSD');
+    const assessmentYearSelect = document.getElementById('assessmentYear');
 
     if (calculateBtn) {
-        calculateBtn.onclick = calculateTax;
+        calculateBtn.onclick = calculateMonthlyTax;
     }
 
     if (resetBtn) {
         resetBtn.onclick = resetTaxCalculator;
     }
 
-    if (countrySelect) {
-        countrySelect.onchange = updateTaxBracketsDisplay;
+    // Update bonus LKR display when exchange rate or bonus amount changes
+    if (exchangeRateInput) {
+        exchangeRateInput.addEventListener('input', updateBonusLKRDisplay);
     }
 
-    if (yearSelect) {
-        yearSelect.onchange = updateTaxBracketsDisplay;
+    if (bonusAmountInput) {
+        bonusAmountInput.addEventListener('input', updateBonusLKRDisplay);
     }
 
-    // Update initial tax brackets display
-    updateTaxBracketsDisplay();
+    // Update year/assessment display
+    if (assessmentYearSelect) {
+        assessmentYearSelect.addEventListener('change', updateYearDisplay);
+        updateYearDisplay();
+    }
+
+    // Initial bonus display update
+    updateBonusLKRDisplay();
 }
 
-function updateTaxBracketsDisplay() {
-    const country = document.getElementById('taxCountry').value;
-    const year = document.getElementById('taxYear').value;
-    const taxBracketsInfo = document.getElementById('taxBracketsInfo');
-
-    if (!taxBracketsInfo) return;
-
-    const brackets = taxBrackets[country]?.[year] || taxBrackets.LK[2024];
-    const countryNames = {
-        LK: 'Sri Lanka',
-        US: 'United States',
-        UK: 'United Kingdom',
-        CA: 'Canada',
-        AU: 'Australia'
-    };
-
-    let html = `<p class="mb-2"><strong>${countryNames[country]} ${year} Tax Rates:</strong></p>`;
-    html += '<ul class="list-unstyled mb-0">';
-
-    brackets.forEach((bracket, index) => {
-        const minFormatted = formatCurrency(bracket.min);
-        const maxFormatted = bracket.max === Infinity ? 'Above' : formatCurrency(bracket.max);
-
-        if (bracket.max === Infinity) {
-            html += `<li class="mb-1">Above ${minFormatted}: ${bracket.rate}%</li>`;
-        } else {
-            html += `<li class="mb-1">${minFormatted} - ${maxFormatted}: ${bracket.rate}%</li>`;
-        }
-    });
-
-    html += '</ul>';
-    taxBracketsInfo.innerHTML = html;
+function updateYearDisplay() {
+    const assessmentYear = document.getElementById('assessmentYear').value;
+    const yaDisplay = document.getElementById('yaDisplay');
+    if (yaDisplay) {
+        yaDisplay.textContent = assessmentYear;
+    }
 }
 
-function calculateTax() {
+function updateBonusLKRDisplay() {
+    const exchangeRate = parseFloat(document.getElementById('exchangeRate').value) || 0;
+    const bonusUSD = parseFloat(document.getElementById('bonusAmountUSD').value) || 0;
+    const bonusLKR = bonusUSD * exchangeRate;
+
+    const bonusLKRDisplay = document.getElementById('bonusLKRDisplay');
+    if (bonusLKRDisplay) {
+        bonusLKRDisplay.textContent = formatCurrency(bonusLKR);
+    }
+}
+
+function calculateMonthlyTax() {
     // Get form values
-    const foreignIncome = parseFloat(document.getElementById('foreignIncome').value) || 0;
-    const localIncome = parseFloat(document.getElementById('localIncome').value) || 0;
-    const deductions = parseFloat(document.getElementById('deductions').value) || 0;
-    const taxPaid = parseFloat(document.getElementById('taxPaid').value) || 0;
-    const country = document.getElementById('taxCountry').value;
-    const year = document.getElementById('taxYear').value;
+    const monthlySalaryUSD = parseFloat(document.getElementById('monthlySalaryUSD').value) || 0;
+    const exchangeRate = parseFloat(document.getElementById('exchangeRate').value) || 0;
+    const taxRate = parseFloat(document.getElementById('taxRate').value) || 15;
+    const taxFreeThreshold = parseFloat(document.getElementById('taxFreeThreshold').value) || 360000;
+    const startMonthIndex = parseInt(document.getElementById('startMonth').value) || 0;
+    const bonusMonthValue = document.getElementById('bonusMonth').value;
+    const bonusAmountUSD = parseFloat(document.getElementById('bonusAmountUSD').value) || 0;
 
-    // Calculate totals
-    const totalIncome = foreignIncome + localIncome;
-    const taxableIncome = Math.max(0, totalIncome - deductions);
-
-    // Get tax brackets for selected country and year
-    const brackets = taxBrackets[country]?.[year] || taxBrackets.LK[2024];
-
-    // Calculate tax using progressive brackets
-    let taxLiability = 0;
-    const breakdownData = [];
-
-    brackets.forEach((bracket, index) => {
-        if (taxableIncome > bracket.min) {
-            const incomeInBracket = Math.min(
-                taxableIncome - bracket.min,
-                bracket.max === Infinity ? taxableIncome - bracket.min : bracket.max - bracket.min
-            );
-
-            const taxInBracket = incomeInBracket * (bracket.rate / 100);
-            taxLiability += taxInBracket;
-
-            if (incomeInBracket > 0) {
-                breakdownData.push({
-                    bracket: bracket.max === Infinity
-                        ? `Above ${formatCurrency(bracket.min)}`
-                        : `${formatCurrency(bracket.min)} - ${formatCurrency(bracket.max)}`,
-                    incomeInBracket: incomeInBracket,
-                    rate: bracket.rate,
-                    taxAmount: taxInBracket
-                });
-            }
-        }
-    });
-
-    // Calculate tax credits (foreign tax already paid)
-    const taxCredits = taxPaid;
-    const netTaxPayable = Math.max(0, taxLiability - taxCredits);
-
-    // Update summary display
-    document.getElementById('totalIncomeSummary').textContent = formatCurrency(totalIncome);
-    document.getElementById('taxableIncomeSummary').textContent = formatCurrency(taxableIncome);
-    document.getElementById('taxLiabilitySummary').textContent = formatCurrency(taxLiability);
-    document.getElementById('taxCreditsSummary').textContent = formatCurrency(taxCredits);
-    document.getElementById('netTaxPayableSummary').textContent = formatCurrency(netTaxPayable);
-
-    // Update breakdown table
-    const breakdownBody = document.getElementById('taxBreakdownBody');
-    if (breakdownBody) {
-        if (breakdownData.length === 0) {
-            breakdownBody.innerHTML = `
-                <tr>
-                    <td colspan="4" class="text-center text-muted">No tax liability</td>
-                </tr>
-            `;
-        } else {
-            let html = '';
-            breakdownData.forEach(row => {
-                html += `
-                    <tr>
-                        <td>${row.bracket}</td>
-                        <td>${formatCurrency(row.incomeInBracket)}</td>
-                        <td>${row.rate}%</td>
-                        <td class="text-danger fw-bold">${formatCurrency(row.taxAmount)}</td>
-                    </tr>
-                `;
-            });
-            breakdownBody.innerHTML = html;
-        }
+    // Validate inputs
+    if (monthlySalaryUSD <= 0 || exchangeRate <= 0) {
+        showToast('Please enter valid monthly salary and exchange rate', 'warning');
+        return;
     }
 
-    showToast('Tax calculated successfully', 'success');
+    // Convert bonus month to index (or null if no bonus)
+    const bonusMonthIndex = bonusMonthValue !== '' ? parseInt(bonusMonthValue) : null;
+
+    // Calculate monthly salary in LKR
+    const monthlySalaryLKR = monthlySalaryUSD * exchangeRate;
+    const bonusLKR = bonusAmountUSD * exchangeRate;
+
+    // Calculate for 12 months
+    const monthlyData = [];
+    let cumulativeIncome = 0;
+    let previousTaxLiability = 0;
+    let totalUSD = 0;
+    let totalConverted = 0;
+
+    for (let i = 0; i < 12; i++) {
+        const monthIndex = (startMonthIndex + i) % 12;
+        const monthName = monthNames[monthIndex];
+
+        // Calculate FC receipts for this month
+        let fcReceiptsUSD = monthlySalaryUSD;
+        let fcReceiptsLKR = monthlySalaryLKR;
+
+        // Add bonus if this is the bonus month
+        if (bonusMonthIndex !== null && monthIndex === bonusMonthIndex) {
+            fcReceiptsUSD += bonusAmountUSD;
+            fcReceiptsLKR += bonusLKR;
+        }
+
+        // Update cumulative income
+        cumulativeIncome += fcReceiptsLKR;
+
+        // Calculate total tax liability
+        const taxableIncome = Math.max(0, cumulativeIncome - taxFreeThreshold);
+        const totalTaxLiability = taxableIncome * (taxRate / 100);
+
+        // Calculate monthly payment (difference from previous month)
+        const monthlyPayment = Math.max(0, totalTaxLiability - previousTaxLiability);
+
+        // Store data
+        monthlyData.push({
+            month: monthName,
+            fcReceiptsUSD: fcReceiptsUSD,
+            fcReceiptsLKR: fcReceiptsLKR,
+            cumulativeIncome: cumulativeIncome,
+            totalTaxLiability: totalTaxLiability,
+            monthlyPayment: monthlyPayment
+        });
+
+        // Update for next iteration
+        previousTaxLiability = totalTaxLiability;
+        totalUSD += fcReceiptsUSD;
+        totalConverted += fcReceiptsLKR;
+    }
+
+    // Update table
+    updateTaxScheduleTable(monthlyData);
+
+    // Update totals
+    document.getElementById('totalUSD').textContent = `$${totalUSD.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+    document.getElementById('totalConverted').textContent = formatCurrency(totalConverted);
+    document.getElementById('totalTaxLiability').textContent = formatCurrency(previousTaxLiability);
+    document.getElementById('totalMonthlyPayments').textContent = formatCurrency(previousTaxLiability);
+
+    // Update summary cards
+    document.getElementById('annualIncomeSummary').textContent = formatCurrency(cumulativeIncome);
+    document.getElementById('taxFreeAmountSummary').textContent = formatCurrency(taxFreeThreshold);
+    document.getElementById('totalTaxSummary').textContent = formatCurrency(previousTaxLiability);
+
+    const effectiveRate = cumulativeIncome > 0 ? (previousTaxLiability / cumulativeIncome * 100) : 0;
+    document.getElementById('effectiveTaxRateSummary').textContent = `${effectiveRate.toFixed(2)}%`;
+
+    showToast('Tax schedule calculated successfully', 'success');
+}
+
+function updateTaxScheduleTable(monthlyData) {
+    const tbody = document.getElementById('taxScheduleBody');
+    if (!tbody) return;
+
+    let html = '';
+    monthlyData.forEach(row => {
+        html += `
+            <tr>
+                <td>${row.month}</td>
+                <td class="text-end">$${row.fcReceiptsUSD.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</td>
+                <td class="text-end">${formatCurrency(row.fcReceiptsLKR)}</td>
+                <td class="text-end">${formatCurrency(row.cumulativeIncome)}</td>
+                <td class="text-end">${formatCurrency(row.totalTaxLiability)}</td>
+                <td class="text-end fw-bold text-danger">${formatCurrency(row.monthlyPayment)}</td>
+            </tr>
+        `;
+    });
+
+    tbody.innerHTML = html;
 }
 
 function resetTaxCalculator() {
     // Reset form fields
-    document.getElementById('foreignIncome').value = '';
-    document.getElementById('localIncome').value = '';
-    document.getElementById('deductions').value = '';
-    document.getElementById('taxPaid').value = '';
-    document.getElementById('taxYear').value = '2024';
-    document.getElementById('taxCountry').value = 'LK';
+    document.getElementById('assessmentYear').value = '2024/2025';
+    document.getElementById('monthlySalaryUSD').value = '6000';
+    document.getElementById('exchangeRate').value = '299';
+    document.getElementById('taxRate').value = '15';
+    document.getElementById('taxFreeThreshold').value = '360000';
+    document.getElementById('startMonth').value = '0';
+    document.getElementById('bonusMonth').value = '6';
+    document.getElementById('bonusAmountUSD').value = '10000';
 
-    // Reset summary display
-    document.getElementById('totalIncomeSummary').textContent = 'LKR 0.00';
-    document.getElementById('taxableIncomeSummary').textContent = 'LKR 0.00';
-    document.getElementById('taxLiabilitySummary').textContent = 'LKR 0.00';
-    document.getElementById('taxCreditsSummary').textContent = 'LKR 0.00';
-    document.getElementById('netTaxPayableSummary').textContent = 'LKR 0.00';
-
-    // Reset breakdown table
-    const breakdownBody = document.getElementById('taxBreakdownBody');
-    if (breakdownBody) {
-        breakdownBody.innerHTML = `
+    // Reset table
+    const tbody = document.getElementById('taxScheduleBody');
+    if (tbody) {
+        tbody.innerHTML = `
             <tr>
-                <td colspan="4" class="text-center text-muted">
-                    Click "Calculate Tax" to see breakdown
+                <td colspan="6" class="text-center text-muted py-4">
+                    Click "Calculate Monthly Tax Withholding" to see the schedule
                 </td>
             </tr>
         `;
     }
 
-    // Update tax brackets display
-    updateTaxBracketsDisplay();
+    // Reset totals
+    document.getElementById('totalUSD').textContent = '$0';
+    document.getElementById('totalConverted').textContent = 'LKR 0';
+    document.getElementById('totalTaxLiability').textContent = 'LKR 0';
+    document.getElementById('totalMonthlyPayments').textContent = 'LKR 0';
+
+    // Reset summary cards
+    document.getElementById('annualIncomeSummary').textContent = 'LKR 0';
+    document.getElementById('taxFreeAmountSummary').textContent = 'LKR 360,000';
+    document.getElementById('totalTaxSummary').textContent = 'LKR 0';
+    document.getElementById('effectiveTaxRateSummary').textContent = '0%';
+
+    // Update displays
+    updateYearDisplay();
+    updateBonusLKRDisplay();
 
     showToast('Tax calculator reset', 'info');
 }

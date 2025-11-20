@@ -443,73 +443,125 @@
             <div id="taxPage" class="page-content" style="display:none;">
                 <div class="card">
                     <div class="card-header">
-                        <h5 class="card-title mb-0">Tax Calculator</h5>
+                        <h5 class="card-title mb-0"><i class="fas fa-calculator me-2"></i>Foreign Employment Income Tax Calculator (Sri Lanka)</h5>
                     </div>
                     <div class="card-body">
-                        <div class="row">
-                            <div class="col-lg-8">
-                                <div class="card mb-3">
+                        <!-- Input Section -->
+                        <div class="row mb-4">
+                            <div class="col-lg-12">
+                                <div class="card">
                                     <div class="card-header bg-primary text-white">
-                                        <h6 class="mb-0"><i class="fas fa-globe me-2"></i>Foreign Income Tax Calculator</h6>
+                                        <h6 class="mb-0"><i class="fas fa-edit me-2"></i>Income Details</h6>
                                     </div>
                                     <div class="card-body">
                                         <form id="taxCalculatorForm">
-                                            <div class="row mb-3">
-                                                <div class="col-md-6">
-                                                    <label for="taxYear" class="form-label">Tax Year</label>
-                                                    <select id="taxYear" class="form-select">
-                                                        <option value="2025">2025</option>
-                                                        <option value="2024" selected>2024</option>
-                                                        <option value="2023">2023</option>
+                                            <div class="row">
+                                                <div class="col-md-4 mb-3">
+                                                    <label for="assessmentYear" class="form-label">Assessment Year</label>
+                                                    <select id="assessmentYear" class="form-select">
+                                                        <option value="2025/2026">2025/2026 (Apr 2025 - Mar 2026)</option>
+                                                        <option value="2024/2025" selected>2024/2025 (Apr 2024 - Mar 2025)</option>
+                                                        <option value="2023/2024">2023/2024 (Apr 2023 - Mar 2024)</option>
                                                     </select>
                                                 </div>
-                                                <div class="col-md-6">
-                                                    <label for="taxCountry" class="form-label">Country</label>
-                                                    <select id="taxCountry" class="form-select">
-                                                        <option value="LK" selected>Sri Lanka</option>
-                                                        <option value="US">United States</option>
-                                                        <option value="UK">United Kingdom</option>
-                                                        <option value="CA">Canada</option>
-                                                        <option value="AU">Australia</option>
+
+                                                <div class="col-md-4 mb-3">
+                                                    <label for="monthlySalaryUSD" class="form-label">Monthly Salary (USD)</label>
+                                                    <div class="input-group">
+                                                        <span class="input-group-text">$</span>
+                                                        <input type="number" class="form-control" id="monthlySalaryUSD" placeholder="6000" value="6000" step="100" min="0">
+                                                    </div>
+                                                </div>
+
+                                                <div class="col-md-4 mb-3">
+                                                    <label for="exchangeRate" class="form-label">Exchange Rate (USD to LKR)</label>
+                                                    <div class="input-group">
+                                                        <input type="number" class="form-control" id="exchangeRate" placeholder="299" value="299" step="0.01" min="0">
+                                                        <span class="input-group-text">LKR</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="row">
+                                                <div class="col-md-4 mb-3">
+                                                    <label for="taxRate" class="form-label">Tax Rate (%)</label>
+                                                    <div class="input-group">
+                                                        <input type="number" class="form-control" id="taxRate" placeholder="15" value="15" step="0.1" min="0" max="100">
+                                                        <span class="input-group-text">%</span>
+                                                    </div>
+                                                </div>
+
+                                                <div class="col-md-4 mb-3">
+                                                    <label for="taxFreeThreshold" class="form-label">Tax-Free Threshold (Annual)</label>
+                                                    <div class="input-group">
+                                                        <span class="input-group-text">LKR</span>
+                                                        <input type="number" class="form-control" id="taxFreeThreshold" placeholder="360000" value="360000" step="1000" min="0">
+                                                    </div>
+                                                </div>
+
+                                                <div class="col-md-4 mb-3">
+                                                    <label for="startMonth" class="form-label">Start Month</label>
+                                                    <select id="startMonth" class="form-select">
+                                                        <option value="0" selected>April</option>
+                                                        <option value="1">May</option>
+                                                        <option value="2">June</option>
+                                                        <option value="3">July</option>
+                                                        <option value="4">August</option>
+                                                        <option value="5">September</option>
+                                                        <option value="6">October</option>
+                                                        <option value="7">November</option>
+                                                        <option value="8">December</option>
+                                                        <option value="9">January</option>
+                                                        <option value="10">February</option>
+                                                        <option value="11">March</option>
                                                     </select>
                                                 </div>
                                             </div>
 
-                                            <div class="mb-3">
-                                                <label for="foreignIncome" class="form-label">Foreign Income (Annual)</label>
-                                                <div class="input-group">
-                                                    <span class="input-group-text">LKR</span>
-                                                    <input type="number" class="form-control" id="foreignIncome" placeholder="0.00" step="0.01" min="0">
+                                            <div class="row">
+                                                <div class="col-md-12">
+                                                    <div class="card bg-light">
+                                                        <div class="card-body p-3">
+                                                            <h6 class="mb-2"><i class="fas fa-gift me-2"></i>Bonus/Additional Income (Optional)</h6>
+                                                            <div class="row">
+                                                                <div class="col-md-4 mb-2">
+                                                                    <label for="bonusMonth" class="form-label small">Bonus Month</label>
+                                                                    <select id="bonusMonth" class="form-select form-select-sm">
+                                                                        <option value="">No Bonus</option>
+                                                                        <option value="0">April</option>
+                                                                        <option value="1">May</option>
+                                                                        <option value="2">June</option>
+                                                                        <option value="3">July</option>
+                                                                        <option value="4">August</option>
+                                                                        <option value="5">September</option>
+                                                                        <option value="6" selected>October</option>
+                                                                        <option value="7">November</option>
+                                                                        <option value="8">December</option>
+                                                                        <option value="9">January</option>
+                                                                        <option value="10">February</option>
+                                                                        <option value="11">March</option>
+                                                                    </select>
+                                                                </div>
+                                                                <div class="col-md-4 mb-2">
+                                                                    <label for="bonusAmountUSD" class="form-label small">Bonus Amount (USD)</label>
+                                                                    <div class="input-group input-group-sm">
+                                                                        <span class="input-group-text">$</span>
+                                                                        <input type="number" class="form-control" id="bonusAmountUSD" placeholder="10000" value="10000" step="100" min="0">
+                                                                    </div>
+                                                                </div>
+                                                                <div class="col-md-4 mb-2">
+                                                                    <label class="form-label small">Bonus in LKR</label>
+                                                                    <div class="form-control form-control-sm bg-white" id="bonusLKRDisplay">LKR 0</div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
 
-                                            <div class="mb-3">
-                                                <label for="localIncome" class="form-label">Local Income (Annual)</label>
-                                                <div class="input-group">
-                                                    <span class="input-group-text">LKR</span>
-                                                    <input type="number" class="form-control" id="localIncome" placeholder="0.00" step="0.01" min="0">
-                                                </div>
-                                            </div>
-
-                                            <div class="mb-3">
-                                                <label for="deductions" class="form-label">Deductions & Allowances</label>
-                                                <div class="input-group">
-                                                    <span class="input-group-text">LKR</span>
-                                                    <input type="number" class="form-control" id="deductions" placeholder="0.00" step="0.01" min="0">
-                                                </div>
-                                            </div>
-
-                                            <div class="mb-3">
-                                                <label for="taxPaid" class="form-label">Tax Already Paid (Foreign)</label>
-                                                <div class="input-group">
-                                                    <span class="input-group-text">LKR</span>
-                                                    <input type="number" class="form-control" id="taxPaid" placeholder="0.00" step="0.01" min="0">
-                                                </div>
-                                            </div>
-
-                                            <div class="d-grid gap-2">
+                                            <div class="d-grid gap-2 mt-3">
                                                 <button type="button" class="btn btn-primary" id="calculateTaxBtn">
-                                                    <i class="fas fa-calculator me-2"></i>Calculate Tax
+                                                    <i class="fas fa-calculator me-2"></i>Calculate Monthly Tax Withholding
                                                 </button>
                                                 <button type="button" class="btn btn-outline-secondary" id="resetTaxBtn">
                                                     <i class="fas fa-redo me-2"></i>Reset
@@ -519,84 +571,87 @@
                                     </div>
                                 </div>
                             </div>
+                        </div>
 
-                            <div class="col-lg-4">
-                                <div class="card mb-3">
-                                    <div class="card-header bg-success text-white">
-                                        <h6 class="mb-0"><i class="fas fa-chart-line me-2"></i>Tax Summary</h6>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="mb-3">
-                                            <label class="text-muted small">Total Income</label>
-                                            <h4 id="totalIncomeSummary" class="mb-0">LKR 0.00</h4>
-                                        </div>
-                                        <div class="mb-3">
-                                            <label class="text-muted small">Taxable Income</label>
-                                            <h4 id="taxableIncomeSummary" class="mb-0">LKR 0.00</h4>
-                                        </div>
-                                        <div class="mb-3">
-                                            <label class="text-muted small">Tax Liability</label>
-                                            <h4 id="taxLiabilitySummary" class="text-danger mb-0">LKR 0.00</h4>
-                                        </div>
-                                        <div class="mb-3">
-                                            <label class="text-muted small">Tax Credits</label>
-                                            <h5 id="taxCreditsSummary" class="text-success mb-0">LKR 0.00</h5>
-                                        </div>
-                                        <hr>
-                                        <div class="mb-0">
-                                            <label class="text-muted small">Net Tax Payable</label>
-                                            <h3 id="netTaxPayableSummary" class="text-primary mb-0">LKR 0.00</h3>
-                                        </div>
-                                    </div>
-                                </div>
-
+                        <!-- Results Section -->
+                        <div class="row">
+                            <div class="col-lg-12">
                                 <div class="card">
-                                    <div class="card-header bg-info text-white">
-                                        <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>Tax Brackets</h6>
+                                    <div class="card-header bg-success text-white">
+                                        <h6 class="mb-0"><i class="fas fa-table me-2"></i>Monthly Tax Withholding Schedule</h6>
                                     </div>
                                     <div class="card-body">
-                                        <div id="taxBracketsInfo" class="small">
-                                            <p class="mb-2"><strong>Sri Lanka 2024 Tax Rates:</strong></p>
-                                            <ul class="list-unstyled mb-0">
-                                                <li class="mb-1">Up to 500,000: 0%</li>
-                                                <li class="mb-1">500,001 - 1,000,000: 6%</li>
-                                                <li class="mb-1">1,000,001 - 1,500,000: 12%</li>
-                                                <li class="mb-1">1,500,001 - 2,000,000: 18%</li>
-                                                <li class="mb-1">Above 2,000,000: 24%</li>
-                                            </ul>
+                                        <div class="alert alert-info mb-3">
+                                            <i class="fas fa-info-circle me-2"></i>
+                                            <strong>Note:</strong> Tax payment is due on or before the 15th day of the following month.
+                                        </div>
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-hover" id="taxScheduleTable">
+                                                <thead class="table-dark">
+                                                    <tr>
+                                                        <th style="width: 12%;">Month (Y/A <span id="yaDisplay">2024/2025</span>)</th>
+                                                        <th style="width: 15%;" class="text-end">FC Receipts (USD)</th>
+                                                        <th style="width: 18%;" class="text-end">FC Converted (LKR)</th>
+                                                        <th style="width: 18%;" class="text-end">Cumulative Income (LKR)</th>
+                                                        <th style="width: 18%;" class="text-end">Total Tax Liability (LKR)</th>
+                                                        <th style="width: 19%;" class="text-end">Monthly Payment (LKR)</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="taxScheduleBody">
+                                                    <tr>
+                                                        <td colspan="6" class="text-center text-muted py-4">
+                                                            Click "Calculate Monthly Tax Withholding" to see the schedule
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                                <tfoot class="table-secondary fw-bold">
+                                                    <tr>
+                                                        <td>Total</td>
+                                                        <td class="text-end" id="totalUSD">$0</td>
+                                                        <td class="text-end" id="totalConverted">LKR 0</td>
+                                                        <td class="text-end">-</td>
+                                                        <td class="text-end" id="totalTaxLiability">LKR 0</td>
+                                                        <td class="text-end" id="totalMonthlyPayments">LKR 0</td>
+                                                    </tr>
+                                                </tfoot>
+                                            </table>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Detailed Breakdown -->
+                        <!-- Summary Cards -->
                         <div class="row mt-3">
-                            <div class="col-12">
-                                <div class="card">
-                                    <div class="card-header">
-                                        <h6 class="mb-0"><i class="fas fa-list me-2"></i>Detailed Tax Breakdown</h6>
-                                    </div>
+                            <div class="col-md-3">
+                                <div class="card text-white bg-primary">
                                     <div class="card-body">
-                                        <div class="table-responsive">
-                                            <table class="table table-sm table-striped" id="taxBreakdownTable">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Tax Bracket</th>
-                                                        <th>Income in Bracket</th>
-                                                        <th>Tax Rate</th>
-                                                        <th>Tax Amount</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody id="taxBreakdownBody">
-                                                    <tr>
-                                                        <td colspan="4" class="text-center text-muted">
-                                                            Click "Calculate Tax" to see breakdown
-                                                        </td>
-                                                    </tr>
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                        <h6 class="card-title">Annual Income</h6>
+                                        <h4 id="annualIncomeSummary">LKR 0</h4>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card text-white bg-warning">
+                                    <div class="card-body">
+                                        <h6 class="card-title">Tax-Free Amount</h6>
+                                        <h4 id="taxFreeAmountSummary">LKR 360,000</h4>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card text-white bg-danger">
+                                    <div class="card-body">
+                                        <h6 class="card-title">Total Tax Liability</h6>
+                                        <h4 id="totalTaxSummary">LKR 0</h4>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card text-white bg-info">
+                                    <div class="card-body">
+                                        <h6 class="card-title">Effective Tax Rate</h6>
+                                        <h4 id="effectiveTaxRateSummary">0%</h4>
                                     </div>
                                 </div>
                             </div>
