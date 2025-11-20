@@ -3630,21 +3630,17 @@ function displaySavedCalculations(calculations, filterYear = null) {
                             <span class="text-muted">Saved: ${createdDate}</span>
                         </p>
                         <div class="row mt-2">
-                            <div class="col-md-3">
+                            <div class="col-md-4">
                                 <small class="text-muted">Annual Income:</small><br>
                                 <strong>${formatCurrency(calc.total_annual_income)}</strong>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-4">
                                 <small class="text-muted">Tax Liability:</small><br>
                                 <strong class="text-danger">${formatCurrency(calc.total_tax_liability)}</strong>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-4">
                                 <small class="text-muted">Effective Rate:</small><br>
                                 <strong class="text-info">${effectiveRate}%</strong>
-                            </div>
-                            <div class="col-md-3">
-                                <small class="text-muted">Monthly Salary:</small><br>
-                                <strong>$${parseFloat(calc.monthly_salary_usd || 0).toLocaleString()}</strong>
                             </div>
                         </div>
                     </div>
@@ -3740,9 +3736,9 @@ function loadCalculation(calculationId) {
         // Update year display
         updateYearDisplay();
 
-        // Parse monthly data from JSON
-        const monthlyData = JSON.parse(calc.monthly_data || '[]');
-        console.log('Parsed monthly data:', monthlyData);
+        // Get monthly data (already parsed by backend)
+        const monthlyData = calc.monthly_data || [];
+        console.log('Monthly data:', monthlyData);
 
         // Repopulate monthly table with current start month
         populateMonthlyDataTable();
