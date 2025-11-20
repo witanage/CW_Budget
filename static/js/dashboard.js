@@ -3081,12 +3081,12 @@ function populateMonthlyDataTable() {
 
     const startMonthIndex = parseInt(document.getElementById('startMonth').value) || 0;
     const defaultRate = 299;
+    const monthlySalary = parseFloat(document.getElementById('monthlySalaryUSD').value) || 6000;
 
     let html = '';
     for (let i = 0; i < 12; i++) {
         const monthIndex = (startMonthIndex + i) % 12;
         const monthName = monthNames[monthIndex];
-        const isOctober = monthIndex === 6; // October (0-indexed from April)
 
         html += `
             <tr>
@@ -3105,10 +3105,10 @@ function populateMonthlyDataTable() {
                 <td>
                     <div class="input-group input-group-sm">
                         <span class="input-group-text">$</span>
-                        <input type="number" class="form-control month-bonus"
+                        <input type="number" class="form-control month-total-income"
                                data-month="${monthIndex}"
-                               placeholder="0"
-                               value="${isOctober ? '10000' : '0'}"
+                               placeholder="${monthlySalary}"
+                               value="${monthlySalary}"
                                step="100"
                                min="0">
                     </div>
@@ -3133,12 +3133,12 @@ function calculateMonthlyTax() {
         return;
     }
 
-    // Read monthly exchange rates and bonuses from table
+    // Read monthly exchange rates and total income from table
     const exchangeRateInputs = document.querySelectorAll('.month-exchange-rate');
-    const bonusInputs = document.querySelectorAll('.month-bonus');
+    const totalIncomeInputs = document.querySelectorAll('.month-total-income');
 
     const monthlyRates = {};
-    const monthlyBonuses = {};
+    const monthlyIncomes = {};
 
     exchangeRateInputs.forEach(input => {
         const monthIndex = parseInt(input.getAttribute('data-month'));
@@ -3146,10 +3146,10 @@ function calculateMonthlyTax() {
         monthlyRates[monthIndex] = rate;
     });
 
-    bonusInputs.forEach(input => {
+    totalIncomeInputs.forEach(input => {
         const monthIndex = parseInt(input.getAttribute('data-month'));
-        const bonus = parseFloat(input.value) || 0;
-        monthlyBonuses[monthIndex] = bonus;
+        const income = parseFloat(input.value) || 0;
+        monthlyIncomes[monthIndex] = income;
     });
 
     // Validate that all months have exchange rates
@@ -3174,11 +3174,11 @@ function calculateMonthlyTax() {
         const monthIndex = (startMonthIndex + i) % 12;
         const monthName = monthNames[monthIndex];
         const exchangeRate = monthlyRates[monthIndex];
-        const bonusUSD = monthlyBonuses[monthIndex] || 0;
+        const totalIncomeUSD = monthlyIncomes[monthIndex] || 0;
 
         // Calculate FC receipts for this month
-        const fcReceiptsUSD = monthlySalaryUSD + bonusUSD;
-        const fcReceiptsLKR = (monthlySalaryUSD * exchangeRate) + (bonusUSD * exchangeRate);
+        const fcReceiptsUSD = totalIncomeUSD;
+        const fcReceiptsLKR = totalIncomeUSD * exchangeRate;
 
         // Update cumulative income
         cumulativeIncome += fcReceiptsLKR;
@@ -3237,7 +3237,8 @@ function calculateMonthlyTax() {
             month_index: index,
             month: row.month,
             exchange_rate: monthlyRates[(startMonthIndex + index) % 12],
-            bonus_usd: monthlyBonuses[(startMonthIndex + index) % 12] || 0,
+            total_income_usd: monthlyIncomes[(startMonthIndex + index) % 12] || 0,
+            bonus_usd: 0, // Kept for backwards compatibility
             fcReceiptsUSD: row.fcReceiptsUSD,
             fcReceiptsLKR: row.fcReceiptsLKR,
             cumulativeIncome: row.cumulativeIncome,
@@ -3566,22 +3567,22 @@ function loadCalculation(calculationId) {
         // Repopulate monthly table with current start month
         populateMonthlyDataTable();
 
-        // Create a map of actual month index to exchange rate and bonus
+        // Create a map of actual month index to exchange rate and total income
         const monthDataMap = {};
         monthlyData.forEach((month) => {
             // Calculate the actual month index from start_month + month_index
             const actualMonthIndex = (calc.start_month + month.month_index) % 12;
             monthDataMap[actualMonthIndex] = {
                 exchange_rate: month.exchange_rate,
-                bonus_usd: month.bonus_usd || 0
+                total_income_usd: month.total_income_usd || month.bonus_usd + calc.monthly_salary_usd || calc.monthly_salary_usd
             };
         });
 
         console.log('Month data map:', monthDataMap);
 
-        // Load exchange rates and bonuses by matching data-month attribute
+        // Load exchange rates and total income by matching data-month attribute
         const exchangeRateInputs = document.querySelectorAll('.month-exchange-rate');
-        const bonusInputs = document.querySelectorAll('.month-bonus');
+        const totalIncomeInputs = document.querySelectorAll('.month-total-income');
 
         exchangeRateInputs.forEach(input => {
             const monthIndex = parseInt(input.getAttribute('data-month'));
@@ -3591,11 +3592,11 @@ function loadCalculation(calculationId) {
             }
         });
 
-        bonusInputs.forEach(input => {
+        totalIncomeInputs.forEach(input => {
             const monthIndex = parseInt(input.getAttribute('data-month'));
             if (monthDataMap[monthIndex]) {
-                input.value = monthDataMap[monthIndex].bonus_usd;
-                console.log(`Set month ${monthIndex} bonus to ${monthDataMap[monthIndex].bonus_usd}`);
+                input.value = monthDataMap[monthIndex].total_income_usd;
+                console.log(`Set month ${monthIndex} total income to ${monthDataMap[monthIndex].total_income_usd}`);
             }
         });
 
