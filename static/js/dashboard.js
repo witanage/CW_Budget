@@ -3564,6 +3564,8 @@ function loadCalculation(calculationId) {
             return;
         }
 
+        console.log('Loading calculation:', calc);
+
         // Load values into form
         document.getElementById('assessmentYear').value = calc.assessment_year;
         document.getElementById('monthlySalaryUSD').value = calc.monthly_salary_usd;
@@ -3571,29 +3573,53 @@ function loadCalculation(calculationId) {
         document.getElementById('taxFreeThreshold').value = calc.tax_free_threshold;
         document.getElementById('startMonth').value = calc.start_month;
 
+        // Update year display
+        updateYearDisplay();
+
         // Parse monthly data from JSON
         const monthlyData = JSON.parse(calc.monthly_data || '[]');
+        console.log('Parsed monthly data:', monthlyData);
 
-        // Repopulate monthly table
+        // Repopulate monthly table with current start month
         populateMonthlyDataTable();
 
-        // Load exchange rates and bonuses
+        // Create a map of actual month index to exchange rate and bonus
+        const monthDataMap = {};
+        monthlyData.forEach((month) => {
+            // Calculate the actual month index from start_month + month_index
+            const actualMonthIndex = (calc.start_month + month.month_index) % 12;
+            monthDataMap[actualMonthIndex] = {
+                exchange_rate: month.exchange_rate,
+                bonus_usd: month.bonus_usd || 0
+            };
+        });
+
+        console.log('Month data map:', monthDataMap);
+
+        // Load exchange rates and bonuses by matching data-month attribute
         const exchangeRateInputs = document.querySelectorAll('.month-exchange-rate');
         const bonusInputs = document.querySelectorAll('.month-bonus');
 
-        monthlyData.forEach((month, index) => {
-            if (exchangeRateInputs[index]) {
-                exchangeRateInputs[index].value = month.exchange_rate;
+        exchangeRateInputs.forEach(input => {
+            const monthIndex = parseInt(input.getAttribute('data-month'));
+            if (monthDataMap[monthIndex]) {
+                input.value = monthDataMap[monthIndex].exchange_rate;
+                console.log(`Set month ${monthIndex} exchange rate to ${monthDataMap[monthIndex].exchange_rate}`);
             }
-            if (bonusInputs[index]) {
-                bonusInputs[index].value = month.bonus_usd || 0;
+        });
+
+        bonusInputs.forEach(input => {
+            const monthIndex = parseInt(input.getAttribute('data-month'));
+            if (monthDataMap[monthIndex]) {
+                input.value = monthDataMap[monthIndex].bonus_usd;
+                console.log(`Set month ${monthIndex} bonus to ${monthDataMap[monthIndex].bonus_usd}`);
             }
         });
 
         // Recalculate
         calculateMonthlyTax();
 
-        showToast(`Loaded calculation: ${calc.calculation_name}`, 'success');
+        showToast(`Loaded: ${calc.calculation_name}`, 'success');
 
         // Scroll to top
         window.scrollTo({ top: 0, behavior: 'smooth' });
