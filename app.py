@@ -2147,6 +2147,23 @@ def clone_month_transactions():
 # TAX CALCULATOR API ENDPOINTS
 # ==================================================
 
+def check_column_exists(connection, table_name, column_name):
+    """Check if a column exists in a table."""
+    try:
+        cursor = connection.cursor()
+        cursor.execute("""
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+            AND TABLE_NAME = %s
+            AND COLUMN_NAME = %s
+        """, (table_name, column_name))
+        result = cursor.fetchone()
+        cursor.close()
+        return result[0] > 0
+    except:
+        return False
+
 @app.route('/api/tax-calculations', methods=['POST'])
 @login_required
 def save_tax_calculation():
@@ -2175,8 +2192,11 @@ def save_tax_calculation():
         connection = get_db_connection()
         cursor = connection.cursor(dictionary=True)
 
-        # If marking as active, deactivate other calculations for this year
-        if is_active:
+        # Check if is_active column exists (backward compatibility)
+        has_is_active = check_column_exists(connection, 'tax_calculations', 'is_active')
+
+        # If marking as active and column exists, deactivate other calculations for this year
+        if is_active and has_is_active:
             cursor.execute("""
                 UPDATE tax_calculations
                 SET is_active = FALSE
@@ -2184,17 +2204,31 @@ def save_tax_calculation():
             """, (user_id, assessment_year))
 
         # Insert main tax calculation
-        cursor.execute("""
-            INSERT INTO tax_calculations
-            (user_id, calculation_name, assessment_year, monthly_salary_usd,
-             tax_rate, tax_free_threshold, start_month, monthly_data,
-             total_annual_income, total_tax_liability, effective_tax_rate, is_active)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (
-            user_id, calculation_name, assessment_year, monthly_salary_usd,
-            tax_rate, tax_free_threshold, start_month, json.dumps(monthly_data),
-            total_annual_income, total_tax_liability, effective_tax_rate, is_active
-        ))
+        if has_is_active:
+            cursor.execute("""
+                INSERT INTO tax_calculations
+                (user_id, calculation_name, assessment_year, monthly_salary_usd,
+                 tax_rate, tax_free_threshold, start_month, monthly_data,
+                 total_annual_income, total_tax_liability, effective_tax_rate, is_active)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                user_id, calculation_name, assessment_year, monthly_salary_usd,
+                tax_rate, tax_free_threshold, start_month, json.dumps(monthly_data),
+                total_annual_income, total_tax_liability, effective_tax_rate, is_active
+            ))
+        else:
+            # Fallback for databases without is_active column
+            cursor.execute("""
+                INSERT INTO tax_calculations
+                (user_id, calculation_name, assessment_year, monthly_salary_usd,
+                 tax_rate, tax_free_threshold, start_month, monthly_data,
+                 total_annual_income, total_tax_liability, effective_tax_rate)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                user_id, calculation_name, assessment_year, monthly_salary_usd,
+                tax_rate, tax_free_threshold, start_month, json.dumps(monthly_data),
+                total_annual_income, total_tax_liability, effective_tax_rate
+            ))
 
         tax_calculation_id = cursor.lastrowid
 
@@ -2251,29 +2285,60 @@ def get_tax_calculations():
         connection = get_db_connection()
         cursor = connection.cursor(dictionary=True)
 
-        # Build query based on whether year filter is provided
-        if year:
-            cursor.execute("""
-                SELECT id, calculation_name, assessment_year,
-                       monthly_salary_usd, tax_rate, tax_free_threshold,
-                       total_annual_income, total_tax_liability, effective_tax_rate,
-                       is_active, created_at, updated_at
-                FROM tax_calculations
-                WHERE user_id = %s AND assessment_year = %s
-                ORDER BY is_active DESC, created_at DESC
-            """, (user_id, year))
+        # Check if is_active column exists (backward compatibility)
+        has_is_active = check_column_exists(connection, 'tax_calculations', 'is_active')
+
+        # Build query based on whether year filter is provided and column existence
+        if has_is_active:
+            if year:
+                cursor.execute("""
+                    SELECT id, calculation_name, assessment_year,
+                           monthly_salary_usd, tax_rate, tax_free_threshold,
+                           total_annual_income, total_tax_liability, effective_tax_rate,
+                           is_active, created_at, updated_at
+                    FROM tax_calculations
+                    WHERE user_id = %s AND assessment_year = %s
+                    ORDER BY is_active DESC, created_at DESC
+                """, (user_id, year))
+            else:
+                cursor.execute("""
+                    SELECT id, calculation_name, assessment_year,
+                           monthly_salary_usd, tax_rate, tax_free_threshold,
+                           total_annual_income, total_tax_liability, effective_tax_rate,
+                           is_active, created_at, updated_at
+                    FROM tax_calculations
+                    WHERE user_id = %s
+                    ORDER BY assessment_year DESC, is_active DESC, created_at DESC
+                """, (user_id,))
         else:
-            cursor.execute("""
-                SELECT id, calculation_name, assessment_year,
-                       monthly_salary_usd, tax_rate, tax_free_threshold,
-                       total_annual_income, total_tax_liability, effective_tax_rate,
-                       is_active, created_at, updated_at
-                FROM tax_calculations
-                WHERE user_id = %s
-                ORDER BY assessment_year DESC, is_active DESC, created_at DESC
-            """, (user_id,))
+            # Fallback without is_active column
+            if year:
+                cursor.execute("""
+                    SELECT id, calculation_name, assessment_year,
+                           monthly_salary_usd, tax_rate, tax_free_threshold,
+                           total_annual_income, total_tax_liability, effective_tax_rate,
+                           created_at, updated_at
+                    FROM tax_calculations
+                    WHERE user_id = %s AND assessment_year = %s
+                    ORDER BY created_at DESC
+                """, (user_id, year))
+            else:
+                cursor.execute("""
+                    SELECT id, calculation_name, assessment_year,
+                           monthly_salary_usd, tax_rate, tax_free_threshold,
+                           total_annual_income, total_tax_liability, effective_tax_rate,
+                           created_at, updated_at
+                    FROM tax_calculations
+                    WHERE user_id = %s
+                    ORDER BY assessment_year DESC, created_at DESC
+                """, (user_id,))
 
         calculations = cursor.fetchall()
+
+        # Add is_active=False for calculations if column doesn't exist
+        if not has_is_active:
+            for calc in calculations:
+                calc['is_active'] = False
 
         return jsonify(calculations), 200
 
@@ -2382,17 +2447,33 @@ def get_tax_calculation_years():
         connection = get_db_connection()
         cursor = connection.cursor(dictionary=True)
 
-        cursor.execute("""
-            SELECT
-                assessment_year,
-                COUNT(*) as calculation_count,
-                SUM(CASE WHEN is_active = TRUE THEN 1 ELSE 0 END) as has_active,
-                MAX(created_at) as last_updated
-            FROM tax_calculations
-            WHERE user_id = %s
-            GROUP BY assessment_year
-            ORDER BY assessment_year DESC
-        """, (user_id,))
+        # Check if is_active column exists (backward compatibility)
+        has_is_active = check_column_exists(connection, 'tax_calculations', 'is_active')
+
+        if has_is_active:
+            cursor.execute("""
+                SELECT
+                    assessment_year,
+                    COUNT(*) as calculation_count,
+                    SUM(CASE WHEN is_active = TRUE THEN 1 ELSE 0 END) as has_active,
+                    MAX(created_at) as last_updated
+                FROM tax_calculations
+                WHERE user_id = %s
+                GROUP BY assessment_year
+                ORDER BY assessment_year DESC
+            """, (user_id,))
+        else:
+            cursor.execute("""
+                SELECT
+                    assessment_year,
+                    COUNT(*) as calculation_count,
+                    0 as has_active,
+                    MAX(created_at) as last_updated
+                FROM tax_calculations
+                WHERE user_id = %s
+                GROUP BY assessment_year
+                ORDER BY assessment_year DESC
+            """, (user_id,))
 
         years = cursor.fetchall()
 
@@ -2416,17 +2497,36 @@ def get_tax_calculations_by_year(year):
         connection = get_db_connection()
         cursor = connection.cursor(dictionary=True)
 
-        cursor.execute("""
-            SELECT id, calculation_name, assessment_year,
-                   monthly_salary_usd, tax_rate, tax_free_threshold,
-                   total_annual_income, total_tax_liability, effective_tax_rate,
-                   is_active, created_at, updated_at
-            FROM tax_calculations
-            WHERE user_id = %s AND assessment_year = %s
-            ORDER BY is_active DESC, created_at DESC
-        """, (user_id, year))
+        # Check if is_active column exists (backward compatibility)
+        has_is_active = check_column_exists(connection, 'tax_calculations', 'is_active')
+
+        if has_is_active:
+            cursor.execute("""
+                SELECT id, calculation_name, assessment_year,
+                       monthly_salary_usd, tax_rate, tax_free_threshold,
+                       total_annual_income, total_tax_liability, effective_tax_rate,
+                       is_active, created_at, updated_at
+                FROM tax_calculations
+                WHERE user_id = %s AND assessment_year = %s
+                ORDER BY is_active DESC, created_at DESC
+            """, (user_id, year))
+        else:
+            cursor.execute("""
+                SELECT id, calculation_name, assessment_year,
+                       monthly_salary_usd, tax_rate, tax_free_threshold,
+                       total_annual_income, total_tax_liability, effective_tax_rate,
+                       created_at, updated_at
+                FROM tax_calculations
+                WHERE user_id = %s AND assessment_year = %s
+                ORDER BY created_at DESC
+            """, (user_id, year))
 
         calculations = cursor.fetchall()
+
+        # Add is_active=False if column doesn't exist
+        if not has_is_active:
+            for calc in calculations:
+                calc['is_active'] = False
 
         return jsonify(calculations), 200
 
@@ -2447,6 +2547,14 @@ def get_active_tax_calculation_by_year(year):
 
         connection = get_db_connection()
         cursor = connection.cursor(dictionary=True)
+
+        # Check if is_active column exists (backward compatibility)
+        has_is_active = check_column_exists(connection, 'tax_calculations', 'is_active')
+
+        if not has_is_active:
+            return jsonify({
+                'error': 'Active calculation feature requires database migration. Please run the migration script.'
+            }), 501  # Not Implemented
 
         # Get main calculation
         cursor.execute("""
@@ -2494,6 +2602,14 @@ def set_active_tax_calculation(calculation_id):
 
         connection = get_db_connection()
         cursor = connection.cursor(dictionary=True)
+
+        # Check if is_active column exists (backward compatibility)
+        has_is_active = check_column_exists(connection, 'tax_calculations', 'is_active')
+
+        if not has_is_active:
+            return jsonify({
+                'error': 'Active calculation feature requires database migration. Please run the migration script.'
+            }), 501  # Not Implemented
 
         # Verify ownership and get assessment year
         cursor.execute("""

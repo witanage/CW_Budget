@@ -3703,8 +3703,20 @@ function setActiveCalculation(calculationId) {
             'Content-Type': 'application/json'
         }
     })
-    .then(response => response.json())
+    .then(response => {
+        // Check if feature is not implemented (501)
+        if (response.status === 501) {
+            return response.json().then(data => {
+                hideLoading();
+                showToast(data.error || 'This feature requires a database migration.', 'warning');
+                return null;
+            });
+        }
+        return response.json();
+    })
     .then(data => {
+        if (!data) return; // Already handled 501 case
+
         hideLoading();
         if (data.error) {
             showToast(data.error, 'danger');
