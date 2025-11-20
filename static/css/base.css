@@ -1433,3 +1433,69 @@ background-color: rgba(0, 0, 0, 0.1);
 [data-theme="light"] .user-name-display {
 color: #ffffff;
 }
+
+/* ============================================================
+   Tax Calculator - Saved Calculations Dark Mode Fix
+   ============================================================ */
+
+/* Field labels in saved calculations - ensure visibility in dark mode */
+[data-theme="dark"] .calculation-item small.text-muted {
+    color: var(--text-secondary) !important;
+    opacity: 0.9;
+}
+
+/* Date text in saved calculations */
+[data-theme="dark"] .calculation-item .text-muted {
+    color: var(--text-secondary) !important;
+    opacity: 0.8;
+}
+
+/* Strong values should be clearly visible */
+[data-theme="dark"] .calculation-item strong {
+    color: var(--text-primary);
+}
+
+/* List group items in dark mode */
+[data-theme="dark"] .calculation-item {
+    background-color: var(--bg-secondary);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .calculation-item:hover {
+    background-color: var(--bg-tertiary);
+}
+
+/* Active calculation border in dark mode */
+[data-theme="dark"] .calculation-item.border-success {
+    border-color: var(--success-color) !important;
+    border-width: 2px;
+}
+
+/* Light theme - keep default Bootstrap styling */
+[data-theme="light"] .calculation-item {
+    background-color: #ffffff;
+}
+
+[data-theme="light"] .calculation-item small.text-muted {
+    color: #6c757d;
+}
+
+/* Tax Calculator - Load button height fix */
+#loadSavedByYearBtn {
+    height: 38px;
+    padding: 0.375rem 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Ensure proper alignment in input group */
+.input-group > #assessmentYear {
+    height: 38px;
+}
+
+.input-group > #assessmentYear + #loadSavedByYearBtn {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+}

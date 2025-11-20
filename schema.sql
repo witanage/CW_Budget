@@ -13,8 +13,9 @@
 -- - Audit logging for admin actions
 -- - Performance views for reporting
 -- - Category spending analysis (weekly, monthly, yearly)
+-- - Tax calculator with assessment year-wise tracking
 --
--- Date: 2025-11-14
+-- Date: 2025-11-20
 -- ============================================================
 
 -- ============================================================
@@ -267,54 +268,71 @@ INSERT IGNORE INTO categories (name, type) VALUES
 -- ============================================================
 -- Tax Calculations Table
 -- ============================================================
--- Stores foreign employment income tax calculations for trend analysis
--- Enables tracking tax liability across multiple assessment years
+-- Stores income input data for foreign employment tax calculations
+--
+-- Design Philosophy:
+-- - Store ONLY income input data (salaries, exchange rates, bonuses)
+-- - Tax calculations (totals, liabilities) computed on-the-fly when loading
+-- - Enables tracking across multiple assessment years
+-- - One active calculation per user per assessment year
+--
+-- Monthly Data JSON Structure:
+-- [
+--   {
+--     "month_index": 0-11,
+--     "month": "April",
+--     "salary_usd": 6000,
+--     "salary_rate": 299.50,
+--     "bonuses": [{"amount": 5000, "rate": 300}]
+--   },
+--   ...
+-- ]
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS tax_calculations (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
     calculation_name VARCHAR(255) NOT NULL,
-    assessment_year VARCHAR(20) NOT NULL,
-    monthly_salary_usd DECIMAL(15, 2) NOT NULL,
-    tax_rate DECIMAL(5, 2) NOT NULL,
-    tax_free_threshold DECIMAL(15, 2) NOT NULL,
-    start_month INT NOT NULL COMMENT '0=April, 11=March',
-    monthly_data JSON NOT NULL COMMENT 'Array of 12 months with exchange rates and bonuses',
-    total_annual_income DECIMAL(15, 2) NOT NULL,
-    total_tax_liability DECIMAL(15, 2) NOT NULL,
-    effective_tax_rate DECIMAL(5, 2) NOT NULL,
+    assessment_year VARCHAR(20) NOT NULL COMMENT 'Format: YYYY/YYYY (e.g., 2024/2025)',
+    tax_rate DECIMAL(5, 2) NOT NULL COMMENT 'Tax rate percentage (e.g., 15.00 for 15%)',
+    tax_free_threshold DECIMAL(15, 2) NOT NULL COMMENT 'Annual tax-free threshold in LKR',
+    start_month INT NOT NULL COMMENT 'Starting month index: 0=April, 1=May, ..., 11=March',
+    monthly_data JSON NOT NULL COMMENT 'Array of 12 months with salaries, exchange rates, and bonuses',
+    is_active BOOLEAN DEFAULT FALSE COMMENT 'TRUE if this is the active calculation for the assessment year',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     INDEX idx_user_id (user_id),
     INDEX idx_assessment_year (assessment_year),
-    INDEX idx_created_at (created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    INDEX idx_created_at (created_at),
+    INDEX idx_user_assessment_active (user_id, assessment_year, is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+COMMENT='Stores income input data only - tax calculations computed on-the-fly when loading';
 
 -- ============================================================
--- Tax Calculation Monthly Details Table
+-- Tax Calculation Monthly Details Table (DEPRECATED)
 -- ============================================================
--- Stores detailed monthly breakdown for each tax calculation
--- Enables granular analysis and reporting per month
+-- This table is no longer used. Tax calculations are computed on-the-fly
+-- from the income data stored in tax_calculations.monthly_data JSON field.
+-- Keeping this commented out for reference in case of rollback.
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS tax_calculation_details (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    tax_calculation_id INT NOT NULL,
-    month_index INT NOT NULL COMMENT '0-11 representing the month order',
-    month_name VARCHAR(20) NOT NULL,
-    exchange_rate DECIMAL(10, 2) NOT NULL,
-    bonus_usd DECIMAL(15, 2) DEFAULT 0,
-    fc_receipts_usd DECIMAL(15, 2) NOT NULL,
-    fc_receipts_lkr DECIMAL(15, 2) NOT NULL,
-    cumulative_income DECIMAL(15, 2) NOT NULL,
-    total_tax_liability DECIMAL(15, 2) NOT NULL,
-    monthly_payment DECIMAL(15, 2) NOT NULL,
-    FOREIGN KEY (tax_calculation_id) REFERENCES tax_calculations(id) ON DELETE CASCADE,
-    INDEX idx_tax_calculation (tax_calculation_id),
-    INDEX idx_month_index (month_index)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- CREATE TABLE IF NOT EXISTS tax_calculation_details (
+--     id INT AUTO_INCREMENT PRIMARY KEY,
+--     tax_calculation_id INT NOT NULL,
+--     month_index INT NOT NULL COMMENT '0-11 representing the month order',
+--     month_name VARCHAR(20) NOT NULL,
+--     exchange_rate DECIMAL(10, 2) NOT NULL,
+--     bonus_usd DECIMAL(15, 2) DEFAULT 0,
+--     fc_receipts_usd DECIMAL(15, 2) NOT NULL,
+--     fc_receipts_lkr DECIMAL(15, 2) NOT NULL,
+--     cumulative_income DECIMAL(15, 2) NOT NULL,
+--     total_tax_liability DECIMAL(15, 2) NOT NULL,
+--     monthly_payment DECIMAL(15, 2) NOT NULL,
+--     FOREIGN KEY (tax_calculation_id) REFERENCES tax_calculations(id) ON DELETE CASCADE,
+--     INDEX idx_tax_calculation (tax_calculation_id),
+--     INDEX idx_month_index (month_index)
+-- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
 -- Initial Setup Notes
@@ -344,10 +362,11 @@ CREATE TABLE IF NOT EXISTS tax_calculation_details (
 --    - v_category_breakdown_monthly: Category totals by month
 --    - v_category_breakdown_yearly: Category totals by year
 --
--- 6. Tax calculations are stored with full monthly details for trend analysis.
---    Each calculation includes:
---    - Assessment year, salary, tax rates
---    - Monthly exchange rates and bonuses
---    - Cumulative income and tax liability
---    - Effective tax rate for the year
+-- 6. Tax Calculator Feature:
+--    - Stores ONLY income input data (monthly salaries, exchange rates, bonuses)
+--    - Tax calculations are computed on-the-fly when loading saved calculations
+--    - Supports multiple calculations per assessment year
+--    - One "active" calculation per user per assessment year
+--    - Monthly data stored as JSON array for flexibility
+--    - Access via the Tax Calculator page in the dashboard
 -- ============================================================

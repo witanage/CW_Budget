@@ -2997,7 +2997,6 @@ function loadTaxCalculator() {
     const resetBtn = document.getElementById('resetTaxBtn');
     const assessmentYearSelect = document.getElementById('assessmentYear');
     const startMonthSelect = document.getElementById('startMonth');
-    const saveCalculationBtn = document.getElementById('saveCalculationBtn');
     const saveCalculationBtnAlt = document.getElementById('saveCalculationBtnAlt');
     const refreshSavedBtn = document.getElementById('refreshSavedCalculationsBtn');
     const loadSavedByYearBtn = document.getElementById('loadSavedByYearBtn');
@@ -3008,10 +3007,6 @@ function loadTaxCalculator() {
 
     if (resetBtn) {
         resetBtn.onclick = resetTaxCalculator;
-    }
-
-    if (saveCalculationBtn) {
-        saveCalculationBtn.onclick = saveTaxCalculation;
     }
 
     if (saveCalculationBtnAlt) {
@@ -3061,18 +3056,51 @@ function updateYearDisplay() {
 function filterCalculationsByYear() {
     const selectedYear = document.getElementById('assessmentYear').value;
 
-    console.log('Filtering calculations for year:', selectedYear);
-    console.log('All saved calculations:', allSavedCalculations);
+    console.log('Loading calculations for year:', selectedYear);
 
-    // Filter calculations for the selected year
-    const filteredCalculations = allSavedCalculations.filter(calc =>
-        calc.assessment_year === selectedYear
-    );
+    // Use backend filtering for better performance
+    showLoading();
 
-    console.log('Filtered calculations:', filteredCalculations);
+    fetch(`/api/tax-calculations?year=${encodeURIComponent(selectedYear)}`)
+    .then(response => response.json())
+    .then(calculations => {
+        console.log('Filtered calculations from backend:', calculations);
 
-    // Display filtered calculations
-    displaySavedCalculations(filteredCalculations, selectedYear);
+        // Check if it's an error response
+        if (calculations.error) {
+            hideLoading();
+            console.error('API returned error:', calculations.error);
+            showToast('Error: ' + calculations.error, 'danger');
+            displaySavedCalculations([], selectedYear);
+            return;
+        }
+
+        const calculationsList = Array.isArray(calculations) ? calculations : [];
+
+        // Display filtered calculations
+        displaySavedCalculations(calculationsList, selectedYear);
+
+        // Auto-load the active calculation or the most recent one
+        if (calculationsList.length > 0) {
+            // Find active calculation
+            const activeCalc = calculationsList.find(calc => calc.is_active);
+            const calcToLoad = activeCalc || calculationsList[0]; // Use active or first (most recent)
+
+            console.log(`Auto-loading ${activeCalc ? 'active' : 'most recent'} calculation: ${calcToLoad.calculation_name}`);
+
+            // Load the calculation (this will call hideLoading())
+            loadCalculation(calcToLoad.id);
+        } else {
+            hideLoading();
+            showToast(`No calculations found for ${selectedYear}`, 'info');
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Error filtering calculations:', error);
+        showToast('Failed to load calculations. Check console for details.', 'danger');
+        displaySavedCalculations([], selectedYear);
+    });
 }
 
 function populateMonthlyDataTable() {
@@ -3080,8 +3108,8 @@ function populateMonthlyDataTable() {
     if (!tbody) return;
 
     const startMonthIndex = parseInt(document.getElementById('startMonth').value) || 0;
-    const defaultSalaryRate = 299;
-    const defaultSalary = 6000;
+    const defaultSalaryRate = 0;
+    const defaultSalary = 0;
 
     let html = '';
     for (let i = 0; i < 12; i++) {
@@ -3344,33 +3372,23 @@ function calculateMonthlyTax() {
     const effectiveRate = cumulativeIncome > 0 ? (previousTaxLiability / cumulativeIncome * 100) : 0;
     document.getElementById('effectiveTaxRateSummary').textContent = `${effectiveRate.toFixed(2)}%`;
 
-    // Store calculation data for saving
+    // Store calculation data for saving (ONLY input data, calculations are computed on-the-fly)
     lastCalculationData = {
         assessment_year: document.getElementById('assessmentYear').value,
-        monthly_salary_usd: 0, // Kept for backwards compatibility, no longer used
         tax_rate: taxRate,
         tax_free_threshold: taxFreeThreshold,
         start_month: startMonthIndex,
-        total_annual_income: cumulativeIncome,
-        total_tax_liability: previousTaxLiability,
-        effective_tax_rate: effectiveRate,
         monthly_data: monthlyData.map((row, index) => {
             const actualMonthIndex = (startMonthIndex + index) % 12;
             const bonuses = monthlyBonusesData[actualMonthIndex] || [];
 
+            // Save ONLY income input data (salaries, rates, bonuses)
             return {
                 month_index: index,
                 month: row.month,
                 salary_usd: monthlySalaries[actualMonthIndex] || 0,
                 salary_rate: monthlySalaryRates[actualMonthIndex] || 0,
-                bonuses: bonuses, // New array format: [{amount: 5000, rate: 299}, {amount: 10000, rate: 305}]
-                bonus_usd: 0, // Kept for backwards compatibility, no longer used
-                bonus_rate: 0, // Kept for backwards compatibility, no longer used
-                fcReceiptsUSD: row.fcReceiptsUSD,
-                fcReceiptsLKR: row.fcReceiptsLKR,
-                cumulativeIncome: row.cumulativeIncome,
-                totalTaxLiability: row.totalTaxLiability,
-                monthlyPayment: row.monthlyPayment
+                bonuses: bonuses  // Array format: [{amount: 5000, rate: 299}, ...]
             };
         })
     };
@@ -3387,12 +3405,6 @@ function calculateMonthlyTax() {
     const summaryCards = document.getElementById('taxSummaryCards');
     if (summaryCards) {
         summaryCards.style.display = 'flex';
-    }
-
-    // Show save button in header
-    const saveBtn = document.getElementById('saveCalculationBtn');
-    if (saveBtn) {
-        saveBtn.style.display = 'inline-block';
     }
 
     // Show table footer
@@ -3475,12 +3487,6 @@ function resetTaxCalculator() {
         summaryCards.style.display = 'none';
     }
 
-    // Hide save button in header
-    const saveBtn = document.getElementById('saveCalculationBtn');
-    if (saveBtn) {
-        saveBtn.style.display = 'none';
-    }
-
     // Hide table footer
     const tfoot = document.querySelector('#taxScheduleTable tfoot');
     if (tfoot) {
@@ -3508,10 +3514,17 @@ function saveTaxCalculation() {
         return;
     }
 
+    const setAsActive = document.getElementById('setAsActive')?.checked || false;
+
     const dataToSave = {
         ...lastCalculationData,
-        calculation_name: calculationName
+        calculation_name: calculationName,
+        is_active: setAsActive
     };
+
+    console.log('=== SAVING CALCULATION ===');
+    console.log('Data to save:', dataToSave);
+    console.log('Monthly data being saved:', dataToSave.monthly_data);
 
     showLoading();
 
@@ -3611,40 +3624,40 @@ function displaySavedCalculations(calculations, filterYear = null) {
     let html = headerHtml + '<div class="list-group">';
     calculations.forEach(calc => {
         const createdDate = new Date(calc.created_at).toLocaleDateString();
-        const effectiveRate = parseFloat(calc.effective_tax_rate || 0).toFixed(2);
+        const isActive = calc.is_active || false;
+        const activeClass = isActive ? 'border-success' : '';
 
         html += `
-            <div class="list-group-item list-group-item-action calculation-item mb-2">
+            <div class="list-group-item list-group-item-action calculation-item mb-2 ${activeClass}">
                 <div class="d-flex justify-content-between align-items-start">
                     <div class="flex-grow-1">
-                        <h6 class="mb-1">${calc.calculation_name}</h6>
+                        <h6 class="mb-1">
+                            ${calc.calculation_name}
+                            ${isActive ? '<span class="badge bg-success ms-2">Active</span>' : ''}
+                        </h6>
                         <p class="mb-1 small">
                             <span class="badge bg-primary me-2">${calc.assessment_year}</span>
                             <span class="text-muted">Saved: ${createdDate}</span>
                         </p>
                         <div class="row mt-2">
-                            <div class="col-md-3">
-                                <small class="text-muted">Annual Income:</small><br>
-                                <strong>${formatCurrency(calc.total_annual_income)}</strong>
+                            <div class="col-md-6">
+                                <small class="text-muted">Tax Rate:</small><br>
+                                <strong>${calc.tax_rate}%</strong>
                             </div>
-                            <div class="col-md-3">
-                                <small class="text-muted">Tax Liability:</small><br>
-                                <strong class="text-danger">${formatCurrency(calc.total_tax_liability)}</strong>
-                            </div>
-                            <div class="col-md-3">
-                                <small class="text-muted">Effective Rate:</small><br>
-                                <strong class="text-info">${effectiveRate}%</strong>
-                            </div>
-                            <div class="col-md-3">
-                                <small class="text-muted">Monthly Salary:</small><br>
-                                <strong>$${parseFloat(calc.monthly_salary_usd || 0).toLocaleString()}</strong>
+                            <div class="col-md-6">
+                                <small class="text-muted">Tax-Free Threshold:</small><br>
+                                <strong>${formatCurrency(calc.tax_free_threshold)}</strong>
                             </div>
                         </div>
+                        <p class="mb-0 mt-2"><small class="text-muted"><i class="fas fa-info-circle me-1"></i>Tax totals will be calculated when you load this</small></p>
                     </div>
-                    <div class="ms-3">
-                        <button class="btn btn-sm btn-outline-primary mb-1" onclick="loadCalculation(${calc.id})" title="Load this calculation">
+                    <div class="ms-3 d-flex flex-column gap-1">
+                        <button class="btn btn-sm btn-outline-primary" onclick="loadCalculation(${calc.id})" title="Load this calculation">
                             <i class="fas fa-download"></i>
                         </button>
+                        ${!isActive ? `<button class="btn btn-sm btn-outline-success" onclick="setActiveCalculation(${calc.id})" title="Set as active">
+                            <i class="fas fa-star"></i>
+                        </button>` : ''}
                         <button class="btn btn-sm btn-outline-danger" onclick="deleteCalculation(${calc.id})" title="Delete this calculation">
                             <i class="fas fa-trash"></i>
                         </button>
@@ -3659,7 +3672,51 @@ function displaySavedCalculations(calculations, filterYear = null) {
 }
 
 function showAllCalculations() {
-    displaySavedCalculations(allSavedCalculations);
+    // Reload all calculations from backend
+    loadSavedCalculations();
+}
+
+function setActiveCalculation(calculationId) {
+    if (!confirm('Set this calculation as active for its assessment year?')) {
+        return;
+    }
+
+    showLoading();
+
+    fetch(`/api/tax-calculations/${calculationId}/set-active`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => {
+        // Check if feature is not implemented (501)
+        if (response.status === 501) {
+            return response.json().then(data => {
+                hideLoading();
+                showToast(data.error || 'This feature requires a database migration.', 'warning');
+                return null;
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (!data) return; // Already handled 501 case
+
+        hideLoading();
+        if (data.error) {
+            showToast(data.error, 'danger');
+        } else {
+            showToast(`Calculation set as active for ${data.assessment_year}!`, 'success');
+            // Reload the calculations list to reflect the change
+            loadSavedCalculations();
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Error setting active calculation:', error);
+        showToast('Failed to set active calculation', 'danger');
+    });
 }
 
 function loadCalculation(calculationId) {
@@ -3675,9 +3732,13 @@ function loadCalculation(calculationId) {
             return;
         }
 
-        console.log('Loading calculation:', calc);
+        console.log('=== LOADING CALCULATION ===');
+        console.log('ID:', calc.id, '| Name:', calc.calculation_name);
+        console.log('Year:', calc.assessment_year, '| Rate:', calc.tax_rate + '%', '| Threshold:', calc.tax_free_threshold);
+        console.log('Start month:', calc.start_month);
+        console.log('Monthly data entries:', calc.monthly_data ? calc.monthly_data.length : 0);
 
-        // Load values into form
+        // Load values into form fields
         document.getElementById('assessmentYear').value = calc.assessment_year;
         document.getElementById('taxRate').value = calc.tax_rate;
         document.getElementById('taxFreeThreshold').value = calc.tax_free_threshold;
@@ -3686,12 +3747,17 @@ function loadCalculation(calculationId) {
         // Update year display
         updateYearDisplay();
 
-        // Parse monthly data from JSON
-        const monthlyData = JSON.parse(calc.monthly_data || '[]');
-        console.log('Parsed monthly data:', monthlyData);
+        // Get monthly data (already parsed by backend)
+        const monthlyData = calc.monthly_data || [];
+        if (monthlyData.length > 0) {
+            console.log('Sample monthly entry:', monthlyData[0]);
+        }
 
-        // Repopulate monthly table with current start month
+        // Repopulate monthly table with current start month (this creates fresh input fields)
         populateMonthlyDataTable();
+
+        // Clear any existing bonus data
+        monthlyBonusesData = {};
 
         // Create a map of actual month index to salary, salary rate, and bonuses
         const monthDataMap = {};
@@ -3699,51 +3765,28 @@ function loadCalculation(calculationId) {
             // Calculate the actual month index from start_month + month_index
             const actualMonthIndex = (calc.start_month + month.month_index) % 12;
 
-            // Handle backwards compatibility with old data formats
-            if (month.bonuses && Array.isArray(month.bonuses)) {
-                // Newest format with bonuses array
-                monthDataMap[actualMonthIndex] = {
-                    salary_usd: month.salary_usd,
-                    salary_rate: month.salary_rate,
-                    bonuses: month.bonuses // Array of {amount, rate}
-                };
-            } else if (month.salary_usd !== undefined && month.salary_rate !== undefined) {
-                // Previous format with separate salary and single bonus
-                monthDataMap[actualMonthIndex] = {
-                    salary_usd: month.salary_usd,
-                    salary_rate: month.salary_rate,
-                    bonuses: (month.bonus_usd && month.bonus_usd > 0) ?
-                        [{amount: month.bonus_usd, rate: month.bonus_rate || month.salary_rate}] : []
-                };
-            } else if (month.total_income_usd !== undefined) {
-                // Older format with total_income_usd
-                monthDataMap[actualMonthIndex] = {
-                    salary_usd: month.total_income_usd,
-                    salary_rate: month.exchange_rate || 299,
-                    bonuses: []
-                };
-            } else {
-                // Oldest format with bonus_usd and monthly_salary_usd
-                monthDataMap[actualMonthIndex] = {
-                    salary_usd: calc.monthly_salary_usd || 6000,
-                    salary_rate: month.exchange_rate || 299,
-                    bonuses: (month.bonus_usd && month.bonus_usd > 0) ?
-                        [{amount: month.bonus_usd, rate: month.exchange_rate || 299}] : []
-                };
-            }
+            monthDataMap[actualMonthIndex] = {
+                salary_usd: month.salary_usd || 0,
+                salary_rate: month.salary_rate || 0,
+                bonuses: month.bonuses || []  // Array of {amount, rate}
+            };
         });
 
-        console.log('Month data map:', monthDataMap);
+        console.log(`Mapped ${Object.keys(monthDataMap).length} months from saved data`);
+        console.log('Sample month data:', monthDataMap[0] || monthDataMap[Object.keys(monthDataMap)[0]]);
 
         // Load salary and salary rate by matching data-month attribute
         const salaryInputs = document.querySelectorAll('.month-salary');
         const salaryRateInputs = document.querySelectorAll('.month-salary-rate');
 
+        console.log(`Found ${salaryInputs.length} salary inputs and ${salaryRateInputs.length} salary rate inputs`);
+
+        let salariesSet = 0, ratesSet = 0;
         salaryInputs.forEach(input => {
             const monthIndex = parseInt(input.getAttribute('data-month'));
             if (monthDataMap[monthIndex]) {
                 input.value = monthDataMap[monthIndex].salary_usd;
-                console.log(`Set month ${monthIndex} salary to ${monthDataMap[monthIndex].salary_usd}`);
+                salariesSet++;
             }
         });
 
@@ -3751,25 +3794,31 @@ function loadCalculation(calculationId) {
             const monthIndex = parseInt(input.getAttribute('data-month'));
             if (monthDataMap[monthIndex]) {
                 input.value = monthDataMap[monthIndex].salary_rate;
-                console.log(`Set month ${monthIndex} salary rate to ${monthDataMap[monthIndex].salary_rate}`);
+                ratesSet++;
             }
         });
 
+        console.log(`Set ${salariesSet} salaries and ${ratesSet} exchange rates`);
+
         // Load bonuses for each month
+        let bonusesLoaded = 0;
         Object.keys(monthDataMap).forEach(monthIndex => {
-            const monthData = monthDataMap[monthIndex];
-            const bonuses = monthData.bonuses || [];
+            const bonuses = monthDataMap[monthIndex].bonuses || [];
 
             // Add each bonus entry
             bonuses.forEach(bonus => {
                 if (bonus.amount > 0) {
                     addBonusEntry(parseInt(monthIndex), bonus.amount, bonus.rate);
-                    console.log(`Added bonus to month ${monthIndex}: $${bonus.amount} @ ${bonus.rate} LKR`);
+                    bonusesLoaded++;
                 }
             });
         });
 
-        // Recalculate
+        console.log(`Loaded ${bonusesLoaded} bonus entries`);
+
+        console.log('Form fields populated, recalculating tax schedule...');
+
+        // Recalculate tax schedule with loaded data
         calculateMonthlyTax();
 
         showToast(`Loaded: ${calc.calculation_name}`, 'success');
