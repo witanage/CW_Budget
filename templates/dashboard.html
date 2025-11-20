@@ -20,13 +20,13 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#" data-page="reports">
-                            <i class="fas fa-chart-bar me-2"></i>Reports
+                        <a class="nav-link" href="#" data-page="tax">
+                            <i class="fas fa-calculator me-2"></i>Tax
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#" data-page="tax">
-                            <i class="fas fa-calculator me-2"></i>Tax
+                        <a class="nav-link" href="#" data-page="reports">
+                            <i class="fas fa-chart-bar me-2"></i>Reports
                         </a>
                     </li>
                 </ul>
@@ -1346,6 +1346,26 @@
         font-size: 0.8rem;
         padding: 0.4rem 0.6rem;
     }
+}
+
+/* Tax Calculator Page - Prevent card hover animations */
+#taxPage .card:hover {
+    transform: none !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+}
+
+[data-theme="light"] #taxPage .card:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Tax Summary Card - Improve label visibility in dark mode */
+#taxPage .text-muted.small {
+    color: var(--text-secondary) !important;
+    font-weight: 500;
+}
+
+[data-theme="dark"] #taxPage .text-muted.small {
+    color: #b0b0b0 !important;
 }
 </style>
 
