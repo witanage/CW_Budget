@@ -13,8 +13,9 @@
 -- - Audit logging for admin actions
 -- - Performance views for reporting
 -- - Category spending analysis (weekly, monthly, yearly)
+-- - Tax calculator with assessment year-wise tracking
 --
--- Date: 2025-11-14
+-- Date: 2025-11-20
 -- ============================================================
 
 -- ============================================================
@@ -267,20 +268,37 @@ INSERT IGNORE INTO categories (name, type) VALUES
 -- ============================================================
 -- Tax Calculations Table
 -- ============================================================
--- Stores foreign employment income tax calculations for trend analysis
--- Enables tracking tax liability across multiple assessment years
+-- Stores income input data for foreign employment tax calculations
+--
+-- Design Philosophy:
+-- - Store ONLY income input data (salaries, exchange rates, bonuses)
+-- - Tax calculations (totals, liabilities) computed on-the-fly when loading
+-- - Enables tracking across multiple assessment years
+-- - One active calculation per user per assessment year
+--
+-- Monthly Data JSON Structure:
+-- [
+--   {
+--     "month_index": 0-11,
+--     "month": "April",
+--     "salary_usd": 6000,
+--     "salary_rate": 299.50,
+--     "bonuses": [{"amount": 5000, "rate": 300}]
+--   },
+--   ...
+-- ]
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS tax_calculations (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
     calculation_name VARCHAR(255) NOT NULL,
-    assessment_year VARCHAR(20) NOT NULL,
-    tax_rate DECIMAL(5, 2) NOT NULL,
-    tax_free_threshold DECIMAL(15, 2) NOT NULL,
-    start_month INT NOT NULL COMMENT '0=April, 11=March',
-    monthly_data JSON NOT NULL COMMENT 'Income details: array of 12 months with salaries, exchange rates and bonuses',
-    is_active BOOLEAN DEFAULT FALSE COMMENT 'Indicates if this is the active calculation for the assessment year',
+    assessment_year VARCHAR(20) NOT NULL COMMENT 'Format: YYYY/YYYY (e.g., 2024/2025)',
+    tax_rate DECIMAL(5, 2) NOT NULL COMMENT 'Tax rate percentage (e.g., 15.00 for 15%)',
+    tax_free_threshold DECIMAL(15, 2) NOT NULL COMMENT 'Annual tax-free threshold in LKR',
+    start_month INT NOT NULL COMMENT 'Starting month index: 0=April, 1=May, ..., 11=March',
+    monthly_data JSON NOT NULL COMMENT 'Array of 12 months with salaries, exchange rates, and bonuses',
+    is_active BOOLEAN DEFAULT FALSE COMMENT 'TRUE if this is the active calculation for the assessment year',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -289,7 +307,7 @@ CREATE TABLE IF NOT EXISTS tax_calculations (
     INDEX idx_created_at (created_at),
     INDEX idx_user_assessment_active (user_id, assessment_year, is_active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-COMMENT='Stores only income input data - tax calculations are computed on load';
+COMMENT='Stores income input data only - tax calculations computed on-the-fly when loading';
 
 -- ============================================================
 -- Tax Calculation Monthly Details Table (DEPRECATED)
@@ -344,10 +362,11 @@ COMMENT='Stores only income input data - tax calculations are computed on load';
 --    - v_category_breakdown_monthly: Category totals by month
 --    - v_category_breakdown_yearly: Category totals by year
 --
--- 6. Tax calculations are stored with full monthly details for trend analysis.
---    Each calculation includes:
---    - Assessment year, salary, tax rates
---    - Monthly exchange rates and bonuses
---    - Cumulative income and tax liability
---    - Effective tax rate for the year
+-- 6. Tax Calculator Feature:
+--    - Stores ONLY income input data (monthly salaries, exchange rates, bonuses)
+--    - Tax calculations are computed on-the-fly when loading saved calculations
+--    - Supports multiple calculations per assessment year
+--    - One "active" calculation per user per assessment year
+--    - Monthly data stored as JSON array for flexibility
+--    - Access via the Tax Calculator page in the dashboard
 -- ============================================================
