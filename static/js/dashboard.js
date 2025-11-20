@@ -3056,7 +3056,7 @@ function updateYearDisplay() {
 function filterCalculationsByYear() {
     const selectedYear = document.getElementById('assessmentYear').value;
 
-    console.log('Filtering calculations for year:', selectedYear);
+    console.log('Loading calculations for year:', selectedYear);
 
     // Use backend filtering for better performance
     showLoading();
@@ -3064,24 +3064,41 @@ function filterCalculationsByYear() {
     fetch(`/api/tax-calculations?year=${encodeURIComponent(selectedYear)}`)
     .then(response => response.json())
     .then(calculations => {
-        hideLoading();
         console.log('Filtered calculations from backend:', calculations);
 
         // Check if it's an error response
         if (calculations.error) {
+            hideLoading();
             console.error('API returned error:', calculations.error);
             showToast('Error: ' + calculations.error, 'danger');
             displaySavedCalculations([], selectedYear);
             return;
         }
 
+        const calculationsList = Array.isArray(calculations) ? calculations : [];
+
         // Display filtered calculations
-        displaySavedCalculations(Array.isArray(calculations) ? calculations : [], selectedYear);
+        displaySavedCalculations(calculationsList, selectedYear);
+
+        // Auto-load the active calculation or the most recent one
+        if (calculationsList.length > 0) {
+            // Find active calculation
+            const activeCalc = calculationsList.find(calc => calc.is_active);
+            const calcToLoad = activeCalc || calculationsList[0]; // Use active or first (most recent)
+
+            console.log(`Auto-loading ${activeCalc ? 'active' : 'most recent'} calculation: ${calcToLoad.calculation_name}`);
+
+            // Load the calculation (this will call hideLoading())
+            loadCalculation(calcToLoad.id);
+        } else {
+            hideLoading();
+            showToast(`No calculations found for ${selectedYear}`, 'info');
+        }
     })
     .catch(error => {
         hideLoading();
         console.error('Error filtering calculations:', error);
-        showToast('Failed to filter calculations. Check console for details.', 'danger');
+        showToast('Failed to load calculations. Check console for details.', 'danger');
         displaySavedCalculations([], selectedYear);
     });
 }
@@ -3736,8 +3753,11 @@ function loadCalculation(calculationId) {
             console.log('Sample monthly entry:', monthlyData[0]);
         }
 
-        // Repopulate monthly table with current start month
+        // Repopulate monthly table with current start month (this creates fresh input fields)
         populateMonthlyDataTable();
+
+        // Clear any existing bonus data
+        monthlyBonusesData = {};
 
         // Create a map of actual month index to salary, salary rate, and bonuses
         const monthDataMap = {};
@@ -3752,16 +3772,21 @@ function loadCalculation(calculationId) {
             };
         });
 
-        console.log(`Loaded ${Object.keys(monthDataMap).length} months of data`);
+        console.log(`Mapped ${Object.keys(monthDataMap).length} months from saved data`);
+        console.log('Sample month data:', monthDataMap[0] || monthDataMap[Object.keys(monthDataMap)[0]]);
 
         // Load salary and salary rate by matching data-month attribute
         const salaryInputs = document.querySelectorAll('.month-salary');
         const salaryRateInputs = document.querySelectorAll('.month-salary-rate');
 
+        console.log(`Found ${salaryInputs.length} salary inputs and ${salaryRateInputs.length} salary rate inputs`);
+
+        let salariesSet = 0, ratesSet = 0;
         salaryInputs.forEach(input => {
             const monthIndex = parseInt(input.getAttribute('data-month'));
             if (monthDataMap[monthIndex]) {
                 input.value = monthDataMap[monthIndex].salary_usd;
+                salariesSet++;
             }
         });
 
@@ -3769,10 +3794,14 @@ function loadCalculation(calculationId) {
             const monthIndex = parseInt(input.getAttribute('data-month'));
             if (monthDataMap[monthIndex]) {
                 input.value = monthDataMap[monthIndex].salary_rate;
+                ratesSet++;
             }
         });
 
+        console.log(`Set ${salariesSet} salaries and ${ratesSet} exchange rates`);
+
         // Load bonuses for each month
+        let bonusesLoaded = 0;
         Object.keys(monthDataMap).forEach(monthIndex => {
             const bonuses = monthDataMap[monthIndex].bonuses || [];
 
@@ -3780,9 +3809,12 @@ function loadCalculation(calculationId) {
             bonuses.forEach(bonus => {
                 if (bonus.amount > 0) {
                     addBonusEntry(parseInt(monthIndex), bonus.amount, bonus.rate);
+                    bonusesLoaded++;
                 }
             });
         });
+
+        console.log(`Loaded ${bonusesLoaded} bonus entries`);
 
         console.log('Form fields populated, recalculating tax schedule...');
 
