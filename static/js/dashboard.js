@@ -3088,52 +3088,69 @@ function populateMonthlyDataTable() {
     for (let i = 0; i < 12; i++) {
         const monthIndex = (startMonthIndex + i) % 12;
         const monthName = monthNames[monthIndex];
+        const collapseId = `month-${monthIndex}-collapse`;
 
         html += `
-            <tr>
-                <td class="align-middle"><strong>${monthName}</strong></td>
-                <td>
-                    <div class="input-group input-group-sm">
-                        <span class="input-group-text">$</span>
-                        <input type="number" class="form-control month-salary"
-                               data-month="${monthIndex}"
-                               placeholder="6000"
-                               value="${defaultSalary}"
-                               step="100"
-                               min="0">
-                    </div>
+            <tr class="month-header-row" data-bs-toggle="collapse" data-bs-target="#${collapseId}" role="button">
+                <td colspan="5" class="month-header">
+                    <i class="fas fa-chevron-right me-2 month-chevron"></i>
+                    <strong>${monthName}</strong>
+                    <span class="text-muted ms-2 month-summary" id="summary-${monthIndex}"></span>
                 </td>
-                <td>
-                    <div class="input-group input-group-sm">
-                        <input type="number" class="form-control month-salary-rate"
-                               data-month="${monthIndex}"
-                               placeholder="299"
-                               value="${defaultSalaryRate}"
-                               step="0.01"
-                               min="0">
-                        <span class="input-group-text">LKR</span>
-                    </div>
-                </td>
-                <td>
-                    <div class="input-group input-group-sm">
-                        <span class="input-group-text">$</span>
-                        <input type="number" class="form-control month-bonus"
-                               data-month="${monthIndex}"
-                               placeholder="0"
-                               value="0"
-                               step="100"
-                               min="0">
-                    </div>
-                </td>
-                <td>
-                    <div class="input-group input-group-sm">
-                        <input type="number" class="form-control month-bonus-rate"
-                               data-month="${monthIndex}"
-                               placeholder="299"
-                               value="${defaultBonusRate}"
-                               step="0.01"
-                               min="0">
-                        <span class="input-group-text">LKR</span>
+            </tr>
+            <tr class="collapse month-detail-row" id="${collapseId}">
+                <td colspan="5" class="p-0">
+                    <div class="month-detail-content">
+                        <div class="row g-2 p-3">
+                            <div class="col-md-6">
+                                <label class="form-label small mb-1">Salary (USD)</label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control month-salary"
+                                           data-month="${monthIndex}"
+                                           placeholder="6000"
+                                           value="${defaultSalary}"
+                                           step="100"
+                                           min="0">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small mb-1">Salary Rate (LKR)</label>
+                                <div class="input-group input-group-sm">
+                                    <input type="number" class="form-control month-salary-rate"
+                                           data-month="${monthIndex}"
+                                           placeholder="299"
+                                           value="${defaultSalaryRate}"
+                                           step="0.01"
+                                           min="0">
+                                    <span class="input-group-text">LKR</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small mb-1">Bonus (USD)</label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control month-bonus"
+                                           data-month="${monthIndex}"
+                                           placeholder="0"
+                                           value="0"
+                                           step="100"
+                                           min="0">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small mb-1">Bonus Rate (LKR)</label>
+                                <div class="input-group input-group-sm">
+                                    <input type="number" class="form-control month-bonus-rate"
+                                           data-month="${monthIndex}"
+                                           placeholder="299"
+                                           value="${defaultBonusRate}"
+                                           step="0.01"
+                                           min="0">
+                                    <span class="input-group-text">LKR</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </td>
             </tr>
@@ -3141,6 +3158,15 @@ function populateMonthlyDataTable() {
     }
 
     tbody.innerHTML = html;
+
+    // Add event listeners to rotate chevron icons
+    document.querySelectorAll('.month-header-row').forEach(row => {
+        row.addEventListener('click', function() {
+            const chevron = this.querySelector('.month-chevron');
+            chevron.classList.toggle('fa-chevron-right');
+            chevron.classList.toggle('fa-chevron-down');
+        });
+    });
 }
 
 function calculateMonthlyTax() {
