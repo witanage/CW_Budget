@@ -2997,7 +2997,6 @@ function loadTaxCalculator() {
     const resetBtn = document.getElementById('resetTaxBtn');
     const assessmentYearSelect = document.getElementById('assessmentYear');
     const startMonthSelect = document.getElementById('startMonth');
-    const saveCalculationBtn = document.getElementById('saveCalculationBtn');
     const saveCalculationBtnAlt = document.getElementById('saveCalculationBtnAlt');
     const refreshSavedBtn = document.getElementById('refreshSavedCalculationsBtn');
     const loadSavedByYearBtn = document.getElementById('loadSavedByYearBtn');
@@ -3008,10 +3007,6 @@ function loadTaxCalculator() {
 
     if (resetBtn) {
         resetBtn.onclick = resetTaxCalculator;
-    }
-
-    if (saveCalculationBtn) {
-        saveCalculationBtn.onclick = saveTaxCalculation;
     }
 
     if (saveCalculationBtnAlt) {
@@ -3405,12 +3400,6 @@ function calculateMonthlyTax() {
         summaryCards.style.display = 'flex';
     }
 
-    // Show save button in header
-    const saveBtn = document.getElementById('saveCalculationBtn');
-    if (saveBtn) {
-        saveBtn.style.display = 'inline-block';
-    }
-
     // Show table footer
     const tfoot = document.querySelector('#taxScheduleTable tfoot');
     if (tfoot) {
@@ -3489,12 +3478,6 @@ function resetTaxCalculator() {
     const summaryCards = document.getElementById('taxSummaryCards');
     if (summaryCards) {
         summaryCards.style.display = 'none';
-    }
-
-    // Hide save button in header
-    const saveBtn = document.getElementById('saveCalculationBtn');
-    if (saveBtn) {
-        saveBtn.style.display = 'none';
     }
 
     // Hide table footer
