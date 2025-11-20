@@ -2986,6 +2986,9 @@ const monthNames = ['April', 'May', 'June', 'July', 'August', 'September',
 // Store last calculation data for saving
 let lastCalculationData = null;
 
+// Store all saved calculations for filtering
+let allSavedCalculations = [];
+
 function loadTaxCalculator() {
     console.log('Loading Tax Calculator...');
 
@@ -3018,9 +3021,12 @@ function loadTaxCalculator() {
         refreshSavedBtn.onclick = loadSavedCalculations;
     }
 
-    // Update year/assessment display
+    // Update year/assessment display and filter calculations
     if (assessmentYearSelect) {
-        assessmentYearSelect.addEventListener('change', updateYearDisplay);
+        assessmentYearSelect.addEventListener('change', function() {
+            updateYearDisplay();
+            filterCalculationsByYear();
+        });
         updateYearDisplay();
     }
 
@@ -3042,6 +3048,18 @@ function updateYearDisplay() {
     if (yaDisplay) {
         yaDisplay.textContent = assessmentYear;
     }
+}
+
+function filterCalculationsByYear() {
+    const selectedYear = document.getElementById('assessmentYear').value;
+
+    // Filter calculations for the selected year
+    const filteredCalculations = allSavedCalculations.filter(calc =>
+        calc.assessment_year === selectedYear
+    );
+
+    // Display filtered calculations
+    displaySavedCalculations(filteredCalculations, selectedYear);
 }
 
 function populateMonthlyDataTable() {
@@ -3365,7 +3383,10 @@ function loadSavedCalculations() {
     .then(response => response.json())
     .then(calculations => {
         hideLoading();
-        displaySavedCalculations(calculations);
+        // Store all calculations globally
+        allSavedCalculations = calculations;
+        // Filter by currently selected year
+        filterCalculationsByYear();
     })
     .catch(error => {
         hideLoading();
@@ -3374,20 +3395,35 @@ function loadSavedCalculations() {
     });
 }
 
-function displaySavedCalculations(calculations) {
+function displaySavedCalculations(calculations, filterYear = null) {
     const listContainer = document.getElementById('savedCalculationsList');
     if (!listContainer) return;
 
     if (!calculations || calculations.length === 0) {
+        const message = filterYear
+            ? `No saved calculations found for ${filterYear}. <a href="#" onclick="showAllCalculations(); return false;" class="alert-link">Show all calculations</a>`
+            : 'No saved calculations yet. Calculate and save your tax to see it here.';
+
         listContainer.innerHTML = `
             <p class="text-muted text-center py-4">
-                <i class="fas fa-info-circle me-2"></i>No saved calculations yet. Calculate and save your tax to see it here.
+                <i class="fas fa-info-circle me-2"></i>${message}
             </p>
         `;
         return;
     }
 
-    let html = '<div class="list-group">';
+    // Show filter info if filtering
+    let headerHtml = '';
+    if (filterYear && allSavedCalculations.length > calculations.length) {
+        headerHtml = `
+            <div class="alert alert-info mb-3">
+                <i class="fas fa-filter me-2"></i>Showing ${calculations.length} calculation(s) for ${filterYear}.
+                <a href="#" onclick="showAllCalculations(); return false;" class="alert-link">Show all ${allSavedCalculations.length} calculations</a>
+            </div>
+        `;
+    }
+
+    let html = headerHtml + '<div class="list-group">';
     calculations.forEach(calc => {
         const createdDate = new Date(calc.created_at).toLocaleDateString();
         const effectiveRate = parseFloat(calc.effective_tax_rate || 0).toFixed(2);
@@ -3435,6 +3471,10 @@ function displaySavedCalculations(calculations) {
     html += '</div>';
 
     listContainer.innerHTML = html;
+}
+
+function showAllCalculations() {
+    displaySavedCalculations(allSavedCalculations);
 }
 
 function loadCalculation(calculationId) {
