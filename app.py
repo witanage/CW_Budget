@@ -2327,9 +2327,11 @@ def get_tax_calculation(calculation_id):
         connection = get_db_connection()
         cursor = connection.cursor(dictionary=True)
 
-        # Get main calculation
+        # Get main calculation with all income data
         cursor.execute("""
-            SELECT *
+            SELECT id, calculation_name, assessment_year,
+                   tax_rate, tax_free_threshold, start_month, monthly_data,
+                   is_active, created_at, updated_at
             FROM tax_calculations
             WHERE id = %s AND user_id = %s
         """, (calculation_id, user_id))
@@ -2510,9 +2512,11 @@ def get_active_tax_calculation_by_year(year):
                 'error': 'Active calculation feature requires database migration. Please run the migration script.'
             }), 501  # Not Implemented
 
-        # Get main calculation
+        # Get active calculation with all income data
         cursor.execute("""
-            SELECT *
+            SELECT id, calculation_name, assessment_year,
+                   tax_rate, tax_free_threshold, start_month, monthly_data,
+                   is_active, created_at, updated_at
             FROM tax_calculations
             WHERE user_id = %s AND assessment_year = %s AND is_active = TRUE
         """, (user_id, year))
