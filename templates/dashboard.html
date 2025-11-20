@@ -24,6 +24,11 @@
                             <i class="fas fa-chart-bar me-2"></i>Reports
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-page="tax">
+                            <i class="fas fa-calculator me-2"></i>Tax
+                        </a>
+                    </li>
                 </ul>
             </div>
         </nav>
@@ -425,6 +430,172 @@
                                                     </table>
                                                 </div>
                                             </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tax Calculator Page -->
+            <div id="taxPage" class="page-content" style="display:none;">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Tax Calculator</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-lg-8">
+                                <div class="card mb-3">
+                                    <div class="card-header bg-primary text-white">
+                                        <h6 class="mb-0"><i class="fas fa-globe me-2"></i>Foreign Income Tax Calculator</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <form id="taxCalculatorForm">
+                                            <div class="row mb-3">
+                                                <div class="col-md-6">
+                                                    <label for="taxYear" class="form-label">Tax Year</label>
+                                                    <select id="taxYear" class="form-select">
+                                                        <option value="2025">2025</option>
+                                                        <option value="2024" selected>2024</option>
+                                                        <option value="2023">2023</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label for="taxCountry" class="form-label">Country</label>
+                                                    <select id="taxCountry" class="form-select">
+                                                        <option value="LK" selected>Sri Lanka</option>
+                                                        <option value="US">United States</option>
+                                                        <option value="UK">United Kingdom</option>
+                                                        <option value="CA">Canada</option>
+                                                        <option value="AU">Australia</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label for="foreignIncome" class="form-label">Foreign Income (Annual)</label>
+                                                <div class="input-group">
+                                                    <span class="input-group-text">LKR</span>
+                                                    <input type="number" class="form-control" id="foreignIncome" placeholder="0.00" step="0.01" min="0">
+                                                </div>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label for="localIncome" class="form-label">Local Income (Annual)</label>
+                                                <div class="input-group">
+                                                    <span class="input-group-text">LKR</span>
+                                                    <input type="number" class="form-control" id="localIncome" placeholder="0.00" step="0.01" min="0">
+                                                </div>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label for="deductions" class="form-label">Deductions & Allowances</label>
+                                                <div class="input-group">
+                                                    <span class="input-group-text">LKR</span>
+                                                    <input type="number" class="form-control" id="deductions" placeholder="0.00" step="0.01" min="0">
+                                                </div>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label for="taxPaid" class="form-label">Tax Already Paid (Foreign)</label>
+                                                <div class="input-group">
+                                                    <span class="input-group-text">LKR</span>
+                                                    <input type="number" class="form-control" id="taxPaid" placeholder="0.00" step="0.01" min="0">
+                                                </div>
+                                            </div>
+
+                                            <div class="d-grid gap-2">
+                                                <button type="button" class="btn btn-primary" id="calculateTaxBtn">
+                                                    <i class="fas fa-calculator me-2"></i>Calculate Tax
+                                                </button>
+                                                <button type="button" class="btn btn-outline-secondary" id="resetTaxBtn">
+                                                    <i class="fas fa-redo me-2"></i>Reset
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-lg-4">
+                                <div class="card mb-3">
+                                    <div class="card-header bg-success text-white">
+                                        <h6 class="mb-0"><i class="fas fa-chart-line me-2"></i>Tax Summary</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="mb-3">
+                                            <label class="text-muted small">Total Income</label>
+                                            <h4 id="totalIncomeSummary" class="mb-0">LKR 0.00</h4>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="text-muted small">Taxable Income</label>
+                                            <h4 id="taxableIncomeSummary" class="mb-0">LKR 0.00</h4>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="text-muted small">Tax Liability</label>
+                                            <h4 id="taxLiabilitySummary" class="text-danger mb-0">LKR 0.00</h4>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="text-muted small">Tax Credits</label>
+                                            <h5 id="taxCreditsSummary" class="text-success mb-0">LKR 0.00</h5>
+                                        </div>
+                                        <hr>
+                                        <div class="mb-0">
+                                            <label class="text-muted small">Net Tax Payable</label>
+                                            <h3 id="netTaxPayableSummary" class="text-primary mb-0">LKR 0.00</h3>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="card">
+                                    <div class="card-header bg-info text-white">
+                                        <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>Tax Brackets</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div id="taxBracketsInfo" class="small">
+                                            <p class="mb-2"><strong>Sri Lanka 2024 Tax Rates:</strong></p>
+                                            <ul class="list-unstyled mb-0">
+                                                <li class="mb-1">Up to 500,000: 0%</li>
+                                                <li class="mb-1">500,001 - 1,000,000: 6%</li>
+                                                <li class="mb-1">1,000,001 - 1,500,000: 12%</li>
+                                                <li class="mb-1">1,500,001 - 2,000,000: 18%</li>
+                                                <li class="mb-1">Above 2,000,000: 24%</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Detailed Breakdown -->
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h6 class="mb-0"><i class="fas fa-list me-2"></i>Detailed Tax Breakdown</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-striped" id="taxBreakdownTable">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Tax Bracket</th>
+                                                        <th>Income in Bracket</th>
+                                                        <th>Tax Rate</th>
+                                                        <th>Tax Amount</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="taxBreakdownBody">
+                                                    <tr>
+                                                        <td colspan="4" class="text-center text-muted">
+                                                            Click "Calculate Tax" to see breakdown
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
                                         </div>
                                     </div>
                                 </div>
