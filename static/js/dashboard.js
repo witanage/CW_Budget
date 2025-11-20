@@ -2999,6 +2999,7 @@ function loadTaxCalculator() {
     const applyDefaultRateBtn = document.getElementById('applyDefaultRateBtn');
     const startMonthSelect = document.getElementById('startMonth');
     const saveCalculationBtn = document.getElementById('saveCalculationBtn');
+    const saveCalculationBtnAlt = document.getElementById('saveCalculationBtnAlt');
     const refreshSavedBtn = document.getElementById('refreshSavedCalculationsBtn');
     const loadSavedByYearBtn = document.getElementById('loadSavedByYearBtn');
 
@@ -3016,6 +3017,10 @@ function loadTaxCalculator() {
 
     if (saveCalculationBtn) {
         saveCalculationBtn.onclick = saveTaxCalculation;
+    }
+
+    if (saveCalculationBtnAlt) {
+        saveCalculationBtnAlt.onclick = saveTaxCalculation;
     }
 
     if (refreshSavedBtn) {
@@ -3265,6 +3270,24 @@ function calculateMonthlyTax() {
         document.getElementById('calculationName').value = `Tax Calculation ${lastCalculationData.assessment_year}`;
     }
 
+    // Show summary cards
+    const summaryCards = document.getElementById('taxSummaryCards');
+    if (summaryCards) {
+        summaryCards.style.display = 'flex';
+    }
+
+    // Show save button in header
+    const saveBtn = document.getElementById('saveCalculationBtn');
+    if (saveBtn) {
+        saveBtn.style.display = 'inline-block';
+    }
+
+    // Show table footer
+    const tfoot = document.querySelector('#taxScheduleTable tfoot');
+    if (tfoot) {
+        tfoot.style.display = 'table-footer-group';
+    }
+
     showToast('Tax schedule calculated successfully', 'success');
 }
 
@@ -3306,8 +3329,9 @@ function resetTaxCalculator() {
     if (tbody) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="6" class="text-center text-muted py-4">
-                    Click "Calculate Monthly Tax Withholding" to see the schedule
+                <td colspan="6" class="text-center text-muted py-5">
+                    <i class="fas fa-calculator fa-2x mb-2 d-block"></i>
+                    Click "Calculate Tax" to generate schedule
                 </td>
             </tr>
         `;
@@ -3332,6 +3356,24 @@ function resetTaxCalculator() {
     const saveSection = document.getElementById('saveCalculationSection');
     if (saveSection) {
         saveSection.style.display = 'none';
+    }
+
+    // Hide summary cards
+    const summaryCards = document.getElementById('taxSummaryCards');
+    if (summaryCards) {
+        summaryCards.style.display = 'none';
+    }
+
+    // Hide save button in header
+    const saveBtn = document.getElementById('saveCalculationBtn');
+    if (saveBtn) {
+        saveBtn.style.display = 'none';
+    }
+
+    // Hide table footer
+    const tfoot = document.querySelector('#taxScheduleTable tfoot');
+    if (tfoot) {
+        tfoot.style.display = 'none';
     }
 
     lastCalculationData = null;
