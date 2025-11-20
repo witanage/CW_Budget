@@ -2983,6 +2983,9 @@ document.addEventListener('DOMContentLoaded', function() {
 const monthNames = ['April', 'May', 'June', 'July', 'August', 'September',
                    'October', 'November', 'December', 'January', 'February', 'March'];
 
+// Store last calculation data for saving
+let lastCalculationData = null;
+
 function loadTaxCalculator() {
     console.log('Loading Tax Calculator...');
 
@@ -2992,6 +2995,8 @@ function loadTaxCalculator() {
     const assessmentYearSelect = document.getElementById('assessmentYear');
     const applyDefaultRateBtn = document.getElementById('applyDefaultRateBtn');
     const startMonthSelect = document.getElementById('startMonth');
+    const saveCalculationBtn = document.getElementById('saveCalculationBtn');
+    const refreshSavedBtn = document.getElementById('refreshSavedCalculationsBtn');
 
     if (calculateBtn) {
         calculateBtn.onclick = calculateMonthlyTax;
@@ -3003,6 +3008,14 @@ function loadTaxCalculator() {
 
     if (applyDefaultRateBtn) {
         applyDefaultRateBtn.onclick = applyDefaultRateToAll;
+    }
+
+    if (saveCalculationBtn) {
+        saveCalculationBtn.onclick = saveTaxCalculation;
+    }
+
+    if (refreshSavedBtn) {
+        refreshSavedBtn.onclick = loadSavedCalculations;
     }
 
     // Update year/assessment display
@@ -3018,6 +3031,9 @@ function loadTaxCalculator() {
 
     // Initial table population
     populateMonthlyDataTable();
+
+    // Load saved calculations
+    loadSavedCalculations();
 }
 
 function updateYearDisplay() {
@@ -3187,6 +3203,37 @@ function calculateMonthlyTax() {
     const effectiveRate = cumulativeIncome > 0 ? (previousTaxLiability / cumulativeIncome * 100) : 0;
     document.getElementById('effectiveTaxRateSummary').textContent = `${effectiveRate.toFixed(2)}%`;
 
+    // Store calculation data for saving
+    lastCalculationData = {
+        assessment_year: document.getElementById('assessmentYear').value,
+        monthly_salary_usd: monthlySalaryUSD,
+        tax_rate: taxRate,
+        tax_free_threshold: taxFreeThreshold,
+        start_month: startMonthIndex,
+        total_annual_income: cumulativeIncome,
+        total_tax_liability: previousTaxLiability,
+        effective_tax_rate: effectiveRate,
+        monthly_data: monthlyData.map((row, index) => ({
+            month_index: index,
+            month: row.month,
+            exchange_rate: monthlyRates[(startMonthIndex + index) % 12],
+            bonus_usd: monthlyBonuses[(startMonthIndex + index) % 12] || 0,
+            fcReceiptsUSD: row.fcReceiptsUSD,
+            fcReceiptsLKR: row.fcReceiptsLKR,
+            cumulativeIncome: row.cumulativeIncome,
+            totalTaxLiability: row.totalTaxLiability,
+            monthlyPayment: row.monthlyPayment
+        }))
+    };
+
+    // Show save section
+    const saveSection = document.getElementById('saveCalculationSection');
+    if (saveSection) {
+        saveSection.style.display = 'block';
+        // Auto-generate calculation name
+        document.getElementById('calculationName').value = `Tax Calculation ${lastCalculationData.assessment_year}`;
+    }
+
     showToast('Tax schedule calculated successfully', 'success');
 }
 
@@ -3250,7 +3297,225 @@ function resetTaxCalculator() {
     // Update displays
     updateYearDisplay();
 
+    // Hide save section
+    const saveSection = document.getElementById('saveCalculationSection');
+    if (saveSection) {
+        saveSection.style.display = 'none';
+    }
+
+    lastCalculationData = null;
+
     showToast('Tax calculator reset', 'info');
+}
+
+// ================================
+// SAVE AND LOAD CALCULATIONS
+// ================================
+
+function saveTaxCalculation() {
+    if (!lastCalculationData) {
+        showToast('Please calculate tax first before saving', 'warning');
+        return;
+    }
+
+    const calculationName = document.getElementById('calculationName').value.trim();
+    if (!calculationName) {
+        showToast('Please enter a name for this calculation', 'warning');
+        return;
+    }
+
+    const dataToSave = {
+        ...lastCalculationData,
+        calculation_name: calculationName
+    };
+
+    showLoading();
+
+    fetch('/api/tax-calculations', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(dataToSave)
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.error) {
+            showToast(data.error, 'danger');
+        } else {
+            showToast('Tax calculation saved successfully!', 'success');
+            // Reload saved calculations list
+            loadSavedCalculations();
+            // Hide save section
+            document.getElementById('saveCalculationSection').style.display = 'none';
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Error saving calculation:', error);
+        showToast('Failed to save calculation', 'danger');
+    });
+}
+
+function loadSavedCalculations() {
+    showLoading();
+
+    fetch('/api/tax-calculations')
+    .then(response => response.json())
+    .then(calculations => {
+        hideLoading();
+        displaySavedCalculations(calculations);
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Error loading calculations:', error);
+        showToast('Failed to load saved calculations', 'danger');
+    });
+}
+
+function displaySavedCalculations(calculations) {
+    const listContainer = document.getElementById('savedCalculationsList');
+    if (!listContainer) return;
+
+    if (!calculations || calculations.length === 0) {
+        listContainer.innerHTML = `
+            <p class="text-muted text-center py-4">
+                <i class="fas fa-info-circle me-2"></i>No saved calculations yet. Calculate and save your tax to see it here.
+            </p>
+        `;
+        return;
+    }
+
+    let html = '<div class="list-group">';
+    calculations.forEach(calc => {
+        const createdDate = new Date(calc.created_at).toLocaleDateString();
+        const effectiveRate = parseFloat(calc.effective_tax_rate || 0).toFixed(2);
+
+        html += `
+            <div class="list-group-item list-group-item-action calculation-item mb-2">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                        <h6 class="mb-1">${calc.calculation_name}</h6>
+                        <p class="mb-1 small">
+                            <span class="badge bg-primary me-2">${calc.assessment_year}</span>
+                            <span class="text-muted">Saved: ${createdDate}</span>
+                        </p>
+                        <div class="row mt-2">
+                            <div class="col-md-3">
+                                <small class="text-muted">Annual Income:</small><br>
+                                <strong>${formatCurrency(calc.total_annual_income)}</strong>
+                            </div>
+                            <div class="col-md-3">
+                                <small class="text-muted">Tax Liability:</small><br>
+                                <strong class="text-danger">${formatCurrency(calc.total_tax_liability)}</strong>
+                            </div>
+                            <div class="col-md-3">
+                                <small class="text-muted">Effective Rate:</small><br>
+                                <strong class="text-info">${effectiveRate}%</strong>
+                            </div>
+                            <div class="col-md-3">
+                                <small class="text-muted">Monthly Salary:</small><br>
+                                <strong>$${parseFloat(calc.monthly_salary_usd || 0).toLocaleString()}</strong>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ms-3">
+                        <button class="btn btn-sm btn-outline-primary mb-1" onclick="loadCalculation(${calc.id})" title="Load this calculation">
+                            <i class="fas fa-download"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteCalculation(${calc.id})" title="Delete this calculation">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    html += '</div>';
+
+    listContainer.innerHTML = html;
+}
+
+function loadCalculation(calculationId) {
+    showLoading();
+
+    fetch(`/api/tax-calculations/${calculationId}`)
+    .then(response => response.json())
+    .then(calc => {
+        hideLoading();
+
+        if (calc.error) {
+            showToast(calc.error, 'danger');
+            return;
+        }
+
+        // Load values into form
+        document.getElementById('assessmentYear').value = calc.assessment_year;
+        document.getElementById('monthlySalaryUSD').value = calc.monthly_salary_usd;
+        document.getElementById('taxRate').value = calc.tax_rate;
+        document.getElementById('taxFreeThreshold').value = calc.tax_free_threshold;
+        document.getElementById('startMonth').value = calc.start_month;
+
+        // Parse monthly data from JSON
+        const monthlyData = JSON.parse(calc.monthly_data || '[]');
+
+        // Repopulate monthly table
+        populateMonthlyDataTable();
+
+        // Load exchange rates and bonuses
+        const exchangeRateInputs = document.querySelectorAll('.month-exchange-rate');
+        const bonusInputs = document.querySelectorAll('.month-bonus');
+
+        monthlyData.forEach((month, index) => {
+            if (exchangeRateInputs[index]) {
+                exchangeRateInputs[index].value = month.exchange_rate;
+            }
+            if (bonusInputs[index]) {
+                bonusInputs[index].value = month.bonus_usd || 0;
+            }
+        });
+
+        // Recalculate
+        calculateMonthlyTax();
+
+        showToast(`Loaded calculation: ${calc.calculation_name}`, 'success');
+
+        // Scroll to top
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Error loading calculation:', error);
+        showToast('Failed to load calculation', 'danger');
+    });
+}
+
+function deleteCalculation(calculationId) {
+    if (!confirm('Are you sure you want to delete this calculation? This action cannot be undone.')) {
+        return;
+    }
+
+    showLoading();
+
+    fetch(`/api/tax-calculations/${calculationId}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.error) {
+            showToast(data.error, 'danger');
+        } else {
+            showToast('Calculation deleted successfully', 'success');
+            loadSavedCalculations();
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Error deleting calculation:', error);
+        showToast('Failed to delete calculation', 'danger');
+    });
 }
 
 // Note: formatCurrency, formatDate, showLoading, hideLoading, showToast
