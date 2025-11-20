@@ -2302,6 +2302,13 @@ def get_tax_calculations():
 
         calculations = cursor.fetchall()
 
+        # Convert Decimal types to float for JSON serialization
+        for calc in calculations:
+            if calc.get('tax_rate'):
+                calc['tax_rate'] = float(calc['tax_rate'])
+            if calc.get('tax_free_threshold'):
+                calc['tax_free_threshold'] = float(calc['tax_free_threshold'])
+
         # Add is_active=False for calculations if column doesn't exist
         if not has_is_active:
             for calc in calculations:
@@ -2341,10 +2348,17 @@ def get_tax_calculation(calculation_id):
         if not calculation:
             return jsonify({'error': 'Tax calculation not found'}), 404
 
+        # Convert Decimal types to float for JSON serialization
+        if calculation['tax_rate']:
+            calculation['tax_rate'] = float(calculation['tax_rate'])
+        if calculation['tax_free_threshold']:
+            calculation['tax_free_threshold'] = float(calculation['tax_free_threshold'])
+
         # Parse JSON monthly_data (contains all income details)
         if calculation['monthly_data']:
             calculation['monthly_data'] = json.loads(calculation['monthly_data'])
 
+        logger.info(f"Returning calculation: id={calculation['id']}, tax_rate={calculation['tax_rate']}, tax_free_threshold={calculation['tax_free_threshold']}")
         return jsonify(calculation), 200
 
     except Error as e:
@@ -2479,6 +2493,13 @@ def get_tax_calculations_by_year(year):
 
         calculations = cursor.fetchall()
 
+        # Convert Decimal types to float for JSON serialization
+        for calc in calculations:
+            if calc.get('tax_rate'):
+                calc['tax_rate'] = float(calc['tax_rate'])
+            if calc.get('tax_free_threshold'):
+                calc['tax_free_threshold'] = float(calc['tax_free_threshold'])
+
         # Add is_active=False if column doesn't exist
         if not has_is_active:
             for calc in calculations:
@@ -2525,6 +2546,12 @@ def get_active_tax_calculation_by_year(year):
 
         if not calculation:
             return jsonify({'error': 'No active tax calculation found for this year'}), 404
+
+        # Convert Decimal types to float for JSON serialization
+        if calculation['tax_rate']:
+            calculation['tax_rate'] = float(calculation['tax_rate'])
+        if calculation['tax_free_threshold']:
+            calculation['tax_free_threshold'] = float(calculation['tax_free_threshold'])
 
         # Parse JSON monthly_data (contains all income details)
         if calculation['monthly_data']:

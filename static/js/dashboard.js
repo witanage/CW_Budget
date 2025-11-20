@@ -3723,12 +3723,20 @@ function loadCalculation(calculationId) {
         console.log('Full calculation object:', calc);
         console.log('Assessment year:', calc.assessment_year);
         console.log('Tax rate:', calc.tax_rate);
+        console.log('Tax-free threshold:', calc.tax_free_threshold);
         console.log('Start month:', calc.start_month);
 
         // Load values into form
+        console.log('Setting assessmentYear field to:', calc.assessment_year);
         document.getElementById('assessmentYear').value = calc.assessment_year;
+
+        console.log('Setting taxRate field to:', calc.tax_rate);
         document.getElementById('taxRate').value = calc.tax_rate;
+
+        console.log('Setting taxFreeThreshold field to:', calc.tax_free_threshold);
         document.getElementById('taxFreeThreshold').value = calc.tax_free_threshold;
+
+        console.log('Setting startMonth field to:', calc.start_month);
         document.getElementById('startMonth').value = calc.start_month;
 
         // Update year display
