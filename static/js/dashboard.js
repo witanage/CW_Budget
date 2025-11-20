@@ -2996,7 +2996,6 @@ function loadTaxCalculator() {
     const calculateBtn = document.getElementById('calculateTaxBtn');
     const resetBtn = document.getElementById('resetTaxBtn');
     const assessmentYearSelect = document.getElementById('assessmentYear');
-    const applyDefaultRateBtn = document.getElementById('applyDefaultRateBtn');
     const startMonthSelect = document.getElementById('startMonth');
     const saveCalculationBtn = document.getElementById('saveCalculationBtn');
     const saveCalculationBtnAlt = document.getElementById('saveCalculationBtnAlt');
@@ -3009,10 +3008,6 @@ function loadTaxCalculator() {
 
     if (resetBtn) {
         resetBtn.onclick = resetTaxCalculator;
-    }
-
-    if (applyDefaultRateBtn) {
-        applyDefaultRateBtn.onclick = applyDefaultRateToAll;
     }
 
     if (saveCalculationBtn) {
@@ -3085,7 +3080,7 @@ function populateMonthlyDataTable() {
     if (!tbody) return;
 
     const startMonthIndex = parseInt(document.getElementById('startMonth').value) || 0;
-    const defaultRate = parseFloat(document.getElementById('defaultExchangeRate').value) || 299;
+    const defaultRate = 299;
 
     let html = '';
     for (let i = 0; i < 12; i++) {
@@ -3123,17 +3118,6 @@ function populateMonthlyDataTable() {
     }
 
     tbody.innerHTML = html;
-}
-
-function applyDefaultRateToAll() {
-    const defaultRate = parseFloat(document.getElementById('defaultExchangeRate').value) || 299;
-    const exchangeRateInputs = document.querySelectorAll('.month-exchange-rate');
-
-    exchangeRateInputs.forEach(input => {
-        input.value = defaultRate;
-    });
-
-    showToast('Default exchange rate applied to all months', 'success');
 }
 
 function calculateMonthlyTax() {
@@ -3316,7 +3300,6 @@ function resetTaxCalculator() {
     // Reset form fields
     document.getElementById('assessmentYear').value = '2024/2025';
     document.getElementById('monthlySalaryUSD').value = '6000';
-    document.getElementById('defaultExchangeRate').value = '299';
     document.getElementById('taxRate').value = '15';
     document.getElementById('taxFreeThreshold').value = '360000';
     document.getElementById('startMonth').value = '0';
