@@ -284,12 +284,14 @@ CREATE TABLE IF NOT EXISTS tax_calculations (
     total_annual_income DECIMAL(15, 2) NOT NULL,
     total_tax_liability DECIMAL(15, 2) NOT NULL,
     effective_tax_rate DECIMAL(5, 2) NOT NULL,
+    is_active BOOLEAN DEFAULT FALSE COMMENT 'Indicates if this is the active calculation for the assessment year',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     INDEX idx_user_id (user_id),
     INDEX idx_assessment_year (assessment_year),
-    INDEX idx_created_at (created_at)
+    INDEX idx_created_at (created_at),
+    INDEX idx_user_assessment_active (user_id, assessment_year, is_active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================

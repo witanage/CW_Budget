@@ -2166,6 +2166,7 @@ def save_tax_calculation():
         total_annual_income = Decimal(str(data.get('total_annual_income', 0)))
         total_tax_liability = Decimal(str(data.get('total_tax_liability', 0)))
         effective_tax_rate = Decimal(str(data.get('effective_tax_rate', 0)))
+        is_active = data.get('is_active', False)
 
         # Validate required fields
         if not all([calculation_name, assessment_year]):
@@ -2174,17 +2175,25 @@ def save_tax_calculation():
         connection = get_db_connection()
         cursor = connection.cursor(dictionary=True)
 
+        # If marking as active, deactivate other calculations for this year
+        if is_active:
+            cursor.execute("""
+                UPDATE tax_calculations
+                SET is_active = FALSE
+                WHERE user_id = %s AND assessment_year = %s
+            """, (user_id, assessment_year))
+
         # Insert main tax calculation
         cursor.execute("""
             INSERT INTO tax_calculations
             (user_id, calculation_name, assessment_year, monthly_salary_usd,
              tax_rate, tax_free_threshold, start_month, monthly_data,
-             total_annual_income, total_tax_liability, effective_tax_rate)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+             total_annual_income, total_tax_liability, effective_tax_rate, is_active)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             user_id, calculation_name, assessment_year, monthly_salary_usd,
             tax_rate, tax_free_threshold, start_month, json.dumps(monthly_data),
-            total_annual_income, total_tax_liability, effective_tax_rate
+            total_annual_income, total_tax_liability, effective_tax_rate, is_active
         ))
 
         tax_calculation_id = cursor.lastrowid
@@ -2234,22 +2243,35 @@ def save_tax_calculation():
 @app.route('/api/tax-calculations', methods=['GET'])
 @login_required
 def get_tax_calculations():
-    """Get all tax calculations for the current user."""
+    """Get all tax calculations for the current user, optionally filtered by year."""
     try:
         user_id = session['user_id']
+        year = request.args.get('year')  # Optional year filter
 
         connection = get_db_connection()
         cursor = connection.cursor(dictionary=True)
 
-        cursor.execute("""
-            SELECT id, calculation_name, assessment_year,
-                   monthly_salary_usd, tax_rate, tax_free_threshold,
-                   total_annual_income, total_tax_liability, effective_tax_rate,
-                   created_at, updated_at
-            FROM tax_calculations
-            WHERE user_id = %s
-            ORDER BY created_at DESC
-        """, (user_id,))
+        # Build query based on whether year filter is provided
+        if year:
+            cursor.execute("""
+                SELECT id, calculation_name, assessment_year,
+                       monthly_salary_usd, tax_rate, tax_free_threshold,
+                       total_annual_income, total_tax_liability, effective_tax_rate,
+                       is_active, created_at, updated_at
+                FROM tax_calculations
+                WHERE user_id = %s AND assessment_year = %s
+                ORDER BY is_active DESC, created_at DESC
+            """, (user_id, year))
+        else:
+            cursor.execute("""
+                SELECT id, calculation_name, assessment_year,
+                       monthly_salary_usd, tax_rate, tax_free_threshold,
+                       total_annual_income, total_tax_liability, effective_tax_rate,
+                       is_active, created_at, updated_at
+                FROM tax_calculations
+                WHERE user_id = %s
+                ORDER BY assessment_year DESC, is_active DESC, created_at DESC
+            """, (user_id,))
 
         calculations = cursor.fetchall()
 
@@ -2344,6 +2366,175 @@ def delete_tax_calculation(calculation_id):
     except Error as e:
         connection.rollback()
         logger.error(f"Error deleting tax calculation {calculation_id}: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@app.route('/api/tax-calculations/years', methods=['GET'])
+@login_required
+def get_tax_calculation_years():
+    """Get list of all assessment years with calculation counts for the current user."""
+    try:
+        user_id = session['user_id']
+
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+
+        cursor.execute("""
+            SELECT
+                assessment_year,
+                COUNT(*) as calculation_count,
+                SUM(CASE WHEN is_active = TRUE THEN 1 ELSE 0 END) as has_active,
+                MAX(created_at) as last_updated
+            FROM tax_calculations
+            WHERE user_id = %s
+            GROUP BY assessment_year
+            ORDER BY assessment_year DESC
+        """, (user_id,))
+
+        years = cursor.fetchall()
+
+        return jsonify(years), 200
+
+    except Error as e:
+        logger.error(f"Error fetching tax calculation years: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@app.route('/api/tax-calculations/by-year/<year>', methods=['GET'])
+@login_required
+def get_tax_calculations_by_year(year):
+    """Get all tax calculations for a specific assessment year."""
+    try:
+        user_id = session['user_id']
+
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+
+        cursor.execute("""
+            SELECT id, calculation_name, assessment_year,
+                   monthly_salary_usd, tax_rate, tax_free_threshold,
+                   total_annual_income, total_tax_liability, effective_tax_rate,
+                   is_active, created_at, updated_at
+            FROM tax_calculations
+            WHERE user_id = %s AND assessment_year = %s
+            ORDER BY is_active DESC, created_at DESC
+        """, (user_id, year))
+
+        calculations = cursor.fetchall()
+
+        return jsonify(calculations), 200
+
+    except Error as e:
+        logger.error(f"Error fetching tax calculations for year {year}: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@app.route('/api/tax-calculations/by-year/<year>/active', methods=['GET'])
+@login_required
+def get_active_tax_calculation_by_year(year):
+    """Get the active tax calculation for a specific assessment year."""
+    try:
+        user_id = session['user_id']
+
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+
+        # Get main calculation
+        cursor.execute("""
+            SELECT *
+            FROM tax_calculations
+            WHERE user_id = %s AND assessment_year = %s AND is_active = TRUE
+        """, (user_id, year))
+
+        calculation = cursor.fetchone()
+
+        if not calculation:
+            return jsonify({'error': 'No active tax calculation found for this year'}), 404
+
+        # Get monthly details
+        cursor.execute("""
+            SELECT *
+            FROM tax_calculation_details
+            WHERE tax_calculation_id = %s
+            ORDER BY month_index
+        """, (calculation['id'],))
+
+        details = cursor.fetchall()
+        calculation['details'] = details
+
+        # Parse JSON monthly_data
+        if calculation['monthly_data']:
+            calculation['monthly_data'] = json.loads(calculation['monthly_data'])
+
+        return jsonify(calculation), 200
+
+    except Error as e:
+        logger.error(f"Error fetching active tax calculation for year {year}: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@app.route('/api/tax-calculations/<int:calculation_id>/set-active', methods=['PUT'])
+@login_required
+def set_active_tax_calculation(calculation_id):
+    """Set a tax calculation as active for its assessment year."""
+    try:
+        user_id = session['user_id']
+
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+
+        # Verify ownership and get assessment year
+        cursor.execute("""
+            SELECT assessment_year FROM tax_calculations
+            WHERE id = %s AND user_id = %s
+        """, (calculation_id, user_id))
+
+        calculation = cursor.fetchone()
+
+        if not calculation:
+            return jsonify({'error': 'Tax calculation not found'}), 404
+
+        assessment_year = calculation['assessment_year']
+
+        # Deactivate all calculations for this year
+        cursor.execute("""
+            UPDATE tax_calculations
+            SET is_active = FALSE
+            WHERE user_id = %s AND assessment_year = %s
+        """, (user_id, assessment_year))
+
+        # Activate the specified calculation
+        cursor.execute("""
+            UPDATE tax_calculations
+            SET is_active = TRUE, updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s AND user_id = %s
+        """, (calculation_id, user_id))
+
+        connection.commit()
+
+        logger.info(f"Tax calculation {calculation_id} set as active for year {assessment_year}")
+
+        return jsonify({
+            'message': 'Tax calculation set as active successfully',
+            'id': calculation_id,
+            'assessment_year': assessment_year
+        }), 200
+
+    except Error as e:
+        connection.rollback()
+        logger.error(f"Error setting tax calculation {calculation_id} as active: {str(e)}")
         return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()

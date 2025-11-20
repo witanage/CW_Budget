@@ -3062,17 +3062,33 @@ function filterCalculationsByYear() {
     const selectedYear = document.getElementById('assessmentYear').value;
 
     console.log('Filtering calculations for year:', selectedYear);
-    console.log('All saved calculations:', allSavedCalculations);
 
-    // Filter calculations for the selected year
-    const filteredCalculations = allSavedCalculations.filter(calc =>
-        calc.assessment_year === selectedYear
-    );
+    // Use backend filtering for better performance
+    showLoading();
 
-    console.log('Filtered calculations:', filteredCalculations);
+    fetch(`/api/tax-calculations?year=${encodeURIComponent(selectedYear)}`)
+    .then(response => response.json())
+    .then(calculations => {
+        hideLoading();
+        console.log('Filtered calculations from backend:', calculations);
 
-    // Display filtered calculations
-    displaySavedCalculations(filteredCalculations, selectedYear);
+        // Check if it's an error response
+        if (calculations.error) {
+            console.error('API returned error:', calculations.error);
+            showToast('Error: ' + calculations.error, 'danger');
+            displaySavedCalculations([], selectedYear);
+            return;
+        }
+
+        // Display filtered calculations
+        displaySavedCalculations(Array.isArray(calculations) ? calculations : [], selectedYear);
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Error filtering calculations:', error);
+        showToast('Failed to filter calculations. Check console for details.', 'danger');
+        displaySavedCalculations([], selectedYear);
+    });
 }
 
 function populateMonthlyDataTable() {
@@ -3508,9 +3524,12 @@ function saveTaxCalculation() {
         return;
     }
 
+    const setAsActive = document.getElementById('setAsActive')?.checked || false;
+
     const dataToSave = {
         ...lastCalculationData,
-        calculation_name: calculationName
+        calculation_name: calculationName,
+        is_active: setAsActive
     };
 
     showLoading();
@@ -3612,12 +3631,17 @@ function displaySavedCalculations(calculations, filterYear = null) {
     calculations.forEach(calc => {
         const createdDate = new Date(calc.created_at).toLocaleDateString();
         const effectiveRate = parseFloat(calc.effective_tax_rate || 0).toFixed(2);
+        const isActive = calc.is_active || false;
+        const activeClass = isActive ? 'border-success' : '';
 
         html += `
-            <div class="list-group-item list-group-item-action calculation-item mb-2">
+            <div class="list-group-item list-group-item-action calculation-item mb-2 ${activeClass}">
                 <div class="d-flex justify-content-between align-items-start">
                     <div class="flex-grow-1">
-                        <h6 class="mb-1">${calc.calculation_name}</h6>
+                        <h6 class="mb-1">
+                            ${calc.calculation_name}
+                            ${isActive ? '<span class="badge bg-success ms-2">Active</span>' : ''}
+                        </h6>
                         <p class="mb-1 small">
                             <span class="badge bg-primary me-2">${calc.assessment_year}</span>
                             <span class="text-muted">Saved: ${createdDate}</span>
@@ -3641,10 +3665,13 @@ function displaySavedCalculations(calculations, filterYear = null) {
                             </div>
                         </div>
                     </div>
-                    <div class="ms-3">
-                        <button class="btn btn-sm btn-outline-primary mb-1" onclick="loadCalculation(${calc.id})" title="Load this calculation">
+                    <div class="ms-3 d-flex flex-column gap-1">
+                        <button class="btn btn-sm btn-outline-primary" onclick="loadCalculation(${calc.id})" title="Load this calculation">
                             <i class="fas fa-download"></i>
                         </button>
+                        ${!isActive ? `<button class="btn btn-sm btn-outline-success" onclick="setActiveCalculation(${calc.id})" title="Set as active">
+                            <i class="fas fa-star"></i>
+                        </button>` : ''}
                         <button class="btn btn-sm btn-outline-danger" onclick="deleteCalculation(${calc.id})" title="Delete this calculation">
                             <i class="fas fa-trash"></i>
                         </button>
@@ -3659,7 +3686,39 @@ function displaySavedCalculations(calculations, filterYear = null) {
 }
 
 function showAllCalculations() {
-    displaySavedCalculations(allSavedCalculations);
+    // Reload all calculations from backend
+    loadSavedCalculations();
+}
+
+function setActiveCalculation(calculationId) {
+    if (!confirm('Set this calculation as active for its assessment year?')) {
+        return;
+    }
+
+    showLoading();
+
+    fetch(`/api/tax-calculations/${calculationId}/set-active`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.error) {
+            showToast(data.error, 'danger');
+        } else {
+            showToast(`Calculation set as active for ${data.assessment_year}!`, 'success');
+            // Reload the calculations list to reflect the change
+            loadSavedCalculations();
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Error setting active calculation:', error);
+        showToast('Failed to set active calculation', 'danger');
+    });
 }
 
 function loadCalculation(calculationId) {
