@@ -615,35 +615,83 @@
 
                         <!-- Summary Cards -->
                         <div class="row mt-3">
-                            <div class="col-md-3">
-                                <div class="card text-white bg-primary">
+                            <div class="col-md-3 mb-3">
+                                <div class="card text-white bg-primary summary-card">
                                     <div class="card-body">
                                         <h6 class="card-title">Annual Income</h6>
                                         <h4 id="annualIncomeSummary">LKR 0</h4>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-3">
-                                <div class="card text-white bg-warning">
+                            <div class="col-md-3 mb-3">
+                                <div class="card text-white bg-warning summary-card">
                                     <div class="card-body">
                                         <h6 class="card-title">Tax-Free Amount</h6>
                                         <h4 id="taxFreeAmountSummary">LKR 360,000</h4>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-3">
-                                <div class="card text-white bg-danger">
+                            <div class="col-md-3 mb-3">
+                                <div class="card text-white bg-danger summary-card">
                                     <div class="card-body">
                                         <h6 class="card-title">Total Tax Liability</h6>
                                         <h4 id="totalTaxSummary">LKR 0</h4>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-3">
-                                <div class="card text-white bg-info">
+                            <div class="col-md-3 mb-3">
+                                <div class="card text-white bg-info summary-card">
                                     <div class="card-body">
                                         <h6 class="card-title">Effective Tax Rate</h6>
                                         <h4 id="effectiveTaxRateSummary">0%</h4>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Save Calculation -->
+                        <div class="row mt-4" id="saveCalculationSection" style="display: none;">
+                            <div class="col-12">
+                                <div class="card border-success">
+                                    <div class="card-header bg-success text-white">
+                                        <h6 class="mb-0"><i class="fas fa-save me-2"></i>Save This Calculation</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-8 mb-3">
+                                                <label for="calculationName" class="form-label">Calculation Name</label>
+                                                <input type="text" class="form-control" id="calculationName" placeholder="e.g., My 2024/2025 Tax Calculation">
+                                            </div>
+                                            <div class="col-md-4 mb-3">
+                                                <label class="form-label">&nbsp;</label>
+                                                <button type="button" class="btn btn-success w-100" id="saveCalculationBtn">
+                                                    <i class="fas fa-save me-2"></i>Save to Database
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Saved Calculations -->
+                        <div class="row saved-calculations-section">
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <h6 class="mb-0"><i class="fas fa-history me-2"></i>Saved Tax Calculations</h6>
+                                            <button type="button" class="btn btn-sm btn-outline-primary" id="refreshSavedCalculationsBtn">
+                                                <i class="fas fa-sync-alt me-1"></i>Refresh
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="card-body">
+                                        <div id="savedCalculationsList">
+                                            <p class="text-muted text-center py-4">
+                                                <i class="fas fa-info-circle me-2"></i>No saved calculations yet. Calculate and save your tax to see it here.
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1414,6 +1462,143 @@
 [data-theme="dark"] #taxPage .text-muted.small {
     color: #b0b0b0 !important;
 }
+
+/* Tax Calculator Enhanced Styling */
+#taxPage .card {
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    margin-bottom: 1.5rem;
+}
+
+[data-theme="dark"] #taxPage .card {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+#taxPage .card-header {
+    border-radius: 12px 12px 0 0 !important;
+    padding: 1rem 1.5rem;
+}
+
+#taxPage .form-label {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+}
+
+#taxPage .input-group-text {
+    background-color: var(--bg-tertiary);
+    border-color: var(--input-border);
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+#taxPage .form-control, #taxPage .form-select {
+    border: 2px solid var(--input-border);
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+#taxPage .form-control:focus, #taxPage .form-select:focus {
+    border-color: #4a90e2;
+    box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+}
+
+#taxPage .btn {
+    border-radius: 8px;
+    padding: 0.6rem 1.2rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+#taxPage .btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+}
+
+#taxPage .btn-primary:hover {
+    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+#taxPage #monthlyDataTable {
+    margin-bottom: 0;
+}
+
+#taxPage #monthlyDataTable thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: var(--bg-secondary);
+}
+
+#taxPage #monthlyDataTable tbody tr:hover {
+    background-color: var(--sidebar-hover);
+}
+
+#taxPage #monthlyDataTable input {
+    font-size: 0.875rem;
+}
+
+#taxPage .summary-card {
+    border-radius: 12px;
+    transition: all 0.3s ease;
+}
+
+#taxPage .summary-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+#taxPage .summary-card h6 {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.5rem;
+}
+
+#taxPage .summary-card h4 {
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+#taxPage .table-responsive {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+#taxPage #taxScheduleTable {
+    margin-bottom: 0;
+}
+
+#taxPage #taxScheduleTable thead {
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+}
+
+#taxPage #taxScheduleTable tbody tr:hover {
+    background-color: rgba(102, 126, 234, 0.1);
+    transform: scale(1.01);
+    transition: all 0.2s ease;
+}
+
+#taxPage .saved-calculations-section {
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 2px solid var(--border-color);
+}
+
+#taxPage .calculation-item {
+    border-left: 4px solid #667eea;
+    transition: all 0.3s ease;
+}
+
+#taxPage .calculation-item:hover {
+    border-left-color: #764ba2;
+    background-color: var(--sidebar-hover);
+}
+
 </style>
 
 {% endblock %}
