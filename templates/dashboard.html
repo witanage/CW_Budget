@@ -20,6 +20,11 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link" href="#" data-page="tax">
+                            <i class="fas fa-calculator me-2"></i>Tax
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link" href="#" data-page="reports">
                             <i class="fas fa-chart-bar me-2"></i>Reports
                         </a>
@@ -426,6 +431,253 @@
                                                 </div>
                                             </div>
                                         </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tax Calculator Page - Completely Redesigned -->
+            <div id="taxPage" class="page-content" style="display:none;">
+                <!-- Page Header -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h4 class="mb-1"><i class="fas fa-calculator me-2"></i>Tax Calculator</h4>
+                        <p class="text-muted mb-0">Foreign Employment Income Tax (Sri Lanka)</p>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="refreshSavedCalculationsBtn">
+                            <i class="fas fa-sync-alt me-1"></i>Refresh
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Quick Summary Stats -->
+                <div class="row g-3 mb-4" id="taxSummaryCards" style="display: none;">
+                    <div class="col-md-3">
+                        <div class="tax-stat-card">
+                            <div class="tax-stat-icon bg-primary-soft">
+                                <i class="fas fa-dollar-sign"></i>
+                            </div>
+                            <div class="tax-stat-content">
+                                <small class="tax-stat-label">Annual Income</small>
+                                <h5 class="tax-stat-value mb-0" id="annualIncomeSummary">LKR 0</h5>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="tax-stat-card">
+                            <div class="tax-stat-icon bg-warning-soft">
+                                <i class="fas fa-shield-alt"></i>
+                            </div>
+                            <div class="tax-stat-content">
+                                <small class="tax-stat-label">Tax-Free Amount</small>
+                                <h5 class="tax-stat-value mb-0" id="taxFreeAmountSummary">LKR 360,000</h5>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="tax-stat-card">
+                            <div class="tax-stat-icon bg-danger-soft">
+                                <i class="fas fa-file-invoice-dollar"></i>
+                            </div>
+                            <div class="tax-stat-content">
+                                <small class="tax-stat-label">Total Tax Liability</small>
+                                <h5 class="tax-stat-value mb-0" id="totalTaxSummary">LKR 0</h5>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="tax-stat-card">
+                            <div class="tax-stat-icon bg-info-soft">
+                                <i class="fas fa-percentage"></i>
+                            </div>
+                            <div class="tax-stat-content">
+                                <small class="tax-stat-label">Effective Tax Rate</small>
+                                <h5 class="tax-stat-value mb-0" id="effectiveTaxRateSummary">0%</h5>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3">
+                    <!-- Left Column - Input Form -->
+                    <div class="col-lg-5">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0"><i class="fas fa-edit me-2"></i>Income Details</h6>
+                            </div>
+                            <div class="card-body">
+                                <form id="taxCalculatorForm">
+                                    <!-- Assessment Year with Load Button -->
+                                    <div class="mb-3">
+                                        <label for="assessmentYear" class="form-label">Assessment Year</label>
+                                        <div class="input-group">
+                                            <select id="assessmentYear" class="form-select">
+                                                <option value="2025/2026">2025/2026</option>
+                                                <option value="2024/2025" selected>2024/2025</option>
+                                                <option value="2023/2024">2023/2024</option>
+                                            </select>
+                                            <button type="button" class="btn btn-primary" id="loadSavedByYearBtn" title="Load calculations">
+                                                <i class="fas fa-search"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Tax Rate & Threshold Row -->
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="taxRate" class="form-label">Tax Rate (%)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" id="taxRate" value="15" step="0.1" min="0" max="100">
+                                                <span class="input-group-text">%</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="startMonth" class="form-label">Start Month</label>
+                                            <select id="startMonth" class="form-select">
+                                                <option value="0" selected>April</option>
+                                                <option value="1">May</option>
+                                                <option value="2">June</option>
+                                                <option value="3">July</option>
+                                                <option value="4">August</option>
+                                                <option value="5">September</option>
+                                                <option value="6">October</option>
+                                                <option value="7">November</option>
+                                                <option value="8">December</option>
+                                                <option value="9">January</option>
+                                                <option value="10">February</option>
+                                                <option value="11">March</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <!-- Tax-Free Threshold -->
+                                    <div class="mb-3">
+                                        <label for="taxFreeThreshold" class="form-label">Tax-Free Threshold (Annual)</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">LKR</span>
+                                            <input type="number" class="form-control" id="taxFreeThreshold" value="360000" step="1000" min="0">
+                                        </div>
+                                    </div>
+
+                                    <!-- Monthly Data Expandable Section -->
+                                    <div class="accordion mb-3" id="monthlyDataAccordion">
+                                        <div class="accordion-item">
+                                            <h2 class="accordion-header">
+                                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#monthlyDataCollapse">
+                                                    <i class="fas fa-calendar-alt me-2"></i>Monthly Salary & Bonus
+                                                </button>
+                                            </h2>
+                                            <div id="monthlyDataCollapse" class="accordion-collapse collapse">
+                                                <div class="accordion-body p-2">
+                                                    <div class="table-responsive" style="max-height: 350px; overflow-y: auto;">
+                                                        <table class="table table-sm mb-0" id="monthlyDataTable">
+                                                            <tbody id="monthlyDataBody"></tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Action Buttons -->
+                                    <div class="d-grid gap-2">
+                                        <button type="button" class="btn btn-primary btn-lg" id="calculateTaxBtn">
+                                            <i class="fas fa-calculator me-2"></i>Calculate Tax
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary" id="resetTaxBtn">
+                                            <i class="fas fa-redo me-2"></i>Reset Form
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column - Results & Saved Calculations -->
+                    <div class="col-lg-7">
+                        <!-- Tax Schedule Results -->
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0"><i class="fas fa-table me-2"></i>Tax Schedule <span class="badge bg-secondary" id="yaDisplay">2024/2025</span></h6>
+                                    <button type="button" class="btn btn-sm btn-success" id="saveCalculationBtn" style="display: none;">
+                                        <i class="fas fa-save me-1"></i>Save
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="alert alert-info alert-sm mb-3">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    Payment due by 15th of following month
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover mb-0" id="taxScheduleTable">
+                                        <thead>
+                                            <tr>
+                                                <th>Month</th>
+                                                <th class="text-end">Receipts</th>
+                                                <th class="text-end">LKR</th>
+                                                <th class="text-end">Cumulative</th>
+                                                <th class="text-end">Tax Due</th>
+                                                <th class="text-end">Payment</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="taxScheduleBody">
+                                            <tr>
+                                                <td colspan="6" class="text-center text-muted py-5">
+                                                    <i class="fas fa-calculator fa-2x mb-2 d-block"></i>
+                                                    Click "Calculate Tax" to generate schedule
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                        <tfoot style="display: none;">
+                                            <tr class="fw-bold">
+                                                <td>Total</td>
+                                                <td class="text-end" id="totalUSD">$0</td>
+                                                <td class="text-end" id="totalConverted">LKR 0</td>
+                                                <td class="text-end">-</td>
+                                                <td class="text-end" id="totalTaxLiability">LKR 0</td>
+                                                <td class="text-end" id="totalMonthlyPayments">LKR 0</td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Save Modal (appears after calculation) -->
+                        <div id="saveCalculationSection" style="display: none;">
+                            <div class="card border-success mb-3">
+                                <div class="card-body">
+                                    <div class="row align-items-end">
+                                        <div class="col-md-8">
+                                            <label for="calculationName" class="form-label small mb-1">Save this calculation</label>
+                                            <input type="text" class="form-control" id="calculationName" placeholder="e.g., My 2024/2025 Tax Plan">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <button type="button" class="btn btn-success w-100" id="saveCalculationBtnAlt">
+                                                <i class="fas fa-save me-1"></i>Save
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Saved Calculations List -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0"><i class="fas fa-history me-2"></i>Saved Calculations</h6>
+                            </div>
+                            <div class="card-body">
+                                <div id="savedCalculationsList">
+                                    <div class="text-center text-muted py-4">
+                                        <i class="fas fa-folder-open fa-2x mb-2 d-block"></i>
+                                        <small>No saved calculations</small>
                                     </div>
                                 </div>
                             </div>
@@ -1176,6 +1428,347 @@
         padding: 0.4rem 0.6rem;
     }
 }
+
+/* Tax Calculator Page - Prevent card hover animations */
+#taxPage .card:hover {
+    transform: none !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+}
+
+[data-theme="light"] #taxPage .card:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Tax Summary Card - Improve label visibility in dark mode */
+#taxPage .text-muted.small {
+    color: var(--text-secondary) !important;
+    font-weight: 500;
+}
+
+[data-theme="dark"] #taxPage .text-muted.small {
+    color: #b0b0b0 !important;
+}
+
+/* Tax Calculator - Modern Redesign */
+
+/* Tax Stat Cards */
+.tax-stat-card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: all 0.2s ease;
+}
+
+.tax-stat-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+[data-theme="dark"] .tax-stat-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.tax-stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.bg-primary-soft {
+    background-color: rgba(8, 102, 255, 0.1);
+    color: var(--accent-color);
+}
+
+.bg-warning-soft {
+    background-color: rgba(255, 193, 7, 0.1);
+    color: #ffc107;
+}
+
+.bg-danger-soft {
+    background-color: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+}
+
+.bg-info-soft {
+    background-color: rgba(13, 202, 240, 0.1);
+    color: #0dcaf0;
+}
+
+.tax-stat-content {
+    flex: 1;
+}
+
+.tax-stat-label {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.25rem;
+    font-weight: 600;
+}
+
+.tax-stat-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+/* Tax Page General Styles */
+#taxPage .card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+#taxPage .card-header {
+    background-color: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    padding: 1rem 1.25rem;
+}
+
+#taxPage .card-header h6 {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+#taxPage .form-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+#taxPage .form-control,
+#taxPage .form-select {
+    background-color: var(--input-bg);
+    color: var(--text-primary);
+    border: 1px solid var(--input-border);
+    border-radius: 6px;
+    font-size: 0.9375rem;
+    padding: 0.625rem 0.75rem;
+    min-height: 44px;
+}
+
+#taxPage .form-select {
+    padding-right: 2.5rem;
+}
+
+#taxPage .form-control:focus,
+#taxPage .form-select:focus {
+    background-color: var(--input-bg);
+    color: var(--text-primary);
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(8, 102, 255, 0.1);
+}
+
+#taxPage .input-group-text {
+    background-color: var(--bg-tertiary);
+    border-color: var(--input-border);
+    color: var(--text-primary);
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+/* Accordion Styles */
+#taxPage .accordion-item {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+}
+
+#taxPage .accordion-button {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    font-weight: 600;
+    font-size: 0.875rem;
+    padding: 0.75rem 1rem;
+}
+
+#taxPage .accordion-button:not(.collapsed) {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+#taxPage .accordion-button:focus {
+    box-shadow: none;
+    border-color: var(--border-color);
+}
+
+#taxPage .accordion-body {
+    background-color: var(--card-bg);
+}
+
+/* Table Styles */
+#taxPage table {
+    color: var(--text-primary);
+}
+
+#taxPage table thead {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+#taxPage table tbody tr {
+    background-color: var(--table-bg);
+    border-bottom: 1px solid var(--border-color);
+}
+
+#taxPage table tbody tr:hover {
+    background-color: var(--table-hover);
+}
+
+#taxPage table tfoot {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    font-weight: 600;
+    border-top: 2px solid var(--border-color);
+}
+
+#taxPage #monthlyDataTable input {
+    font-size: 0.8125rem;
+    padding: 0.25rem 0.5rem;
+    background-color: var(--input-bg);
+    color: var(--text-primary);
+    border: 1px solid var(--input-border);
+}
+
+/* Alert Styles */
+#taxPage .alert-sm {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+}
+
+#taxPage .alert-info {
+    background-color: rgba(8, 102, 255, 0.1);
+    border-color: var(--accent-color);
+    color: var(--text-primary);
+}
+
+/* Saved Calculations */
+#taxPage .calculation-item {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-left: 3px solid var(--accent-color);
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    transition: all 0.2s ease;
+}
+
+#taxPage .calculation-item:hover {
+    background-color: var(--sidebar-hover);
+    border-left-width: 4px;
+    transform: translateX(2px);
+}
+
+/* Buttons */
+#taxPage .btn {
+    font-weight: 600;
+    border-radius: 6px;
+}
+
+#taxPage .btn-lg {
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+}
+
+/* Remove card hover transform */
+#taxPage .card:hover {
+    transform: none !important;
+}
+
+/* Month Expandable Rows */
+.month-header-row {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.month-header-row:hover {
+    background-color: var(--table-hover);
+}
+
+.month-header {
+    padding: 0.75rem 1rem !important;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.month-chevron {
+    transition: transform 0.2s ease;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+}
+
+.month-detail-row {
+    border: none !important;
+}
+
+.month-detail-content {
+    background-color: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.month-summary {
+    font-size: 0.875rem;
+}
+
+/* Bonus Entry Styles */
+.bonuses-container {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.bonus-entry {
+    padding: 0.5rem;
+    background-color: var(--input-bg);
+    border: 1px solid var(--input-border);
+    border-radius: 6px;
+}
+
+.bonus-entry:hover {
+    background-color: var(--table-hover);
+}
+
+.add-bonus-btn {
+    font-size: 0.875rem;
+    padding: 0.25rem 0.5rem;
+}
+
+.remove-bonus-btn {
+    padding: 0.375rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 991px) {
+    .tax-stat-card {
+        padding: 1rem;
+    }
+
+    .tax-stat-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 1rem;
+    }
+
+    .tax-stat-value {
+        font-size: 1.1rem;
+    }
+}
+
 </style>
 
 {% endblock %}

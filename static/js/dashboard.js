@@ -169,6 +169,9 @@ function loadPageData(pageName) {
         case 'overview':
             loadDashboardStats();
             break;
+        case 'tax':
+            loadTaxCalculator();
+            break;
     }
 }
 
@@ -2971,6 +2974,842 @@ document.addEventListener('DOMContentLoaded', function() {
         manageCCModal.addEventListener('shown.bs.modal', loadCreditCardsList);
     }
 });
+
+// ================================
+// TAX CALCULATOR - Monthly Withholding Tax (Sri Lanka)
+// ================================
+
+// Month names for display
+const monthNames = ['April', 'May', 'June', 'July', 'August', 'September',
+                   'October', 'November', 'December', 'January', 'February', 'March'];
+
+// Store last calculation data for saving
+let lastCalculationData = null;
+
+// Store all saved calculations for filtering
+let allSavedCalculations = [];
+
+function loadTaxCalculator() {
+    console.log('Loading Tax Calculator...');
+
+    // Setup event listeners
+    const calculateBtn = document.getElementById('calculateTaxBtn');
+    const resetBtn = document.getElementById('resetTaxBtn');
+    const assessmentYearSelect = document.getElementById('assessmentYear');
+    const startMonthSelect = document.getElementById('startMonth');
+    const saveCalculationBtn = document.getElementById('saveCalculationBtn');
+    const saveCalculationBtnAlt = document.getElementById('saveCalculationBtnAlt');
+    const refreshSavedBtn = document.getElementById('refreshSavedCalculationsBtn');
+    const loadSavedByYearBtn = document.getElementById('loadSavedByYearBtn');
+
+    if (calculateBtn) {
+        calculateBtn.onclick = calculateMonthlyTax;
+    }
+
+    if (resetBtn) {
+        resetBtn.onclick = resetTaxCalculator;
+    }
+
+    if (saveCalculationBtn) {
+        saveCalculationBtn.onclick = saveTaxCalculation;
+    }
+
+    if (saveCalculationBtnAlt) {
+        saveCalculationBtnAlt.onclick = saveTaxCalculation;
+    }
+
+    if (refreshSavedBtn) {
+        refreshSavedBtn.onclick = loadSavedCalculations;
+    }
+
+    // Load button to filter calculations by selected year
+    if (loadSavedByYearBtn) {
+        loadSavedByYearBtn.onclick = function() {
+            console.log('Load button clicked');
+            filterCalculationsByYear();
+        };
+    }
+
+    // Update year/assessment display when year changes
+    if (assessmentYearSelect) {
+        assessmentYearSelect.addEventListener('change', function() {
+            updateYearDisplay();
+        });
+        updateYearDisplay();
+    }
+
+    // Update monthly data table when start month changes
+    if (startMonthSelect) {
+        startMonthSelect.addEventListener('change', populateMonthlyDataTable);
+    }
+
+    // Initial table population
+    populateMonthlyDataTable();
+
+    // Load all saved calculations on page load
+    loadSavedCalculations();
+}
+
+function updateYearDisplay() {
+    const assessmentYear = document.getElementById('assessmentYear').value;
+    const yaDisplay = document.getElementById('yaDisplay');
+    if (yaDisplay) {
+        yaDisplay.textContent = assessmentYear;
+    }
+}
+
+function filterCalculationsByYear() {
+    const selectedYear = document.getElementById('assessmentYear').value;
+
+    console.log('Filtering calculations for year:', selectedYear);
+    console.log('All saved calculations:', allSavedCalculations);
+
+    // Filter calculations for the selected year
+    const filteredCalculations = allSavedCalculations.filter(calc =>
+        calc.assessment_year === selectedYear
+    );
+
+    console.log('Filtered calculations:', filteredCalculations);
+
+    // Display filtered calculations
+    displaySavedCalculations(filteredCalculations, selectedYear);
+}
+
+function populateMonthlyDataTable() {
+    const tbody = document.getElementById('monthlyDataBody');
+    if (!tbody) return;
+
+    const startMonthIndex = parseInt(document.getElementById('startMonth').value) || 0;
+    const defaultSalaryRate = 299;
+    const defaultSalary = 6000;
+
+    let html = '';
+    for (let i = 0; i < 12; i++) {
+        const monthIndex = (startMonthIndex + i) % 12;
+        const monthName = monthNames[monthIndex];
+        const collapseId = `month-${monthIndex}-collapse`;
+
+        html += `
+            <tr class="month-header-row" data-bs-toggle="collapse" data-bs-target="#${collapseId}" role="button">
+                <td colspan="5" class="month-header">
+                    <i class="fas fa-chevron-right me-2 month-chevron"></i>
+                    <strong>${monthName}</strong>
+                    <span class="text-muted ms-2 month-summary" id="summary-${monthIndex}"></span>
+                </td>
+            </tr>
+            <tr class="collapse month-detail-row" id="${collapseId}">
+                <td colspan="5" class="p-0">
+                    <div class="month-detail-content">
+                        <div class="row g-2 p-3">
+                            <div class="col-md-6">
+                                <label class="form-label small mb-1">Salary (USD)</label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control month-salary"
+                                           data-month="${monthIndex}"
+                                           placeholder="6000"
+                                           value="${defaultSalary}"
+                                           step="100"
+                                           min="0">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small mb-1">Salary Rate (LKR)</label>
+                                <div class="input-group input-group-sm">
+                                    <input type="number" class="form-control month-salary-rate"
+                                           data-month="${monthIndex}"
+                                           placeholder="299"
+                                           value="${defaultSalaryRate}"
+                                           step="0.01"
+                                           min="0">
+                                    <span class="input-group-text">LKR</span>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <hr class="my-2">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <label class="form-label small mb-0">Bonuses</label>
+                                    <button type="button" class="btn btn-sm btn-outline-primary add-bonus-btn"
+                                            data-month="${monthIndex}">
+                                        <i class="fas fa-plus me-1"></i>Add Bonus
+                                    </button>
+                                </div>
+                                <div class="bonuses-container" data-month="${monthIndex}">
+                                    <!-- Bonuses will be added dynamically here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }
+
+    tbody.innerHTML = html;
+
+    // Add event listeners to rotate chevron icons
+    document.querySelectorAll('.month-header-row').forEach(row => {
+        row.addEventListener('click', function() {
+            const chevron = this.querySelector('.month-chevron');
+            chevron.classList.toggle('fa-chevron-right');
+            chevron.classList.toggle('fa-chevron-down');
+        });
+    });
+
+    // Add event listeners for "Add Bonus" buttons
+    document.querySelectorAll('.add-bonus-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation(); // Prevent collapse toggle
+            const monthIndex = parseInt(this.getAttribute('data-month'));
+            addBonusEntry(monthIndex);
+        });
+    });
+}
+
+// Helper function to add a bonus entry
+function addBonusEntry(monthIndex, bonusAmount = 0, bonusRate = 299) {
+    const container = document.querySelector(`.bonuses-container[data-month="${monthIndex}"]`);
+    if (!container) return;
+
+    const bonusId = `bonus-${monthIndex}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    const bonusHtml = `
+        <div class="bonus-entry mb-2" data-bonus-id="${bonusId}">
+            <div class="row g-2">
+                <div class="col-5">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text">$</span>
+                        <input type="number" class="form-control month-bonus"
+                               data-month="${monthIndex}"
+                               placeholder="0"
+                               value="${bonusAmount}"
+                               step="100"
+                               min="0">
+                    </div>
+                </div>
+                <div class="col-5">
+                    <div class="input-group input-group-sm">
+                        <input type="number" class="form-control month-bonus-rate"
+                               data-month="${monthIndex}"
+                               placeholder="299"
+                               value="${bonusRate}"
+                               step="0.01"
+                               min="0">
+                        <span class="input-group-text">LKR</span>
+                    </div>
+                </div>
+                <div class="col-2">
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-bonus-btn w-100"
+                            data-bonus-id="${bonusId}">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    container.insertAdjacentHTML('beforeend', bonusHtml);
+
+    // Add event listener for remove button
+    const removeBtn = container.querySelector(`[data-bonus-id="${bonusId}"] .remove-bonus-btn`);
+    removeBtn.addEventListener('click', function(e) {
+        e.stopPropagation(); // Prevent collapse toggle
+        const bonusEntry = this.closest('.bonus-entry');
+        bonusEntry.remove();
+    });
+}
+
+function calculateMonthlyTax() {
+    // Get form values
+    const taxRate = parseFloat(document.getElementById('taxRate').value) || 15;
+    const taxFreeThreshold = parseFloat(document.getElementById('taxFreeThreshold').value) || 360000;
+    const startMonthIndex = parseInt(document.getElementById('startMonth').value) || 0;
+
+    // Read monthly salary and their exchange rates from table
+    const salaryInputs = document.querySelectorAll('.month-salary');
+    const salaryRateInputs = document.querySelectorAll('.month-salary-rate');
+
+    const monthlySalaries = {};
+    const monthlySalaryRates = {};
+    const monthlyBonusesData = {}; // Will store array of {amount, rate} for each month
+
+    salaryInputs.forEach(input => {
+        const monthIndex = parseInt(input.getAttribute('data-month'));
+        monthlySalaries[monthIndex] = parseFloat(input.value) || 0;
+    });
+
+    salaryRateInputs.forEach(input => {
+        const monthIndex = parseInt(input.getAttribute('data-month'));
+        monthlySalaryRates[monthIndex] = parseFloat(input.value) || 0;
+    });
+
+    // Collect all bonuses for each month
+    const bonusContainers = document.querySelectorAll('.bonuses-container');
+    bonusContainers.forEach(container => {
+        const monthIndex = parseInt(container.getAttribute('data-month'));
+        const bonusEntries = container.querySelectorAll('.bonus-entry');
+
+        monthlyBonusesData[monthIndex] = [];
+        bonusEntries.forEach(entry => {
+            const bonusInput = entry.querySelector('.month-bonus');
+            const bonusRateInput = entry.querySelector('.month-bonus-rate');
+
+            const amount = parseFloat(bonusInput.value) || 0;
+            const rate = parseFloat(bonusRateInput.value) || 0;
+
+            if (amount > 0) {
+                monthlyBonusesData[monthIndex].push({ amount, rate });
+            }
+        });
+    });
+
+    // Validate that all months have valid salary exchange rates
+    let hasInvalidRates = false;
+    Object.values(monthlySalaryRates).forEach(rate => {
+        if (rate <= 0) hasInvalidRates = true;
+    });
+
+    if (hasInvalidRates) {
+        showToast('Please enter valid salary exchange rates for all months', 'warning');
+        return;
+    }
+
+    // Calculate for 12 months
+    const monthlyData = [];
+    let cumulativeIncome = 0;
+    let previousTaxLiability = 0;
+    let totalUSD = 0;
+    let totalConverted = 0;
+
+    for (let i = 0; i < 12; i++) {
+        const monthIndex = (startMonthIndex + i) % 12;
+        const monthName = monthNames[monthIndex];
+
+        const salaryUSD = monthlySalaries[monthIndex] || 0;
+        const salaryRate = monthlySalaryRates[monthIndex] || 0;
+
+        // Calculate total bonuses for this month
+        let totalBonusUSD = 0;
+        let totalBonusLKR = 0;
+        const bonuses = monthlyBonusesData[monthIndex] || [];
+        bonuses.forEach(bonus => {
+            totalBonusUSD += bonus.amount;
+            totalBonusLKR += bonus.amount * bonus.rate;
+        });
+
+        // Calculate FC receipts for this month
+        const fcReceiptsUSD = salaryUSD + totalBonusUSD;
+        const fcReceiptsLKR = (salaryUSD * salaryRate) + totalBonusLKR;
+
+        // Update cumulative income
+        cumulativeIncome += fcReceiptsLKR;
+
+        // Calculate total tax liability
+        const taxableIncome = Math.max(0, cumulativeIncome - taxFreeThreshold);
+        const totalTaxLiability = taxableIncome * (taxRate / 100);
+
+        // Calculate monthly payment (difference from previous month)
+        const monthlyPayment = Math.max(0, totalTaxLiability - previousTaxLiability);
+
+        // Store data
+        monthlyData.push({
+            month: monthName,
+            fcReceiptsUSD: fcReceiptsUSD,
+            fcReceiptsLKR: fcReceiptsLKR,
+            cumulativeIncome: cumulativeIncome,
+            totalTaxLiability: totalTaxLiability,
+            monthlyPayment: monthlyPayment
+        });
+
+        // Update for next iteration
+        previousTaxLiability = totalTaxLiability;
+        totalUSD += fcReceiptsUSD;
+        totalConverted += fcReceiptsLKR;
+    }
+
+    // Update table
+    updateTaxScheduleTable(monthlyData);
+
+    // Update totals
+    document.getElementById('totalUSD').textContent = `$${totalUSD.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+    document.getElementById('totalConverted').textContent = formatCurrency(totalConverted);
+    document.getElementById('totalTaxLiability').textContent = formatCurrency(previousTaxLiability);
+    document.getElementById('totalMonthlyPayments').textContent = formatCurrency(previousTaxLiability);
+
+    // Update summary cards
+    document.getElementById('annualIncomeSummary').textContent = formatCurrency(cumulativeIncome);
+    document.getElementById('taxFreeAmountSummary').textContent = formatCurrency(taxFreeThreshold);
+    document.getElementById('totalTaxSummary').textContent = formatCurrency(previousTaxLiability);
+
+    const effectiveRate = cumulativeIncome > 0 ? (previousTaxLiability / cumulativeIncome * 100) : 0;
+    document.getElementById('effectiveTaxRateSummary').textContent = `${effectiveRate.toFixed(2)}%`;
+
+    // Store calculation data for saving
+    lastCalculationData = {
+        assessment_year: document.getElementById('assessmentYear').value,
+        monthly_salary_usd: 0, // Kept for backwards compatibility, no longer used
+        tax_rate: taxRate,
+        tax_free_threshold: taxFreeThreshold,
+        start_month: startMonthIndex,
+        total_annual_income: cumulativeIncome,
+        total_tax_liability: previousTaxLiability,
+        effective_tax_rate: effectiveRate,
+        monthly_data: monthlyData.map((row, index) => {
+            const actualMonthIndex = (startMonthIndex + index) % 12;
+            const bonuses = monthlyBonusesData[actualMonthIndex] || [];
+
+            return {
+                month_index: index,
+                month: row.month,
+                salary_usd: monthlySalaries[actualMonthIndex] || 0,
+                salary_rate: monthlySalaryRates[actualMonthIndex] || 0,
+                bonuses: bonuses, // New array format: [{amount: 5000, rate: 299}, {amount: 10000, rate: 305}]
+                bonus_usd: 0, // Kept for backwards compatibility, no longer used
+                bonus_rate: 0, // Kept for backwards compatibility, no longer used
+                fcReceiptsUSD: row.fcReceiptsUSD,
+                fcReceiptsLKR: row.fcReceiptsLKR,
+                cumulativeIncome: row.cumulativeIncome,
+                totalTaxLiability: row.totalTaxLiability,
+                monthlyPayment: row.monthlyPayment
+            };
+        })
+    };
+
+    // Show save section
+    const saveSection = document.getElementById('saveCalculationSection');
+    if (saveSection) {
+        saveSection.style.display = 'block';
+        // Auto-generate calculation name
+        document.getElementById('calculationName').value = `Tax Calculation ${lastCalculationData.assessment_year}`;
+    }
+
+    // Show summary cards
+    const summaryCards = document.getElementById('taxSummaryCards');
+    if (summaryCards) {
+        summaryCards.style.display = 'flex';
+    }
+
+    // Show save button in header
+    const saveBtn = document.getElementById('saveCalculationBtn');
+    if (saveBtn) {
+        saveBtn.style.display = 'inline-block';
+    }
+
+    // Show table footer
+    const tfoot = document.querySelector('#taxScheduleTable tfoot');
+    if (tfoot) {
+        tfoot.style.display = 'table-footer-group';
+    }
+
+    showToast('Tax schedule calculated successfully', 'success');
+}
+
+function updateTaxScheduleTable(monthlyData) {
+    const tbody = document.getElementById('taxScheduleBody');
+    if (!tbody) return;
+
+    let html = '';
+    monthlyData.forEach(row => {
+        html += `
+            <tr>
+                <td>${row.month}</td>
+                <td class="text-end">$${row.fcReceiptsUSD.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</td>
+                <td class="text-end">${formatCurrency(row.fcReceiptsLKR)}</td>
+                <td class="text-end">${formatCurrency(row.cumulativeIncome)}</td>
+                <td class="text-end">${formatCurrency(row.totalTaxLiability)}</td>
+                <td class="text-end fw-bold text-danger">${formatCurrency(row.monthlyPayment)}</td>
+            </tr>
+        `;
+    });
+
+    tbody.innerHTML = html;
+}
+
+function resetTaxCalculator() {
+    // Reset form fields
+    document.getElementById('assessmentYear').value = '2024/2025';
+    document.getElementById('taxRate').value = '15';
+    document.getElementById('taxFreeThreshold').value = '360000';
+    document.getElementById('startMonth').value = '0';
+
+    // Repopulate monthly data table with default values
+    populateMonthlyDataTable();
+
+    // Reset results table
+    const tbody = document.getElementById('taxScheduleBody');
+    if (tbody) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="text-center text-muted py-5">
+                    <i class="fas fa-calculator fa-2x mb-2 d-block"></i>
+                    Click "Calculate Tax" to generate schedule
+                </td>
+            </tr>
+        `;
+    }
+
+    // Reset totals
+    document.getElementById('totalUSD').textContent = '$0';
+    document.getElementById('totalConverted').textContent = 'LKR 0';
+    document.getElementById('totalTaxLiability').textContent = 'LKR 0';
+    document.getElementById('totalMonthlyPayments').textContent = 'LKR 0';
+
+    // Reset summary cards
+    document.getElementById('annualIncomeSummary').textContent = 'LKR 0';
+    document.getElementById('taxFreeAmountSummary').textContent = 'LKR 360,000';
+    document.getElementById('totalTaxSummary').textContent = 'LKR 0';
+    document.getElementById('effectiveTaxRateSummary').textContent = '0%';
+
+    // Update displays
+    updateYearDisplay();
+
+    // Hide save section
+    const saveSection = document.getElementById('saveCalculationSection');
+    if (saveSection) {
+        saveSection.style.display = 'none';
+    }
+
+    // Hide summary cards
+    const summaryCards = document.getElementById('taxSummaryCards');
+    if (summaryCards) {
+        summaryCards.style.display = 'none';
+    }
+
+    // Hide save button in header
+    const saveBtn = document.getElementById('saveCalculationBtn');
+    if (saveBtn) {
+        saveBtn.style.display = 'none';
+    }
+
+    // Hide table footer
+    const tfoot = document.querySelector('#taxScheduleTable tfoot');
+    if (tfoot) {
+        tfoot.style.display = 'none';
+    }
+
+    lastCalculationData = null;
+
+    showToast('Tax calculator reset', 'info');
+}
+
+// ================================
+// SAVE AND LOAD CALCULATIONS
+// ================================
+
+function saveTaxCalculation() {
+    if (!lastCalculationData) {
+        showToast('Please calculate tax first before saving', 'warning');
+        return;
+    }
+
+    const calculationName = document.getElementById('calculationName').value.trim();
+    if (!calculationName) {
+        showToast('Please enter a name for this calculation', 'warning');
+        return;
+    }
+
+    const dataToSave = {
+        ...lastCalculationData,
+        calculation_name: calculationName
+    };
+
+    showLoading();
+
+    fetch('/api/tax-calculations', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(dataToSave)
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.error) {
+            showToast(data.error, 'danger');
+        } else {
+            showToast('Tax calculation saved successfully!', 'success');
+            // Reload saved calculations list
+            loadSavedCalculations();
+            // Hide save section
+            document.getElementById('saveCalculationSection').style.display = 'none';
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Error saving calculation:', error);
+        showToast('Failed to save calculation', 'danger');
+    });
+}
+
+function loadSavedCalculations() {
+    console.log('Loading saved calculations from API...');
+    showLoading();
+
+    fetch('/api/tax-calculations')
+    .then(response => {
+        console.log('API response status:', response.status);
+        return response.json();
+    })
+    .then(calculations => {
+        hideLoading();
+        console.log('Received calculations from API:', calculations);
+
+        // Check if it's an error response
+        if (calculations.error) {
+            console.error('API returned error:', calculations.error);
+            showToast('Error: ' + calculations.error, 'danger');
+            allSavedCalculations = [];
+            displaySavedCalculations([], null);
+            return;
+        }
+
+        // Store all calculations globally
+        allSavedCalculations = Array.isArray(calculations) ? calculations : [];
+        console.log('Stored calculations:', allSavedCalculations.length, 'items');
+
+        // Display all calculations (not filtered)
+        displaySavedCalculations(allSavedCalculations, null);
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Error loading calculations:', error);
+        showToast('Failed to load saved calculations. Check console for details.', 'danger');
+        allSavedCalculations = [];
+        displaySavedCalculations([], null);
+    });
+}
+
+function displaySavedCalculations(calculations, filterYear = null) {
+    const listContainer = document.getElementById('savedCalculationsList');
+    if (!listContainer) return;
+
+    if (!calculations || calculations.length === 0) {
+        const message = filterYear
+            ? `No saved calculations found for ${filterYear}. <a href="#" onclick="showAllCalculations(); return false;" class="alert-link">Show all calculations</a>`
+            : 'No saved calculations yet. Calculate and save your tax to see it here.';
+
+        listContainer.innerHTML = `
+            <p class="text-muted text-center py-4">
+                <i class="fas fa-info-circle me-2"></i>${message}
+            </p>
+        `;
+        return;
+    }
+
+    // Show filter info if filtering
+    let headerHtml = '';
+    if (filterYear && allSavedCalculations.length > calculations.length) {
+        headerHtml = `
+            <div class="alert alert-info mb-3">
+                <i class="fas fa-filter me-2"></i>Showing ${calculations.length} calculation(s) for ${filterYear}.
+                <a href="#" onclick="showAllCalculations(); return false;" class="alert-link">Show all ${allSavedCalculations.length} calculations</a>
+            </div>
+        `;
+    }
+
+    let html = headerHtml + '<div class="list-group">';
+    calculations.forEach(calc => {
+        const createdDate = new Date(calc.created_at).toLocaleDateString();
+        const effectiveRate = parseFloat(calc.effective_tax_rate || 0).toFixed(2);
+
+        html += `
+            <div class="list-group-item list-group-item-action calculation-item mb-2">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                        <h6 class="mb-1">${calc.calculation_name}</h6>
+                        <p class="mb-1 small">
+                            <span class="badge bg-primary me-2">${calc.assessment_year}</span>
+                            <span class="text-muted">Saved: ${createdDate}</span>
+                        </p>
+                        <div class="row mt-2">
+                            <div class="col-md-3">
+                                <small class="text-muted">Annual Income:</small><br>
+                                <strong>${formatCurrency(calc.total_annual_income)}</strong>
+                            </div>
+                            <div class="col-md-3">
+                                <small class="text-muted">Tax Liability:</small><br>
+                                <strong class="text-danger">${formatCurrency(calc.total_tax_liability)}</strong>
+                            </div>
+                            <div class="col-md-3">
+                                <small class="text-muted">Effective Rate:</small><br>
+                                <strong class="text-info">${effectiveRate}%</strong>
+                            </div>
+                            <div class="col-md-3">
+                                <small class="text-muted">Monthly Salary:</small><br>
+                                <strong>$${parseFloat(calc.monthly_salary_usd || 0).toLocaleString()}</strong>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ms-3">
+                        <button class="btn btn-sm btn-outline-primary mb-1" onclick="loadCalculation(${calc.id})" title="Load this calculation">
+                            <i class="fas fa-download"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteCalculation(${calc.id})" title="Delete this calculation">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    html += '</div>';
+
+    listContainer.innerHTML = html;
+}
+
+function showAllCalculations() {
+    displaySavedCalculations(allSavedCalculations);
+}
+
+function loadCalculation(calculationId) {
+    showLoading();
+
+    fetch(`/api/tax-calculations/${calculationId}`)
+    .then(response => response.json())
+    .then(calc => {
+        hideLoading();
+
+        if (calc.error) {
+            showToast(calc.error, 'danger');
+            return;
+        }
+
+        console.log('Loading calculation:', calc);
+
+        // Load values into form
+        document.getElementById('assessmentYear').value = calc.assessment_year;
+        document.getElementById('taxRate').value = calc.tax_rate;
+        document.getElementById('taxFreeThreshold').value = calc.tax_free_threshold;
+        document.getElementById('startMonth').value = calc.start_month;
+
+        // Update year display
+        updateYearDisplay();
+
+        // Parse monthly data from JSON
+        const monthlyData = JSON.parse(calc.monthly_data || '[]');
+        console.log('Parsed monthly data:', monthlyData);
+
+        // Repopulate monthly table with current start month
+        populateMonthlyDataTable();
+
+        // Create a map of actual month index to salary, salary rate, and bonuses
+        const monthDataMap = {};
+        monthlyData.forEach((month) => {
+            // Calculate the actual month index from start_month + month_index
+            const actualMonthIndex = (calc.start_month + month.month_index) % 12;
+
+            // Handle backwards compatibility with old data formats
+            if (month.bonuses && Array.isArray(month.bonuses)) {
+                // Newest format with bonuses array
+                monthDataMap[actualMonthIndex] = {
+                    salary_usd: month.salary_usd,
+                    salary_rate: month.salary_rate,
+                    bonuses: month.bonuses // Array of {amount, rate}
+                };
+            } else if (month.salary_usd !== undefined && month.salary_rate !== undefined) {
+                // Previous format with separate salary and single bonus
+                monthDataMap[actualMonthIndex] = {
+                    salary_usd: month.salary_usd,
+                    salary_rate: month.salary_rate,
+                    bonuses: (month.bonus_usd && month.bonus_usd > 0) ?
+                        [{amount: month.bonus_usd, rate: month.bonus_rate || month.salary_rate}] : []
+                };
+            } else if (month.total_income_usd !== undefined) {
+                // Older format with total_income_usd
+                monthDataMap[actualMonthIndex] = {
+                    salary_usd: month.total_income_usd,
+                    salary_rate: month.exchange_rate || 299,
+                    bonuses: []
+                };
+            } else {
+                // Oldest format with bonus_usd and monthly_salary_usd
+                monthDataMap[actualMonthIndex] = {
+                    salary_usd: calc.monthly_salary_usd || 6000,
+                    salary_rate: month.exchange_rate || 299,
+                    bonuses: (month.bonus_usd && month.bonus_usd > 0) ?
+                        [{amount: month.bonus_usd, rate: month.exchange_rate || 299}] : []
+                };
+            }
+        });
+
+        console.log('Month data map:', monthDataMap);
+
+        // Load salary and salary rate by matching data-month attribute
+        const salaryInputs = document.querySelectorAll('.month-salary');
+        const salaryRateInputs = document.querySelectorAll('.month-salary-rate');
+
+        salaryInputs.forEach(input => {
+            const monthIndex = parseInt(input.getAttribute('data-month'));
+            if (monthDataMap[monthIndex]) {
+                input.value = monthDataMap[monthIndex].salary_usd;
+                console.log(`Set month ${monthIndex} salary to ${monthDataMap[monthIndex].salary_usd}`);
+            }
+        });
+
+        salaryRateInputs.forEach(input => {
+            const monthIndex = parseInt(input.getAttribute('data-month'));
+            if (monthDataMap[monthIndex]) {
+                input.value = monthDataMap[monthIndex].salary_rate;
+                console.log(`Set month ${monthIndex} salary rate to ${monthDataMap[monthIndex].salary_rate}`);
+            }
+        });
+
+        // Load bonuses for each month
+        Object.keys(monthDataMap).forEach(monthIndex => {
+            const monthData = monthDataMap[monthIndex];
+            const bonuses = monthData.bonuses || [];
+
+            // Add each bonus entry
+            bonuses.forEach(bonus => {
+                if (bonus.amount > 0) {
+                    addBonusEntry(parseInt(monthIndex), bonus.amount, bonus.rate);
+                    console.log(`Added bonus to month ${monthIndex}: $${bonus.amount} @ ${bonus.rate} LKR`);
+                }
+            });
+        });
+
+        // Recalculate
+        calculateMonthlyTax();
+
+        showToast(`Loaded: ${calc.calculation_name}`, 'success');
+
+        // Scroll to top
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Error loading calculation:', error);
+        showToast('Failed to load calculation', 'danger');
+    });
+}
+
+function deleteCalculation(calculationId) {
+    if (!confirm('Are you sure you want to delete this calculation? This action cannot be undone.')) {
+        return;
+    }
+
+    showLoading();
+
+    fetch(`/api/tax-calculations/${calculationId}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.error) {
+            showToast(data.error, 'danger');
+        } else {
+            showToast('Calculation deleted successfully', 'success');
+            loadSavedCalculations();
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Error deleting calculation:', error);
+        showToast('Failed to delete calculation', 'danger');
+    });
+}
 
 // Note: formatCurrency, formatDate, showLoading, hideLoading, showToast
 // are defined in base.html and available globally

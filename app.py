@@ -2143,6 +2143,212 @@ def clone_month_transactions():
         cursor.close()
         connection.close()
 
+# ==================================================
+# TAX CALCULATOR API ENDPOINTS
+# ==================================================
+
+@app.route('/api/tax-calculations', methods=['POST'])
+@login_required
+def save_tax_calculation():
+    """Save a tax calculation to the database."""
+    try:
+        data = request.get_json()
+        user_id = session['user_id']
+
+        # Extract main calculation data
+        calculation_name = data.get('calculation_name')
+        assessment_year = data.get('assessment_year')
+        monthly_salary_usd = Decimal(str(data.get('monthly_salary_usd', 0)))
+        tax_rate = Decimal(str(data.get('tax_rate', 0)))
+        tax_free_threshold = Decimal(str(data.get('tax_free_threshold', 0)))
+        start_month = int(data.get('start_month', 0))
+        monthly_data = data.get('monthly_data', [])
+        total_annual_income = Decimal(str(data.get('total_annual_income', 0)))
+        total_tax_liability = Decimal(str(data.get('total_tax_liability', 0)))
+        effective_tax_rate = Decimal(str(data.get('effective_tax_rate', 0)))
+
+        # Validate required fields
+        if not all([calculation_name, assessment_year]):
+            return jsonify({'error': 'Calculation name and assessment year are required'}), 400
+
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+
+        # Insert main tax calculation
+        cursor.execute("""
+            INSERT INTO tax_calculations
+            (user_id, calculation_name, assessment_year, monthly_salary_usd,
+             tax_rate, tax_free_threshold, start_month, monthly_data,
+             total_annual_income, total_tax_liability, effective_tax_rate)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            user_id, calculation_name, assessment_year, monthly_salary_usd,
+            tax_rate, tax_free_threshold, start_month, json.dumps(monthly_data),
+            total_annual_income, total_tax_liability, effective_tax_rate
+        ))
+
+        tax_calculation_id = cursor.lastrowid
+
+        # Insert monthly details
+        for month in monthly_data:
+            cursor.execute("""
+                INSERT INTO tax_calculation_details
+                (tax_calculation_id, month_index, month_name, exchange_rate,
+                 bonus_usd, fc_receipts_usd, fc_receipts_lkr,
+                 cumulative_income, total_tax_liability, monthly_payment)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                tax_calculation_id,
+                month['month_index'],
+                month['month'],
+                Decimal(str(month['exchange_rate'])),
+                Decimal(str(month.get('bonus_usd', 0))),
+                Decimal(str(month['fcReceiptsUSD'])),
+                Decimal(str(month['fcReceiptsLKR'])),
+                Decimal(str(month['cumulativeIncome'])),
+                Decimal(str(month['totalTaxLiability'])),
+                Decimal(str(month['monthlyPayment']))
+            ))
+
+        connection.commit()
+
+        logger.info(f"Tax calculation saved successfully: ID {tax_calculation_id}")
+
+        return jsonify({
+            'message': 'Tax calculation saved successfully',
+            'id': tax_calculation_id
+        }), 201
+
+    except Error as e:
+        if connection:
+            connection.rollback()
+        logger.error(f"Error saving tax calculation: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+
+@app.route('/api/tax-calculations', methods=['GET'])
+@login_required
+def get_tax_calculations():
+    """Get all tax calculations for the current user."""
+    try:
+        user_id = session['user_id']
+
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+
+        cursor.execute("""
+            SELECT id, calculation_name, assessment_year,
+                   monthly_salary_usd, tax_rate, tax_free_threshold,
+                   total_annual_income, total_tax_liability, effective_tax_rate,
+                   created_at, updated_at
+            FROM tax_calculations
+            WHERE user_id = %s
+            ORDER BY created_at DESC
+        """, (user_id,))
+
+        calculations = cursor.fetchall()
+
+        return jsonify(calculations), 200
+
+    except Error as e:
+        logger.error(f"Error fetching tax calculations: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@app.route('/api/tax-calculations/<int:calculation_id>', methods=['GET'])
+@login_required
+def get_tax_calculation(calculation_id):
+    """Get a specific tax calculation with all details."""
+    try:
+        user_id = session['user_id']
+
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+
+        # Get main calculation
+        cursor.execute("""
+            SELECT *
+            FROM tax_calculations
+            WHERE id = %s AND user_id = %s
+        """, (calculation_id, user_id))
+
+        calculation = cursor.fetchone()
+
+        if not calculation:
+            return jsonify({'error': 'Tax calculation not found'}), 404
+
+        # Get monthly details
+        cursor.execute("""
+            SELECT *
+            FROM tax_calculation_details
+            WHERE tax_calculation_id = %s
+            ORDER BY month_index
+        """, (calculation_id,))
+
+        details = cursor.fetchall()
+        calculation['details'] = details
+
+        # Parse JSON monthly_data
+        if calculation['monthly_data']:
+            calculation['monthly_data'] = json.loads(calculation['monthly_data'])
+
+        return jsonify(calculation), 200
+
+    except Error as e:
+        logger.error(f"Error fetching tax calculation {calculation_id}: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@app.route('/api/tax-calculations/<int:calculation_id>', methods=['DELETE'])
+@login_required
+def delete_tax_calculation(calculation_id):
+    """Delete a tax calculation."""
+    try:
+        user_id = session['user_id']
+
+        connection = get_db_connection()
+        cursor = connection.cursor()
+
+        # Verify ownership before deleting
+        cursor.execute("""
+            SELECT id FROM tax_calculations
+            WHERE id = %s AND user_id = %s
+        """, (calculation_id, user_id))
+
+        if not cursor.fetchone():
+            return jsonify({'error': 'Tax calculation not found'}), 404
+
+        # Delete (details will be cascaded)
+        cursor.execute("""
+            DELETE FROM tax_calculations
+            WHERE id = %s AND user_id = %s
+        """, (calculation_id, user_id))
+
+        connection.commit()
+
+        logger.info(f"Tax calculation {calculation_id} deleted successfully")
+
+        return jsonify({'message': 'Tax calculation deleted successfully'}), 200
+
+    except Error as e:
+        connection.rollback()
+        logger.error(f"Error deleting tax calculation {calculation_id}: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
 # Global error handlers (must be outside if __name__ block)
 @app.errorhandler(500)
 def internal_error(error):
