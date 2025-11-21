@@ -2989,59 +2989,6 @@ let lastCalculationData = null;
 // Store all saved calculations for filtering
 let allSavedCalculations = [];
 
-// Pre-load exchange rates for a given assessment year
-function preloadExchangeRatesForYear(assessmentYear) {
-    if (!assessmentYear) {
-        console.warn('No assessment year provided for pre-caching');
-        return;
-    }
-
-    console.log(`Pre-caching exchange rates for assessment year ${assessmentYear}...`);
-
-    // Assessment year starts in April of previous year and ends in March of assessment year
-    // For example, assessment year 2024 covers April 2023 - March 2024
-    const previousYear = parseInt(assessmentYear) - 1;
-    const startDate = `${previousYear}-04-01`; // April 1st of previous year
-    const endDate = `${assessmentYear}-03-31`;   // March 31st of assessment year
-
-    console.log(`Date range: ${startDate} to ${endDate}`);
-
-    // Call the bulk-cache API endpoint
-    fetch('/api/exchange-rate/bulk-cache', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            start_date: startDate,
-            end_date: endDate
-        })
-    })
-    .then(response => {
-        console.log('Bulk cache response status:', response.status);
-        return response.json();
-    })
-    .then(data => {
-        if (data.error) {
-            console.error('Failed to pre-cache exchange rates:', data.error);
-            showToast(`Failed to cache exchange rates: ${data.error}`, 'warning');
-            return;
-        }
-
-        console.log(`Exchange rate caching complete for ${assessmentYear}:`, data);
-
-        if (data.newly_cached > 0) {
-            showToast(`Cached ${data.newly_cached} new exchange rates for ${assessmentYear}`, 'success');
-        } else if (data.already_cached > 0) {
-            console.log(`All ${data.already_cached} exchange rates already cached`);
-        }
-    })
-    .catch(error => {
-        console.error('Error pre-caching exchange rates:', error);
-        showToast('Failed to pre-cache exchange rates. Check console for details.', 'danger');
-    });
-}
-
 function loadTaxCalculator() {
     console.log('Loading Tax Calculator...');
 
@@ -3082,8 +3029,6 @@ function loadTaxCalculator() {
     if (assessmentYearSelect) {
         assessmentYearSelect.addEventListener('change', function() {
             updateYearDisplay();
-            // Pre-cache exchange rates when year changes
-            preloadExchangeRatesForYear(this.value);
         });
         updateYearDisplay();
     }
@@ -3098,10 +3043,6 @@ function loadTaxCalculator() {
 
     // Load all saved calculations on page load
     loadSavedCalculations();
-
-    // Pre-cache exchange rates for the selected year
-    const selectedYear = assessmentYearSelect ? assessmentYearSelect.value : new Date().getFullYear();
-    preloadExchangeRatesForYear(selectedYear);
 }
 
 function updateYearDisplay() {

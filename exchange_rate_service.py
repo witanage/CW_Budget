@@ -34,7 +34,7 @@ class ExchangeRateService:
         """
         Fetch exchange rate for a specific date
 
-        Checks database first, then attempts to fetch from CBSL if not found
+        Checks database first, then attempts to fetch bulk CSV from CBSL if database is empty
 
         Args:
             date: The date for which to fetch the exchange rate
@@ -50,7 +50,18 @@ class ExchangeRateService:
             logger.info(f"Returning database exchange rate for {date_str}")
             return db_rate
 
-        # Try to fetch from CBSL if not in database
+        # Check if database has ANY exchange rates
+        # If empty, fetch bulk CSV to populate it
+        if self._is_database_empty():
+            logger.info("Database is empty. Fetching bulk CSV data from CBSL...")
+            bulk_imported = self._fetch_and_import_bulk_csv()
+            if bulk_imported:
+                logger.info("Bulk CSV import successful. Checking database again...")
+                db_rate = self._get_rate_from_db(date)
+                if db_rate:
+                    return db_rate
+
+        # If still not found, try to fetch individual date from CBSL
         logger.info(f"Exchange rate for {date_str} not in database, attempting to fetch from CBSL")
         cbsl_rate = self._fetch_from_cbsl(date)
         if cbsl_rate:
@@ -306,6 +317,110 @@ class ExchangeRateService:
                 rates[date_str] = rate
 
         return rates
+
+    def _is_database_empty(self) -> bool:
+        """Check if the exchange_rates table is empty"""
+        try:
+            connection = mysql.connector.connect(**self.db_config)
+            cursor = connection.cursor()
+            cursor.execute("SELECT COUNT(*) FROM exchange_rates")
+            count = cursor.fetchone()[0]
+            cursor.close()
+            connection.close()
+            return count == 0
+        except Error as e:
+            logger.error(f"Database error checking if empty: {str(e)}")
+            return False
+
+    def _fetch_and_import_bulk_csv(self) -> bool:
+        """
+        Fetch the entire historical CSV dataset from CBSL and import into database
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            from exchange_rate_parser import ExchangeRateParser
+
+            # Fetch last 5 years of data (CBSL CSV export limit)
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=5*365)
+
+            start_str = start_date.strftime('%Y-%m-%d')
+            end_str = end_date.strftime('%Y-%m-%d')
+
+            logger.info(f"Fetching bulk CSV from CBSL for date range: {start_str} to {end_str}")
+
+            # Prepare POST payload to get CSV data
+            payload = {
+                'lookupPage': 'lookup_daily_exchange_rates.php',
+                'startRange': '2006-11-11',  # CBSL's minimum date
+                'txtStart': start_str,
+                'txtEnd': end_str,
+                'rangeType': 'range',
+                'rangeValue': '5',  # 5 years
+                'chk_cur[]': 'USD~United States Dollar',
+                'submit_button': 'Submit',
+                'format': 'csv'  # Request CSV format
+            }
+
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Accept': 'text/csv,text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Origin': 'https://www.cbsl.gov.lk',
+                'Referer': 'https://www.cbsl.gov.lk/cbsl_custom/exratestt/exrates_resultstt.php'
+            }
+
+            # Make the request
+            response = requests.post(self.CBSL_URL, data=payload, headers=headers, timeout=30)
+            response.raise_for_status()
+
+            # Parse the response - could be CSV or HTML with table
+            content = response.text
+
+            # Try to parse as CSV
+            parser = ExchangeRateParser()
+            rates_dict = parser.parse_csv_content(content)
+
+            if not rates_dict:
+                logger.error("Failed to parse bulk CSV data from CBSL")
+                return False
+
+            logger.info(f"Parsed {len(rates_dict)} exchange rates from CBSL")
+
+            # Import all rates to database
+            success_count = 0
+            error_count = 0
+
+            for date_str, rate_data in rates_dict.items():
+                try:
+                    date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+                    if self.save_exchange_rate(
+                        date_obj,
+                        rate_data['buy_rate'],
+                        rate_data['sell_rate'],
+                        source='CBSL_BULK'
+                    ):
+                        success_count += 1
+                        if success_count % 100 == 0:
+                            logger.info(f"Imported {success_count} rates...")
+                    else:
+                        error_count += 1
+                except Exception as e:
+                    logger.error(f"Error importing rate for {date_str}: {str(e)}")
+                    error_count += 1
+
+            logger.info(f"Bulk import complete: {success_count} successful, {error_count} errors")
+            return success_count > 0
+
+        except requests.RequestException as e:
+            logger.error(f"HTTP error fetching bulk CSV: {str(e)}")
+            return False
+        except Exception as e:
+            logger.error(f"Unexpected error in bulk CSV import: {str(e)}")
+            return False
 
 # Singleton instance
 _exchange_rate_service = None
