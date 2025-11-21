@@ -3295,7 +3295,11 @@ function calculateMonthlyTax() {
 
     salaryRateDateInputs.forEach(input => {
         const monthIndex = parseInt(input.getAttribute('data-month'));
-        monthlySalaryRateDates[monthIndex] = input.value || null;
+        const dateValue = input.value || null;
+        monthlySalaryRateDates[monthIndex] = dateValue;
+        if (dateValue) {
+            console.log(`Collecting date for month ${monthIndex}: ${dateValue}`);
+        }
     });
 
     // Collect all bonuses for each month
@@ -3425,18 +3429,27 @@ function calculateMonthlyTax() {
         monthly_data: monthlyData.map((row, index) => {
             const actualMonthIndex = (startMonthIndex + index) % 12;
             const bonuses = monthlyBonusesData[actualMonthIndex] || [];
+            const salaryRateDate = monthlySalaryRateDates[actualMonthIndex] || null;
 
             // Save ONLY income input data (salaries, rates, bonuses, and dates)
-            return {
+            const monthDataEntry = {
                 month_index: index,
                 month: row.month,
                 salary_usd: monthlySalaries[actualMonthIndex] || 0,
                 salary_rate: monthlySalaryRates[actualMonthIndex] || 0,
-                salary_rate_date: monthlySalaryRateDates[actualMonthIndex] || null,
+                salary_rate_date: salaryRateDate,
                 bonuses: bonuses  // Array format: [{amount: 5000, rate: 299, date: '2025-11-21'}, ...]
             };
+
+            if (salaryRateDate) {
+                console.log(`Saving month ${actualMonthIndex} (${row.month}) with date: ${salaryRateDate}`);
+            }
+
+            return monthDataEntry;
         })
     };
+
+    console.log('Full calculation data to be saved:', JSON.stringify(lastCalculationData.monthly_data, null, 2));
 
     // Show save section
     const saveSection = document.getElementById('saveCalculationSection');
@@ -3874,7 +3887,7 @@ function loadCalculation(calculationId) {
         const salaryRateInputs = document.querySelectorAll('.month-salary-rate');
         const salaryRateDateInputs = document.querySelectorAll('.month-salary-rate-date');
 
-        console.log(`Found ${salaryInputs.length} salary inputs and ${salaryRateInputs.length} salary rate inputs`);
+        console.log(`Found ${salaryInputs.length} salary inputs, ${salaryRateInputs.length} salary rate inputs, and ${salaryRateDateInputs.length} date inputs`);
 
         let salariesSet = 0, ratesSet = 0, datesSet = 0;
         salaryInputs.forEach(input => {
@@ -3895,8 +3908,11 @@ function loadCalculation(calculationId) {
 
         salaryRateDateInputs.forEach(input => {
             const monthIndex = parseInt(input.getAttribute('data-month'));
-            if (monthDataMap[monthIndex] && monthDataMap[monthIndex].salary_rate_date) {
-                input.value = monthDataMap[monthIndex].salary_rate_date;
+            const monthData = monthDataMap[monthIndex];
+            console.log(`Month ${monthIndex}: salary_rate_date =`, monthData ? monthData.salary_rate_date : 'no data');
+            if (monthData && monthData.salary_rate_date) {
+                input.value = monthData.salary_rate_date;
+                console.log(`Set date input for month ${monthIndex} to ${monthData.salary_rate_date}`);
                 datesSet++;
             }
         });
@@ -3911,7 +3927,9 @@ function loadCalculation(calculationId) {
             // Add each bonus entry
             bonuses.forEach(bonus => {
                 if (bonus.amount > 0) {
-                    addBonusEntry(parseInt(monthIndex), bonus.amount, bonus.rate, bonus.date || '');
+                    const bonusDate = bonus.date || '';
+                    console.log(`Loading bonus for month ${monthIndex}: amount=${bonus.amount}, rate=${bonus.rate}, date=${bonusDate}`);
+                    addBonusEntry(parseInt(monthIndex), bonus.amount, bonus.rate, bonusDate);
                     bonusesLoaded++;
                 }
             });
