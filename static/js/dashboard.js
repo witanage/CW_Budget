@@ -4019,6 +4019,26 @@ function loadCalculation(calculationId) {
         // Wait for DOM to update after populateMonthlyDataTable()
         // This ensures the date inputs are fully rendered before we try to set their values
         setTimeout(() => {
+            // First, expand all month rows that have data (collapsed elements don't accept values properly)
+            Object.keys(monthDataMap).forEach(monthIndex => {
+                const collapseElement = document.getElementById(`month-${monthIndex}-collapse`);
+                if (collapseElement && !collapseElement.classList.contains('show')) {
+                    collapseElement.classList.add('show');
+
+                    // Update chevron icon to show expanded state
+                    const headerRow = document.querySelector(`[data-bs-target="#month-${monthIndex}-collapse"]`);
+                    if (headerRow) {
+                        const chevron = headerRow.querySelector('.month-chevron');
+                        if (chevron) {
+                            chevron.classList.remove('fa-chevron-right');
+                            chevron.classList.add('fa-chevron-down');
+                        }
+                    }
+
+                    console.log(`Expanded month ${monthIndex} to allow value setting`);
+                }
+            });
+
             // Load salary and salary rate by matching data-month attribute
             const salaryInputs = document.querySelectorAll('.month-salary');
             const salaryRateInputs = document.querySelectorAll('.month-salary-rate');
