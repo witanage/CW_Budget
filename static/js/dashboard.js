@@ -2991,6 +2991,11 @@ let allSavedCalculations = [];
 
 // Pre-load exchange rates for a given assessment year
 function preloadExchangeRatesForYear(assessmentYear) {
+    if (!assessmentYear) {
+        console.warn('No assessment year provided for pre-caching');
+        return;
+    }
+
     console.log(`Pre-caching exchange rates for assessment year ${assessmentYear}...`);
 
     // Assessment year starts in April of previous year and ends in March of assessment year
@@ -2998,6 +3003,8 @@ function preloadExchangeRatesForYear(assessmentYear) {
     const previousYear = parseInt(assessmentYear) - 1;
     const startDate = `${previousYear}-04-01`; // April 1st of previous year
     const endDate = `${assessmentYear}-03-31`;   // March 31st of assessment year
+
+    console.log(`Date range: ${startDate} to ${endDate}`);
 
     // Call the bulk-cache API endpoint
     fetch('/api/exchange-rate/bulk-cache', {
@@ -3010,27 +3017,28 @@ function preloadExchangeRatesForYear(assessmentYear) {
             end_date: endDate
         })
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('Bulk cache response status:', response.status);
+        return response.json();
+    })
     .then(data => {
         if (data.error) {
-            console.warn('Failed to pre-cache exchange rates:', data.error);
+            console.error('Failed to pre-cache exchange rates:', data.error);
+            showToast(`Failed to cache exchange rates: ${data.error}`, 'warning');
             return;
         }
 
-        console.log(`Exchange rate caching complete for ${assessmentYear}:`, {
-            already_cached: data.already_cached,
-            newly_cached: data.newly_cached,
-            failed: data.failed,
-            total_dates: data.total_dates
-        });
+        console.log(`Exchange rate caching complete for ${assessmentYear}:`, data);
 
         if (data.newly_cached > 0) {
             showToast(`Cached ${data.newly_cached} new exchange rates for ${assessmentYear}`, 'success');
+        } else if (data.already_cached > 0) {
+            console.log(`All ${data.already_cached} exchange rates already cached`);
         }
     })
     .catch(error => {
         console.error('Error pre-caching exchange rates:', error);
-        // Don't show error toast - this is a background operation
+        showToast('Failed to pre-cache exchange rates. Check console for details.', 'danger');
     });
 }
 

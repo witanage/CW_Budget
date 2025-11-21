@@ -2642,7 +2642,15 @@ def bulk_cache_exchange_rates():
         service = get_exchange_rate_service()
 
         # Step 1: Get all dates that are already in the database (single query)
-        cursor = service.db.cursor()
+        import mysql.connector
+        connection = mysql.connector.connect(
+            host=os.environ.get('DB_HOST', 'localhost'),
+            port=int(os.environ.get('DB_PORT', 3306)),
+            user=os.environ.get('DB_USER', 'root'),
+            password=os.environ.get('DB_PASSWORD', ''),
+            database=os.environ.get('DB_NAME', 'budget_app')
+        )
+        cursor = connection.cursor()
         cursor.execute("""
             SELECT date FROM exchange_rates
             WHERE date BETWEEN %s AND %s
@@ -2650,6 +2658,7 @@ def bulk_cache_exchange_rates():
 
         existing_dates = {row[0] for row in cursor.fetchall()}
         cursor.close()
+        connection.close()
 
         # Step 2: Determine which dates need to be fetched
         current_date = start_date
