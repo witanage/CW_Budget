@@ -511,29 +511,15 @@
                             </div>
                             <div class="card-body">
                                 <form id="taxCalculatorForm">
-                                    <!-- Assessment Year with Load Button -->
-                                    <div class="mb-3">
-                                        <label for="assessmentYear" class="form-label">Assessment Year</label>
-                                        <div class="input-group">
+                                    <!-- Form Fields Row -->
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="assessmentYear" class="form-label">Assessment Year</label>
                                             <select id="assessmentYear" class="form-select">
                                                 <option value="2025/2026">2025/2026</option>
                                                 <option value="2024/2025" selected>2024/2025</option>
                                                 <option value="2023/2024">2023/2024</option>
                                             </select>
-                                            <button type="button" class="btn btn-primary" id="loadSavedByYearBtn" title="Load calculations">
-                                                <i class="fas fa-search"></i>
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <!-- Tax Rate & Threshold Row -->
-                                    <div class="row">
-                                        <div class="col-md-6 mb-3">
-                                            <label for="taxRate" class="form-label">Tax Rate (%)</label>
-                                            <div class="input-group">
-                                                <input type="number" class="form-control" id="taxRate" value="15" step="0.1" min="0" max="100">
-                                                <span class="input-group-text">%</span>
-                                            </div>
                                         </div>
                                         <div class="col-md-6 mb-3">
                                             <label for="startMonth" class="form-label">Start Month</label>
@@ -559,21 +545,21 @@
                                         <label for="taxFreeThreshold" class="form-label">Tax-Free Threshold (Annual)</label>
                                         <div class="input-group">
                                             <span class="input-group-text">LKR</span>
-                                            <input type="number" class="form-control" id="taxFreeThreshold" value="360000" step="1000" min="0">
+                                            <input type="number" class="form-control" id="taxFreeThreshold" value="1800000" step="1000" min="0">
                                         </div>
                                     </div>
 
-                                    <!-- Monthly Data Expandable Section -->
+                                    <!-- Monthly Data Section (Always Expanded) -->
                                     <div class="accordion mb-3" id="monthlyDataAccordion">
                                         <div class="accordion-item">
                                             <h2 class="accordion-header">
-                                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#monthlyDataCollapse">
+                                                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#monthlyDataCollapse">
                                                     <i class="fas fa-calendar-alt me-2"></i>Monthly Salary & Bonus
                                                 </button>
                                             </h2>
-                                            <div id="monthlyDataCollapse" class="accordion-collapse collapse">
+                                            <div id="monthlyDataCollapse" class="accordion-collapse collapse show">
                                                 <div class="accordion-body p-2">
-                                                    <div class="table-responsive" style="max-height: 350px; overflow-y: auto;">
+                                                    <div class="table-responsive">
                                                         <table class="table table-sm mb-0" id="monthlyDataTable">
                                                             <tbody id="monthlyDataBody"></tbody>
                                                         </table>
@@ -605,10 +591,6 @@
                                 <h6 class="mb-0"><i class="fas fa-table me-2"></i>Tax Schedule <span class="badge bg-secondary" id="yaDisplay">2024/2025</span></h6>
                             </div>
                             <div class="card-body">
-                                <div class="alert alert-info alert-sm mb-3">
-                                    <i class="fas fa-info-circle me-2"></i>
-                                    Payment due by 15th of following month
-                                </div>
                                 <div class="table-responsive">
                                     <table class="table table-sm table-hover mb-0" id="taxScheduleTable">
                                         <thead>
