@@ -3332,9 +3332,24 @@ function calculateMonthlyTax() {
         // Update cumulative income
         cumulativeIncome += fcReceiptsLKR;
 
-        // Calculate total tax liability
-        const taxableIncome = Math.max(0, cumulativeIncome - taxFreeThreshold);
-        const totalTaxLiability = taxableIncome * (taxRate / 100);
+        // Calculate total tax liability using progressive brackets
+        // Bracket 1: Up to 1,800,000 - 0% (Relief)
+        // Bracket 2: 1,800,001 to 2,800,000 (next 1,000,000) - 6%
+        // Bracket 3: Above 2,800,000 - 15%
+        let totalTaxLiability = 0;
+
+        if (cumulativeIncome > 1_800_000) {
+            if (cumulativeIncome <= 2_800_000) {
+                // Income is in the 6% bracket
+                totalTaxLiability = (cumulativeIncome - 1_800_000) * 0.06;
+            } else {
+                // Income exceeds 2,800,000
+                // Tax on first 1,000,000 above 1,800,000 (up to 2,800,000): 6%
+                totalTaxLiability = 1_000_000 * 0.06;  // LKR 60,000
+                // Tax on amount above 2,800,000: 15%
+                totalTaxLiability += (cumulativeIncome - 2_800_000) * 0.15;
+            }
+        }
 
         // Calculate monthly payment (difference from previous month)
         const monthlyPayment = Math.max(0, totalTaxLiability - previousTaxLiability);
