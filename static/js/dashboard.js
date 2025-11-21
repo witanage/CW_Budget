@@ -3389,7 +3389,7 @@ function calculateMonthlyTax() {
     // Store calculation data for saving (ONLY input data, calculations are computed on-the-fly)
     lastCalculationData = {
         assessment_year: document.getElementById('assessmentYear').value,
-        tax_rate: taxRate,
+        tax_rate: 0, // Using progressive brackets (0%, 6%, 15%), not a single rate
         tax_free_threshold: taxFreeThreshold,
         start_month: startMonthIndex,
         monthly_data: monthlyData.map((row, index) => {
@@ -3435,7 +3435,12 @@ function updateTaxScheduleTable(monthlyData) {
     if (!tbody) return;
 
     let html = '';
-    monthlyData.forEach(row => {
+    let quarterlyUSD = 0;
+    let quarterlyLKR = 0;
+    let quarterlyPayment = 0;
+
+    monthlyData.forEach((row, index) => {
+        // Add month row
         html += `
             <tr>
                 <td>${row.month}</td>
@@ -3446,6 +3451,50 @@ function updateTaxScheduleTable(monthlyData) {
                 <td class="text-end fw-bold text-danger">${formatCurrency(row.monthlyPayment)}</td>
             </tr>
         `;
+
+        // Accumulate quarterly totals
+        quarterlyUSD += row.fcReceiptsUSD;
+        quarterlyLKR += row.fcReceiptsLKR;
+        quarterlyPayment += row.monthlyPayment;
+
+        const monthNumber = index + 1;
+
+        // Add quarterly summary after every 3 months
+        if (monthNumber % 3 === 0) {
+            const quarterNum = monthNumber / 3;
+            html += `
+                <tr class="table-active border-top border-bottom border-2">
+                    <td class="fw-bold"><i class="fas fa-chart-bar me-2"></i>Q${quarterNum} Total</td>
+                    <td class="text-end fw-bold">$${quarterlyUSD.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</td>
+                    <td class="text-end fw-bold">${formatCurrency(quarterlyLKR)}</td>
+                    <td class="text-end">-</td>
+                    <td class="text-end">-</td>
+                    <td class="text-end fw-bold text-primary">${formatCurrency(quarterlyPayment)}</td>
+                </tr>
+            `;
+            // Reset quarterly totals
+            quarterlyUSD = 0;
+            quarterlyLKR = 0;
+            quarterlyPayment = 0;
+        }
+
+        // Add half-year summary after 6 months
+        if (monthNumber === 6) {
+            const halfYearUSD = monthlyData.slice(0, 6).reduce((sum, m) => sum + m.fcReceiptsUSD, 0);
+            const halfYearLKR = monthlyData.slice(0, 6).reduce((sum, m) => sum + m.fcReceiptsLKR, 0);
+            const halfYearPayment = monthlyData.slice(0, 6).reduce((sum, m) => sum + m.monthlyPayment, 0);
+
+            html += `
+                <tr class="table-warning border-top border-bottom border-3">
+                    <td class="fw-bold"><i class="fas fa-star me-2"></i>Half-Year Total</td>
+                    <td class="text-end fw-bold">$${halfYearUSD.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</td>
+                    <td class="text-end fw-bold">${formatCurrency(halfYearLKR)}</td>
+                    <td class="text-end">-</td>
+                    <td class="text-end">-</td>
+                    <td class="text-end fw-bold text-success">${formatCurrency(halfYearPayment)}</td>
+                </tr>
+            `;
+        }
     });
 
     tbody.innerHTML = html;
@@ -3654,8 +3703,8 @@ function displaySavedCalculations(calculations, filterYear = null) {
                         </p>
                         <div class="row mt-2">
                             <div class="col-md-6">
-                                <small class="text-muted">Tax Rate:</small><br>
-                                <strong>${calc.tax_rate}%</strong>
+                                <small class="text-muted">Tax Structure:</small><br>
+                                <strong>Progressive Brackets</strong>
                             </div>
                             <div class="col-md-6">
                                 <small class="text-muted">Tax-Free Threshold:</small><br>
@@ -3747,7 +3796,7 @@ function loadCalculation(calculationId) {
 
         console.log('=== LOADING CALCULATION ===');
         console.log('ID:', calc.id, '| Name:', calc.calculation_name);
-        console.log('Year:', calc.assessment_year, '| Rate:', calc.tax_rate + '%', '| Threshold:', calc.tax_free_threshold);
+        console.log('Year:', calc.assessment_year, '| Threshold:', calc.tax_free_threshold);
         console.log('Start month:', calc.start_month);
         console.log('Monthly data entries:', calc.monthly_data ? calc.monthly_data.length : 0);
 
