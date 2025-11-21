@@ -3195,42 +3195,63 @@ function populateMonthlyDataTable() {
 }
 
 // Helper function to add a bonus entry
-function addBonusEntry(monthIndex, bonusAmount = 0, bonusRate = 299) {
+function addBonusEntry(monthIndex, bonusAmount = 0, bonusRate = 299, bonusDate = '') {
     const container = document.querySelector(`.bonuses-container[data-month="${monthIndex}"]`);
     if (!container) return;
 
     const bonusId = `bonus-${monthIndex}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     const bonusHtml = `
-        <div class="bonus-entry mb-2" data-bonus-id="${bonusId}">
-            <div class="row g-2">
-                <div class="col-5">
-                    <div class="input-group input-group-sm">
-                        <span class="input-group-text">$</span>
-                        <input type="number" class="form-control month-bonus"
-                               data-month="${monthIndex}"
-                               placeholder="0"
-                               value="${bonusAmount}"
-                               step="100"
-                               min="0">
+        <div class="bonus-entry mb-3" data-bonus-id="${bonusId}">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row g-3 align-items-start">
+                        <div class="col-md-4">
+                            <label class="form-label small mb-2" style="opacity: 0.65;">Amount</label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control month-bonus"
+                                       data-month="${monthIndex}"
+                                       placeholder="0"
+                                       value="${bonusAmount}"
+                                       step="100"
+                                       min="0">
+                                <span class="input-group-text">USD</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small mb-2" style="opacity: 0.65;">Exchange Rate</label>
+                            <div class="input-group input-group-sm mb-2">
+                                <input type="number" class="form-control month-bonus-rate"
+                                       data-month="${monthIndex}"
+                                       placeholder="299"
+                                       value="${bonusRate}"
+                                       step="0.01"
+                                       min="0">
+                                <span class="input-group-text">LKR</span>
+                            </div>
+                            <div class="input-group input-group-sm">
+                                <input type="date" class="form-control month-bonus-rate-date"
+                                       data-month="${monthIndex}"
+                                       data-bonus-id="${bonusId}"
+                                       placeholder="Select date"
+                                       value="${bonusDate}">
+                                <button type="button" class="btn btn-sm btn-outline-secondary fetch-bonus-rate-btn"
+                                        data-month="${monthIndex}"
+                                        data-bonus-id="${bonusId}"
+                                        title="Auto-fetch rate from database">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-2 d-flex align-items-start" style="padding-top: 1.9rem;">
+                            <button type="button" class="btn btn-sm btn-outline-danger remove-bonus-btn w-100"
+                                    data-bonus-id="${bonusId}"
+                                    title="Remove bonus">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
                     </div>
-                </div>
-                <div class="col-5">
-                    <div class="input-group input-group-sm">
-                        <input type="number" class="form-control month-bonus-rate"
-                               data-month="${monthIndex}"
-                               placeholder="299"
-                               value="${bonusRate}"
-                               step="0.01"
-                               min="0">
-                        <span class="input-group-text">LKR</span>
-                    </div>
-                </div>
-                <div class="col-2">
-                    <button type="button" class="btn btn-sm btn-outline-danger remove-bonus-btn w-100"
-                            data-bonus-id="${bonusId}">
-                        <i class="fas fa-trash"></i>
-                    </button>
                 </div>
             </div>
         </div>
@@ -3255,10 +3276,12 @@ function calculateMonthlyTax() {
     // Read monthly salary and their exchange rates from table
     const salaryInputs = document.querySelectorAll('.month-salary');
     const salaryRateInputs = document.querySelectorAll('.month-salary-rate');
+    const salaryRateDateInputs = document.querySelectorAll('.month-salary-rate-date');
 
     const monthlySalaries = {};
     const monthlySalaryRates = {};
-    const monthlyBonusesData = {}; // Will store array of {amount, rate} for each month
+    const monthlySalaryRateDates = {};
+    const monthlyBonusesData = {}; // Will store array of {amount, rate, date} for each month
 
     salaryInputs.forEach(input => {
         const monthIndex = parseInt(input.getAttribute('data-month'));
@@ -3268,6 +3291,11 @@ function calculateMonthlyTax() {
     salaryRateInputs.forEach(input => {
         const monthIndex = parseInt(input.getAttribute('data-month'));
         monthlySalaryRates[monthIndex] = parseFloat(input.value) || 0;
+    });
+
+    salaryRateDateInputs.forEach(input => {
+        const monthIndex = parseInt(input.getAttribute('data-month'));
+        monthlySalaryRateDates[monthIndex] = input.value || null;
     });
 
     // Collect all bonuses for each month
@@ -3280,12 +3308,14 @@ function calculateMonthlyTax() {
         bonusEntries.forEach(entry => {
             const bonusInput = entry.querySelector('.month-bonus');
             const bonusRateInput = entry.querySelector('.month-bonus-rate');
+            const bonusRateDateInput = entry.querySelector('.month-bonus-rate-date');
 
             const amount = parseFloat(bonusInput.value) || 0;
             const rate = parseFloat(bonusRateInput.value) || 0;
+            const date = bonusRateDateInput ? (bonusRateDateInput.value || null) : null;
 
             if (amount > 0) {
-                monthlyBonusesData[monthIndex].push({ amount, rate });
+                monthlyBonusesData[monthIndex].push({ amount, rate, date });
             }
         });
     });
@@ -3396,13 +3426,14 @@ function calculateMonthlyTax() {
             const actualMonthIndex = (startMonthIndex + index) % 12;
             const bonuses = monthlyBonusesData[actualMonthIndex] || [];
 
-            // Save ONLY income input data (salaries, rates, bonuses)
+            // Save ONLY income input data (salaries, rates, bonuses, and dates)
             return {
                 month_index: index,
                 month: row.month,
                 salary_usd: monthlySalaries[actualMonthIndex] || 0,
                 salary_rate: monthlySalaryRates[actualMonthIndex] || 0,
-                bonuses: bonuses  // Array format: [{amount: 5000, rate: 299}, ...]
+                salary_rate_date: monthlySalaryRateDates[actualMonthIndex] || null,
+                bonuses: bonuses  // Array format: [{amount: 5000, rate: 299, date: '2025-11-21'}, ...]
             };
         })
     };
@@ -3830,7 +3861,8 @@ function loadCalculation(calculationId) {
             monthDataMap[actualMonthIndex] = {
                 salary_usd: month.salary_usd || 0,
                 salary_rate: month.salary_rate || 0,
-                bonuses: month.bonuses || []  // Array of {amount, rate}
+                salary_rate_date: month.salary_rate_date || null,
+                bonuses: month.bonuses || []  // Array of {amount, rate, date}
             };
         });
 
@@ -3840,10 +3872,11 @@ function loadCalculation(calculationId) {
         // Load salary and salary rate by matching data-month attribute
         const salaryInputs = document.querySelectorAll('.month-salary');
         const salaryRateInputs = document.querySelectorAll('.month-salary-rate');
+        const salaryRateDateInputs = document.querySelectorAll('.month-salary-rate-date');
 
         console.log(`Found ${salaryInputs.length} salary inputs and ${salaryRateInputs.length} salary rate inputs`);
 
-        let salariesSet = 0, ratesSet = 0;
+        let salariesSet = 0, ratesSet = 0, datesSet = 0;
         salaryInputs.forEach(input => {
             const monthIndex = parseInt(input.getAttribute('data-month'));
             if (monthDataMap[monthIndex]) {
@@ -3860,7 +3893,15 @@ function loadCalculation(calculationId) {
             }
         });
 
-        console.log(`Set ${salariesSet} salaries and ${ratesSet} exchange rates`);
+        salaryRateDateInputs.forEach(input => {
+            const monthIndex = parseInt(input.getAttribute('data-month'));
+            if (monthDataMap[monthIndex] && monthDataMap[monthIndex].salary_rate_date) {
+                input.value = monthDataMap[monthIndex].salary_rate_date;
+                datesSet++;
+            }
+        });
+
+        console.log(`Set ${salariesSet} salaries, ${ratesSet} exchange rates, and ${datesSet} rate dates`);
 
         // Load bonuses for each month
         let bonusesLoaded = 0;
@@ -3870,7 +3911,7 @@ function loadCalculation(calculationId) {
             // Add each bonus entry
             bonuses.forEach(bonus => {
                 if (bonus.amount > 0) {
-                    addBonusEntry(parseInt(monthIndex), bonus.amount, bonus.rate);
+                    addBonusEntry(parseInt(monthIndex), bonus.amount, bonus.rate, bonus.date || '');
                     bonusesLoaded++;
                 }
             });
