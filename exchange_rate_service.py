@@ -50,8 +50,22 @@ class ExchangeRateService:
             logger.info(f"Returning database exchange rate for {date_str}")
             return db_rate
 
-        # If not in database and CBSL fetch fails, try to find nearest previous date in DB
-        logger.info(f"Exchange rate for {date_str} not in database, looking for nearest date")
+        # Try to fetch from CBSL if not in database
+        logger.info(f"Exchange rate for {date_str} not in database, attempting to fetch from CBSL")
+        cbsl_rate = self._fetch_from_cbsl(date)
+        if cbsl_rate:
+            # Save to database for future use
+            self.save_exchange_rate(
+                date,
+                cbsl_rate['buy_rate'],
+                cbsl_rate['sell_rate'],
+                source='CBSL'
+            )
+            logger.info(f"Successfully fetched and saved exchange rate from CBSL for {date_str}")
+            return cbsl_rate
+
+        # If CBSL fetch fails, try to find nearest previous date in DB
+        logger.info(f"CBSL fetch failed for {date_str}, looking for nearest date in database")
         nearest_rate = self._get_nearest_rate_from_db(date)
         if nearest_rate:
             logger.info(f"Using nearest rate from database for {date_str}")
@@ -154,30 +168,45 @@ class ExchangeRateService:
 
     def _fetch_from_cbsl(self, date: datetime) -> Optional[Dict[str, float]]:
         """
-        Fetch exchange rates from CBSL website
+        Fetch exchange rates from CBSL website using their form submission
 
-        The CBSL website shows rates for the past year by default.
-        We'll fetch the data and parse it to find the rate for our specific date.
+        Args:
+            date: The date for which to fetch the exchange rate
+
+        Returns:
+            Dictionary with buy_rate and sell_rate or None if not found
         """
         try:
+            # Prepare POST payload matching CBSL's form structure
+            date_str = date.strftime('%Y-%m-%d')
+
+            payload = {
+                'lookupPage': 'lookup_daily_exchange_rates.php',
+                'startRange': '2006-11-11',  # CBSL's minimum date
+                'txtStart': date_str,
+                'txtEnd': date_str,
+                'rangeType': 'range',
+                'rangeValue': '1',
+                'chk_cur[]': 'USD~United States Dollar',
+                'submit_button': 'Submit'
+            }
+
             # Add headers to make the request look like it's from a browser
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
                 'Accept-Language': 'en-US,en;q=0.9',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'Connection': 'keep-alive',
-                'Upgrade-Insecure-Requests': '1',
-                'Sec-Fetch-Dest': 'document',
-                'Sec-Fetch-Mode': 'navigate',
-                'Sec-Fetch-Site': 'none'
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Origin': 'https://www.cbsl.gov.lk',
+                'Referer': 'https://www.cbsl.gov.lk/cbsl_custom/exratestt/exrates_resultstt.php',
+                'Connection': 'keep-alive'
             }
 
-            # Try GET request first - the page shows 1 year of data by default
-            response = requests.get(self.CBSL_URL, headers=headers, timeout=15, verify=True)
+            # POST request to CBSL
+            response = requests.post(self.CBSL_URL, data=payload, headers=headers, timeout=15)
             response.raise_for_status()
 
-            # Parse the HTML
+            # Parse the HTML response
             soup = BeautifulSoup(response.text, 'html.parser')
 
             # Find the table with exchange rates

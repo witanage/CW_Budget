@@ -6,15 +6,70 @@ This feature automates the retrieval and management of USD to LKR exchange rates
 
 ## Features
 
-1. **Date-based Exchange Rate Retrieval**: Select a date and automatically fetch the exchange rate
-2. **Database Storage**: Exchange rates are cached in the database for fast access
-3. **CSV Import**: Import exchange rates from CBSL CSV exports
-4. **Smart Fallback**: If the exact date isn't available, the system uses the nearest previous date
-5. **Manual Entry**: The existing manual entry functionality is preserved as a backup
+1. **CSV Import from CBSL**: Bulk import exchange rates from CBSL's CSV export (PRIMARY METHOD)
+2. **Database Storage**: Exchange rates stored in database for fast, reliable access
+3. **Date-based Rate Retrieval**: Select a date and automatically populate the exchange rate from database
+4. **Smart Fallback**: If exact date isn't available, uses the nearest previous date
+5. **Manual Entry**: Existing manual entry functionality preserved as backup
+6. **Helper Script**: Easy-to-use command-line tool for CSV imports
 
 ## How to Use
 
-### Method 1: Using Date Picker (In the Tax Section)
+### Method 1: CSV Import (RECOMMENDED)
+
+**Important:** The CBSL website has bot protection that blocks automated requests. The CSV import method is the most reliable way to populate exchange rates.
+
+#### Using the Import Script:
+
+1. **Download CSV from CBSL:**
+   - Visit: https://www.cbsl.gov.lk/cbsl_custom/exratestt/exrates_resultstt.php
+   - Select your date range (recommended: "1 Year" for comprehensive coverage)
+   - Click the "CSV" button to download the rates file
+
+2. **Import Using the Helper Script:**
+   ```bash
+   python import_cbsl_csv.py path/to/downloaded.csv
+   ```
+
+   The script will:
+   - Parse the CSV file
+   - Show you how many rates were found
+   - Ask for confirmation before importing
+   - Import all rates to the database with progress updates
+   - Report success/error statistics
+
+   Example output:
+   ```
+   Importing exchange rates from: exchange_rates.csv
+   Found 365 exchange rates in CSV
+   Date range: 2024-11-21 to 2025-11-21
+
+   Import 365 exchange rates? (yes/no): yes
+
+   Importing to database...
+     Imported 50 rates...
+     Imported 100 rates...
+     ...
+
+   Import complete!
+     Successfully imported: 365
+     Errors: 0
+   ```
+
+#### Using the API Endpoint Directly:
+
+If you prefer to use the API:
+
+```bash
+curl -X POST http://localhost:5000/api/exchange-rate/import-csv \
+  -H "Content-Type: application/json" \
+  -H "Cookie: session=<your-session-cookie>" \
+  -d '{"csv_content": "Date,Buy Rate (LKR),Sell Rate (LKR)\n2025-11-21,304.2758,311.8332\n..."}'
+```
+
+### Method 2: Using Date Picker (After Importing Data)
+
+Once you've imported exchange rates into the database:
 
 1. Navigate to the Tax Calculator section in your dashboard
 2. For each month's salary or bonus, you'll see:
@@ -25,33 +80,11 @@ This feature automates the retrieval and management of USD to LKR exchange rates
 3. **To auto-fetch a rate:**
    - Select a date using the date picker
    - Click the download button (📥)
-   - The exchange rate will be automatically fetched and populated
+   - The exchange rate will be automatically fetched from the database and populated
 
-### Method 2: CSV Import (Recommended for Bulk Updates)
+**Note:** The date picker fetches from your database, not directly from CBSL. Make sure you've imported data first using Method 1.
 
-Since the CBSL website may block automated requests, the CSV import method is recommended:
-
-1. **Download CSV from CBSL:**
-   - Visit: https://www.cbsl.gov.lk/cbsl_custom/exratestt/exrates_resultstt.php
-   - Select your date range (e.g., past 1 year)
-   - Click the "CSV" button to download the rates
-
-2. **Import to the Application:**
-   - Use the API endpoint `/api/exchange-rate/import-csv`
-   - Send a POST request with the CSV content
-
-   Example using curl:
-   ```bash
-   curl -X POST http://localhost:5000/api/exchange-rate/import-csv \
-     -H "Content-Type: application/json" \
-     -d '{"csv_content": "Date,Buy Rate (LKR),Sell Rate (LKR)\n2025-11-21,304.2758,311.8332\n..."}'
-   ```
-
-3. **Verify Import:**
-   - The API will return the number of rates successfully imported
-   - Now you can use the date picker to fetch these rates instantly
-
-### Method 3: Manual Entry (Fallback)
+### Method 3: Manual Entry (Always Available)
 
 If automatic fetching isn't working or for custom rates:
 - Simply enter the exchange rate manually in the rate input field
@@ -143,14 +176,19 @@ mysql -u your_user -p your_database < schema.sql
 
 Or manually create the table using the SQL from the schema file.
 
-### 3. Import Initial Data (Optional)
+### 3. Import Initial Data (REQUIRED for date picker functionality)
 
-Download a year's worth of exchange rates from CBSL and import them:
+Download and import exchange rates from CBSL:
 
-1. Visit the CBSL website
-2. Select "1 Year" timeframe
-3. Click "CSV" to download
-4. Use the import API or create a script to import the CSV
+1. Visit: https://www.cbsl.gov.lk/cbsl_custom/exratestt/exrates_resultstt.php
+2. Select "1 Year" timeframe (or your preferred range)
+3. Click "CSV" button to download
+4. Run the import script:
+   ```bash
+   python import_cbsl_csv.py path/to/downloaded.csv
+   ```
+
+This step is essential for the date picker feature to work.
 
 ### 4. Restart the Application
 
@@ -174,35 +212,45 @@ python app.py
 
 ## Troubleshooting
 
-### Issue: "Failed to fetch exchange rate"
+### Issue: "Failed to fetch exchange rate" or "No exchange rate found for this date"
 
-**Possible causes:**
-1. The CBSL website is blocking requests (403 Forbidden)
-2. No data available for the selected date
-3. Network connectivity issues
+**Cause:** No data in the database for the selected date
 
 **Solutions:**
-1. Use the CSV import method instead
-2. Select a different date (weekdays are more likely to have data)
-3. Check your internet connection
+1. **Import exchange rates first** - The date picker fetches from the database, not directly from CBSL
+   ```bash
+   python import_cbsl_csv.py path/to/cbsl_rates.csv
+   ```
+2. Import a wider date range from CBSL (use "1 Year" option)
+3. The system will automatically use the nearest previous date if available
 4. Manually enter the rate as a fallback
 
-### Issue: "No exchange rate found for this date"
+### Issue: CSV import fails or shows errors
 
-**Cause:** The selected date doesn't have data in the database
+**Solutions:**
+1. Verify the CSV file format matches CBSL's format:
+   - Header: `Date,Buy Rate (LKR),Sell Rate (LKR)`
+   - Data rows: `2025-11-21,304.2758,311.8332`
+2. Check database connection settings in `.env` file
+3. Ensure the `exchange_rates` table exists in the database
+4. Check import script logs for specific error messages
 
-**Solution:**
-1. Import CSV data from CBSL for a wider date range
-2. The system will automatically use the nearest previous date if available
-3. Manually enter the rate if needed
+### Issue: Date picker shows but button doesn't work
 
-### Issue: Date picker shows but rates aren't fetching
-
-**Solution:**
-1. Check browser console for errors (F12)
+**Solutions:**
+1. Check browser console for JavaScript errors (F12)
 2. Verify you're logged in
-3. Ensure the database table was created successfully
-4. Check application logs for detailed error messages
+3. Ensure you've imported data into the database
+4. Check application logs for API errors
+5. Clear browser cache and reload the page
+
+### Issue: Import script shows "Database error"
+
+**Solutions:**
+1. Verify database is running: `mysql -u your_user -p`
+2. Check database connection settings in `.env` file
+3. Ensure the `exchange_rates` table was created
+4. Verify database user has INSERT/UPDATE permissions
 
 ## Best Practices
 
@@ -214,11 +262,14 @@ python app.py
 ## Future Enhancements
 
 Potential improvements for the future:
-- Automatic scheduled imports from CBSL
-- Alternative data sources (e.g., other financial APIs)
-- Rate comparison and validation
-- Historical rate charts and analysis
-- Email notifications for rate updates
+- **Direct CBSL API integration** (when/if CBSL provides an official API)
+- **Automated scraping with proxy rotation** (to work around bot protection)
+- **Alternative data sources** (e.g., other financial APIs like exchangerate-api.com)
+- **Bulk date range import via UI** (upload CSV through web interface)
+- **Rate comparison and validation** (compare rates from multiple sources)
+- **Historical rate charts** (visualize exchange rate trends)
+- **Email notifications** (alert when rates haven't been updated in X days)
+- **Scheduled CSV imports** (automatic download and import on schedule)
 
 ## Support
 
