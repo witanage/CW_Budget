@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import threading
 from datetime import datetime, timedelta
 from decimal import Decimal
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash
@@ -212,6 +213,31 @@ def register():
     
     return render_template('register.html')
 
+def populate_exchange_rates_background():
+    """
+    Background task to populate missing exchange rates in the database.
+    Runs in a separate thread after user login to proactively fill the cache.
+    """
+    try:
+        logger.info("Background task: Starting exchange rate population check...")
+        from exchange_rate_service import get_exchange_rate_service
+
+        service = get_exchange_rate_service()
+
+        # Check if database is empty
+        if service._is_database_empty():
+            logger.info("Background task: Database is empty, triggering bulk import...")
+            success = service._fetch_and_import_bulk_csv()
+            if success:
+                logger.info("Background task: Bulk import completed successfully")
+            else:
+                logger.warning("Background task: Bulk import failed")
+        else:
+            logger.info("Background task: Database already has exchange rates, skipping bulk import")
+
+    except Exception as e:
+        logger.error(f"Background task: Error populating exchange rates: {str(e)}", exc_info=True)
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     """User login."""
@@ -248,6 +274,12 @@ def login():
                     session['username'] = user['username']
                     session['is_admin'] = user.get('is_admin', False)
                     logger.info(f"Login successful for user: {username} (ID: {user['id']}), permanent: {remember_me}, is_admin: {user.get('is_admin', False)}")
+
+                    # Start background task to populate exchange rates
+                    background_thread = threading.Thread(target=populate_exchange_rates_background, daemon=True)
+                    background_thread.start()
+                    logger.info("Background task started to populate exchange rates")
+
                     return jsonify({'message': 'Login successful'}), 200
                 else:
                     logger.warning(f"Login failed for username: {username} - Invalid credentials")
