@@ -3130,58 +3130,70 @@ function populateMonthlyDataTable() {
                     <div class="month-detail-content">
                         <div class="p-3">
                             <div class="row g-3">
-                                <!-- Salary Section -->
+                                <!-- Salary Section Card -->
                                 <div class="col-md-6">
-                                    <label class="form-label small mb-2 fw-bold">Monthly Salary</label>
-                                    <div class="input-group input-group-sm">
-                                        <span class="input-group-text">$</span>
-                                        <input type="number" class="form-control month-salary"
-                                               data-month="${monthIndex}"
-                                               placeholder="6000"
-                                               value="${defaultSalary}"
-                                               step="100"
-                                               min="0">
-                                        <span class="input-group-text">USD</span>
+                                    <div class="card">
+                                        <div class="card-body">
+                                            <h6 class="card-subtitle mb-3">Monthly Salary</h6>
+                                            <div class="input-group input-group-sm">
+                                                <span class="input-group-text">$</span>
+                                                <input type="number" class="form-control month-salary"
+                                                       data-month="${monthIndex}"
+                                                       placeholder="6000"
+                                                       value="${defaultSalary}"
+                                                       step="100"
+                                                       min="0">
+                                                <span class="input-group-text">USD</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <!-- Exchange Rate Section -->
+                                <!-- Exchange Rate Section Card -->
                                 <div class="col-md-6">
-                                    <label class="form-label small mb-2 fw-bold">Exchange Rate</label>
-                                    <div class="input-group input-group-sm mb-2">
-                                        <input type="number" class="form-control month-salary-rate"
-                                               data-month="${monthIndex}"
-                                               placeholder="299"
-                                               value="${defaultSalaryRate}"
-                                               step="0.01"
-                                               min="0">
-                                        <span class="input-group-text">LKR</span>
+                                    <div class="card">
+                                        <div class="card-body">
+                                            <h6 class="card-subtitle mb-3">Exchange Rate</h6>
+                                            <div class="input-group input-group-sm mb-2">
+                                                <input type="number" class="form-control month-salary-rate"
+                                                       data-month="${monthIndex}"
+                                                       placeholder="299"
+                                                       value="${defaultSalaryRate}"
+                                                       step="0.01"
+                                                       min="0">
+                                                <span class="input-group-text">LKR</span>
+                                            </div>
+                                            <div class="input-group input-group-sm mb-2">
+                                                <input type="date" class="form-control month-salary-rate-date"
+                                                       data-month="${monthIndex}"
+                                                       placeholder="Select date">
+                                                <button type="button" class="btn btn-outline-secondary fetch-salary-rate-btn"
+                                                        data-month="${monthIndex}"
+                                                        title="Auto-fetch rate from database">
+                                                    <i class="fas fa-sync-alt"></i>
+                                                </button>
+                                            </div>
+                                            <small class="d-block text-body-secondary">Select date to auto-fetch rate</small>
+                                        </div>
                                     </div>
-                                    <div class="input-group input-group-sm">
-                                        <input type="date" class="form-control month-salary-rate-date"
-                                               data-month="${monthIndex}"
-                                               placeholder="Select date">
-                                        <button type="button" class="btn btn-outline-secondary fetch-salary-rate-btn"
-                                                data-month="${monthIndex}"
-                                                title="Auto-fetch rate from database">
-                                            <i class="fas fa-sync-alt"></i>
-                                        </button>
-                                    </div>
-                                    <small class="text-muted">Select date to auto-fetch rate</small>
                                 </div>
                             </div>
 
                             <!-- Bonuses Section -->
-                            <div class="mt-3 pt-3 border-top">
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <label class="form-label small mb-0 fw-bold">Bonuses</label>
-                                    <button type="button" class="btn btn-sm btn-outline-primary add-bonus-btn"
-                                            data-month="${monthIndex}">
-                                        <i class="fas fa-plus me-1"></i>Add Bonus
-                                    </button>
-                                </div>
-                                <div class="bonuses-container" data-month="${monthIndex}">
-                                    <!-- Bonuses will be added dynamically here -->
+                            <div class="mt-3">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-center mb-3">
+                                            <h6 class="card-subtitle mb-0">Bonuses</h6>
+                                            <button type="button" class="btn btn-sm btn-outline-primary add-bonus-btn"
+                                                    data-month="${monthIndex}">
+                                                <i class="fas fa-plus me-1"></i>Add Bonus
+                                            </button>
+                                        </div>
+                                        <div class="bonuses-container" data-month="${monthIndex}">
+                                            <!-- Bonuses will be added dynamically here -->
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -3229,51 +3241,55 @@ function addBonusEntry(monthIndex, bonusAmount = 0, bonusRate = 299) {
     const bonusId = `bonus-${monthIndex}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     const bonusHtml = `
-        <div class="bonus-entry mb-3 pb-3 border-bottom" data-bonus-id="${bonusId}">
-            <div class="row g-2 align-items-end">
-                <div class="col-md-4">
-                    <label class="form-label small mb-1 text-muted">Amount</label>
-                    <div class="input-group input-group-sm">
-                        <span class="input-group-text">$</span>
-                        <input type="number" class="form-control month-bonus"
-                               data-month="${monthIndex}"
-                               placeholder="0"
-                               value="${bonusAmount}"
-                               step="100"
-                               min="0">
-                        <span class="input-group-text">USD</span>
+        <div class="bonus-entry mb-3" data-bonus-id="${bonusId}">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-4">
+                            <label class="form-label small mb-2 text-body-secondary">Amount</label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control month-bonus"
+                                       data-month="${monthIndex}"
+                                       placeholder="0"
+                                       value="${bonusAmount}"
+                                       step="100"
+                                       min="0">
+                                <span class="input-group-text">USD</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small mb-2 text-body-secondary">Exchange Rate</label>
+                            <div class="input-group input-group-sm mb-2">
+                                <input type="number" class="form-control month-bonus-rate"
+                                       data-month="${monthIndex}"
+                                       placeholder="299"
+                                       value="${bonusRate}"
+                                       step="0.01"
+                                       min="0">
+                                <span class="input-group-text">LKR</span>
+                            </div>
+                            <div class="input-group input-group-sm">
+                                <input type="date" class="form-control month-bonus-rate-date"
+                                       data-month="${monthIndex}"
+                                       data-bonus-id="${bonusId}"
+                                       placeholder="Select date">
+                                <button type="button" class="btn btn-outline-secondary fetch-bonus-rate-btn"
+                                        data-month="${monthIndex}"
+                                        data-bonus-id="${bonusId}"
+                                        title="Auto-fetch rate from database">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <button type="button" class="btn btn-sm btn-outline-danger remove-bonus-btn w-100"
+                                    data-bonus-id="${bonusId}"
+                                    title="Remove bonus">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
                     </div>
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label small mb-1 text-muted">Exchange Rate</label>
-                    <div class="input-group input-group-sm mb-1">
-                        <input type="number" class="form-control month-bonus-rate"
-                               data-month="${monthIndex}"
-                               placeholder="299"
-                               value="${bonusRate}"
-                               step="0.01"
-                               min="0">
-                        <span class="input-group-text">LKR</span>
-                    </div>
-                    <div class="input-group input-group-sm">
-                        <input type="date" class="form-control month-bonus-rate-date"
-                               data-month="${monthIndex}"
-                               data-bonus-id="${bonusId}"
-                               placeholder="Select date">
-                        <button type="button" class="btn btn-outline-secondary fetch-bonus-rate-btn"
-                                data-month="${monthIndex}"
-                                data-bonus-id="${bonusId}"
-                                title="Auto-fetch rate from database">
-                            <i class="fas fa-sync-alt"></i>
-                        </button>
-                    </div>
-                </div>
-                <div class="col-md-2">
-                    <button type="button" class="btn btn-sm btn-outline-danger remove-bonus-btn w-100"
-                            data-bonus-id="${bonusId}"
-                            title="Remove bonus">
-                        <i class="fas fa-trash"></i>
-                    </button>
                 </div>
             </div>
         </div>
