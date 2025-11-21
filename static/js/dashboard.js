@@ -3882,65 +3882,69 @@ function loadCalculation(calculationId) {
         console.log(`Mapped ${Object.keys(monthDataMap).length} months from saved data`);
         console.log('Sample month data:', monthDataMap[0] || monthDataMap[Object.keys(monthDataMap)[0]]);
 
-        // Load salary and salary rate by matching data-month attribute
-        const salaryInputs = document.querySelectorAll('.month-salary');
-        const salaryRateInputs = document.querySelectorAll('.month-salary-rate');
-        const salaryRateDateInputs = document.querySelectorAll('.month-salary-rate-date');
+        // Wait for DOM to update after populateMonthlyDataTable()
+        // This ensures the date inputs are fully rendered before we try to set their values
+        setTimeout(() => {
+            // Load salary and salary rate by matching data-month attribute
+            const salaryInputs = document.querySelectorAll('.month-salary');
+            const salaryRateInputs = document.querySelectorAll('.month-salary-rate');
+            const salaryRateDateInputs = document.querySelectorAll('.month-salary-rate-date');
 
-        console.log(`Found ${salaryInputs.length} salary inputs, ${salaryRateInputs.length} salary rate inputs, and ${salaryRateDateInputs.length} date inputs`);
+            console.log(`Found ${salaryInputs.length} salary inputs, ${salaryRateInputs.length} salary rate inputs, and ${salaryRateDateInputs.length} date inputs`);
 
-        let salariesSet = 0, ratesSet = 0, datesSet = 0;
-        salaryInputs.forEach(input => {
-            const monthIndex = parseInt(input.getAttribute('data-month'));
-            if (monthDataMap[monthIndex]) {
-                input.value = monthDataMap[monthIndex].salary_usd;
-                salariesSet++;
-            }
-        });
-
-        salaryRateInputs.forEach(input => {
-            const monthIndex = parseInt(input.getAttribute('data-month'));
-            if (monthDataMap[monthIndex]) {
-                input.value = monthDataMap[monthIndex].salary_rate;
-                ratesSet++;
-            }
-        });
-
-        salaryRateDateInputs.forEach(input => {
-            const monthIndex = parseInt(input.getAttribute('data-month'));
-            const monthData = monthDataMap[monthIndex];
-            console.log(`Month ${monthIndex}: salary_rate_date =`, monthData ? monthData.salary_rate_date : 'no data');
-            if (monthData && monthData.salary_rate_date) {
-                input.value = monthData.salary_rate_date;
-                console.log(`Set date input for month ${monthIndex} to ${monthData.salary_rate_date}`);
-                datesSet++;
-            }
-        });
-
-        console.log(`Set ${salariesSet} salaries, ${ratesSet} exchange rates, and ${datesSet} rate dates`);
-
-        // Load bonuses for each month
-        let bonusesLoaded = 0;
-        Object.keys(monthDataMap).forEach(monthIndex => {
-            const bonuses = monthDataMap[monthIndex].bonuses || [];
-
-            // Add each bonus entry
-            bonuses.forEach(bonus => {
-                if (bonus.amount > 0) {
-                    const bonusDate = bonus.date || '';
-                    console.log(`Loading bonus for month ${monthIndex}: amount=${bonus.amount}, rate=${bonus.rate}, date=${bonusDate}`);
-                    addBonusEntry(parseInt(monthIndex), bonus.amount, bonus.rate, bonusDate);
-                    bonusesLoaded++;
+            let salariesSet = 0, ratesSet = 0, datesSet = 0;
+            salaryInputs.forEach(input => {
+                const monthIndex = parseInt(input.getAttribute('data-month'));
+                if (monthDataMap[monthIndex]) {
+                    input.value = monthDataMap[monthIndex].salary_usd;
+                    salariesSet++;
                 }
             });
-        });
 
-        console.log(`Loaded ${bonusesLoaded} bonus entries`);
+            salaryRateInputs.forEach(input => {
+                const monthIndex = parseInt(input.getAttribute('data-month'));
+                if (monthDataMap[monthIndex]) {
+                    input.value = monthDataMap[monthIndex].salary_rate;
+                    ratesSet++;
+                }
+            });
 
-        console.log('Form fields populated, recalculating tax schedule...');
+            salaryRateDateInputs.forEach(input => {
+                const monthIndex = parseInt(input.getAttribute('data-month'));
+                const monthData = monthDataMap[monthIndex];
+                console.log(`Month ${monthIndex}: salary_rate_date =`, monthData ? monthData.salary_rate_date : 'no data');
+                if (monthData && monthData.salary_rate_date) {
+                    input.value = monthData.salary_rate_date;
+                    console.log(`Set date input for month ${monthIndex} to ${monthData.salary_rate_date}`);
+                    datesSet++;
+                }
+            });
 
-        // Recalculate tax schedule with loaded data
-        calculateMonthlyTax();
+            console.log(`Set ${salariesSet} salaries, ${ratesSet} exchange rates, and ${datesSet} rate dates`);
+
+            // Load bonuses for each month
+            let bonusesLoaded = 0;
+            Object.keys(monthDataMap).forEach(monthIndex => {
+                const bonuses = monthDataMap[monthIndex].bonuses || [];
+
+                // Add each bonus entry
+                bonuses.forEach(bonus => {
+                    if (bonus.amount > 0) {
+                        const bonusDate = bonus.date || '';
+                        console.log(`Loading bonus for month ${monthIndex}: amount=${bonus.amount}, rate=${bonus.rate}, date=${bonusDate}`);
+                        addBonusEntry(parseInt(monthIndex), bonus.amount, bonus.rate, bonusDate);
+                        bonusesLoaded++;
+                    }
+                });
+            });
+
+            console.log(`Loaded ${bonusesLoaded} bonus entries`);
+
+            console.log('Form fields populated, recalculating tax schedule...');
+
+            // Recalculate tax schedule with loaded data
+            calculateMonthlyTax();
+        }, 100); // 100ms delay to ensure DOM is updated
 
         showToast(`Loaded: ${calc.calculation_name}`, 'success');
 
