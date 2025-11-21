@@ -283,7 +283,8 @@ INSERT IGNORE INTO categories (name, type) VALUES
 --     "month": "April",
 --     "salary_usd": 6000,
 --     "salary_rate": 299.50,
---     "bonuses": [{"amount": 5000, "rate": 300}]
+--     "salary_rate_date": "2025-11-21" (optional),
+--     "bonuses": [{"amount": 5000, "rate": 300, "date": "2025-11-21" (optional)}]
 --   },
 --   ...
 -- ]
