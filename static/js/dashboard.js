@@ -2989,6 +2989,51 @@ let lastCalculationData = null;
 // Store all saved calculations for filtering
 let allSavedCalculations = [];
 
+// Pre-load exchange rates for a given assessment year
+function preloadExchangeRatesForYear(assessmentYear) {
+    console.log(`Pre-caching exchange rates for assessment year ${assessmentYear}...`);
+
+    // Assessment year starts in April of previous year and ends in March of assessment year
+    // For example, assessment year 2024 covers April 2023 - March 2024
+    const previousYear = parseInt(assessmentYear) - 1;
+    const startDate = `${previousYear}-04-01`; // April 1st of previous year
+    const endDate = `${assessmentYear}-03-31`;   // March 31st of assessment year
+
+    // Call the bulk-cache API endpoint
+    fetch('/api/exchange-rate/bulk-cache', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            start_date: startDate,
+            end_date: endDate
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            console.warn('Failed to pre-cache exchange rates:', data.error);
+            return;
+        }
+
+        console.log(`Exchange rate caching complete for ${assessmentYear}:`, {
+            already_cached: data.already_cached,
+            newly_cached: data.newly_cached,
+            failed: data.failed,
+            total_dates: data.total_dates
+        });
+
+        if (data.newly_cached > 0) {
+            showToast(`Cached ${data.newly_cached} new exchange rates for ${assessmentYear}`, 'success');
+        }
+    })
+    .catch(error => {
+        console.error('Error pre-caching exchange rates:', error);
+        // Don't show error toast - this is a background operation
+    });
+}
+
 function loadTaxCalculator() {
     console.log('Loading Tax Calculator...');
 
@@ -3029,6 +3074,8 @@ function loadTaxCalculator() {
     if (assessmentYearSelect) {
         assessmentYearSelect.addEventListener('change', function() {
             updateYearDisplay();
+            // Pre-cache exchange rates when year changes
+            preloadExchangeRatesForYear(this.value);
         });
         updateYearDisplay();
     }
@@ -3043,6 +3090,10 @@ function loadTaxCalculator() {
 
     // Load all saved calculations on page load
     loadSavedCalculations();
+
+    // Pre-cache exchange rates for the selected year
+    const selectedYear = assessmentYearSelect ? assessmentYearSelect.value : new Date().getFullYear();
+    preloadExchangeRatesForYear(selectedYear);
 }
 
 function updateYearDisplay() {
