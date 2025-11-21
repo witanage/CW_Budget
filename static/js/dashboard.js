@@ -3913,9 +3913,20 @@ function loadCalculation(calculationId) {
                 const monthIndex = parseInt(input.getAttribute('data-month'));
                 const monthData = monthDataMap[monthIndex];
                 console.log(`Month ${monthIndex}: salary_rate_date =`, monthData ? monthData.salary_rate_date : 'no data');
+                console.log(`Input element for month ${monthIndex}:`, input, 'type:', input.type);
+
                 if (monthData && monthData.salary_rate_date) {
-                    input.value = monthData.salary_rate_date;
-                    console.log(`Set date input for month ${monthIndex} to ${monthData.salary_rate_date}`);
+                    const dateValue = monthData.salary_rate_date;
+
+                    // Try multiple methods to set the date value
+                    input.value = dateValue;
+                    input.setAttribute('value', dateValue);
+
+                    // Force a change event to ensure the UI updates
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+
+                    console.log(`Set date input for month ${monthIndex} to ${dateValue}`);
+                    console.log(`Verification: input.value = ${input.value}, getAttribute = ${input.getAttribute('value')}`);
                     datesSet++;
                 }
             });
@@ -3944,7 +3955,7 @@ function loadCalculation(calculationId) {
 
             // Recalculate tax schedule with loaded data
             calculateMonthlyTax();
-        }, 100); // 100ms delay to ensure DOM is updated
+        }, 250); // 250ms delay to ensure DOM is fully updated and rendered
 
         showToast(`Loaded: ${calc.calculation_name}`, 'success');
 
