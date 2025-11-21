@@ -3128,45 +3128,64 @@ function populateMonthlyDataTable() {
             <tr class="collapse month-detail-row" id="${collapseId}">
                 <td colspan="5" class="p-0">
                     <div class="month-detail-content">
-                        <div class="row g-2 p-3">
-                            <div class="col-md-6">
-                                <label class="form-label small mb-1">Salary (USD)</label>
-                                <div class="input-group input-group-sm">
-                                    <span class="input-group-text">$</span>
-                                    <input type="number" class="form-control month-salary"
-                                           data-month="${monthIndex}"
-                                           placeholder="6000"
-                                           value="${defaultSalary}"
-                                           step="100"
-                                           min="0">
+                        <div class="p-3">
+                            <!-- Salary Section -->
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-6">
+                                    <div class="border rounded p-2 bg-light">
+                                        <label class="form-label small mb-2 fw-semibold">
+                                            <i class="fas fa-dollar-sign text-success me-1"></i>Monthly Salary (USD)
+                                        </label>
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text bg-white"><i class="fas fa-dollar-sign text-success"></i></span>
+                                            <input type="number" class="form-control month-salary"
+                                                   data-month="${monthIndex}"
+                                                   placeholder="6000"
+                                                   value="${defaultSalary}"
+                                                   step="100"
+                                                   min="0">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="border rounded p-2 bg-light">
+                                        <label class="form-label small mb-2 fw-semibold">
+                                            <i class="fas fa-exchange-alt text-primary me-1"></i>Exchange Rate (USD → LKR)
+                                        </label>
+                                        <div class="input-group input-group-sm mb-2">
+                                            <span class="input-group-text bg-white">1 USD =</span>
+                                            <input type="number" class="form-control month-salary-rate"
+                                                   data-month="${monthIndex}"
+                                                   placeholder="299"
+                                                   value="${defaultSalaryRate}"
+                                                   step="0.01"
+                                                   min="0">
+                                            <span class="input-group-text bg-white">LKR</span>
+                                        </div>
+                                        <div class="d-flex gap-1">
+                                            <input type="date" class="form-control form-control-sm month-salary-rate-date"
+                                                   data-month="${monthIndex}"
+                                                   title="Select date to auto-fetch exchange rate"
+                                                   style="flex: 1;">
+                                            <button type="button" class="btn btn-sm btn-primary fetch-salary-rate-btn"
+                                                    data-month="${monthIndex}"
+                                                    title="Fetch exchange rate from database">
+                                                <i class="fas fa-sync-alt"></i>
+                                            </button>
+                                        </div>
+                                        <small class="text-muted d-block mt-1">
+                                            <i class="fas fa-info-circle"></i> Select date & click to auto-fetch rate
+                                        </small>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label small mb-1">Salary Rate (LKR)</label>
-                                <div class="input-group input-group-sm">
-                                    <input type="number" class="form-control month-salary-rate"
-                                           data-month="${monthIndex}"
-                                           placeholder="299"
-                                           value="${defaultSalaryRate}"
-                                           step="0.01"
-                                           min="0">
-                                    <span class="input-group-text">LKR</span>
-                                </div>
-                                <div class="input-group input-group-sm mt-1">
-                                    <input type="date" class="form-control month-salary-rate-date"
-                                           data-month="${monthIndex}"
-                                           title="Select date to auto-fetch exchange rate">
-                                    <button type="button" class="btn btn-outline-secondary fetch-salary-rate-btn"
-                                            data-month="${monthIndex}"
-                                            title="Fetch exchange rate from CBSL">
-                                        <i class="fas fa-download"></i>
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="col-12">
-                                <hr class="my-2">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <label class="form-label small mb-0">Bonuses</label>
+
+                            <!-- Bonuses Section -->
+                            <div class="border-top pt-3">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <label class="form-label small mb-0 fw-semibold">
+                                        <i class="fas fa-gift text-warning me-1"></i>Bonuses
+                                    </label>
                                     <button type="button" class="btn btn-sm btn-outline-primary add-bonus-btn"
                                             data-month="${monthIndex}">
                                         <i class="fas fa-plus me-1"></i>Add Bonus
@@ -3221,11 +3240,12 @@ function addBonusEntry(monthIndex, bonusAmount = 0, bonusRate = 299) {
     const bonusId = `bonus-${monthIndex}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     const bonusHtml = `
-        <div class="bonus-entry mb-2" data-bonus-id="${bonusId}">
-            <div class="row g-2">
-                <div class="col-5">
+        <div class="bonus-entry mb-3 border rounded p-2 bg-white shadow-sm" data-bonus-id="${bonusId}">
+            <div class="row g-2 align-items-start">
+                <div class="col-md-4">
+                    <label class="form-label small mb-1 text-muted">Bonus Amount</label>
                     <div class="input-group input-group-sm">
-                        <span class="input-group-text">$</span>
+                        <span class="input-group-text bg-light"><i class="fas fa-dollar-sign text-success"></i></span>
                         <input type="number" class="form-control month-bonus"
                                data-month="${monthIndex}"
                                placeholder="0"
@@ -3234,33 +3254,37 @@ function addBonusEntry(monthIndex, bonusAmount = 0, bonusRate = 299) {
                                min="0">
                     </div>
                 </div>
-                <div class="col-5">
+                <div class="col-md-6">
+                    <label class="form-label small mb-1 text-muted">Exchange Rate</label>
                     <div class="input-group input-group-sm mb-1">
+                        <span class="input-group-text bg-light">1 USD =</span>
                         <input type="number" class="form-control month-bonus-rate"
                                data-month="${monthIndex}"
                                placeholder="299"
                                value="${bonusRate}"
                                step="0.01"
                                min="0">
-                        <span class="input-group-text">LKR</span>
+                        <span class="input-group-text bg-light">LKR</span>
                     </div>
-                    <div class="input-group input-group-sm">
-                        <input type="date" class="form-control month-bonus-rate-date"
+                    <div class="d-flex gap-1">
+                        <input type="date" class="form-control form-control-sm month-bonus-rate-date"
                                data-month="${monthIndex}"
                                data-bonus-id="${bonusId}"
-                               title="Select date to auto-fetch exchange rate">
-                        <button type="button" class="btn btn-outline-secondary fetch-bonus-rate-btn"
+                               title="Select date to auto-fetch exchange rate"
+                               style="flex: 1;">
+                        <button type="button" class="btn btn-sm btn-primary fetch-bonus-rate-btn"
                                 data-month="${monthIndex}"
                                 data-bonus-id="${bonusId}"
-                                title="Fetch exchange rate from CBSL">
-                            <i class="fas fa-download"></i>
+                                title="Fetch exchange rate from database">
+                            <i class="fas fa-sync-alt"></i>
                         </button>
                     </div>
                 </div>
-                <div class="col-2">
+                <div class="col-md-2 d-flex align-items-end">
                     <button type="button" class="btn btn-sm btn-outline-danger remove-bonus-btn w-100"
-                            data-bonus-id="${bonusId}">
-                        <i class="fas fa-trash"></i>
+                            data-bonus-id="${bonusId}"
+                            title="Remove this bonus">
+                        <i class="fas fa-trash-alt"></i>
                     </button>
                 </div>
             </div>
