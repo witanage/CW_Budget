@@ -23,6 +23,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
 logger.info("Environment variables loaded")
 
 # Custom JSON provider to handle Decimal objects
