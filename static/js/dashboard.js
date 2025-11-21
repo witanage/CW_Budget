@@ -3249,8 +3249,7 @@ function addBonusEntry(monthIndex, bonusAmount = 0, bonusRate = 299) {
 
 function calculateMonthlyTax() {
     // Get form values
-    const taxRate = parseFloat(document.getElementById('taxRate').value) || 15;
-    const taxFreeThreshold = parseFloat(document.getElementById('taxFreeThreshold').value) || 360000;
+    const taxFreeThreshold = parseFloat(document.getElementById('taxFreeThreshold').value) || 1800000;
     const startMonthIndex = parseInt(document.getElementById('startMonth').value) || 0;
 
     // Read monthly salary and their exchange rates from table
@@ -3455,8 +3454,7 @@ function updateTaxScheduleTable(monthlyData) {
 function resetTaxCalculator() {
     // Reset form fields
     document.getElementById('assessmentYear').value = '2024/2025';
-    document.getElementById('taxRate').value = '15';
-    document.getElementById('taxFreeThreshold').value = '360000';
+    document.getElementById('taxFreeThreshold').value = '1800000';
     document.getElementById('startMonth').value = '0';
 
     // Repopulate monthly data table with default values
@@ -3755,7 +3753,7 @@ function loadCalculation(calculationId) {
 
         // Load values into form fields
         document.getElementById('assessmentYear').value = calc.assessment_year;
-        document.getElementById('taxRate').value = calc.tax_rate;
+        // Tax rate is now hardcoded in progressive brackets, not loaded from saved data
         document.getElementById('taxFreeThreshold').value = calc.tax_free_threshold;
         document.getElementById('startMonth').value = calc.start_month;
 
