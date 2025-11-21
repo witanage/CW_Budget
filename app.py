@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import threading
 from datetime import datetime, timedelta
 from decimal import Decimal
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash
@@ -212,6 +213,86 @@ def register():
     
     return render_template('register.html')
 
+def populate_exchange_rates_background():
+    """
+    Background task to populate missing exchange rates in the database.
+    Runs in a separate thread after user login to proactively fill the cache.
+
+    Strategy:
+    - If database is empty: Fetch 2 years of bulk data from CBSL
+    - If database has data: Check last 10 days and fill any missing dates
+    """
+    try:
+        logger.info("Background task: Starting exchange rate population check...")
+        from exchange_rate_service import get_exchange_rate_service
+
+        service = get_exchange_rate_service()
+
+        # Check if database is empty
+        if service._is_database_empty():
+            logger.info("Background task: Database is empty, triggering bulk import...")
+            success = service._fetch_and_import_bulk_csv()
+            if success:
+                logger.info("Background task: Bulk import completed successfully")
+            else:
+                logger.warning("Background task: Bulk import failed")
+        else:
+            # Database has data, check last 10 days for missing dates
+            logger.info("Background task: Checking last 10 days for missing exchange rates...")
+
+            end_date = datetime.now().date()
+            start_date = end_date - timedelta(days=10)
+
+            # Get existing dates in the last 10 days
+            connection = mysql.connector.connect(
+                host=os.environ.get('DB_HOST', 'localhost'),
+                port=int(os.environ.get('DB_PORT', 3306)),
+                user=os.environ.get('DB_USER', 'root'),
+                password=os.environ.get('DB_PASSWORD', ''),
+                database=os.environ.get('DB_NAME', 'budget_app')
+            )
+            cursor = connection.cursor()
+            cursor.execute("""
+                SELECT date FROM exchange_rates
+                WHERE date BETWEEN %s AND %s
+            """, (start_date, end_date))
+
+            existing_dates = {row[0] for row in cursor.fetchall()}
+            cursor.close()
+            connection.close()
+
+            # Find missing dates in the last 10 days
+            current_date = start_date
+            missing_dates = []
+            while current_date <= end_date:
+                if current_date not in existing_dates:
+                    missing_dates.append(current_date)
+                current_date += timedelta(days=1)
+
+            if missing_dates:
+                logger.info(f"Background task: Found {len(missing_dates)} missing dates in last 10 days: {missing_dates}")
+
+                # Fetch each missing date
+                fetched = 0
+                failed = 0
+                for date in missing_dates:
+                    try:
+                        rate = service.get_exchange_rate(datetime.combine(date, datetime.min.time()))
+                        if rate:
+                            fetched += 1
+                        else:
+                            failed += 1
+                    except Exception as e:
+                        logger.error(f"Background task: Error fetching rate for {date}: {str(e)}")
+                        failed += 1
+
+                logger.info(f"Background task: Completed - {fetched} fetched, {failed} failed")
+            else:
+                logger.info("Background task: No missing dates in last 10 days")
+
+    except Exception as e:
+        logger.error(f"Background task: Error populating exchange rates: {str(e)}", exc_info=True)
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     """User login."""
@@ -248,6 +329,12 @@ def login():
                     session['username'] = user['username']
                     session['is_admin'] = user.get('is_admin', False)
                     logger.info(f"Login successful for user: {username} (ID: {user['id']}), permanent: {remember_me}, is_admin: {user.get('is_admin', False)}")
+
+                    # Start background task to populate exchange rates
+                    background_thread = threading.Thread(target=populate_exchange_rates_background, daemon=True)
+                    background_thread.start()
+                    logger.info("Background task started to populate exchange rates")
+
                     return jsonify({'message': 'Login successful'}), 200
                 else:
                     logger.warning(f"Login failed for username: {username} - Invalid credentials")
@@ -2432,13 +2519,18 @@ def set_active_tax_calculation(calculation_id):
 @login_required
 def get_exchange_rate_api():
     """
-    Fetch USD to LKR exchange rate from CBSL for a specific date
+    Get USD to LKR exchange rate for a specific date
+
+    This endpoint:
+    1. First checks the exchange_rates table in the database (cache)
+    2. If not found, fetches from CBSL and stores in DB for future use
+    3. If CBSL fails, returns nearest previous date from DB
 
     Query Parameters:
         date: Date in YYYY-MM-DD format (required)
 
     Returns:
-        JSON with buy_rate and sell_rate or error message
+        JSON with buy_rate, sell_rate, source, and date
     """
     try:
         from exchange_rate_service import get_exchange_rate_service
@@ -2581,6 +2673,123 @@ def import_exchange_rates_csv():
     except Exception as e:
         logger.error(f"Error importing CSV exchange rates: {str(e)}")
         return jsonify({'error': 'Failed to import exchange rates', 'details': str(e)}), 500
+
+@app.route('/api/exchange-rate/bulk-cache', methods=['POST'])
+@login_required
+def bulk_cache_exchange_rates():
+    """
+    Pre-populate exchange rates cache in database for a date range.
+
+    This endpoint efficiently:
+    1. Checks which dates in the range are missing from the database
+    2. Fetches only missing dates from CBSL and stores them in the DB
+    3. Returns summary of caching operation
+
+    Request Body (JSON):
+        start_date: Start date (YYYY-MM-DD). Required.
+        end_date: End date (YYYY-MM-DD). Required.
+
+    Returns:
+        JSON with:
+        - already_cached: Number of dates already in DB
+        - newly_cached: Number of dates fetched and stored
+        - failed: Number of dates that couldn't be fetched
+        - message: Summary message
+    """
+    try:
+        from exchange_rate_service import get_exchange_rate_service
+        from datetime import datetime, timedelta
+
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'Request body is required'}), 400
+
+        start_date_str = data.get('start_date')
+        end_date_str = data.get('end_date')
+
+        if not start_date_str or not end_date_str:
+            return jsonify({'error': 'Both start_date and end_date are required'}), 400
+
+        try:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+        except ValueError as e:
+            return jsonify({'error': 'Invalid date format. Use YYYY-MM-DD'}), 400
+
+        if start_date > end_date:
+            return jsonify({'error': 'start_date must be before or equal to end_date'}), 400
+
+        # Don't fetch dates too far in the future
+        today = datetime.now().date()
+        if start_date > today:
+            return jsonify({'error': 'start_date cannot be in the future'}), 400
+        if end_date > today:
+            end_date = today
+
+        service = get_exchange_rate_service()
+
+        # Step 1: Get all dates that are already in the database (single query)
+        import mysql.connector
+        connection = mysql.connector.connect(
+            host=os.environ.get('DB_HOST', 'localhost'),
+            port=int(os.environ.get('DB_PORT', 3306)),
+            user=os.environ.get('DB_USER', 'root'),
+            password=os.environ.get('DB_PASSWORD', ''),
+            database=os.environ.get('DB_NAME', 'budget_app')
+        )
+        cursor = connection.cursor()
+        cursor.execute("""
+            SELECT date FROM exchange_rates
+            WHERE date BETWEEN %s AND %s
+        """, (start_date, end_date))
+
+        existing_dates = {row[0] for row in cursor.fetchall()}
+        cursor.close()
+        connection.close()
+
+        # Step 2: Determine which dates need to be fetched
+        current_date = start_date
+        dates_to_fetch = []
+        while current_date <= end_date:
+            if current_date not in existing_dates:
+                dates_to_fetch.append(current_date)
+            current_date += timedelta(days=1)
+
+        already_cached = len(existing_dates)
+        newly_cached = 0
+        failed = 0
+
+        logger.info(f"Bulk cache: {already_cached} already in DB, {len(dates_to_fetch)} dates to fetch")
+
+        # Step 3: Fetch and store missing dates
+        for date in dates_to_fetch:
+            try:
+                # This will fetch from CBSL and automatically save to DB
+                rate_data = service.get_exchange_rate(date)
+                if rate_data and rate_data.get('buy_rate'):
+                    newly_cached += 1
+                    logger.debug(f"Cached rate for {date}: {rate_data['buy_rate']} LKR")
+                else:
+                    failed += 1
+                    logger.debug(f"Failed to fetch rate for {date}")
+            except Exception as e:
+                logger.error(f"Error fetching rate for {date}: {str(e)}")
+                failed += 1
+
+        total_dates = (end_date - start_date).days + 1
+        logger.info(f"Bulk cache completed: {already_cached} existing, {newly_cached} new, {failed} failed")
+
+        return jsonify({
+            'already_cached': already_cached,
+            'newly_cached': newly_cached,
+            'failed': failed,
+            'total_dates': total_dates,
+            'message': f'Successfully cached {newly_cached} new exchange rates. {already_cached} were already cached.'
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error in bulk cache exchange rates: {str(e)}")
+        return jsonify({'error': 'Failed to cache exchange rates', 'details': str(e)}), 500
 
 # Global error handlers (must be outside if __name__ block)
 @app.errorhandler(500)
