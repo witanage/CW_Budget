@@ -3167,13 +3167,13 @@ function populateMonthlyDataTable() {
                                                 <input type="date" class="form-control month-salary-rate-date"
                                                        data-month="${monthIndex}"
                                                        placeholder="Select date">
-                                                <button type="button" class="btn btn-outline-secondary fetch-salary-rate-btn"
+                                                <button type="button" class="btn btn-sm btn-outline-secondary fetch-salary-rate-btn"
                                                         data-month="${monthIndex}"
                                                         title="Auto-fetch rate from database">
                                                     <i class="fas fa-sync-alt"></i>
                                                 </button>
                                             </div>
-                                            <small class="d-block text-body-secondary">Select date to auto-fetch rate</small>
+                                            <small class="d-block" style="opacity: 0.65;">Select date to auto-fetch rate</small>
                                         </div>
                                     </div>
                                 </div>
@@ -3244,9 +3244,9 @@ function addBonusEntry(monthIndex, bonusAmount = 0, bonusRate = 299) {
         <div class="bonus-entry mb-3" data-bonus-id="${bonusId}">
             <div class="card">
                 <div class="card-body">
-                    <div class="row g-3 align-items-end">
+                    <div class="row g-3 align-items-start">
                         <div class="col-md-4">
-                            <label class="form-label small mb-2 text-body-secondary">Amount</label>
+                            <label class="form-label small mb-2" style="opacity: 0.65;">Amount</label>
                             <div class="input-group input-group-sm">
                                 <span class="input-group-text">$</span>
                                 <input type="number" class="form-control month-bonus"
@@ -3259,7 +3259,7 @@ function addBonusEntry(monthIndex, bonusAmount = 0, bonusRate = 299) {
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label small mb-2 text-body-secondary">Exchange Rate</label>
+                            <label class="form-label small mb-2" style="opacity: 0.65;">Exchange Rate</label>
                             <div class="input-group input-group-sm mb-2">
                                 <input type="number" class="form-control month-bonus-rate"
                                        data-month="${monthIndex}"
@@ -3274,7 +3274,7 @@ function addBonusEntry(monthIndex, bonusAmount = 0, bonusRate = 299) {
                                        data-month="${monthIndex}"
                                        data-bonus-id="${bonusId}"
                                        placeholder="Select date">
-                                <button type="button" class="btn btn-outline-secondary fetch-bonus-rate-btn"
+                                <button type="button" class="btn btn-sm btn-outline-secondary fetch-bonus-rate-btn"
                                         data-month="${monthIndex}"
                                         data-bonus-id="${bonusId}"
                                         title="Auto-fetch rate from database">
@@ -3282,7 +3282,7 @@ function addBonusEntry(monthIndex, bonusAmount = 0, bonusRate = 299) {
                                 </button>
                             </div>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-2 d-flex align-items-start" style="padding-top: 1.9rem;">
                             <button type="button" class="btn btn-sm btn-outline-danger remove-bonus-btn w-100"
                                     data-bonus-id="${bonusId}"
                                     title="Remove bonus">
