@@ -16,14 +16,12 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-
 
 logger.info("Environment variables loaded")
 
@@ -2429,6 +2427,160 @@ def set_active_tax_calculation(calculation_id):
             cursor.close()
         if connection:
             connection.close()
+
+@app.route('/api/exchange-rate', methods=['GET'])
+@login_required
+def get_exchange_rate_api():
+    """
+    Fetch USD to LKR exchange rate from CBSL for a specific date
+
+    Query Parameters:
+        date: Date in YYYY-MM-DD format (required)
+
+    Returns:
+        JSON with buy_rate and sell_rate or error message
+    """
+    try:
+        from exchange_rate_service import get_exchange_rate_service
+
+        date_str = request.args.get('date')
+        if not date_str:
+            return jsonify({'error': 'Date parameter is required (format: YYYY-MM-DD)'}), 400
+
+        try:
+            date = datetime.strptime(date_str, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({'error': 'Invalid date format. Use YYYY-MM-DD'}), 400
+
+        # Check if date is not in the future
+        if date > datetime.now():
+            return jsonify({'error': 'Cannot fetch exchange rates for future dates'}), 400
+
+        # Fetch exchange rate
+        service = get_exchange_rate_service()
+        rate = service.get_exchange_rate(date)
+
+        if rate:
+            logger.info(f"Exchange rate fetched for {date_str}: {rate}")
+            return jsonify(rate), 200
+        else:
+            return jsonify({'error': 'Exchange rate not available for this date'}), 404
+
+    except Exception as e:
+        logger.error(f"Error fetching exchange rate: {str(e)}")
+        return jsonify({'error': 'Failed to fetch exchange rate', 'details': str(e)}), 500
+
+@app.route('/api/exchange-rate/month', methods=['GET'])
+@login_required
+def get_month_exchange_rates():
+    """
+    Fetch USD to LKR exchange rates for an entire month
+
+    Query Parameters:
+        year: Year (required)
+        month: Month 1-12 (required)
+
+    Returns:
+        JSON with rates for each day in the month
+    """
+    try:
+        from exchange_rate_service import get_exchange_rate_service
+
+        year_str = request.args.get('year')
+        month_str = request.args.get('month')
+
+        if not year_str or not month_str:
+            return jsonify({'error': 'Year and month parameters are required'}), 400
+
+        try:
+            year = int(year_str)
+            month = int(month_str)
+
+            if month < 1 or month > 12:
+                return jsonify({'error': 'Month must be between 1 and 12'}), 400
+
+            if year < 2000 or year > datetime.now().year:
+                return jsonify({'error': f'Year must be between 2000 and {datetime.now().year}'}), 400
+
+        except ValueError:
+            return jsonify({'error': 'Invalid year or month format'}), 400
+
+        # Fetch exchange rates for the month
+        service = get_exchange_rate_service()
+        rates = service.get_rates_for_month(year, month)
+
+        if rates:
+            logger.info(f"Exchange rates fetched for {year}-{month:02d}: {len(rates)} days")
+            return jsonify(rates), 200
+        else:
+            return jsonify({'error': 'No exchange rates available for this month'}), 404
+
+    except Exception as e:
+        logger.error(f"Error fetching monthly exchange rates: {str(e)}")
+        return jsonify({'error': 'Failed to fetch exchange rates', 'details': str(e)}), 500
+
+@app.route('/api/exchange-rate/import-csv', methods=['POST'])
+@login_required
+def import_exchange_rates_csv():
+    """
+    Import exchange rates from CSV file
+
+    Expects:
+        csv_content: CSV content as string in request body
+
+    Returns:
+        JSON with import results
+    """
+    try:
+        from exchange_rate_service import get_exchange_rate_service
+        from exchange_rate_parser import ExchangeRateParser
+
+        data = request.get_json()
+        if not data or 'csv_content' not in data:
+            return jsonify({'error': 'CSV content is required in request body'}), 400
+
+        csv_content = data['csv_content']
+
+        # Parse CSV
+        parser = ExchangeRateParser()
+        rates_dict = parser.parse_csv_content(csv_content)
+
+        if not rates_dict:
+            return jsonify({'error': 'No valid exchange rates found in CSV'}), 400
+
+        # Save to database
+        service = get_exchange_rate_service()
+        success_count = 0
+        error_count = 0
+
+        for date_str, rate_data in rates_dict.items():
+            try:
+                date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+                if service.save_exchange_rate(
+                    date_obj,
+                    rate_data['buy_rate'],
+                    rate_data['sell_rate'],
+                    source='CSV'
+                ):
+                    success_count += 1
+                else:
+                    error_count += 1
+            except Exception as e:
+                logger.error(f"Error saving rate for {date_str}: {str(e)}")
+                error_count += 1
+
+        logger.info(f"CSV import completed: {success_count} successful, {error_count} errors")
+
+        return jsonify({
+            'message': f'Successfully imported {success_count} exchange rates',
+            'success_count': success_count,
+            'error_count': error_count,
+            'total_parsed': len(rates_dict)
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error importing CSV exchange rates: {str(e)}")
+        return jsonify({'error': 'Failed to import exchange rates', 'details': str(e)}), 500
 
 # Global error handlers (must be outside if __name__ block)
 @app.errorhandler(500)
