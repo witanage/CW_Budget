@@ -3152,6 +3152,16 @@ function populateMonthlyDataTable() {
                                            min="0">
                                     <span class="input-group-text">LKR</span>
                                 </div>
+                                <div class="input-group input-group-sm mt-1">
+                                    <input type="date" class="form-control month-salary-rate-date"
+                                           data-month="${monthIndex}"
+                                           title="Select date to auto-fetch exchange rate">
+                                    <button type="button" class="btn btn-outline-secondary fetch-salary-rate-btn"
+                                            data-month="${monthIndex}"
+                                            title="Fetch exchange rate from CBSL">
+                                        <i class="fas fa-download"></i>
+                                    </button>
+                                </div>
                             </div>
                             <div class="col-12">
                                 <hr class="my-2">
@@ -3192,6 +3202,15 @@ function populateMonthlyDataTable() {
             addBonusEntry(monthIndex);
         });
     });
+
+    // Add event listeners for "Fetch Salary Rate" buttons
+    document.querySelectorAll('.fetch-salary-rate-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation(); // Prevent collapse toggle
+            const monthIndex = parseInt(this.getAttribute('data-month'));
+            fetchExchangeRateForSalary(monthIndex);
+        });
+    });
 }
 
 // Helper function to add a bonus entry
@@ -3216,7 +3235,7 @@ function addBonusEntry(monthIndex, bonusAmount = 0, bonusRate = 299) {
                     </div>
                 </div>
                 <div class="col-5">
-                    <div class="input-group input-group-sm">
+                    <div class="input-group input-group-sm mb-1">
                         <input type="number" class="form-control month-bonus-rate"
                                data-month="${monthIndex}"
                                placeholder="299"
@@ -3224,6 +3243,18 @@ function addBonusEntry(monthIndex, bonusAmount = 0, bonusRate = 299) {
                                step="0.01"
                                min="0">
                         <span class="input-group-text">LKR</span>
+                    </div>
+                    <div class="input-group input-group-sm">
+                        <input type="date" class="form-control month-bonus-rate-date"
+                               data-month="${monthIndex}"
+                               data-bonus-id="${bonusId}"
+                               title="Select date to auto-fetch exchange rate">
+                        <button type="button" class="btn btn-outline-secondary fetch-bonus-rate-btn"
+                                data-month="${monthIndex}"
+                                data-bonus-id="${bonusId}"
+                                title="Fetch exchange rate from CBSL">
+                            <i class="fas fa-download"></i>
+                        </button>
                     </div>
                 </div>
                 <div class="col-2">
@@ -3245,6 +3276,101 @@ function addBonusEntry(monthIndex, bonusAmount = 0, bonusRate = 299) {
         const bonusEntry = this.closest('.bonus-entry');
         bonusEntry.remove();
     });
+
+    // Add event listener for fetch bonus rate button
+    const fetchBtn = container.querySelector(`[data-bonus-id="${bonusId}"] .fetch-bonus-rate-btn`);
+    fetchBtn.addEventListener('click', function(e) {
+        e.stopPropagation(); // Prevent collapse toggle
+        const monthIndex = parseInt(this.getAttribute('data-month'));
+        const bonusId = this.getAttribute('data-bonus-id');
+        fetchExchangeRateForBonus(monthIndex, bonusId);
+    });
+}
+
+// Function to fetch exchange rate for salary
+async function fetchExchangeRateForSalary(monthIndex) {
+    const dateInput = document.querySelector(`.month-salary-rate-date[data-month="${monthIndex}"]`);
+    const rateInput = document.querySelector(`.month-salary-rate[data-month="${monthIndex}"]`);
+    const fetchBtn = document.querySelector(`.fetch-salary-rate-btn[data-month="${monthIndex}"]`);
+
+    const date = dateInput.value;
+    if (!date) {
+        showToast('Please select a date first', 'warning');
+        return;
+    }
+
+    // Disable button and show loading state
+    const originalHtml = fetchBtn.innerHTML;
+    fetchBtn.disabled = true;
+    fetchBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+    try {
+        const response = await fetch(`/api/exchange-rate?date=${date}`);
+        const data = await response.json();
+
+        if (response.ok) {
+            // Use the buy rate as the default rate
+            rateInput.value = data.buy_rate.toFixed(2);
+
+            let message = `Rate updated: ${data.buy_rate.toFixed(2)} LKR`;
+            if (data.note) {
+                message += ` (${data.note})`;
+            }
+            showToast(message, 'success');
+        } else {
+            showToast(data.error || 'Failed to fetch exchange rate', 'error');
+        }
+    } catch (error) {
+        console.error('Error fetching exchange rate:', error);
+        showToast('Network error: Unable to fetch exchange rate', 'error');
+    } finally {
+        // Re-enable button and restore icon
+        fetchBtn.disabled = false;
+        fetchBtn.innerHTML = originalHtml;
+    }
+}
+
+// Function to fetch exchange rate for bonus
+async function fetchExchangeRateForBonus(monthIndex, bonusId) {
+    const dateInput = document.querySelector(`.month-bonus-rate-date[data-bonus-id="${bonusId}"]`);
+    const rateInput = document.querySelector(`[data-bonus-id="${bonusId}"] .month-bonus-rate`);
+    const fetchBtn = document.querySelector(`.fetch-bonus-rate-btn[data-bonus-id="${bonusId}"]`);
+
+    const date = dateInput.value;
+    if (!date) {
+        showToast('Please select a date first', 'warning');
+        return;
+    }
+
+    // Disable button and show loading state
+    const originalHtml = fetchBtn.innerHTML;
+    fetchBtn.disabled = true;
+    fetchBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+    try {
+        const response = await fetch(`/api/exchange-rate?date=${date}`);
+        const data = await response.json();
+
+        if (response.ok) {
+            // Use the buy rate as the default rate
+            rateInput.value = data.buy_rate.toFixed(2);
+
+            let message = `Rate updated: ${data.buy_rate.toFixed(2)} LKR`;
+            if (data.note) {
+                message += ` (${data.note})`;
+            }
+            showToast(message, 'success');
+        } else {
+            showToast(data.error || 'Failed to fetch exchange rate', 'error');
+        }
+    } catch (error) {
+        console.error('Error fetching exchange rate:', error);
+        showToast('Network error: Unable to fetch exchange rate', 'error');
+    } finally {
+        // Re-enable button and restore icon
+        fetchBtn.disabled = false;
+        fetchBtn.innerHTML = originalHtml;
+    }
 }
 
 function calculateMonthlyTax() {
