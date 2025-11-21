@@ -3128,72 +3128,42 @@ function populateMonthlyDataTable() {
             <tr class="collapse month-detail-row" id="${collapseId}">
                 <td colspan="5" class="p-0">
                     <div class="month-detail-content">
-                        <div class="p-3">
-                            <div class="row g-3">
-                                <!-- Salary Section Card -->
-                                <div class="col-md-6">
-                                    <div class="card">
-                                        <div class="card-body">
-                                            <h6 class="card-subtitle mb-3">Monthly Salary</h6>
-                                            <div class="input-group input-group-sm">
-                                                <span class="input-group-text">$</span>
-                                                <input type="number" class="form-control month-salary"
-                                                       data-month="${monthIndex}"
-                                                       placeholder="6000"
-                                                       value="${defaultSalary}"
-                                                       step="100"
-                                                       min="0">
-                                                <span class="input-group-text">USD</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Exchange Rate Section Card -->
-                                <div class="col-md-6">
-                                    <div class="card">
-                                        <div class="card-body">
-                                            <h6 class="card-subtitle mb-3">Exchange Rate</h6>
-                                            <div class="input-group input-group-sm mb-2">
-                                                <input type="number" class="form-control month-salary-rate"
-                                                       data-month="${monthIndex}"
-                                                       placeholder="299"
-                                                       value="${defaultSalaryRate}"
-                                                       step="0.01"
-                                                       min="0">
-                                                <span class="input-group-text">LKR</span>
-                                            </div>
-                                            <div class="input-group input-group-sm mb-2">
-                                                <input type="date" class="form-control month-salary-rate-date"
-                                                       data-month="${monthIndex}"
-                                                       placeholder="Select date">
-                                                <button type="button" class="btn btn-sm btn-outline-secondary fetch-salary-rate-btn"
-                                                        data-month="${monthIndex}"
-                                                        title="Auto-fetch rate from database">
-                                                    <i class="fas fa-sync-alt"></i>
-                                                </button>
-                                            </div>
-                                            <small class="d-block" style="opacity: 0.65;">Select date to auto-fetch rate</small>
-                                        </div>
-                                    </div>
+                        <div class="row g-2 p-3">
+                            <div class="col-md-6">
+                                <label class="form-label small mb-1">Salary (USD)</label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control month-salary"
+                                           data-month="${monthIndex}"
+                                           placeholder="6000"
+                                           value="${defaultSalary}"
+                                           step="100"
+                                           min="0">
                                 </div>
                             </div>
-
-                            <!-- Bonuses Section -->
-                            <div class="mt-3">
-                                <div class="card">
-                                    <div class="card-body">
-                                        <div class="d-flex justify-content-between align-items-center mb-3">
-                                            <h6 class="card-subtitle mb-0">Bonuses</h6>
-                                            <button type="button" class="btn btn-sm btn-outline-primary add-bonus-btn"
-                                                    data-month="${monthIndex}">
-                                                <i class="fas fa-plus me-1"></i>Add Bonus
-                                            </button>
-                                        </div>
-                                        <div class="bonuses-container" data-month="${monthIndex}">
-                                            <!-- Bonuses will be added dynamically here -->
-                                        </div>
-                                    </div>
+                            <div class="col-md-6">
+                                <label class="form-label small mb-1">Salary Rate (LKR)</label>
+                                <div class="input-group input-group-sm">
+                                    <input type="number" class="form-control month-salary-rate"
+                                           data-month="${monthIndex}"
+                                           placeholder="299"
+                                           value="${defaultSalaryRate}"
+                                           step="0.01"
+                                           min="0">
+                                    <span class="input-group-text">LKR</span>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <hr class="my-2">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <label class="form-label small mb-0">Bonuses</label>
+                                    <button type="button" class="btn btn-sm btn-outline-primary add-bonus-btn"
+                                            data-month="${monthIndex}">
+                                        <i class="fas fa-plus me-1"></i>Add Bonus
+                                    </button>
+                                </div>
+                                <div class="bonuses-container" data-month="${monthIndex}">
+                                    <!-- Bonuses will be added dynamically here -->
                                 </div>
                             </div>
                         </div>
@@ -3220,15 +3190,6 @@ function populateMonthlyDataTable() {
             e.stopPropagation(); // Prevent collapse toggle
             const monthIndex = parseInt(this.getAttribute('data-month'));
             addBonusEntry(monthIndex);
-        });
-    });
-
-    // Add event listeners for "Fetch Salary Rate" buttons
-    document.querySelectorAll('.fetch-salary-rate-btn').forEach(btn => {
-        btn.addEventListener('click', function(e) {
-            e.stopPropagation(); // Prevent collapse toggle
-            const monthIndex = parseInt(this.getAttribute('data-month'));
-            fetchExchangeRateForSalary(monthIndex);
         });
     });
 }
@@ -3305,101 +3266,6 @@ function addBonusEntry(monthIndex, bonusAmount = 0, bonusRate = 299, bonusDate =
         const bonusEntry = this.closest('.bonus-entry');
         bonusEntry.remove();
     });
-
-    // Add event listener for fetch bonus rate button
-    const fetchBtn = container.querySelector(`[data-bonus-id="${bonusId}"] .fetch-bonus-rate-btn`);
-    fetchBtn.addEventListener('click', function(e) {
-        e.stopPropagation(); // Prevent collapse toggle
-        const monthIndex = parseInt(this.getAttribute('data-month'));
-        const bonusId = this.getAttribute('data-bonus-id');
-        fetchExchangeRateForBonus(monthIndex, bonusId);
-    });
-}
-
-// Function to fetch exchange rate for salary
-async function fetchExchangeRateForSalary(monthIndex) {
-    const dateInput = document.querySelector(`.month-salary-rate-date[data-month="${monthIndex}"]`);
-    const rateInput = document.querySelector(`.month-salary-rate[data-month="${monthIndex}"]`);
-    const fetchBtn = document.querySelector(`.fetch-salary-rate-btn[data-month="${monthIndex}"]`);
-
-    const date = dateInput.value;
-    if (!date) {
-        showToast('Please select a date first', 'warning');
-        return;
-    }
-
-    // Disable button and show loading state
-    const originalHtml = fetchBtn.innerHTML;
-    fetchBtn.disabled = true;
-    fetchBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-
-    try {
-        const response = await fetch(`/api/exchange-rate?date=${date}`);
-        const data = await response.json();
-
-        if (response.ok) {
-            // Use the buy rate as the default rate
-            rateInput.value = data.buy_rate.toFixed(2);
-
-            let message = `Rate updated: ${data.buy_rate.toFixed(2)} LKR`;
-            if (data.note) {
-                message += ` (${data.note})`;
-            }
-            showToast(message, 'success');
-        } else {
-            showToast(data.error || 'Failed to fetch exchange rate', 'error');
-        }
-    } catch (error) {
-        console.error('Error fetching exchange rate:', error);
-        showToast('Network error: Unable to fetch exchange rate', 'error');
-    } finally {
-        // Re-enable button and restore icon
-        fetchBtn.disabled = false;
-        fetchBtn.innerHTML = originalHtml;
-    }
-}
-
-// Function to fetch exchange rate for bonus
-async function fetchExchangeRateForBonus(monthIndex, bonusId) {
-    const dateInput = document.querySelector(`.month-bonus-rate-date[data-bonus-id="${bonusId}"]`);
-    const rateInput = document.querySelector(`[data-bonus-id="${bonusId}"] .month-bonus-rate`);
-    const fetchBtn = document.querySelector(`.fetch-bonus-rate-btn[data-bonus-id="${bonusId}"]`);
-
-    const date = dateInput.value;
-    if (!date) {
-        showToast('Please select a date first', 'warning');
-        return;
-    }
-
-    // Disable button and show loading state
-    const originalHtml = fetchBtn.innerHTML;
-    fetchBtn.disabled = true;
-    fetchBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-
-    try {
-        const response = await fetch(`/api/exchange-rate?date=${date}`);
-        const data = await response.json();
-
-        if (response.ok) {
-            // Use the buy rate as the default rate
-            rateInput.value = data.buy_rate.toFixed(2);
-
-            let message = `Rate updated: ${data.buy_rate.toFixed(2)} LKR`;
-            if (data.note) {
-                message += ` (${data.note})`;
-            }
-            showToast(message, 'success');
-        } else {
-            showToast(data.error || 'Failed to fetch exchange rate', 'error');
-        }
-    } catch (error) {
-        console.error('Error fetching exchange rate:', error);
-        showToast('Network error: Unable to fetch exchange rate', 'error');
-    } finally {
-        // Re-enable button and restore icon
-        fetchBtn.disabled = false;
-        fetchBtn.innerHTML = originalHtml;
-    }
 }
 
 function calculateMonthlyTax() {
@@ -4047,9 +3913,20 @@ function loadCalculation(calculationId) {
                 const monthIndex = parseInt(input.getAttribute('data-month'));
                 const monthData = monthDataMap[monthIndex];
                 console.log(`Month ${monthIndex}: salary_rate_date =`, monthData ? monthData.salary_rate_date : 'no data');
+                console.log(`Input element for month ${monthIndex}:`, input, 'type:', input.type);
+
                 if (monthData && monthData.salary_rate_date) {
-                    input.value = monthData.salary_rate_date;
-                    console.log(`Set date input for month ${monthIndex} to ${monthData.salary_rate_date}`);
+                    const dateValue = monthData.salary_rate_date;
+
+                    // Try multiple methods to set the date value
+                    input.value = dateValue;
+                    input.setAttribute('value', dateValue);
+
+                    // Force a change event to ensure the UI updates
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+
+                    console.log(`Set date input for month ${monthIndex} to ${dateValue}`);
+                    console.log(`Verification: input.value = ${input.value}, getAttribute = ${input.getAttribute('value')}`);
                     datesSet++;
                 }
             });
@@ -4078,7 +3955,7 @@ function loadCalculation(calculationId) {
 
             // Recalculate tax schedule with loaded data
             calculateMonthlyTax();
-        }, 100); // 100ms delay to ensure DOM is updated
+        }, 250); // 250ms delay to ensure DOM is fully updated and rendered
 
         showToast(`Loaded: ${calc.calculation_name}`, 'success');
 
