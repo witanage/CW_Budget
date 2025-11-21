@@ -217,6 +217,10 @@ def populate_exchange_rates_background():
     """
     Background task to populate missing exchange rates in the database.
     Runs in a separate thread after user login to proactively fill the cache.
+
+    Strategy:
+    - If database is empty: Fetch 2 years of bulk data from CBSL
+    - If database has data: Check last 10 days and fill any missing dates
     """
     try:
         logger.info("Background task: Starting exchange rate population check...")
@@ -233,7 +237,58 @@ def populate_exchange_rates_background():
             else:
                 logger.warning("Background task: Bulk import failed")
         else:
-            logger.info("Background task: Database already has exchange rates, skipping bulk import")
+            # Database has data, check last 10 days for missing dates
+            logger.info("Background task: Checking last 10 days for missing exchange rates...")
+
+            end_date = datetime.now().date()
+            start_date = end_date - timedelta(days=10)
+
+            # Get existing dates in the last 10 days
+            connection = mysql.connector.connect(
+                host=os.environ.get('DB_HOST', 'localhost'),
+                port=int(os.environ.get('DB_PORT', 3306)),
+                user=os.environ.get('DB_USER', 'root'),
+                password=os.environ.get('DB_PASSWORD', ''),
+                database=os.environ.get('DB_NAME', 'budget_app')
+            )
+            cursor = connection.cursor()
+            cursor.execute("""
+                SELECT date FROM exchange_rates
+                WHERE date BETWEEN %s AND %s
+            """, (start_date, end_date))
+
+            existing_dates = {row[0] for row in cursor.fetchall()}
+            cursor.close()
+            connection.close()
+
+            # Find missing dates in the last 10 days
+            current_date = start_date
+            missing_dates = []
+            while current_date <= end_date:
+                if current_date not in existing_dates:
+                    missing_dates.append(current_date)
+                current_date += timedelta(days=1)
+
+            if missing_dates:
+                logger.info(f"Background task: Found {len(missing_dates)} missing dates in last 10 days: {missing_dates}")
+
+                # Fetch each missing date
+                fetched = 0
+                failed = 0
+                for date in missing_dates:
+                    try:
+                        rate = service.get_exchange_rate(datetime.combine(date, datetime.min.time()))
+                        if rate:
+                            fetched += 1
+                        else:
+                            failed += 1
+                    except Exception as e:
+                        logger.error(f"Background task: Error fetching rate for {date}: {str(e)}")
+                        failed += 1
+
+                logger.info(f"Background task: Completed - {fetched} fetched, {failed} failed")
+            else:
+                logger.info("Background task: No missing dates in last 10 days")
 
     except Exception as e:
         logger.error(f"Background task: Error populating exchange rates: {str(e)}", exc_info=True)
