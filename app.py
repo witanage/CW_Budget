@@ -224,7 +224,7 @@ def populate_exchange_rates_background():
     """
     try:
         logger.info("Background task: Starting exchange rate population check...")
-        from exchange_rate_service import get_exchange_rate_service
+        from services.exchange_rate_service import get_exchange_rate_service
 
         service = get_exchange_rate_service()
 
@@ -2533,7 +2533,7 @@ def get_exchange_rate_api():
         JSON with buy_rate, sell_rate, source, and date
     """
     try:
-        from exchange_rate_service import get_exchange_rate_service
+        from services.exchange_rate_service import get_exchange_rate_service
 
         date_str = request.args.get('date')
         if not date_str:
@@ -2576,7 +2576,7 @@ def get_month_exchange_rates():
         JSON with rates for each day in the month
     """
     try:
-        from exchange_rate_service import get_exchange_rate_service
+        from services.exchange_rate_service import get_exchange_rate_service
 
         year_str = request.args.get('year')
         month_str = request.args.get('month')
@@ -2624,7 +2624,7 @@ def import_exchange_rates_csv():
         JSON with import results
     """
     try:
-        from exchange_rate_service import get_exchange_rate_service
+        from services.exchange_rate_service import get_exchange_rate_service
         from exchange_rate_parser import ExchangeRateParser
 
         data = request.get_json()
@@ -2697,7 +2697,7 @@ def bulk_cache_exchange_rates():
         - message: Summary message
     """
     try:
-        from exchange_rate_service import get_exchange_rate_service
+        from services.exchange_rate_service import get_exchange_rate_service
         from datetime import datetime, timedelta
 
         data = request.get_json()

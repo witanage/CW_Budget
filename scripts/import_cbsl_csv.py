@@ -16,8 +16,12 @@ Example:
 import sys
 import os
 from datetime import datetime
-from exchange_rate_service import get_exchange_rate_service
-from exchange_rate_parser import ExchangeRateParser
+
+# Add parent directory to path to import from services and utils
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from services.exchange_rate_service import get_exchange_rate_service
+from utils.exchange_rate_parser import ExchangeRateParser
 
 def import_csv_file(file_path: str):
     """Import CSV file into the database"""
