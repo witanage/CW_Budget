@@ -1053,23 +1053,15 @@ function displayTransactions(transactions) {
                 <button class="btn btn-sm btn-danger me-1" onclick="deleteTransaction(${t.id})" title="Delete">
                     <i class="fas fa-trash"></i>
                 </button>
-                <div class="btn-group me-1" role="group">
-                    <button type="button" class="btn btn-sm btn-secondary dropdown-toggle" data-bs-toggle="dropdown" title="More Actions">
-                        <i class="fas fa-ellipsis-v"></i>
-                    </button>
-                    <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="#" onclick="showMoveCopyModal(${t.id}, 'move'); return false;">
-                            <i class="fas fa-arrow-right me-2"></i>Move to Month
-                        </a></li>
-                        <li><a class="dropdown-item" href="#" onclick="showMoveCopyModal(${t.id}, 'copy'); return false;">
-                            <i class="fas fa-copy me-2"></i>Copy to Month
-                        </a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="#" onclick="showAuditModal(${t.id}); return false;">
-                            <i class="fas fa-history me-2"></i>Audit Log
-                        </a></li>
-                    </ul>
-                </div>
+                <button class="btn btn-sm btn-warning me-1" onclick="showMoveCopyModal(${t.id}, 'move')" title="Move to Month">
+                    <i class="fas fa-arrow-right"></i>
+                </button>
+                <button class="btn btn-sm btn-success me-1" onclick="showMoveCopyModal(${t.id}, 'copy')" title="Copy to Month">
+                    <i class="fas fa-copy"></i>
+                </button>
+                <button class="btn btn-sm btn-info" onclick="showAuditModal(${t.id})" title="Audit Log">
+                    <i class="fas fa-history"></i>
+                </button>
             </td>
         `;
 
