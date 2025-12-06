@@ -1046,20 +1046,20 @@ function displayTransactions(transactions) {
             <td class="fw-bold">${formatCurrency(t.calculatedBalance)}</td>
             <td class="opacity-75 small">${paidAtDisplay}</td>
             <td>${t.notes || '-'}</td>
-            <td>
-                <button class="btn btn-sm btn-primary me-1" onclick="editTransaction(${t.id})" title="Edit">
+            <td class="p-1" style="white-space: nowrap;">
+                <button class="btn btn-sm btn-primary p-1 me-1" style="font-size: 0.7rem; line-height: 1;" onclick="editTransaction(${t.id})" title="Edit">
                     <i class="fas fa-edit"></i>
                 </button>
-                <button class="btn btn-sm btn-danger me-1" onclick="deleteTransaction(${t.id})" title="Delete">
+                <button class="btn btn-sm btn-danger p-1 me-1" style="font-size: 0.7rem; line-height: 1;" onclick="deleteTransaction(${t.id})" title="Delete">
                     <i class="fas fa-trash"></i>
                 </button>
-                <button class="btn btn-sm btn-warning me-1" onclick="showMoveCopyModal(${t.id}, 'move')" title="Move to Month">
+                <button class="btn btn-sm btn-warning p-1 me-1" style="font-size: 0.7rem; line-height: 1;" onclick="showMoveCopyModal(${t.id}, 'move')" title="Move to Month">
                     <i class="fas fa-arrow-right"></i>
                 </button>
-                <button class="btn btn-sm btn-success me-1" onclick="showMoveCopyModal(${t.id}, 'copy')" title="Copy to Month">
+                <button class="btn btn-sm btn-success p-1 me-1" style="font-size: 0.7rem; line-height: 1;" onclick="showMoveCopyModal(${t.id}, 'copy')" title="Copy to Month">
                     <i class="fas fa-copy"></i>
                 </button>
-                <button class="btn btn-sm btn-info" onclick="showAuditModal(${t.id})" title="Audit Log">
+                <button class="btn btn-sm btn-info p-1" style="font-size: 0.7rem; line-height: 1;" onclick="showAuditModal(${t.id})" title="Audit Log">
                     <i class="fas fa-history"></i>
                 </button>
             </td>

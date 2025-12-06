@@ -204,7 +204,7 @@
                         
                         <!-- Transactions Table -->
                         <div class="table-responsive">
-                            <table class="table table-hover" id="transactionsTable">
+                            <table class="table table-hover table-sm" id="transactionsTable" style="font-size: 0.875rem;">
                                 <thead>
                                     <tr>
                                         <th style="width: 5%;">Method</th>
@@ -1320,6 +1320,16 @@
 </div>
 
 <style>
+/* Compact Transaction Table Rows */
+#transactionsTable tbody td {
+    padding: 0.25rem 0.5rem !important;
+    vertical-align: middle;
+}
+
+#transactionsTable thead th {
+    padding: 0.5rem !important;
+}
+
 /* Filter Modal Styling - Using Base Template Colors */
 #filterModal .modal-content {
     background-color: var(--modal-bg);
