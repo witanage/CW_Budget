@@ -154,6 +154,39 @@ def decimal_default(obj):
         return float(obj)
     raise TypeError
 
+def log_transaction_audit(cursor, transaction_id, user_id, action, field_name=None, old_value=None, new_value=None):
+    """
+    Log transaction changes to audit trail.
+
+    Args:
+        cursor: Database cursor
+        transaction_id: ID of the transaction (None for DELETE after completion)
+        user_id: ID of the user making the change
+        action: Type of action (CREATE, UPDATE, DELETE)
+        field_name: Name of the field changed (None for CREATE/DELETE)
+        old_value: Previous value (None for CREATE)
+        new_value: New value (None for DELETE)
+    """
+    try:
+        # Get request metadata
+        ip_address = request.remote_addr if request else None
+        user_agent = request.headers.get('User-Agent') if request else None
+
+        # Convert values to strings for storage
+        old_value_str = str(old_value) if old_value is not None else None
+        new_value_str = str(new_value) if new_value is not None else None
+
+        cursor.execute("""
+            INSERT INTO transaction_audit_logs
+            (transaction_id, user_id, action, field_name, old_value, new_value, ip_address, user_agent)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """, (transaction_id, user_id, action, field_name, old_value_str, new_value_str, ip_address, user_agent))
+
+        logger.info(f"Audit log created: {action} on transaction {transaction_id} by user {user_id}")
+    except Exception as e:
+        logger.error(f"Failed to create audit log: {e}")
+        # Don't fail the main transaction if audit logging fails
+
 # Routes
 @app.route('/')
 def index():
@@ -1055,6 +1088,9 @@ def transactions():
             transaction_id = cursor.lastrowid
             print(f"[DEBUG] Transaction inserted with ID: {transaction_id}")
 
+            # Log audit trail for CREATE action
+            log_transaction_audit(cursor, transaction_id, user_id, 'CREATE')
+
             connection.commit()
             print(f"[DEBUG] Transaction committed successfully")
 
@@ -1237,19 +1273,22 @@ def manage_transaction(transaction_id):
 
             print(f"[DEBUG] Updating transaction {transaction_id} with data: {data}")
 
-            # Get the monthly_record_id for this transaction
-            cursor.execute("""
-                SELECT monthly_record_id FROM transactions
-                WHERE id = %s AND monthly_record_id IN
+            # Get the current transaction data for audit trail
+            dict_cursor = connection.cursor(dictionary=True)
+            dict_cursor.execute("""
+                SELECT t.* FROM transactions t
+                WHERE t.id = %s AND t.monthly_record_id IN
                     (SELECT id FROM monthly_records WHERE user_id = %s)
             """, (transaction_id, session['user_id']))
 
-            result = cursor.fetchone()
-            if not result:
+            old_transaction = dict_cursor.fetchone()
+            dict_cursor.close()
+
+            if not old_transaction:
                 print(f"[DEBUG] Transaction {transaction_id} not found for user {session['user_id']}")
                 return jsonify({'error': 'Transaction not found'}), 404
 
-            monthly_record_id = result[0]
+            monthly_record_id = old_transaction['monthly_record_id']
             print(f"[DEBUG] Found monthly_record_id: {monthly_record_id}")
 
             # Convert to Decimal to avoid float/Decimal arithmetic errors
@@ -1284,17 +1323,52 @@ def manage_transaction(transaction_id):
 
             print(f"[DEBUG] Transaction {transaction_id} updated successfully")
 
+            # Log audit trail for each changed field
+            user_id = session['user_id']
+
+            # Track field changes
+            new_debit = debit if debit > 0 else None
+            new_credit = credit if credit > 0 else None
+
+            if old_transaction['description'] != data.get('description'):
+                log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'description',
+                                    old_transaction['description'], data.get('description'))
+
+            if old_transaction['category_id'] != data.get('category_id'):
+                log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'category_id',
+                                    old_transaction['category_id'], data.get('category_id'))
+
+            if old_transaction['debit'] != new_debit:
+                log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'debit',
+                                    old_transaction['debit'], new_debit)
+
+            if old_transaction['credit'] != new_credit:
+                log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'credit',
+                                    old_transaction['credit'], new_credit)
+
+            if str(old_transaction['transaction_date']) != str(transaction_date):
+                log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'transaction_date',
+                                    old_transaction['transaction_date'], transaction_date)
+
+            if old_transaction['notes'] != data.get('notes'):
+                log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'notes',
+                                    old_transaction['notes'], data.get('notes'))
+
             connection.commit()
             print(f"[DEBUG] Transaction update committed successfully")
             return jsonify({'message': 'Transaction updated successfully'})
         
         else:  # DELETE
+            # Log audit trail before deleting
+            user_id = session['user_id']
+            log_transaction_audit(cursor, transaction_id, user_id, 'DELETE')
+
             cursor.execute("""
-                DELETE FROM transactions 
-                WHERE id = %s AND monthly_record_id IN 
+                DELETE FROM transactions
+                WHERE id = %s AND monthly_record_id IN
                     (SELECT id FROM monthly_records WHERE user_id = %s)
-            """, (transaction_id, session['user_id']))
-            
+            """, (transaction_id, user_id))
+
             connection.commit()
             return jsonify({'message': 'Transaction deleted successfully'})
 
@@ -1306,6 +1380,55 @@ def manage_transaction(transaction_id):
         print(f"[ERROR] Unexpected error in manage_transaction: {str(e)}")
         connection.rollback()
         return jsonify({'error': f'Server error: {str(e)}'}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+@app.route('/api/transactions/<int:transaction_id>/audit-logs', methods=['GET'])
+@login_required
+def get_transaction_audit_logs(transaction_id):
+    """Get audit logs for a specific transaction."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    try:
+        cursor = connection.cursor(dictionary=True)
+        user_id = session['user_id']
+
+        # Verify the transaction belongs to the user
+        cursor.execute("""
+            SELECT t.id FROM transactions t
+            INNER JOIN monthly_records mr ON t.monthly_record_id = mr.id
+            WHERE t.id = %s AND mr.user_id = %s
+        """, (transaction_id, user_id))
+
+        transaction = cursor.fetchone()
+        if not transaction:
+            return jsonify({'error': 'Transaction not found'}), 404
+
+        # Fetch audit logs for this transaction
+        cursor.execute("""
+            SELECT
+                tal.id,
+                tal.action,
+                tal.field_name,
+                tal.old_value,
+                tal.new_value,
+                tal.created_at,
+                u.username
+            FROM transaction_audit_logs tal
+            INNER JOIN users u ON tal.user_id = u.id
+            WHERE tal.transaction_id = %s
+            ORDER BY tal.created_at DESC
+        """, (transaction_id,))
+
+        audit_logs = cursor.fetchall()
+        return jsonify(audit_logs)
+
+    except Error as e:
+        logger.error(f"Error fetching audit logs: {e}")
+        return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()
         connection.close()
