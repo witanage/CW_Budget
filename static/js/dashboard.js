@@ -528,7 +528,7 @@ function loadCategoriesForManagement() {
                     </div>
                 `).join('');
             } else {
-                incomeList.innerHTML = '<div class="text-muted text-center p-3">No income categories</div>';
+                incomeList.innerHTML = '<div class="opacity-75 text-center p-3">No income categories</div>';
             }
 
             // Display expense categories
@@ -547,7 +547,7 @@ function loadCategoriesForManagement() {
                     </div>
                 `).join('');
             } else {
-                expenseList.innerHTML = '<div class="text-muted text-center p-3">No expense categories</div>';
+                expenseList.innerHTML = '<div class="opacity-75 text-center p-3">No expense categories</div>';
             }
         })
         .catch(error => {
@@ -1044,7 +1044,7 @@ function displayTransactions(transactions) {
             <td class="text-success">${t.debit ? formatCurrency(t.debit) : '-'}</td>
             <td class="text-danger">${t.credit ? formatCurrency(t.credit) : '-'}</td>
             <td class="fw-bold">${formatCurrency(t.calculatedBalance)}</td>
-            <td class="text-muted small">${paidAtDisplay}</td>
+            <td class="opacity-75 small">${paidAtDisplay}</td>
             <td>${t.notes || '-'}</td>
             <td>
                 <button class="btn btn-sm btn-primary me-1" onclick="editTransaction(${t.id})">
@@ -1478,15 +1478,15 @@ function displayAuditLogs(auditLogs) {
     if (deleteLogs.length > 0) {
         deleteLogs.forEach(log => {
             html += `
-                <div class="audit-log-entry mb-3 p-3 border rounded bg-light">
+                <div class="audit-log-entry mb-3 p-3 border rounded" style="background-color: rgba(248, 249, 250, 0.5);">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <div>
                             ${getActionBadge(log.action)}
-                            <span class="ms-2 text-muted small">by ${log.username}</span>
+                            <span class="ms-2 opacity-75 small">by ${log.username}</span>
                         </div>
-                        <span class="text-muted small">${formatAuditDate(log.created_at)}</span>
+                        <span class="opacity-75 small">${formatAuditDate(log.created_at)}</span>
                     </div>
-                    <div class="text-muted">Transaction was deleted</div>
+                    <div class="opacity-75">Transaction was deleted</div>
                 </div>
             `;
         });
@@ -1502,18 +1502,18 @@ function displayAuditLogs(auditLogs) {
                         <div>
                             ${getActionBadge(log.action)}
                             <strong class="ms-2">${formatFieldName(log.field_name)}</strong>
-                            <span class="ms-2 text-muted small">by ${log.username}</span>
+                            <span class="ms-2 opacity-75 small">by ${log.username}</span>
                         </div>
-                        <span class="text-muted small">${formatAuditDate(log.created_at)}</span>
+                        <span class="opacity-75 small">${formatAuditDate(log.created_at)}</span>
                     </div>
                     <div class="ms-3">
                         <div class="row">
                             <div class="col-md-6">
-                                <small class="text-muted">Old Value:</small>
+                                <small class="opacity-75">Old Value:</small>
                                 <div class="text-danger">${log.old_value || '<em>empty</em>'}</div>
                             </div>
                             <div class="col-md-6">
-                                <small class="text-muted">New Value:</small>
+                                <small class="opacity-75">New Value:</small>
                                 <div class="text-success">${log.new_value || '<em>empty</em>'}</div>
                             </div>
                         </div>
@@ -1527,15 +1527,15 @@ function displayAuditLogs(auditLogs) {
     if (createLogs.length > 0) {
         createLogs.forEach(log => {
             html += `
-                <div class="audit-log-entry mb-3 p-3 border rounded bg-light">
+                <div class="audit-log-entry mb-3 p-3 border rounded" style="background-color: rgba(248, 249, 250, 0.5);">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <div>
                             ${getActionBadge(log.action)}
-                            <span class="ms-2 text-muted small">by ${log.username}</span>
+                            <span class="ms-2 opacity-75 small">by ${log.username}</span>
                         </div>
-                        <span class="text-muted small">${formatAuditDate(log.created_at)}</span>
+                        <span class="opacity-75 small">${formatAuditDate(log.created_at)}</span>
                     </div>
-                    <div class="text-muted">Transaction was created</div>
+                    <div class="opacity-75">Transaction was created</div>
                 </div>
             `;
         });
@@ -2728,7 +2728,7 @@ function updateForecastChart(data) {
                <span class="badge ${forecast.expense_trend > 0 ? 'bg-danger' : 'bg-success'}">${trendText}</span>
             </p>
             <p><strong>Predicted Savings:</strong> LKR ${forecast.predicted_savings.toLocaleString()}</p>
-            <p class="text-muted">Based on ${data.based_on_months} months of historical data</p>
+            <p class="opacity-75">Based on ${data.based_on_months} months of historical data</p>
         `;
     }
 
@@ -3080,14 +3080,14 @@ function loadCreditCardsList() {
 
     // Check if paymentMethods is an array
     if (!Array.isArray(paymentMethods)) {
-        listEl.innerHTML = '<p class="text-muted">No credit cards added yet.</p>';
+        listEl.innerHTML = '<p class="opacity-75">No credit cards added yet.</p>';
         return;
     }
 
     const creditCards = paymentMethods.filter(m => m.type === 'credit_card');
 
     if (creditCards.length === 0) {
-        listEl.innerHTML = '<p class="text-muted">No credit cards added yet.</p>';
+        listEl.innerHTML = '<p class="opacity-75">No credit cards added yet.</p>';
         return;
     }
 
@@ -3289,7 +3289,7 @@ function populateMonthlyDataTable() {
                 <td colspan="5" class="month-header">
                     <i class="fas fa-chevron-right me-2 month-chevron"></i>
                     <strong>${monthName}</strong>
-                    <span class="text-muted ms-2 month-summary" id="summary-${monthIndex}"></span>
+                    <span class="opacity-75 ms-2 month-summary" id="summary-${monthIndex}"></span>
                 </td>
             </tr>
             <tr class="collapse month-detail-row" id="${collapseId}">
@@ -3859,7 +3859,7 @@ function resetTaxCalculator() {
     if (tbody) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="6" class="text-center text-muted py-5">
+                <td colspan="6" class="text-center opacity-75 py-5">
                     <i class="fas fa-calculator fa-2x mb-2 d-block"></i>
                     Click "Calculate Tax" to generate schedule
                 </td>
@@ -4010,7 +4010,7 @@ function displaySavedCalculations(calculations, filterYear = null) {
             : 'No saved calculations yet. Calculate and save your tax to see it here.';
 
         listContainer.innerHTML = `
-            <p class="text-muted text-center py-4">
+            <p class="opacity-75 text-center py-4">
                 <i class="fas fa-info-circle me-2"></i>${message}
             </p>
         `;
@@ -4044,19 +4044,19 @@ function displaySavedCalculations(calculations, filterYear = null) {
                         </h6>
                         <p class="mb-1 small">
                             <span class="badge bg-primary me-2">${calc.assessment_year}</span>
-                            <span class="text-muted">Saved: ${createdDate}</span>
+                            <span class="opacity-75">Saved: ${createdDate}</span>
                         </p>
                         <div class="row mt-2">
                             <div class="col-md-6">
-                                <small class="text-muted">Tax Structure:</small><br>
+                                <small class="opacity-75">Tax Structure:</small><br>
                                 <strong>Progressive Brackets</strong>
                             </div>
                             <div class="col-md-6">
-                                <small class="text-muted">Tax-Free Threshold:</small><br>
+                                <small class="opacity-75">Tax-Free Threshold:</small><br>
                                 <strong>${formatCurrency(calc.tax_free_threshold)}</strong>
                             </div>
                         </div>
-                        <p class="mb-0 mt-2"><small class="text-muted"><i class="fas fa-info-circle me-1"></i>Tax totals will be calculated when you load this</small></p>
+                        <p class="mb-0 mt-2"><small class="opacity-75"><i class="fas fa-info-circle me-1"></i>Tax totals will be calculated when you load this</small></p>
                     </div>
                     <div class="ms-3 d-flex flex-column gap-1">
                         <button class="btn btn-sm btn-outline-primary" onclick="loadCalculation(${calc.id})" title="Load this calculation">
