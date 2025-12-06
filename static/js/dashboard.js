@@ -1050,8 +1050,11 @@ function displayTransactions(transactions) {
                 <button class="btn btn-sm btn-primary me-1" onclick="editTransaction(${t.id})">
                     <i class="fas fa-edit"></i>
                 </button>
-                <button class="btn btn-sm btn-danger" onclick="deleteTransaction(${t.id})">
+                <button class="btn btn-sm btn-danger me-1" onclick="deleteTransaction(${t.id})">
                     <i class="fas fa-trash"></i>
+                </button>
+                <button class="btn btn-sm btn-info" onclick="showAuditModal(${t.id})" title="View Audit Log">
+                    <i class="fas fa-history"></i>
                 </button>
             </td>
         `;
@@ -1377,6 +1380,170 @@ function deleteTransaction(id) {
         'Delete',
         'btn-danger'
     );
+}
+
+// ================================
+// AUDIT LOG FUNCTIONS
+// ================================
+
+function showAuditModal(transactionId) {
+    const modal = new bootstrap.Modal(document.getElementById('auditLogModal'));
+    const auditLogContent = document.getElementById('auditLogContent');
+
+    // Show loading state
+    auditLogContent.innerHTML = `
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading audit logs...</p>
+        </div>
+    `;
+
+    // Show the modal
+    modal.show();
+
+    // Fetch audit logs
+    fetch(`/api/transactions/${transactionId}/audit-logs`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Failed to fetch audit logs');
+            }
+            return response.json();
+        })
+        .then(auditLogs => {
+            displayAuditLogs(auditLogs);
+        })
+        .catch(error => {
+            console.error('Error fetching audit logs:', error);
+            auditLogContent.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    Error loading audit logs. Please try again.
+                </div>
+            `;
+        });
+}
+
+function displayAuditLogs(auditLogs) {
+    const auditLogContent = document.getElementById('auditLogContent');
+
+    if (!auditLogs || auditLogs.length === 0) {
+        auditLogContent.innerHTML = `
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                No audit logs found for this transaction.
+            </div>
+        `;
+        return;
+    }
+
+    // Group logs by action
+    const createLogs = auditLogs.filter(log => log.action === 'CREATE');
+    const updateLogs = auditLogs.filter(log => log.action === 'UPDATE');
+    const deleteLogs = auditLogs.filter(log => log.action === 'DELETE');
+
+    let html = '<div class="audit-log-timeline">';
+
+    // Helper function to format date
+    const formatAuditDate = (dateStr) => {
+        const date = new Date(dateStr);
+        return date.toLocaleString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+    };
+
+    // Helper function to format field name
+    const formatFieldName = (fieldName) => {
+        if (!fieldName) return '';
+        return fieldName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    };
+
+    // Helper function to get action badge
+    const getActionBadge = (action) => {
+        const badges = {
+            'CREATE': '<span class="badge bg-success">Created</span>',
+            'UPDATE': '<span class="badge bg-primary">Updated</span>',
+            'DELETE': '<span class="badge bg-danger">Deleted</span>'
+        };
+        return badges[action] || `<span class="badge bg-secondary">${action}</span>`;
+    };
+
+    // Display DELETE logs first (if any)
+    if (deleteLogs.length > 0) {
+        deleteLogs.forEach(log => {
+            html += `
+                <div class="audit-log-entry mb-3 p-3 border rounded bg-light">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            ${getActionBadge(log.action)}
+                            <span class="ms-2 text-muted small">by ${log.username}</span>
+                        </div>
+                        <span class="text-muted small">${formatAuditDate(log.created_at)}</span>
+                    </div>
+                    <div class="text-muted">Transaction was deleted</div>
+                </div>
+            `;
+        });
+    }
+
+    // Display UPDATE logs
+    if (updateLogs.length > 0) {
+        html += '<div class="mb-3"><strong>Changes:</strong></div>';
+        updateLogs.forEach(log => {
+            html += `
+                <div class="audit-log-entry mb-3 p-3 border rounded">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            ${getActionBadge(log.action)}
+                            <strong class="ms-2">${formatFieldName(log.field_name)}</strong>
+                            <span class="ms-2 text-muted small">by ${log.username}</span>
+                        </div>
+                        <span class="text-muted small">${formatAuditDate(log.created_at)}</span>
+                    </div>
+                    <div class="ms-3">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <small class="text-muted">Old Value:</small>
+                                <div class="text-danger">${log.old_value || '<em>empty</em>'}</div>
+                            </div>
+                            <div class="col-md-6">
+                                <small class="text-muted">New Value:</small>
+                                <div class="text-success">${log.new_value || '<em>empty</em>'}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    // Display CREATE logs last (original creation)
+    if (createLogs.length > 0) {
+        createLogs.forEach(log => {
+            html += `
+                <div class="audit-log-entry mb-3 p-3 border rounded bg-light">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            ${getActionBadge(log.action)}
+                            <span class="ms-2 text-muted small">by ${log.username}</span>
+                        </div>
+                        <span class="text-muted small">${formatAuditDate(log.created_at)}</span>
+                    </div>
+                    <div class="text-muted">Transaction was created</div>
+                </div>
+            `;
+        });
+    }
+
+    html += '</div>';
+
+    auditLogContent.innerHTML = html;
 }
 
 // ================================

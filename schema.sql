@@ -157,6 +157,31 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
+-- Transaction Audit Logs Table
+-- ============================================================
+-- Tracks all changes to transaction records for audit trail
+-- Records CREATE, UPDATE, DELETE operations with before/after values
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS transaction_audit_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    transaction_id INT NULL COMMENT 'Reference to transaction (NULL if deleted)',
+    user_id INT NOT NULL COMMENT 'User who made the change',
+    action VARCHAR(20) NOT NULL COMMENT 'CREATE, UPDATE, DELETE',
+    field_name VARCHAR(100) NULL COMMENT 'Field that was changed (NULL for CREATE/DELETE)',
+    old_value TEXT NULL COMMENT 'Previous value (NULL for CREATE)',
+    new_value TEXT NULL COMMENT 'New value (NULL for DELETE)',
+    ip_address VARCHAR(45) NULL COMMENT 'IP address of the user',
+    user_agent TEXT NULL COMMENT 'Browser user agent',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_transaction_id (transaction_id),
+    INDEX idx_user_id (user_id),
+    INDEX idx_action (action),
+    INDEX idx_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
 -- Performance Views for Reports
 -- ============================================================
 -- These views optimize report queries and provide pre-aggregated data
