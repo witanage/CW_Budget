@@ -1009,34 +1009,46 @@ showToast('Error saving transaction', 'danger');
 
 // Edit transaction
 function editTransaction(id) {
-// Find the transaction in the table
-const tbody = document.getElementById('transactionsList');
-const row = tbody.querySelector(`tr[data-transaction*='"id":${id}']`);
+    // Find the transaction in the table by exact ID match
+    const tbody = document.getElementById('transactionsList');
+    const rows = tbody.querySelectorAll('tr[data-transaction]');
 
-if (!row) {
-showToast('Transaction not found', 'danger');
-return;
-}
+    let transaction = null;
+    for (const row of rows) {
+        try {
+            const data = JSON.parse(row.dataset.transaction);
+            if (data.id === id) {
+                transaction = data;
+                break;
+            }
+        } catch (e) {
+            continue;
+        }
+    }
 
-const transaction = JSON.parse(row.dataset.transaction);
+    if (!transaction) {
+        console.error('Transaction not found:', id);
+        showToast('Transaction not found', 'danger');
+        return;
+    }
 
-// Populate form
-document.getElementById('transDescription').value = transaction.description || '';
-document.getElementById('transCategory').value = transaction.category_id || '';
-document.getElementById('transDebit').value = transaction.debit || '';
-document.getElementById('transCredit').value = transaction.credit || '';
-document.getElementById('transDate').value = transaction.transaction_date ? transaction.transaction_date.split('T')[0] : '';
-document.getElementById('transNotes').value = transaction.notes || '';
+    // Populate form
+    document.getElementById('transDescription').value = transaction.description || '';
+    document.getElementById('transCategory').value = transaction.category_id || '';
+    document.getElementById('transDebit').value = transaction.debit || '';
+    document.getElementById('transCredit').value = transaction.credit || '';
+    document.getElementById('transDate').value = transaction.transaction_date ? transaction.transaction_date.split('T')[0] : '';
+    document.getElementById('transNotes').value = transaction.notes || '';
 
-// Store edit ID
-document.getElementById('transactionForm').dataset.editId = id;
+    // Store edit ID
+    document.getElementById('transactionForm').dataset.editId = id;
 
-// Update modal title
-document.querySelector('#transactionModal .modal-title').textContent = 'Edit Transaction';
+    // Update modal title
+    document.querySelector('#transactionModal .modal-title').textContent = 'Edit Transaction';
 
-// Show modal
-const modal = new bootstrap.Modal(document.getElementById('transactionModal'));
-modal.show();
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('transactionModal'));
+    modal.show();
 }
 
 // Delete transaction
