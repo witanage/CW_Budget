@@ -1047,15 +1047,29 @@ function displayTransactions(transactions) {
             <td class="opacity-75 small">${paidAtDisplay}</td>
             <td>${t.notes || '-'}</td>
             <td>
-                <button class="btn btn-sm btn-primary me-1" onclick="editTransaction(${t.id})">
+                <button class="btn btn-sm btn-primary me-1" onclick="editTransaction(${t.id})" title="Edit">
                     <i class="fas fa-edit"></i>
                 </button>
-                <button class="btn btn-sm btn-danger me-1" onclick="deleteTransaction(${t.id})">
+                <button class="btn btn-sm btn-danger me-1" onclick="deleteTransaction(${t.id})" title="Delete">
                     <i class="fas fa-trash"></i>
                 </button>
-                <button class="btn btn-sm btn-info" onclick="showAuditModal(${t.id})" title="View Audit Log">
-                    <i class="fas fa-history"></i>
-                </button>
+                <div class="btn-group me-1" role="group">
+                    <button type="button" class="btn btn-sm btn-secondary dropdown-toggle" data-bs-toggle="dropdown" title="More Actions">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#" onclick="showMoveCopyModal(${t.id}, 'move'); return false;">
+                            <i class="fas fa-arrow-right me-2"></i>Move to Month
+                        </a></li>
+                        <li><a class="dropdown-item" href="#" onclick="showMoveCopyModal(${t.id}, 'copy'); return false;">
+                            <i class="fas fa-copy me-2"></i>Copy to Month
+                        </a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="#" onclick="showAuditModal(${t.id}); return false;">
+                            <i class="fas fa-history me-2"></i>Audit Log
+                        </a></li>
+                    </ul>
+                </div>
             </td>
         `;
 
@@ -1559,6 +1573,155 @@ function displayAuditLogs(auditLogs) {
     html += '</div>';
 
     auditLogContent.innerHTML = html;
+}
+
+// ================================
+// MOVE/COPY TRANSACTION FUNCTIONS
+// ================================
+
+function showMoveCopyModal(transactionId, action) {
+    // Find the transaction data
+    const tbody = document.querySelector('#transactionsTable tbody');
+    const rows = tbody.querySelectorAll('tr[data-transaction]');
+
+    let transaction = null;
+    for (const row of rows) {
+        try {
+            const data = JSON.parse(row.dataset.transaction);
+            if (data.id === transactionId) {
+                transaction = data;
+                break;
+            }
+        } catch (e) {
+            continue;
+        }
+    }
+
+    if (!transaction) {
+        console.error('Transaction not found:', transactionId);
+        showToast('Transaction not found', 'danger');
+        return;
+    }
+
+    // Update modal content based on action
+    const modal = document.getElementById('moveCopyTransactionModal');
+    const titleEl = document.getElementById('moveCopyTitle');
+    const infoTextEl = document.getElementById('moveCopyInfoText');
+    const confirmBtn = document.getElementById('executeMoveCopyBtn');
+
+    if (action === 'move') {
+        titleEl.textContent = 'Move Transaction';
+        infoTextEl.textContent = 'This will move the transaction to the selected month and remove it from the current month.';
+        confirmBtn.innerHTML = '<i class="fas fa-arrow-right me-1"></i>Move Transaction';
+        confirmBtn.className = 'btn btn-warning';
+    } else {
+        titleEl.textContent = 'Copy Transaction';
+        infoTextEl.textContent = 'This will create a copy of the transaction in the selected month.';
+        confirmBtn.innerHTML = '<i class="fas fa-copy me-1"></i>Copy Transaction';
+        confirmBtn.className = 'btn btn-primary';
+    }
+
+    // Display transaction info
+    const transInfoEl = document.getElementById('moveCopyTransactionInfo');
+    const amount = transaction.debit
+        ? `<span class="text-success">Income: ${formatCurrency(transaction.debit)}</span>`
+        : `<span class="text-danger">Expense: ${formatCurrency(transaction.credit)}</span>`;
+
+    transInfoEl.innerHTML = `
+        <div><strong>${transaction.description}</strong></div>
+        <div class="small opacity-75">Category: ${transaction.category_name || 'Uncategorized'}</div>
+        <div class="small">${amount}</div>
+    `;
+
+    // Set hidden fields
+    document.getElementById('moveCopyTransactionId').value = transactionId;
+    document.getElementById('moveCopyAction').value = action;
+
+    // Set default target month to current month
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    document.getElementById('targetMonthYear').value = currentMonth;
+
+    // Show modal
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+}
+
+// Event listener for execute button
+document.addEventListener('DOMContentLoaded', function() {
+    const executeBtn = document.getElementById('executeMoveCopyBtn');
+    if (executeBtn) {
+        executeBtn.addEventListener('click', executeMoveCopyTransaction);
+    }
+});
+
+function executeMoveCopyTransaction() {
+    const transactionId = document.getElementById('moveCopyTransactionId').value;
+    const action = document.getElementById('moveCopyAction').value;
+    const targetMonthYear = document.getElementById('targetMonthYear').value;
+
+    if (!targetMonthYear) {
+        showToast('Please select a target month', 'warning');
+        return;
+    }
+
+    // Parse target month/year
+    const [targetYear, targetMonth] = targetMonthYear.split('-').map(Number);
+
+    // Confirmation
+    const actionText = action === 'move' ? 'move' : 'copy';
+    const monthName = new Date(targetYear, targetMonth - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    showConfirmModal(
+        `${action === 'move' ? 'Move' : 'Copy'} Transaction`,
+        `Are you sure you want to ${actionText} this transaction to ${monthName}?`,
+        function() {
+            performMoveCopyTransaction(transactionId, action, targetYear, targetMonth);
+        },
+        action === 'move' ? 'Move' : 'Copy',
+        action === 'move' ? 'btn-warning' : 'btn-primary'
+    );
+}
+
+function performMoveCopyTransaction(transactionId, action, targetYear, targetMonth) {
+    showLoading();
+
+    const url = `/api/transactions/${transactionId}/${action}`;
+
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            target_year: targetYear,
+            target_month: targetMonth
+        })
+    })
+    .then(response => response.json())
+    .then(result => {
+        hideLoading();
+
+        if (result.error) {
+            showToast(result.error, 'danger');
+        } else {
+            const actionText = action === 'move' ? 'moved' : 'copied';
+            showToast(result.message || `Transaction ${actionText} successfully`, 'success');
+
+            // Close the modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('moveCopyTransactionModal'));
+            if (modal) modal.hide();
+
+            // Reload transactions
+            loadTransactions();
+            loadDashboardStats();
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        console.error(`Error ${action}ing transaction:`, error);
+        showToast(`Error ${action}ing transaction`, 'danger');
+    });
 }
 
 // ================================
