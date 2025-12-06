@@ -1208,13 +1208,28 @@ function displayPaymentTotals(totals) {
 }
 
 function editTransaction(id) {
-    // Find the transaction in the table
+    // Find the transaction in the table by exact ID match
     const tbody = document.querySelector('#transactionsTable tbody');
-    const row = tbody.querySelector(`tr[data-transaction*='"id":${id}']`);
+    const rows = tbody.querySelectorAll('tr[data-transaction]');
 
-    if (!row) return;
+    let transaction = null;
+    for (const row of rows) {
+        try {
+            const data = JSON.parse(row.dataset.transaction);
+            if (data.id === id) {
+                transaction = data;
+                break;
+            }
+        } catch (e) {
+            continue;
+        }
+    }
 
-    const transaction = JSON.parse(row.dataset.transaction);
+    if (!transaction) {
+        console.error('Transaction not found:', id);
+        showToast('Transaction not found', 'danger');
+        return;
+    }
 
     // Populate form
     document.getElementById('editTransactionId').value = transaction.id;

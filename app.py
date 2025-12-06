@@ -1330,27 +1330,42 @@ def manage_transaction(transaction_id):
             new_debit = debit if debit > 0 else None
             new_credit = credit if credit > 0 else None
 
+            # Normalize values for comparison to avoid false positives
+            # Convert category_id to int for comparison (handle None)
+            old_category = old_transaction['category_id']
+            new_category = int(data.get('category_id')) if data.get('category_id') else None
+
+            # Compare description
             if old_transaction['description'] != data.get('description'):
                 log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'description',
                                     old_transaction['description'], data.get('description'))
 
-            if old_transaction['category_id'] != data.get('category_id'):
+            # Compare category_id (normalized)
+            if old_category != new_category:
                 log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'category_id',
-                                    old_transaction['category_id'], data.get('category_id'))
+                                    old_category, new_category)
 
-            if old_transaction['debit'] != new_debit:
+            # Compare debit (Decimal comparison)
+            old_debit_normalized = old_transaction['debit'] if old_transaction['debit'] else None
+            if old_debit_normalized != new_debit:
                 log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'debit',
                                     old_transaction['debit'], new_debit)
 
-            if old_transaction['credit'] != new_credit:
+            # Compare credit (Decimal comparison)
+            old_credit_normalized = old_transaction['credit'] if old_transaction['credit'] else None
+            if old_credit_normalized != new_credit:
                 log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'credit',
                                     old_transaction['credit'], new_credit)
 
+            # Compare transaction_date
             if str(old_transaction['transaction_date']) != str(transaction_date):
                 log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'transaction_date',
                                     old_transaction['transaction_date'], transaction_date)
 
-            if old_transaction['notes'] != data.get('notes'):
+            # Compare notes (handle None/empty string)
+            old_notes = old_transaction['notes'] if old_transaction['notes'] else None
+            new_notes = data.get('notes') if data.get('notes') else None
+            if old_notes != new_notes:
                 log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'notes',
                                     old_transaction['notes'], data.get('notes'))
 
