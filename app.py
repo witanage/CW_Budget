@@ -1330,27 +1330,42 @@ def manage_transaction(transaction_id):
             new_debit = debit if debit > 0 else None
             new_credit = credit if credit > 0 else None
 
+            # Normalize values for comparison to avoid false positives
+            # Convert category_id to int for comparison (handle None)
+            old_category = old_transaction['category_id']
+            new_category = int(data.get('category_id')) if data.get('category_id') else None
+
+            # Compare description
             if old_transaction['description'] != data.get('description'):
                 log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'description',
                                     old_transaction['description'], data.get('description'))
 
-            if old_transaction['category_id'] != data.get('category_id'):
+            # Compare category_id (normalized)
+            if old_category != new_category:
                 log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'category_id',
-                                    old_transaction['category_id'], data.get('category_id'))
+                                    old_category, new_category)
 
-            if old_transaction['debit'] != new_debit:
+            # Compare debit (Decimal comparison)
+            old_debit_normalized = old_transaction['debit'] if old_transaction['debit'] else None
+            if old_debit_normalized != new_debit:
                 log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'debit',
                                     old_transaction['debit'], new_debit)
 
-            if old_transaction['credit'] != new_credit:
+            # Compare credit (Decimal comparison)
+            old_credit_normalized = old_transaction['credit'] if old_transaction['credit'] else None
+            if old_credit_normalized != new_credit:
                 log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'credit',
                                     old_transaction['credit'], new_credit)
 
+            # Compare transaction_date
             if str(old_transaction['transaction_date']) != str(transaction_date):
                 log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'transaction_date',
                                     old_transaction['transaction_date'], transaction_date)
 
-            if old_transaction['notes'] != data.get('notes'):
+            # Compare notes (handle None/empty string)
+            old_notes = old_transaction['notes'] if old_transaction['notes'] else None
+            new_notes = data.get('notes') if data.get('notes') else None
+            if old_notes != new_notes:
                 log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'notes',
                                     old_transaction['notes'], data.get('notes'))
 
@@ -1428,6 +1443,176 @@ def get_transaction_audit_logs(transaction_id):
 
     except Error as e:
         logger.error(f"Error fetching audit logs: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+@app.route('/api/transactions/<int:transaction_id>/move', methods=['POST'])
+@login_required
+def move_transaction(transaction_id):
+    """Move a transaction to a different month."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    try:
+        cursor = connection.cursor(dictionary=True)
+        user_id = session['user_id']
+        data = request.get_json()
+
+        target_year = data.get('target_year')
+        target_month = data.get('target_month')
+
+        if not target_year or not target_month:
+            return jsonify({'error': 'Target year and month are required'}), 400
+
+        # Verify the transaction belongs to the user
+        cursor.execute("""
+            SELECT t.*, mr.year, mr.month
+            FROM transactions t
+            INNER JOIN monthly_records mr ON t.monthly_record_id = mr.id
+            WHERE t.id = %s AND mr.user_id = %s
+        """, (transaction_id, user_id))
+
+        transaction = cursor.fetchone()
+        if not transaction:
+            return jsonify({'error': 'Transaction not found'}), 404
+
+        # Check if moving to the same month
+        if transaction['year'] == target_year and transaction['month'] == target_month:
+            return jsonify({'error': 'Transaction is already in this month'}), 400
+
+        # Get or create target monthly record
+        month_name = calendar.month_name[target_month]
+        cursor.execute("""
+            INSERT INTO monthly_records (user_id, year, month, month_name)
+            VALUES (%s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP
+        """, (user_id, target_year, target_month, month_name))
+
+        cursor.execute("""
+            SELECT id FROM monthly_records
+            WHERE user_id = %s AND year = %s AND month = %s
+        """, (user_id, target_year, target_month))
+
+        target_record = cursor.fetchone()
+
+        # Update transaction's monthly_record_id and date
+        new_date = datetime(target_year, target_month, 1).date()
+        cursor.execute("""
+            UPDATE transactions
+            SET monthly_record_id = %s, transaction_date = %s
+            WHERE id = %s
+        """, (target_record['id'], new_date, transaction_id))
+
+        # Log audit trail
+        log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'moved_to_month',
+                            f"{transaction['year']}-{transaction['month']:02d}",
+                            f"{target_year}-{target_month:02d}")
+
+        connection.commit()
+
+        return jsonify({
+            'message': f'Transaction moved to {month_name} {target_year} successfully',
+            'target_year': target_year,
+            'target_month': target_month
+        })
+
+    except Error as e:
+        logger.error(f"Error moving transaction: {e}")
+        connection.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+@app.route('/api/transactions/<int:transaction_id>/copy', methods=['POST'])
+@login_required
+def copy_transaction(transaction_id):
+    """Copy a transaction to a different month."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    try:
+        cursor = connection.cursor(dictionary=True)
+        user_id = session['user_id']
+        data = request.get_json()
+
+        target_year = data.get('target_year')
+        target_month = data.get('target_month')
+
+        if not target_year or not target_month:
+            return jsonify({'error': 'Target year and month are required'}), 400
+
+        # Verify the transaction belongs to the user and get its data
+        cursor.execute("""
+            SELECT t.*
+            FROM transactions t
+            INNER JOIN monthly_records mr ON t.monthly_record_id = mr.id
+            WHERE t.id = %s AND mr.user_id = %s
+        """, (transaction_id, user_id))
+
+        transaction = cursor.fetchone()
+        if not transaction:
+            return jsonify({'error': 'Transaction not found'}), 404
+
+        # Get or create target monthly record
+        month_name = calendar.month_name[target_month]
+        cursor.execute("""
+            INSERT INTO monthly_records (user_id, year, month, month_name)
+            VALUES (%s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP
+        """, (user_id, target_year, target_month, month_name))
+
+        cursor.execute("""
+            SELECT id FROM monthly_records
+            WHERE user_id = %s AND year = %s AND month = %s
+        """, (user_id, target_year, target_month))
+
+        target_record = cursor.fetchone()
+
+        # Create a copy of the transaction in the target month
+        new_date = datetime(target_year, target_month, 1).date()
+        debit = Decimal(str(transaction['debit'])) if transaction['debit'] else None
+        credit = Decimal(str(transaction['credit'])) if transaction['credit'] else None
+
+        cursor.execute("""
+            INSERT INTO transactions
+            (monthly_record_id, description, category_id, debit, credit,
+             transaction_date, notes, payment_method_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            target_record['id'],
+            transaction['description'],
+            transaction['category_id'],
+            debit,
+            credit,
+            new_date,
+            transaction['notes'],
+            transaction['payment_method_id']
+        ))
+
+        new_transaction_id = cursor.lastrowid
+
+        # Log audit trail for the new transaction
+        log_transaction_audit(cursor, new_transaction_id, user_id, 'CREATE')
+        log_transaction_audit(cursor, new_transaction_id, user_id, 'UPDATE', 'copied_from_transaction',
+                            None, str(transaction_id))
+
+        connection.commit()
+
+        return jsonify({
+            'message': f'Transaction copied to {month_name} {target_year} successfully',
+            'new_transaction_id': new_transaction_id,
+            'target_year': target_year,
+            'target_month': target_month
+        })
+
+    except Error as e:
+        logger.error(f"Error copying transaction: {e}")
+        connection.rollback()
         return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()
