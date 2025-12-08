@@ -1379,6 +1379,31 @@
     padding: 0.5rem !important;
 }
 
+/* Drag Handle Styling */
+.drag-handle {
+    cursor: grab;
+    user-select: none;
+    opacity: 0.4;
+    transition: opacity 0.2s;
+}
+
+.drag-handle:hover {
+    opacity: 0.8;
+}
+
+.drag-handle:active {
+    cursor: grabbing;
+    opacity: 1;
+}
+
+tr.dragging {
+    opacity: 0.5;
+}
+
+tr[draggable="true"] {
+    cursor: move;
+}
+
 /* Filter Modal Styling - Using Base Template Colors */
 #filterModal .modal-content {
     background-color: var(--modal-bg);

@@ -1038,7 +1038,7 @@ function displayTransactions(transactions) {
         const paidAtDisplay = t.paid_at ? formatDate(t.paid_at) : '-';
 
         row.innerHTML = `
-            <td class="drag-handle text-center" style="cursor: grab; user-select: none; opacity: 0.5;" title="Drag to reorder">
+            <td class="drag-handle text-center" title="Drag to reorder">
                 <i class="fas fa-grip-vertical"></i>
             </td>
             <td class="text-center">${checkboxHtml}</td>
@@ -1110,28 +1110,34 @@ function displayTransactions(transactions) {
             });
         }
 
-        // Make row draggable
-        row.setAttribute('draggable', 'true');
+        // Store transaction data
         row.dataset.transactionId = t.id;
         row.dataset.displayOrder = t.display_order;
 
         // Add drag event listeners
         const dragHandle = row.querySelector('.drag-handle');
 
-        dragHandle.addEventListener('mousedown', function() {
-            row.style.opacity = '0.5';
+        // Only make row draggable when drag handle is pressed
+        dragHandle.addEventListener('mousedown', function(e) {
+            row.setAttribute('draggable', 'true');
+        });
+
+        dragHandle.addEventListener('mouseup', function(e) {
+            row.setAttribute('draggable', 'false');
         });
 
         row.addEventListener('dragstart', function(e) {
             e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/html', this.innerHTML);
+            e.dataTransfer.setData('text/plain', this.dataset.transactionId);
             this.classList.add('dragging');
+            this.style.opacity = '0.5';
             dragHandle.style.cursor = 'grabbing';
         });
 
         row.addEventListener('dragend', function(e) {
             this.classList.remove('dragging');
             this.style.opacity = '1';
+            this.setAttribute('draggable', 'false');
             dragHandle.style.cursor = 'grab';
         });
 
@@ -1140,7 +1146,7 @@ function displayTransactions(transactions) {
             const draggingRow = document.querySelector('.dragging');
             if (draggingRow && draggingRow !== this) {
                 const tbody = this.parentNode;
-                const allRows = [...tbody.querySelectorAll('tr[draggable="true"]')];
+                const allRows = [...tbody.querySelectorAll('tr')];
                 const draggingIndex = allRows.indexOf(draggingRow);
                 const targetIndex = allRows.indexOf(this);
 
@@ -1160,10 +1166,10 @@ function displayTransactions(transactions) {
             if (draggingRow) {
                 // Get all rows in new order
                 const tbody = this.parentNode;
-                const allRows = [...tbody.querySelectorAll('tr[draggable="true"]')];
+                const allRows = [...tbody.querySelectorAll('tr')];
 
                 // Build array of transaction IDs in new order
-                const newOrder = allRows.map(row => parseInt(row.dataset.transactionId));
+                const newOrder = allRows.map(r => parseInt(r.dataset.transactionId)).filter(id => !isNaN(id));
 
                 // Send update to backend
                 updateTransactionOrder(newOrder);
