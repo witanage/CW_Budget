@@ -188,6 +188,11 @@
                                 </button>
                             </div>
                             <div class="col-auto">
+                                <button class="btn btn-success btn-sm" id="downloadTransactionsBtn" data-bs-toggle="modal" data-bs-target="#downloadModal">
+                                    <i class="fas fa-download me-1"></i>Download
+                                </button>
+                            </div>
+                            <div class="col-auto">
                                 <button class="btn btn-info btn-sm" id="cloneMonthBtn" data-bs-toggle="modal" data-bs-target="#cloneMonthModal">
                                     <i class="fas fa-clone me-1"></i>Clone
                                 </button>
@@ -1065,6 +1070,49 @@
                 <button type="button" class="btn btn-primary" id="executeMoveCopyBtn">
                     <i class="fas fa-check me-1"></i>Confirm
                 </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Download Transactions Modal -->
+<div class="modal fade" id="downloadModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-download me-2"></i>Download Transactions
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Download transactions for the currently selected month and filters.
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Select Format:</label>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-success" onclick="downloadTransactions('csv')">
+                            <i class="fas fa-file-csv me-2"></i>CSV (Comma Separated Values)
+                        </button>
+                        <button class="btn btn-outline-danger" onclick="downloadTransactions('pdf')">
+                            <i class="fas fa-file-pdf me-2"></i>PDF (Portable Document)
+                        </button>
+                        <button class="btn btn-outline-primary" onclick="downloadTransactions('excel')">
+                            <i class="fas fa-file-excel me-2"></i>Excel (XLSX Spreadsheet)
+                        </button>
+                    </div>
+                </div>
+
+                <div class="small opacity-75">
+                    <i class="fas fa-lightbulb me-1"></i>
+                    <strong>Tip:</strong> CSV files can be opened in Excel, Google Sheets, or any text editor.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>

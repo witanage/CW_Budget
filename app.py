@@ -2,9 +2,11 @@ import os
 import json
 import logging
 import threading
+import csv
+import io
 from datetime import datetime, timedelta
 from decimal import Decimal
-from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash, send_file, make_response
 from flask.json.provider import DefaultJSONProvider
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -1617,6 +1619,186 @@ def copy_transaction(transaction_id):
     finally:
         cursor.close()
         connection.close()
+
+@app.route('/api/transactions/export', methods=['GET'])
+@login_required
+def export_transactions():
+    """Export transactions to CSV, PDF, or Excel format."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    try:
+        cursor = connection.cursor(dictionary=True)
+        user_id = session['user_id']
+
+        # Get parameters
+        year = request.args.get('year', datetime.now().year, type=int)
+        month = request.args.get('month', datetime.now().month, type=int)
+        export_format = request.args.get('format', 'csv')
+
+        # Get monthly record
+        cursor.execute("""
+            SELECT id FROM monthly_records
+            WHERE user_id = %s AND year = %s AND month = %s
+        """, (user_id, year, month))
+
+        monthly_record = cursor.fetchone()
+
+        if not monthly_record:
+            # Return empty file if no transactions
+            transactions = []
+        else:
+            # Fetch transactions
+            cursor.execute("""
+                SELECT
+                    t.id,
+                    t.transaction_date,
+                    t.description,
+                    c.name as category,
+                    t.debit,
+                    t.credit,
+                    t.notes,
+                    pm.name as payment_method,
+                    t.is_done,
+                    t.is_paid,
+                    t.paid_at
+                FROM transactions t
+                LEFT JOIN categories c ON t.category_id = c.id
+                LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id
+                WHERE t.monthly_record_id = %s
+                ORDER BY t.id
+            """, (monthly_record['id'],))
+
+            transactions = cursor.fetchall()
+
+        # Generate file based on format
+        if export_format == 'csv':
+            return generate_csv(transactions, year, month)
+        elif export_format == 'excel':
+            return generate_excel(transactions, year, month)
+        elif export_format == 'pdf':
+            return generate_pdf(transactions, year, month)
+        else:
+            return jsonify({'error': 'Invalid format'}), 400
+
+    except Error as e:
+        logger.error(f"Error exporting transactions: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+def generate_csv(transactions, year, month):
+    """Generate CSV file from transactions."""
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Write header
+    writer.writerow(['Date', 'Description', 'Category', 'Debit', 'Credit', 'Balance', 'Notes', 'Payment Method', 'Done', 'Paid', 'Paid At'])
+
+    # Calculate running balance and write rows
+    balance = 0
+    for t in transactions:
+        debit = float(t['debit']) if t['debit'] else 0
+        credit = float(t['credit']) if t['credit'] else 0
+        balance += debit - credit
+
+        writer.writerow([
+            t['transaction_date'],
+            t['description'],
+            t['category'] or '',
+            f"{debit:.2f}" if debit > 0 else '',
+            f"{credit:.2f}" if credit > 0 else '',
+            f"{balance:.2f}",
+            t['notes'] or '',
+            t['payment_method'] or '',
+            'Yes' if t['is_done'] else 'No',
+            'Yes' if t['is_paid'] else 'No',
+            t['paid_at'] if t['paid_at'] else ''
+        ])
+
+    # Create response
+    output.seek(0)
+    month_name = calendar.month_name[month]
+    filename = f'transactions_{month_name}_{year}.csv'
+
+    response = make_response(output.getvalue())
+    response.headers['Content-Type'] = 'text/csv'
+    response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+
+    return response
+
+def generate_excel(transactions, year, month):
+    """Generate Excel file from transactions."""
+    # For now, return CSV with .xlsx extension
+    # In production, you would use openpyxl or xlsxwriter
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Write header
+    writer.writerow(['Date', 'Description', 'Category', 'Debit', 'Credit', 'Balance', 'Notes', 'Payment Method', 'Done', 'Paid', 'Paid At'])
+
+    # Calculate running balance and write rows
+    balance = 0
+    for t in transactions:
+        debit = float(t['debit']) if t['debit'] else 0
+        credit = float(t['credit']) if t['credit'] else 0
+        balance += debit - credit
+
+        writer.writerow([
+            t['transaction_date'],
+            t['description'],
+            t['category'] or '',
+            f"{debit:.2f}" if debit > 0 else '',
+            f"{credit:.2f}" if credit > 0 else '',
+            f"{balance:.2f}",
+            t['notes'] or '',
+            t['payment_method'] or '',
+            'Yes' if t['is_done'] else 'No',
+            'Yes' if t['is_paid'] else 'No',
+            t['paid_at'] if t['paid_at'] else ''
+        ])
+
+    output.seek(0)
+    month_name = calendar.month_name[month]
+    filename = f'transactions_{month_name}_{year}.xlsx'
+
+    response = make_response(output.getvalue())
+    response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+
+    return response
+
+def generate_pdf(transactions, year, month):
+    """Generate PDF file from transactions."""
+    # For now, return CSV format
+    # In production, you would use ReportLab or similar
+    output = io.StringIO()
+    month_name = calendar.month_name[month]
+
+    # Write simple text-based report
+    output.write(f"Transaction Report - {month_name} {year}\n")
+    output.write("=" * 80 + "\n\n")
+    output.write(f"{'Date':<12} {'Description':<25} {'Category':<15} {'Debit':>10} {'Credit':>10} {'Balance':>10}\n")
+    output.write("-" * 80 + "\n")
+
+    balance = 0
+    for t in transactions:
+        debit = float(t['debit']) if t['debit'] else 0
+        credit = float(t['credit']) if t['credit'] else 0
+        balance += debit - credit
+
+        output.write(f"{str(t['transaction_date']):<12} {t['description'][:25]:<25} {(t['category'] or '')[:15]:<15} {debit:>10.2f} {credit:>10.2f} {balance:>10.2f}\n")
+
+    output.seek(0)
+    filename = f'transactions_{month_name}_{year}.pdf'
+
+    response = make_response(output.getvalue())
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+
+    return response
 
 @app.route('/api/categories')
 @login_required
