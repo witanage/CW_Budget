@@ -1038,6 +1038,9 @@ function displayTransactions(transactions) {
         const paidAtDisplay = t.paid_at ? formatDate(t.paid_at) : '-';
 
         row.innerHTML = `
+            <td class="drag-handle text-center" style="cursor: grab; user-select: none; opacity: 0.5;" title="Drag to reorder">
+                <i class="fas fa-grip-vertical"></i>
+            </td>
             <td class="text-center">${checkboxHtml}</td>
             <td class="description-cell" style="cursor: pointer;" data-transaction-id="${t.id}">${t.description}</td>
             <td><span class="badge bg-secondary">${t.category_name || 'Uncategorized'}</span></td>
@@ -1047,12 +1050,6 @@ function displayTransactions(transactions) {
             <td class="opacity-75 small">${paidAtDisplay}</td>
             <td>${t.notes || '-'}</td>
             <td class="p-1" style="white-space: nowrap;">
-                <button class="btn btn-sm btn-secondary p-1 me-1" style="font-size: 0.7rem; line-height: 1; background-color: #6c757d !important; border-color: #6c757d !important; color: white !important;" onclick="reorderTransaction(${t.id}, 'up')" title="Move Up">
-                    <i class="fas fa-arrow-up"></i>
-                </button>
-                <button class="btn btn-sm btn-secondary p-1 me-1" style="font-size: 0.7rem; line-height: 1; background-color: #6c757d !important; border-color: #6c757d !important; color: white !important;" onclick="reorderTransaction(${t.id}, 'down')" title="Move Down">
-                    <i class="fas fa-arrow-down"></i>
-                </button>
                 <button class="btn btn-sm btn-primary p-1 me-1" style="font-size: 0.7rem; line-height: 1; background-color: #0d6efd !important; border-color: #0d6efd !important; color: white !important;" onclick="editTransaction(${t.id})" title="Edit">
                     <i class="fas fa-edit"></i>
                 </button>
@@ -1083,10 +1080,10 @@ function displayTransactions(transactions) {
             row.classList.add('transaction-highlighted');
             const cells = row.querySelectorAll('td');
             cells.forEach((cell, index) => {
-                // Apply to all cells except description (index 1)
-                if (index !== 1) {
+                // Apply to all cells except drag handle (index 0) and description (index 2)
+                if (index !== 0 && index !== 2) {
                     cell.style.backgroundColor = t.payment_method_color;
-                } else {
+                } else if (index === 2) {
                     // Apply to description cell only if is_paid is true
                     if (isPaid) {
                         cell.style.backgroundColor = t.payment_method_color;
@@ -1112,6 +1109,66 @@ function displayTransactions(transactions) {
                 }
             });
         }
+
+        // Make row draggable
+        row.setAttribute('draggable', 'true');
+        row.dataset.transactionId = t.id;
+        row.dataset.displayOrder = t.display_order;
+
+        // Add drag event listeners
+        const dragHandle = row.querySelector('.drag-handle');
+
+        dragHandle.addEventListener('mousedown', function() {
+            row.style.opacity = '0.5';
+        });
+
+        row.addEventListener('dragstart', function(e) {
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/html', this.innerHTML);
+            this.classList.add('dragging');
+            dragHandle.style.cursor = 'grabbing';
+        });
+
+        row.addEventListener('dragend', function(e) {
+            this.classList.remove('dragging');
+            this.style.opacity = '1';
+            dragHandle.style.cursor = 'grab';
+        });
+
+        row.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            const draggingRow = document.querySelector('.dragging');
+            if (draggingRow && draggingRow !== this) {
+                const tbody = this.parentNode;
+                const allRows = [...tbody.querySelectorAll('tr[draggable="true"]')];
+                const draggingIndex = allRows.indexOf(draggingRow);
+                const targetIndex = allRows.indexOf(this);
+
+                if (draggingIndex < targetIndex) {
+                    tbody.insertBefore(draggingRow, this.nextSibling);
+                } else {
+                    tbody.insertBefore(draggingRow, this);
+                }
+            }
+        });
+
+        row.addEventListener('drop', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const draggingRow = document.querySelector('.dragging');
+            if (draggingRow) {
+                // Get all rows in new order
+                const tbody = this.parentNode;
+                const allRows = [...tbody.querySelectorAll('tr[draggable="true"]')];
+
+                // Build array of transaction IDs in new order
+                const newOrder = allRows.map(row => parseInt(row.dataset.transactionId));
+
+                // Send update to backend
+                updateTransactionOrder(newOrder);
+            }
+        });
 
         tbody.appendChild(row);
     });
@@ -1808,31 +1865,35 @@ function getActiveFilters() {
 // TRANSACTION REORDERING
 // ================================
 
-function reorderTransaction(transactionId, direction) {
+function updateTransactionOrder(transactionIds) {
     showLoading();
 
-    fetch(`/api/transactions/${transactionId}/reorder`, {
+    fetch('/api/transactions/reorder', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ direction: direction })
+        body: JSON.stringify({ transaction_ids: transactionIds })
     })
     .then(response => response.json())
     .then(data => {
         hideLoading();
         if (data.success) {
-            showToast(data.message, 'success');
-            // Reload transactions to show new order
+            showToast('Transaction order updated successfully', 'success');
+            // Reload transactions to recalculate balances
             loadTransactions();
         } else {
-            showToast(data.error || 'Failed to reorder transaction', 'danger');
+            showToast(data.error || 'Failed to update transaction order', 'danger');
+            // Reload to restore original order
+            loadTransactions();
         }
     })
     .catch(error => {
         hideLoading();
-        console.error('Error reordering transaction:', error);
-        showToast('Error reordering transaction', 'danger');
+        console.error('Error updating transaction order:', error);
+        showToast('Error updating transaction order', 'danger');
+        // Reload to restore original order
+        loadTransactions();
     });
 }
 

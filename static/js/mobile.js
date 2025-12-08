@@ -522,12 +522,6 @@ row.innerHTML = `
 <td colspan="4" style="padding: 0;">
 <div class="swipe-wrapper">
 <div class="swipe-info-actions">
-<button class="swipe-action-btn swipe-action-up" data-action="up" data-id="${t.id}">
-<i class="fas fa-arrow-up"></i>
-</button>
-<button class="swipe-action-btn swipe-action-down" data-action="down" data-id="${t.id}">
-<i class="fas fa-arrow-down"></i>
-</button>
 <button class="swipe-action-btn swipe-action-info" data-action="info" data-id="${t.id}">
 <i class="fas fa-info-circle"></i>
 </button>
@@ -618,8 +612,6 @@ const doneBtn = row.querySelector('[data-action="done"]');
 const undoneBtn = row.querySelector('[data-action="undone"]');
 const deleteBtn = row.querySelector('[data-action="delete"]');
 const infoBtn = row.querySelector('[data-action="info"]');
-const upBtn = row.querySelector('[data-action="up"]');
-const downBtn = row.querySelector('[data-action="down"]');
 
 if (editBtn) {
 editBtn.addEventListener('click', function() {
@@ -650,18 +642,6 @@ deleteTransaction(t.id);
 if (infoBtn) {
 infoBtn.addEventListener('click', function() {
 showTransactionInfo(t);
-});
-}
-
-if (upBtn) {
-upBtn.addEventListener('click', function() {
-reorderTransaction(t.id, 'up');
-});
-}
-
-if (downBtn) {
-downBtn.addEventListener('click', function() {
-reorderTransaction(t.id, 'down');
 });
 }
 
@@ -696,35 +676,6 @@ loadTransactions();
 hideLoading();
 console.error('Error marking transaction as undone:', error);
 showToast('Error marking transaction as undone', 'danger');
-});
-}
-
-// Reorder transaction
-function reorderTransaction(transactionId, direction) {
-showLoading();
-
-fetch(`/api/transactions/${transactionId}/reorder`, {
-method: 'POST',
-headers: {
-'Content-Type': 'application/json'
-},
-body: JSON.stringify({ direction: direction })
-})
-.then(response => response.json())
-.then(data => {
-hideLoading();
-if (data.success) {
-showToast(data.message, 'success');
-// Reload transactions to show new order
-loadTransactions();
-} else {
-showToast(data.error || 'Failed to reorder transaction', 'danger');
-}
-})
-.catch(error => {
-hideLoading();
-console.error('Error reordering transaction:', error);
-showToast('Error reordering transaction', 'danger');
 });
 }
 

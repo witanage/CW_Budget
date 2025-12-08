@@ -1907,93 +1907,60 @@ def generate_pdf(transactions, year, month):
 
     return response
 
-@app.route('/api/transactions/<int:transaction_id>/reorder', methods=['POST'])
+@app.route('/api/transactions/reorder', methods=['POST'])
 @login_required
-def reorder_transaction(transaction_id):
-    """Reorder a transaction up or down within its monthly record."""
+def reorder_transactions():
+    """Reorder transactions based on new order array of transaction IDs."""
     data = request.get_json()
-    direction = data.get('direction')  # 'up' or 'down'
+    transaction_ids = data.get('transaction_ids', [])
 
-    if direction not in ['up', 'down']:
-        return jsonify({'error': 'Invalid direction. Must be "up" or "down"'}), 400
+    if not transaction_ids or not isinstance(transaction_ids, list):
+        return jsonify({'error': 'Invalid transaction_ids. Must be a non-empty array'}), 400
 
     connection = get_db_connection()
     if connection:
         cursor = connection.cursor(dictionary=True)
         try:
-            # Get the current transaction
-            cursor.execute("""
-                SELECT id, monthly_record_id, display_order
-                FROM transactions
-                WHERE id = %s
-            """, (transaction_id,))
-            current_transaction = cursor.fetchone()
-
-            if not current_transaction:
-                return jsonify({'error': 'Transaction not found'}), 404
-
-            current_order = current_transaction['display_order']
-            monthly_record_id = current_transaction['monthly_record_id']
-
-            # Find the adjacent transaction to swap with
-            if direction == 'up':
-                # Find transaction with next lower display_order (move current up = decrease order)
-                cursor.execute("""
-                    SELECT id, display_order
-                    FROM transactions
-                    WHERE monthly_record_id = %s
-                    AND display_order < %s
-                    ORDER BY display_order DESC
-                    LIMIT 1
-                """, (monthly_record_id, current_order))
-            else:  # down
-                # Find transaction with next higher display_order (move current down = increase order)
-                cursor.execute("""
-                    SELECT id, display_order
-                    FROM transactions
-                    WHERE monthly_record_id = %s
-                    AND display_order > %s
-                    ORDER BY display_order ASC
-                    LIMIT 1
-                """, (monthly_record_id, current_order))
-
-            adjacent_transaction = cursor.fetchone()
-
-            if not adjacent_transaction:
-                return jsonify({'error': f'Cannot move {direction}. Transaction is already at the {"top" if direction == "up" else "bottom"}.'}), 400
-
-            adjacent_id = adjacent_transaction['id']
-            adjacent_order = adjacent_transaction['display_order']
-
-            # Swap display_order values
-            cursor.execute("""
-                UPDATE transactions
-                SET display_order = %s
-                WHERE id = %s
-            """, (adjacent_order, transaction_id))
-
-            cursor.execute("""
-                UPDATE transactions
-                SET display_order = %s
-                WHERE id = %s
-            """, (current_order, adjacent_id))
-
-            # Log audit trail for the reordering
             user_id = session.get('user_id')
-            log_transaction_audit(
-                cursor,
-                transaction_id,
-                user_id,
-                'UPDATE',
-                'display_order',
-                str(current_order),
-                str(adjacent_order)
-            )
+
+            # Update display_order for each transaction in the new order
+            for index, transaction_id in enumerate(transaction_ids):
+                new_order = index + 1  # Start from 1
+
+                # Get old display_order for audit log
+                cursor.execute("""
+                    SELECT display_order
+                    FROM transactions
+                    WHERE id = %s
+                """, (transaction_id,))
+
+                result = cursor.fetchone()
+                if result:
+                    old_order = result['display_order']
+
+                    # Only update if order changed
+                    if old_order != new_order:
+                        cursor.execute("""
+                            UPDATE transactions
+                            SET display_order = %s
+                            WHERE id = %s
+                        """, (new_order, transaction_id))
+
+                        # Log audit trail
+                        log_transaction_audit(
+                            cursor,
+                            transaction_id,
+                            user_id,
+                            'UPDATE',
+                            'display_order',
+                            str(old_order),
+                            str(new_order)
+                        )
 
             connection.commit()
             return jsonify({
                 'success': True,
-                'message': f'Transaction moved {direction} successfully'
+                'message': 'Transaction order updated successfully'
             })
 
         except Error as e:
