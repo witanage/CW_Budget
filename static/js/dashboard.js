@@ -1002,13 +1002,14 @@ function displayTransactions(transactions) {
         return;
     }
 
-    // Transactions come from backend already sorted by display_order
-    // We just need to calculate balances in that order
+    // Transactions come from backend sorted by display_order (ASC)
+    // Calculate balance from BOTTOM to TOP so top row shows final cumulative balance
     console.log('Displaying transactions in order:', transactions.map(t => `ID:${t.id} Order:${t.display_order}`));
 
-    // Calculate balance for each transaction in display order
+    // Reverse to calculate from bottom to top (last display_order first)
+    const reversedForCalc = [...transactions].reverse();
     let runningBalance = 0;
-    transactions.forEach(t => {
+    reversedForCalc.forEach(t => {
         const debit = parseFloat(t.debit) || 0;
         const credit = parseFloat(t.credit) || 0;
         runningBalance += debit - credit;
