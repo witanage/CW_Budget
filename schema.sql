@@ -123,6 +123,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     paid_latitude DECIMAL(10, 8) NULL COMMENT 'Latitude when marked as paid',
     paid_longitude DECIMAL(11, 8) NULL COMMENT 'Longitude when marked as paid',
     paid_location_accuracy DECIMAL(10, 2) NULL COMMENT 'Location accuracy in meters when marked as paid',
+    display_order INT NOT NULL DEFAULT 0 COMMENT 'Order for displaying transactions (lower numbers first)',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (monthly_record_id) REFERENCES monthly_records(id) ON DELETE CASCADE,
     FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL,
@@ -132,7 +133,8 @@ CREATE TABLE IF NOT EXISTS transactions (
     INDEX idx_payment_method (payment_method_id),
     INDEX idx_transaction_date (transaction_date),
     INDEX idx_is_done (is_done),
-    INDEX idx_is_paid (is_paid)
+    INDEX idx_is_paid (is_paid),
+    INDEX idx_display_order (display_order)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================

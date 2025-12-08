@@ -1044,7 +1044,7 @@ def transactions():
                     LEFT JOIN categories c ON t.category_id = c.id
                     LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id
                     WHERE {where_sql}
-                    ORDER BY t.id DESC
+                    ORDER BY t.display_order ASC, t.id ASC
                 """
 
                 cursor.execute(query, params)
@@ -1089,6 +1089,15 @@ def transactions():
             if not transaction_date:
                 transaction_date = datetime.now().date()
 
+            # Get the next display_order for this monthly record
+            cursor.execute("""
+                SELECT COALESCE(MAX(display_order), 0) + 1 as next_order
+                FROM transactions
+                WHERE monthly_record_id = %s
+            """, (monthly_record['id'],))
+            next_order_result = cursor.fetchone()
+            next_display_order = next_order_result['next_order']
+
             # Insert transaction (balance will be calculated on frontend)
             insert_values = (
                 monthly_record['id'],
@@ -1097,14 +1106,15 @@ def transactions():
                 debit if debit > 0 else None,
                 credit if credit > 0 else None,
                 transaction_date,
-                data.get('notes')
+                data.get('notes'),
+                next_display_order
             )
             print(f"[DEBUG] Inserting transaction with values: {insert_values}")
 
             cursor.execute("""
                 INSERT INTO transactions
-                (monthly_record_id, description, category_id, debit, credit, transaction_date, notes)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                (monthly_record_id, description, category_id, debit, credit, transaction_date, notes, display_order)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """, insert_values)
 
             transaction_id = cursor.lastrowid
@@ -1896,6 +1906,104 @@ def generate_pdf(transactions, year, month):
     response.headers['Content-Disposition'] = f'attachment; filename={filename}'
 
     return response
+
+@app.route('/api/transactions/<int:transaction_id>/reorder', methods=['POST'])
+@login_required
+def reorder_transaction(transaction_id):
+    """Reorder a transaction up or down within its monthly record."""
+    data = request.get_json()
+    direction = data.get('direction')  # 'up' or 'down'
+
+    if direction not in ['up', 'down']:
+        return jsonify({'error': 'Invalid direction. Must be "up" or "down"'}), 400
+
+    connection = get_db_connection()
+    if connection:
+        cursor = connection.cursor(dictionary=True)
+        try:
+            # Get the current transaction
+            cursor.execute("""
+                SELECT id, monthly_record_id, display_order
+                FROM transactions
+                WHERE id = %s
+            """, (transaction_id,))
+            current_transaction = cursor.fetchone()
+
+            if not current_transaction:
+                return jsonify({'error': 'Transaction not found'}), 404
+
+            current_order = current_transaction['display_order']
+            monthly_record_id = current_transaction['monthly_record_id']
+
+            # Find the adjacent transaction to swap with
+            if direction == 'up':
+                # Find transaction with next lower display_order (move current up = decrease order)
+                cursor.execute("""
+                    SELECT id, display_order
+                    FROM transactions
+                    WHERE monthly_record_id = %s
+                    AND display_order < %s
+                    ORDER BY display_order DESC
+                    LIMIT 1
+                """, (monthly_record_id, current_order))
+            else:  # down
+                # Find transaction with next higher display_order (move current down = increase order)
+                cursor.execute("""
+                    SELECT id, display_order
+                    FROM transactions
+                    WHERE monthly_record_id = %s
+                    AND display_order > %s
+                    ORDER BY display_order ASC
+                    LIMIT 1
+                """, (monthly_record_id, current_order))
+
+            adjacent_transaction = cursor.fetchone()
+
+            if not adjacent_transaction:
+                return jsonify({'error': f'Cannot move {direction}. Transaction is already at the {"top" if direction == "up" else "bottom"}.'}), 400
+
+            adjacent_id = adjacent_transaction['id']
+            adjacent_order = adjacent_transaction['display_order']
+
+            # Swap display_order values
+            cursor.execute("""
+                UPDATE transactions
+                SET display_order = %s
+                WHERE id = %s
+            """, (adjacent_order, transaction_id))
+
+            cursor.execute("""
+                UPDATE transactions
+                SET display_order = %s
+                WHERE id = %s
+            """, (current_order, adjacent_id))
+
+            # Log audit trail for the reordering
+            user_id = session.get('user_id')
+            log_transaction_audit(
+                cursor,
+                transaction_id,
+                user_id,
+                'UPDATE',
+                'display_order',
+                str(current_order),
+                str(adjacent_order)
+            )
+
+            connection.commit()
+            return jsonify({
+                'success': True,
+                'message': f'Transaction moved {direction} successfully'
+            })
+
+        except Error as e:
+            connection.rollback()
+            return jsonify({'error': str(e)}), 500
+        finally:
+            cursor.close()
+            connection.close()
+
+    return jsonify({'error': 'Database connection failed'}), 500
 
 @app.route('/api/categories')
 @login_required

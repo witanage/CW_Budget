@@ -1047,6 +1047,12 @@ function displayTransactions(transactions) {
             <td class="opacity-75 small">${paidAtDisplay}</td>
             <td>${t.notes || '-'}</td>
             <td class="p-1" style="white-space: nowrap;">
+                <button class="btn btn-sm btn-secondary p-1 me-1" style="font-size: 0.7rem; line-height: 1; background-color: #6c757d !important; border-color: #6c757d !important; color: white !important;" onclick="reorderTransaction(${t.id}, 'up')" title="Move Up">
+                    <i class="fas fa-arrow-up"></i>
+                </button>
+                <button class="btn btn-sm btn-secondary p-1 me-1" style="font-size: 0.7rem; line-height: 1; background-color: #6c757d !important; border-color: #6c757d !important; color: white !important;" onclick="reorderTransaction(${t.id}, 'down')" title="Move Down">
+                    <i class="fas fa-arrow-down"></i>
+                </button>
                 <button class="btn btn-sm btn-primary p-1 me-1" style="font-size: 0.7rem; line-height: 1; background-color: #0d6efd !important; border-color: #0d6efd !important; color: white !important;" onclick="editTransaction(${t.id})" title="Edit">
                     <i class="fas fa-edit"></i>
                 </button>
@@ -1796,6 +1802,38 @@ function getActiveFilters() {
     // For now, return empty to download all transactions for the month
 
     return filters;
+}
+
+// ================================
+// TRANSACTION REORDERING
+// ================================
+
+function reorderTransaction(transactionId, direction) {
+    showLoading();
+
+    fetch(`/api/transactions/${transactionId}/reorder`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ direction: direction })
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.success) {
+            showToast(data.message, 'success');
+            // Reload transactions to show new order
+            loadTransactions();
+        } else {
+            showToast(data.error || 'Failed to reorder transaction', 'danger');
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Error reordering transaction:', error);
+        showToast('Error reordering transaction', 'danger');
+    });
 }
 
 // ================================
