@@ -1089,14 +1089,16 @@ def transactions():
             if not transaction_date:
                 transaction_date = datetime.now().date()
 
-            # Get the next display_order for this monthly record
+            # Push all existing transactions down by incrementing their display_order
+            # This makes room for the new transaction at position 1 (top)
             cursor.execute("""
-                SELECT COALESCE(MAX(display_order), 0) + 1 as next_order
-                FROM transactions
+                UPDATE transactions
+                SET display_order = display_order + 1
                 WHERE monthly_record_id = %s
             """, (monthly_record['id'],))
-            next_order_result = cursor.fetchone()
-            next_display_order = next_order_result['next_order']
+
+            # New transaction gets display_order = 1 (appears at top)
+            next_display_order = 1
 
             # Insert transaction (balance will be calculated on frontend)
             insert_values = (
@@ -1605,7 +1607,14 @@ def copy_transaction(transaction_id):
 
         target_record = cursor.fetchone()
 
-        # Create a copy of the transaction in the target month
+        # Push all existing transactions down in the target month
+        cursor.execute("""
+            UPDATE transactions
+            SET display_order = display_order + 1
+            WHERE monthly_record_id = %s
+        """, (target_record['id'],))
+
+        # Create a copy of the transaction in the target month at position 1 (top)
         new_date = datetime(target_year, target_month, 1).date()
         debit = Decimal(str(transaction['debit'])) if transaction['debit'] else None
         credit = Decimal(str(transaction['credit'])) if transaction['credit'] else None
@@ -1613,8 +1622,8 @@ def copy_transaction(transaction_id):
         cursor.execute("""
             INSERT INTO transactions
             (monthly_record_id, description, category_id, debit, credit,
-             transaction_date, notes, payment_method_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+             transaction_date, notes, payment_method_id, display_order)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             target_record['id'],
             transaction['description'],
@@ -1623,7 +1632,8 @@ def copy_transaction(transaction_id):
             credit,
             new_date,
             transaction['notes'],
-            transaction['payment_method_id']
+            transaction['payment_method_id'],
+            1  # Display at top
         ))
 
         new_transaction_id = cursor.lastrowid
@@ -2831,13 +2841,13 @@ def clone_month_transactions():
 
         target_record = cursor.fetchone()
 
-        # Get all transactions from source month
+        # Get all transactions from source month (preserve order)
         cursor.execute("""
             SELECT description, category_id, debit, credit, notes,
-                   payment_method_id, is_done, is_paid
+                   payment_method_id, is_done, is_paid, display_order
             FROM transactions
             WHERE monthly_record_id = %s
-            ORDER BY id
+            ORDER BY display_order ASC, id ASC
         """, (source_record['id'],))
 
         source_transactions = cursor.fetchall()
@@ -2860,8 +2870,8 @@ def clone_month_transactions():
             cursor.execute("""
                 INSERT INTO transactions
                 (monthly_record_id, description, category_id, debit, credit,
-                 transaction_date, notes, payment_method_id, is_done, is_paid)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                 transaction_date, notes, payment_method_id, is_done, is_paid, display_order)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 target_record['id'],
                 trans['description'],
@@ -2872,7 +2882,8 @@ def clone_month_transactions():
                 trans['notes'],
                 payment_method_id,
                 is_done,
-                is_paid
+                is_paid,
+                trans['display_order']  # Preserve order from source
             ))
 
             cloned_count += 1
