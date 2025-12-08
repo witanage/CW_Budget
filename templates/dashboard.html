@@ -212,8 +212,9 @@
                             <table class="table table-hover table-sm" id="transactionsTable" style="font-size: 0.875rem;">
                                 <thead>
                                     <tr>
+                                        <th style="width: 2%;"></th>
                                         <th style="width: 5%;">Method</th>
-                                        <th style="width: 23%;">Description</th>
+                                        <th style="width: 21%;">Description</th>
                                         <th style="width: 8%;">Category</th>
                                         <th style="width: 9%;">Debit</th>
                                         <th style="width: 9%;">Credit</th>
@@ -1376,6 +1377,31 @@
 
 #transactionsTable thead th {
     padding: 0.5rem !important;
+}
+
+/* Drag Handle Styling */
+.drag-handle {
+    cursor: grab;
+    user-select: none;
+    opacity: 0.4;
+    transition: opacity 0.2s;
+}
+
+.drag-handle:hover {
+    opacity: 0.8;
+}
+
+.drag-handle:active {
+    cursor: grabbing;
+    opacity: 1;
+}
+
+tr.dragging {
+    opacity: 0.5;
+}
+
+tr[draggable="true"] {
+    cursor: move;
 }
 
 /* Filter Modal Styling - Using Base Template Colors */

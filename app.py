@@ -1044,7 +1044,7 @@ def transactions():
                     LEFT JOIN categories c ON t.category_id = c.id
                     LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id
                     WHERE {where_sql}
-                    ORDER BY t.id DESC
+                    ORDER BY t.display_order ASC, t.id ASC
                 """
 
                 cursor.execute(query, params)
@@ -1089,6 +1089,17 @@ def transactions():
             if not transaction_date:
                 transaction_date = datetime.now().date()
 
+            # Push all existing transactions down by incrementing their display_order
+            # This makes room for the new transaction at position 1 (top)
+            cursor.execute("""
+                UPDATE transactions
+                SET display_order = display_order + 1
+                WHERE monthly_record_id = %s
+            """, (monthly_record['id'],))
+
+            # New transaction gets display_order = 1 (appears at top)
+            next_display_order = 1
+
             # Insert transaction (balance will be calculated on frontend)
             insert_values = (
                 monthly_record['id'],
@@ -1097,14 +1108,15 @@ def transactions():
                 debit if debit > 0 else None,
                 credit if credit > 0 else None,
                 transaction_date,
-                data.get('notes')
+                data.get('notes'),
+                next_display_order
             )
             print(f"[DEBUG] Inserting transaction with values: {insert_values}")
 
             cursor.execute("""
                 INSERT INTO transactions
-                (monthly_record_id, description, category_id, debit, credit, transaction_date, notes)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                (monthly_record_id, description, category_id, debit, credit, transaction_date, notes, display_order)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """, insert_values)
 
             transaction_id = cursor.lastrowid
@@ -1595,7 +1607,14 @@ def copy_transaction(transaction_id):
 
         target_record = cursor.fetchone()
 
-        # Create a copy of the transaction in the target month
+        # Push all existing transactions down in the target month
+        cursor.execute("""
+            UPDATE transactions
+            SET display_order = display_order + 1
+            WHERE monthly_record_id = %s
+        """, (target_record['id'],))
+
+        # Create a copy of the transaction in the target month at position 1 (top)
         new_date = datetime(target_year, target_month, 1).date()
         debit = Decimal(str(transaction['debit'])) if transaction['debit'] else None
         credit = Decimal(str(transaction['credit'])) if transaction['credit'] else None
@@ -1603,8 +1622,8 @@ def copy_transaction(transaction_id):
         cursor.execute("""
             INSERT INTO transactions
             (monthly_record_id, description, category_id, debit, credit,
-             transaction_date, notes, payment_method_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+             transaction_date, notes, payment_method_id, display_order)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             target_record['id'],
             transaction['description'],
@@ -1613,7 +1632,8 @@ def copy_transaction(transaction_id):
             credit,
             new_date,
             transaction['notes'],
-            transaction['payment_method_id']
+            transaction['payment_method_id'],
+            1  # Display at top
         ))
 
         new_transaction_id = cursor.lastrowid
@@ -1896,6 +1916,71 @@ def generate_pdf(transactions, year, month):
     response.headers['Content-Disposition'] = f'attachment; filename={filename}'
 
     return response
+
+@app.route('/api/transactions/reorder', methods=['POST'])
+@login_required
+def reorder_transactions():
+    """Reorder transactions based on new order array of transaction IDs."""
+    data = request.get_json()
+    transaction_ids = data.get('transaction_ids', [])
+
+    if not transaction_ids or not isinstance(transaction_ids, list):
+        return jsonify({'error': 'Invalid transaction_ids. Must be a non-empty array'}), 400
+
+    connection = get_db_connection()
+    if connection:
+        cursor = connection.cursor(dictionary=True)
+        try:
+            user_id = session.get('user_id')
+
+            # Update display_order for each transaction in the new order
+            for index, transaction_id in enumerate(transaction_ids):
+                new_order = index + 1  # Start from 1
+
+                # Get old display_order for audit log
+                cursor.execute("""
+                    SELECT display_order
+                    FROM transactions
+                    WHERE id = %s
+                """, (transaction_id,))
+
+                result = cursor.fetchone()
+                if result:
+                    old_order = result['display_order']
+
+                    # Only update if order changed
+                    if old_order != new_order:
+                        cursor.execute("""
+                            UPDATE transactions
+                            SET display_order = %s
+                            WHERE id = %s
+                        """, (new_order, transaction_id))
+
+                        # Log audit trail
+                        log_transaction_audit(
+                            cursor,
+                            transaction_id,
+                            user_id,
+                            'UPDATE',
+                            'display_order',
+                            str(old_order),
+                            str(new_order)
+                        )
+
+            connection.commit()
+            return jsonify({
+                'success': True,
+                'message': 'Transaction order updated successfully'
+            })
+
+        except Error as e:
+            connection.rollback()
+            return jsonify({'error': str(e)}), 500
+        finally:
+            cursor.close()
+            connection.close()
+
+    return jsonify({'error': 'Database connection failed'}), 500
 
 @app.route('/api/categories')
 @login_required
@@ -2756,13 +2841,13 @@ def clone_month_transactions():
 
         target_record = cursor.fetchone()
 
-        # Get all transactions from source month
+        # Get all transactions from source month (preserve order)
         cursor.execute("""
             SELECT description, category_id, debit, credit, notes,
-                   payment_method_id, is_done, is_paid
+                   payment_method_id, is_done, is_paid, display_order
             FROM transactions
             WHERE monthly_record_id = %s
-            ORDER BY id
+            ORDER BY display_order ASC, id ASC
         """, (source_record['id'],))
 
         source_transactions = cursor.fetchall()
@@ -2785,8 +2870,8 @@ def clone_month_transactions():
             cursor.execute("""
                 INSERT INTO transactions
                 (monthly_record_id, description, category_id, debit, credit,
-                 transaction_date, notes, payment_method_id, is_done, is_paid)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                 transaction_date, notes, payment_method_id, is_done, is_paid, display_order)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 target_record['id'],
                 trans['description'],
@@ -2797,7 +2882,8 @@ def clone_month_transactions():
                 trans['notes'],
                 payment_method_id,
                 is_done,
-                is_paid
+                is_paid,
+                trans['display_order']  # Preserve order from source
             ))
 
             cloned_count += 1

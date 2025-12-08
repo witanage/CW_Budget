@@ -1002,20 +1002,21 @@ function displayTransactions(transactions) {
         return;
     }
 
-    // Sort transactions by ID (oldest first) to calculate balance correctly
-    const sortedTransactions = [...transactions].sort((a, b) => a.id - b.id);
+    // Transactions come from backend already sorted by display_order
+    // We just need to calculate balances in that order
+    console.log('Displaying transactions in order:', transactions.map(t => `ID:${t.id} Order:${t.display_order}`));
 
-    // Calculate balance for each transaction
+    // Calculate balance for each transaction in display order
     let runningBalance = 0;
-    sortedTransactions.forEach(t => {
+    transactions.forEach(t => {
         const debit = parseFloat(t.debit) || 0;
         const credit = parseFloat(t.credit) || 0;
         runningBalance += debit - credit;
         t.calculatedBalance = runningBalance;
     });
 
-    // Display transactions in reverse order (newest first)
-    sortedTransactions.reverse().forEach(t => {
+    // Display transactions in the order they came from backend (by display_order)
+    transactions.forEach(t => {
         const row = document.createElement('tr');
 
         // Checkbox for marking done/undone (handle both boolean and numeric values)
@@ -1038,6 +1039,9 @@ function displayTransactions(transactions) {
         const paidAtDisplay = t.paid_at ? formatDate(t.paid_at) : '-';
 
         row.innerHTML = `
+            <td class="drag-handle text-center" title="Drag to reorder">
+                <i class="fas fa-grip-vertical"></i>
+            </td>
             <td class="text-center">${checkboxHtml}</td>
             <td class="description-cell" style="cursor: pointer;" data-transaction-id="${t.id}">${t.description}</td>
             <td><span class="badge bg-secondary">${t.category_name || 'Uncategorized'}</span></td>
@@ -1077,10 +1081,10 @@ function displayTransactions(transactions) {
             row.classList.add('transaction-highlighted');
             const cells = row.querySelectorAll('td');
             cells.forEach((cell, index) => {
-                // Apply to all cells except description (index 1)
-                if (index !== 1) {
+                // Apply to all cells except drag handle (index 0) and description (index 2)
+                if (index !== 0 && index !== 2) {
                     cell.style.backgroundColor = t.payment_method_color;
-                } else {
+                } else if (index === 2) {
                     // Apply to description cell only if is_paid is true
                     if (isPaid) {
                         cell.style.backgroundColor = t.payment_method_color;
@@ -1106,6 +1110,72 @@ function displayTransactions(transactions) {
                 }
             });
         }
+
+        // Store transaction data
+        row.dataset.transactionId = t.id;
+        row.dataset.displayOrder = t.display_order;
+
+        // Add drag event listeners
+        const dragHandle = row.querySelector('.drag-handle');
+
+        // Only make row draggable when drag handle is pressed
+        dragHandle.addEventListener('mousedown', function(e) {
+            row.setAttribute('draggable', 'true');
+        });
+
+        dragHandle.addEventListener('mouseup', function(e) {
+            row.setAttribute('draggable', 'false');
+        });
+
+        row.addEventListener('dragstart', function(e) {
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', this.dataset.transactionId);
+            this.classList.add('dragging');
+            this.style.opacity = '0.5';
+            dragHandle.style.cursor = 'grabbing';
+        });
+
+        row.addEventListener('dragend', function(e) {
+            this.classList.remove('dragging');
+            this.style.opacity = '1';
+            this.setAttribute('draggable', 'false');
+            dragHandle.style.cursor = 'grab';
+        });
+
+        row.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            const draggingRow = document.querySelector('.dragging');
+            if (draggingRow && draggingRow !== this) {
+                const tbody = this.parentNode;
+                const allRows = [...tbody.querySelectorAll('tr')];
+                const draggingIndex = allRows.indexOf(draggingRow);
+                const targetIndex = allRows.indexOf(this);
+
+                if (draggingIndex < targetIndex) {
+                    tbody.insertBefore(draggingRow, this.nextSibling);
+                } else {
+                    tbody.insertBefore(draggingRow, this);
+                }
+            }
+        });
+
+        row.addEventListener('drop', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const draggingRow = document.querySelector('.dragging');
+            if (draggingRow) {
+                // Get all rows in new order
+                const tbody = this.parentNode;
+                const allRows = [...tbody.querySelectorAll('tr')];
+
+                // Build array of transaction IDs in new order
+                const newOrder = allRows.map(r => parseInt(r.dataset.transactionId)).filter(id => !isNaN(id));
+
+                // Send update to backend
+                updateTransactionOrder(newOrder);
+            }
+        });
 
         tbody.appendChild(row);
     });
@@ -1796,6 +1866,46 @@ function getActiveFilters() {
     // For now, return empty to download all transactions for the month
 
     return filters;
+}
+
+// ================================
+// TRANSACTION REORDERING
+// ================================
+
+function updateTransactionOrder(transactionIds) {
+    console.log('Updating transaction order:', transactionIds);
+    showLoading();
+
+    fetch('/api/transactions/reorder', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ transaction_ids: transactionIds })
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('Reorder response:', data);
+        hideLoading();
+        if (data.success) {
+            showToast('Transaction order updated successfully', 'success');
+            // Reload transactions to recalculate balances with a slight delay
+            setTimeout(() => {
+                loadTransactions();
+            }, 500);
+        } else {
+            showToast(data.error || 'Failed to update transaction order', 'danger');
+            // Reload to restore original order
+            loadTransactions();
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Error updating transaction order:', error);
+        showToast('Error updating transaction order', 'danger');
+        // Reload to restore original order
+        loadTransactions();
+    });
 }
 
 // ================================
