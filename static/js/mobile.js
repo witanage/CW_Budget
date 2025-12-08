@@ -485,21 +485,20 @@ tbody.innerHTML = `
 return;
 }
 
-// Sort transactions by ID (oldest first) to calculate balance correctly
-const sortedTransactions = [...transactions].sort((a, b) => a.id - b.id);
-
-// Calculate balance for each transaction
+// Transactions come from backend sorted by display_order (ASC)
+// Calculate balance from BOTTOM to TOP so top row shows final cumulative balance
+const reversedForCalc = [...transactions].reverse();
 let runningBalance = 0;
-sortedTransactions.forEach(t => {
+reversedForCalc.forEach(t => {
 const debit = parseFloat(t.debit) || 0;
 const credit = parseFloat(t.credit) || 0;
 runningBalance += debit - credit;
 t.calculatedBalance = runningBalance;
 });
 
-// Display transactions in reverse order (newest first)
+// Display transactions in the order they came from backend (by display_order)
 tbody.innerHTML = '';
-sortedTransactions.reverse().forEach(t => {
+transactions.forEach(t => {
 const row = document.createElement('tr');
 row.className = 'swipe-container';
 
