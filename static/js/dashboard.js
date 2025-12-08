@@ -1002,20 +1002,21 @@ function displayTransactions(transactions) {
         return;
     }
 
-    // Sort transactions by ID (oldest first) to calculate balance correctly
-    const sortedTransactions = [...transactions].sort((a, b) => a.id - b.id);
+    // Transactions come from backend already sorted by display_order
+    // We just need to calculate balances in that order
+    console.log('Displaying transactions in order:', transactions.map(t => `ID:${t.id} Order:${t.display_order}`));
 
-    // Calculate balance for each transaction
+    // Calculate balance for each transaction in display order
     let runningBalance = 0;
-    sortedTransactions.forEach(t => {
+    transactions.forEach(t => {
         const debit = parseFloat(t.debit) || 0;
         const credit = parseFloat(t.credit) || 0;
         runningBalance += debit - credit;
         t.calculatedBalance = runningBalance;
     });
 
-    // Display transactions in reverse order (newest first)
-    sortedTransactions.reverse().forEach(t => {
+    // Display transactions in the order they came from backend (by display_order)
+    transactions.forEach(t => {
         const row = document.createElement('tr');
 
         // Checkbox for marking done/undone (handle both boolean and numeric values)
@@ -1872,6 +1873,7 @@ function getActiveFilters() {
 // ================================
 
 function updateTransactionOrder(transactionIds) {
+    console.log('Updating transaction order:', transactionIds);
     showLoading();
 
     fetch('/api/transactions/reorder', {
@@ -1883,11 +1885,14 @@ function updateTransactionOrder(transactionIds) {
     })
     .then(response => response.json())
     .then(data => {
+        console.log('Reorder response:', data);
         hideLoading();
         if (data.success) {
             showToast('Transaction order updated successfully', 'success');
-            // Reload transactions to recalculate balances
-            loadTransactions();
+            // Reload transactions to recalculate balances with a slight delay
+            setTimeout(() => {
+                loadTransactions();
+            }, 500);
         } else {
             showToast(data.error || 'Failed to update transaction order', 'danger');
             // Reload to restore original order
