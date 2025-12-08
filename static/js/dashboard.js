@@ -1002,23 +1002,13 @@ function displayTransactions(transactions) {
         return;
     }
 
-    // Transactions come from backend sorted by display_order
-    // But we need to calculate balances in chronological order (by transaction_date)
+    // Transactions come from backend sorted by display_order (ASC)
+    // Calculate running balance from top to bottom based on display order
     console.log('Displaying transactions in order:', transactions.map(t => `ID:${t.id} Order:${t.display_order}`));
 
-    // Sort by transaction_date and id for balance calculation (oldest first)
-    const chronologicalTransactions = [...transactions].sort((a, b) => {
-        const dateA = new Date(a.transaction_date || '1970-01-01');
-        const dateB = new Date(b.transaction_date || '1970-01-01');
-        if (dateA.getTime() !== dateB.getTime()) {
-            return dateA - dateB; // Sort by date ascending (oldest first)
-        }
-        return a.id - b.id; // If dates are equal, sort by ID ascending
-    });
-
-    // Calculate balance for each transaction in chronological order
+    // Calculate balance for each transaction in display order (top to bottom)
     let runningBalance = 0;
-    chronologicalTransactions.forEach(t => {
+    transactions.forEach(t => {
         const debit = parseFloat(t.debit) || 0;
         const credit = parseFloat(t.credit) || 0;
         runningBalance += debit - credit;
