@@ -26,6 +26,26 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Try importing optional dependencies
+try:
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill
+    EXCEL_AVAILABLE = True
+except ImportError:
+    EXCEL_AVAILABLE = False
+    logger.warning("openpyxl not installed. Excel export will use CSV format.")
+
+try:
+    from reportlab.lib.pagesizes import letter, A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import inch
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet
+    PDF_AVAILABLE = True
+except ImportError:
+    PDF_AVAILABLE = False
+    logger.warning("reportlab not installed. PDF export will use text format.")
+
 logger.info("Environment variables loaded")
 
 # Custom JSON provider to handle Decimal objects
@@ -1731,13 +1751,30 @@ def generate_csv(transactions, year, month):
 
 def generate_excel(transactions, year, month):
     """Generate Excel file from transactions."""
-    # For now, return CSV with .xlsx extension
-    # In production, you would use openpyxl or xlsxwriter
-    output = io.StringIO()
-    writer = csv.writer(output)
+    if not EXCEL_AVAILABLE:
+        # Fallback to CSV
+        return generate_csv(transactions, year, month)
 
-    # Write header
-    writer.writerow(['Date', 'Description', 'Category', 'Debit', 'Credit', 'Balance', 'Notes', 'Payment Method', 'Done', 'Paid', 'Paid At'])
+    # Create workbook and worksheet
+    wb = Workbook()
+    ws = wb.active
+    month_name = calendar.month_name[month]
+    ws.title = f"{month_name} {year}"
+
+    # Define styles
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    header_alignment = Alignment(horizontal="center", vertical="center")
+
+    # Write header row
+    headers = ['Date', 'Description', 'Category', 'Debit', 'Credit', 'Balance', 'Notes', 'Payment Method', 'Done', 'Paid', 'Paid At']
+    ws.append(headers)
+
+    # Style header row
+    for cell in ws[1]:
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_alignment
 
     # Calculate running balance and write rows
     balance = 0
@@ -1746,22 +1783,35 @@ def generate_excel(transactions, year, month):
         credit = float(t['credit']) if t['credit'] else 0
         balance += debit - credit
 
-        writer.writerow([
-            t['transaction_date'],
+        ws.append([
+            str(t['transaction_date']),
             t['description'],
             t['category'] or '',
-            f"{debit:.2f}" if debit > 0 else '',
-            f"{credit:.2f}" if credit > 0 else '',
-            f"{balance:.2f}",
+            debit if debit > 0 else '',
+            credit if credit > 0 else '',
+            balance,
             t['notes'] or '',
             t['payment_method'] or '',
             'Yes' if t['is_done'] else 'No',
             'Yes' if t['is_paid'] else 'No',
-            t['paid_at'] if t['paid_at'] else ''
+            str(t['paid_at']) if t['paid_at'] else ''
         ])
 
+    # Adjust column widths
+    ws.column_dimensions['A'].width = 12
+    ws.column_dimensions['B'].width = 30
+    ws.column_dimensions['C'].width = 20
+    ws.column_dimensions['D'].width = 12
+    ws.column_dimensions['E'].width = 12
+    ws.column_dimensions['F'].width = 12
+    ws.column_dimensions['G'].width = 30
+    ws.column_dimensions['H'].width = 20
+
+    # Save to BytesIO
+    output = io.BytesIO()
+    wb.save(output)
     output.seek(0)
-    month_name = calendar.month_name[month]
+
     filename = f'transactions_{month_name}_{year}.xlsx'
 
     response = make_response(output.getvalue())
@@ -1772,26 +1822,73 @@ def generate_excel(transactions, year, month):
 
 def generate_pdf(transactions, year, month):
     """Generate PDF file from transactions."""
-    # For now, return CSV format
-    # In production, you would use ReportLab or similar
-    output = io.StringIO()
+    if not PDF_AVAILABLE:
+        # Fallback to CSV
+        return generate_csv(transactions, year, month)
+
     month_name = calendar.month_name[month]
+    output = io.BytesIO()
 
-    # Write simple text-based report
-    output.write(f"Transaction Report - {month_name} {year}\n")
-    output.write("=" * 80 + "\n\n")
-    output.write(f"{'Date':<12} {'Description':<25} {'Category':<15} {'Debit':>10} {'Credit':>10} {'Balance':>10}\n")
-    output.write("-" * 80 + "\n")
+    # Create the PDF document
+    doc = SimpleDocTemplate(output, pagesize=letter)
+    elements = []
+    styles = getSampleStyleSheet()
 
+    # Add title
+    title = Paragraph(f"<b>Transaction Report - {month_name} {year}</b>", styles['Title'])
+    elements.append(title)
+    elements.append(Spacer(1, 0.2 * inch))
+
+    # Create table data
+    table_data = [['Date', 'Description', 'Category', 'Debit', 'Credit', 'Balance']]
+
+    # Calculate running balance and add rows
     balance = 0
     for t in transactions:
         debit = float(t['debit']) if t['debit'] else 0
         credit = float(t['credit']) if t['credit'] else 0
         balance += debit - credit
 
-        output.write(f"{str(t['transaction_date']):<12} {t['description'][:25]:<25} {(t['category'] or '')[:15]:<15} {debit:>10.2f} {credit:>10.2f} {balance:>10.2f}\n")
+        table_data.append([
+            str(t['transaction_date']),
+            t['description'][:30],  # Truncate long descriptions
+            (t['category'] or '')[:15],
+            f"${debit:.2f}" if debit > 0 else '',
+            f"${credit:.2f}" if credit > 0 else '',
+            f"${balance:.2f}"
+        ])
 
+    # Create table
+    table = Table(table_data, colWidths=[1.0*inch, 2.5*inch, 1.2*inch, 0.9*inch, 0.9*inch, 1.0*inch])
+
+    # Style the table
+    table.setStyle(TableStyle([
+        # Header styling
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#366092')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+
+        # Body styling
+        ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+        ('ALIGN', (0, 1), (0, -1), 'LEFT'),  # Date
+        ('ALIGN', (1, 1), (2, -1), 'LEFT'),  # Description, Category
+        ('ALIGN', (3, 1), (-1, -1), 'RIGHT'),  # Amounts
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f0f0f0')]),
+    ]))
+
+    elements.append(table)
+
+    # Build PDF
+    doc.build(elements)
     output.seek(0)
+
     filename = f'transactions_{month_name}_{year}.pdf'
 
     response = make_response(output.getvalue())
