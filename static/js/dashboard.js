@@ -1047,19 +1047,19 @@ function displayTransactions(transactions) {
             <td class="opacity-75 small">${paidAtDisplay}</td>
             <td>${t.notes || '-'}</td>
             <td class="p-1" style="white-space: nowrap;">
-                <button class="btn btn-sm btn-primary p-1 me-1" style="font-size: 0.7rem; line-height: 1;" onclick="editTransaction(${t.id})" title="Edit">
+                <button class="btn btn-sm btn-primary p-1 me-1" style="font-size: 0.7rem; line-height: 1; background-color: #0d6efd !important; border-color: #0d6efd !important; color: white !important;" onclick="editTransaction(${t.id})" title="Edit">
                     <i class="fas fa-edit"></i>
                 </button>
-                <button class="btn btn-sm btn-danger p-1 me-1" style="font-size: 0.7rem; line-height: 1;" onclick="deleteTransaction(${t.id})" title="Delete">
+                <button class="btn btn-sm btn-danger p-1 me-1" style="font-size: 0.7rem; line-height: 1; background-color: #dc3545 !important; border-color: #dc3545 !important; color: white !important;" onclick="deleteTransaction(${t.id})" title="Delete">
                     <i class="fas fa-trash"></i>
                 </button>
-                <button class="btn btn-sm btn-warning p-1 me-1" style="font-size: 0.7rem; line-height: 1;" onclick="showMoveCopyModal(${t.id}, 'move')" title="Move to Month">
+                <button class="btn btn-sm btn-warning p-1 me-1" style="font-size: 0.7rem; line-height: 1; background-color: #ffc107 !important; border-color: #ffc107 !important; color: #000 !important;" onclick="showMoveCopyModal(${t.id}, 'move')" title="Move to Month">
                     <i class="fas fa-arrow-right"></i>
                 </button>
-                <button class="btn btn-sm btn-success p-1 me-1" style="font-size: 0.7rem; line-height: 1;" onclick="showMoveCopyModal(${t.id}, 'copy')" title="Copy to Month">
+                <button class="btn btn-sm btn-success p-1 me-1" style="font-size: 0.7rem; line-height: 1; background-color: #198754 !important; border-color: #198754 !important; color: white !important;" onclick="showMoveCopyModal(${t.id}, 'copy')" title="Copy to Month">
                     <i class="fas fa-copy"></i>
                 </button>
-                <button class="btn btn-sm btn-info p-1" style="font-size: 0.7rem; line-height: 1;" onclick="showAuditModal(${t.id})" title="Audit Log">
+                <button class="btn btn-sm btn-info p-1" style="font-size: 0.7rem; line-height: 1; background-color: #0dcaf0 !important; border-color: #0dcaf0 !important; color: #000 !important;" onclick="showAuditModal(${t.id})" title="Audit Log">
                     <i class="fas fa-history"></i>
                 </button>
             </td>
@@ -1714,6 +1714,88 @@ function performMoveCopyTransaction(transactionId, action, targetYear, targetMon
         console.error(`Error ${action}ing transaction:`, error);
         showToast(`Error ${action}ing transaction`, 'danger');
     });
+}
+
+// ================================
+// DOWNLOAD/EXPORT TRANSACTIONS
+// ================================
+
+function downloadTransactions(format) {
+    // Get current month/year
+    const monthYear = document.getElementById('monthYearPicker').value;
+    const [year, month] = monthYear.split('-').map(Number);
+
+    // Build download URL with current filters
+    const params = new URLSearchParams({
+        year: year,
+        month: month,
+        format: format
+    });
+
+    // Add active filters if any
+    const activeFilters = getActiveFilters();
+    if (activeFilters) {
+        Object.keys(activeFilters).forEach(key => {
+            if (activeFilters[key]) {
+                params.append(key, activeFilters[key]);
+            }
+        });
+    }
+
+    // Create download URL
+    const downloadUrl = `/api/transactions/export?${params.toString()}`;
+
+    // Close the modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById('downloadModal'));
+    if (modal) modal.hide();
+
+    // Show loading
+    showLoading();
+
+    // Trigger download
+    fetch(downloadUrl)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Download failed');
+            }
+            return response.blob();
+        })
+        .then(blob => {
+            hideLoading();
+
+            // Create download link
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+
+            // Set filename based on format
+            const monthName = new Date(year, month - 1).toLocaleString('default', { month: 'long' });
+            const extensions = { csv: 'csv', pdf: 'pdf', excel: 'xlsx' };
+            a.download = `transactions_${monthName}_${year}.${extensions[format]}`;
+
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            showToast(`Transactions downloaded as ${format.toUpperCase()}`, 'success');
+        })
+        .catch(error => {
+            hideLoading();
+            console.error('Download error:', error);
+            showToast('Error downloading transactions', 'danger');
+        });
+}
+
+function getActiveFilters() {
+    // Return current filter state if filters are active
+    // This should match the filter logic used in loadTransactions
+    const filters = {};
+
+    // Add filter extraction logic here if needed
+    // For now, return empty to download all transactions for the month
+
+    return filters;
 }
 
 // ================================
