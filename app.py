@@ -841,14 +841,50 @@ def dashboard_stats():
                 ORDER BY mr.year DESC, mr.month DESC
                 LIMIT 12
             """, (user_id,))
-            
+
             monthly_trend = cursor.fetchall()
-            
+
+            # Get current month income by category
+            cursor.execute("""
+                SELECT
+                    c.name as category,
+                    SUM(t.debit) as amount
+                FROM transactions t
+                JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                LEFT JOIN categories c ON t.category_id = c.id
+                WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s
+                  AND t.debit > 0
+                GROUP BY c.name
+                ORDER BY amount DESC
+                LIMIT 5
+            """, (user_id, current_year, current_month))
+
+            income_categories = cursor.fetchall()
+
+            # Get current month expenses by category
+            cursor.execute("""
+                SELECT
+                    c.name as category,
+                    SUM(t.credit) as amount
+                FROM transactions t
+                JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                LEFT JOIN categories c ON t.category_id = c.id
+                WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s
+                  AND t.credit > 0
+                GROUP BY c.name
+                ORDER BY amount DESC
+                LIMIT 5
+            """, (user_id, current_year, current_month))
+
+            expense_categories = cursor.fetchall()
+
             return jsonify({
                 'current_stats': current_stats,
                 'ytd_stats': ytd_stats,
                 'recent_transactions': recent_transactions,
-                'monthly_trend': monthly_trend
+                'monthly_trend': monthly_trend,
+                'income_categories': income_categories,
+                'expense_categories': expense_categories
             })
             
         except Error as e:
@@ -1707,7 +1743,7 @@ def export_transactions():
                 LEFT JOIN categories c ON t.category_id = c.id
                 LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id
                 WHERE t.monthly_record_id = %s
-                ORDER BY t.id
+                ORDER BY t.display_order ASC, t.id ASC
             """, (monthly_record['id'],))
 
             transactions = cursor.fetchall()
