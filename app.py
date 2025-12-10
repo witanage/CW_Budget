@@ -841,14 +841,50 @@ def dashboard_stats():
                 ORDER BY mr.year DESC, mr.month DESC
                 LIMIT 12
             """, (user_id,))
-            
+
             monthly_trend = cursor.fetchall()
-            
+
+            # Get current month income by category
+            cursor.execute("""
+                SELECT
+                    c.name as category,
+                    SUM(t.debit) as amount
+                FROM transactions t
+                JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                LEFT JOIN categories c ON t.category_id = c.id
+                WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s
+                  AND t.debit > 0
+                GROUP BY c.name
+                ORDER BY amount DESC
+                LIMIT 5
+            """, (user_id, current_year, current_month))
+
+            income_categories = cursor.fetchall()
+
+            # Get current month expenses by category
+            cursor.execute("""
+                SELECT
+                    c.name as category,
+                    SUM(t.credit) as amount
+                FROM transactions t
+                JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                LEFT JOIN categories c ON t.category_id = c.id
+                WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s
+                  AND t.credit > 0
+                GROUP BY c.name
+                ORDER BY amount DESC
+                LIMIT 5
+            """, (user_id, current_year, current_month))
+
+            expense_categories = cursor.fetchall()
+
             return jsonify({
                 'current_stats': current_stats,
                 'ytd_stats': ytd_stats,
                 'recent_transactions': recent_transactions,
-                'monthly_trend': monthly_trend
+                'monthly_trend': monthly_trend,
+                'income_categories': income_categories,
+                'expense_categories': expense_categories
             })
             
         except Error as e:
@@ -1689,7 +1725,7 @@ def export_transactions():
             # Return empty file if no transactions
             transactions = []
         else:
-            # Fetch transactions
+            # Fetch transactions (DESC order for downloads - oldest first)
             cursor.execute("""
                 SELECT
                     t.id,
@@ -1707,7 +1743,7 @@ def export_transactions():
                 LEFT JOIN categories c ON t.category_id = c.id
                 LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id
                 WHERE t.monthly_record_id = %s
-                ORDER BY t.id
+                ORDER BY t.display_order DESC, t.id DESC
             """, (monthly_record['id'],))
 
             transactions = cursor.fetchall()
@@ -1737,7 +1773,8 @@ def generate_csv(transactions, year, month):
     # Write header
     writer.writerow(['Date', 'Description', 'Category', 'Debit', 'Credit', 'Balance', 'Notes', 'Payment Method', 'Done', 'Paid', 'Paid At'])
 
-    # Calculate running balance and write rows
+    # Transactions come in DESC order (oldest first in downloads)
+    # Calculate running balance sequentially from oldest to newest
     balance = 0
     for t in transactions:
         debit = float(t['debit']) if t['debit'] else 0
@@ -1796,7 +1833,8 @@ def generate_excel(transactions, year, month):
         cell.fill = header_fill
         cell.alignment = header_alignment
 
-    # Calculate running balance and write rows
+    # Transactions come in DESC order (oldest first in downloads)
+    # Calculate running balance sequentially from oldest to newest
     balance = 0
     for t in transactions:
         debit = float(t['debit']) if t['debit'] else 0
@@ -1862,7 +1900,8 @@ def generate_pdf(transactions, year, month):
     # Create table data
     table_data = [['Date', 'Description', 'Category', 'Debit', 'Credit', 'Balance']]
 
-    # Calculate running balance and add rows
+    # Transactions come in DESC order (oldest first in downloads)
+    # Calculate running balance sequentially from oldest to newest
     balance = 0
     for t in transactions:
         debit = float(t['debit']) if t['debit'] else 0
@@ -1873,9 +1912,9 @@ def generate_pdf(transactions, year, month):
             str(t['transaction_date']),
             t['description'][:30],  # Truncate long descriptions
             (t['category'] or '')[:15],
-            f"${debit:.2f}" if debit > 0 else '',
-            f"${credit:.2f}" if credit > 0 else '',
-            f"${balance:.2f}"
+            f"{debit:.2f}" if debit > 0 else '',
+            f"{credit:.2f}" if credit > 0 else '',
+            f"{balance:.2f}"
         ])
 
     # Create table
