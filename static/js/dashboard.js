@@ -804,9 +804,9 @@ function updateRecentTransactions(transactions) {
             <td>${t.transaction_date ? formatDate(t.transaction_date) : '-'}</td>
             <td>${t.description}</td>
             <td><span class="badge bg-secondary">${t.category || 'Uncategorized'}</span></td>
-            <td class="text-success">${t.debit ? formatCurrency(t.debit) : '-'}</td>
-            <td class="text-danger">${t.credit ? formatCurrency(t.credit) : '-'}</td>
-            <td class="fw-bold">${formatCurrency(t.calculatedBalance)}</td>
+            <td class="text-success">${t.debit ? parseFloat(t.debit).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,') : '-'}</td>
+            <td class="text-danger">${t.credit ? parseFloat(t.credit).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,') : '-'}</td>
+            <td class="fw-bold">${parseFloat(t.calculatedBalance).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}</td>
         `;
         tbody.appendChild(row);
     });
@@ -1047,9 +1047,9 @@ function displayTransactions(transactions) {
             <td class="text-center">${checkboxHtml}</td>
             <td class="description-cell" style="cursor: pointer;" data-transaction-id="${t.id}">${t.description}</td>
             <td><span class="badge bg-secondary">${t.category_name || 'Uncategorized'}</span></td>
-            <td class="text-success">${t.debit ? formatCurrency(t.debit) : '-'}</td>
-            <td class="text-danger">${t.credit ? formatCurrency(t.credit) : '-'}</td>
-            <td class="fw-bold">${formatCurrency(t.calculatedBalance)}</td>
+            <td class="text-success">${t.debit ? parseFloat(t.debit).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,') : '-'}</td>
+            <td class="text-danger">${t.credit ? parseFloat(t.credit).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,') : '-'}</td>
+            <td class="fw-bold">${parseFloat(t.calculatedBalance).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}</td>
             <td class="opacity-75 small">${paidAtDisplay}</td>
             <td>${t.notes || '-'}</td>
             <td class="p-1" style="white-space: nowrap;">
@@ -1259,10 +1259,10 @@ function displayPaymentTotals(totals) {
                                     </span>
                                 </td>
                                 <td>${t.transaction_count || 0}</td>
-                                <td class="text-end text-success">${formatCurrency(debit)}</td>
-                                <td class="text-end text-danger">${formatCurrency(credit)}</td>
+                                <td class="text-end text-success">${parseFloat(debit).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}</td>
+                                <td class="text-end text-danger">${parseFloat(credit).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}</td>
                                 <td class="text-end fw-bold ${net >= 0 ? 'text-success' : 'text-danger'}">
-                                    ${formatCurrency(net)}
+                                    ${parseFloat(net).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}
                                 </td>
                             </tr>
                         `;
@@ -1271,10 +1271,10 @@ function displayPaymentTotals(totals) {
                 <tfoot>
                     <tr class="table-active fw-bold">
                         <td colspan="3">TOTAL</td>
-                        <td class="text-end text-success">${formatCurrency(totalDebit)}</td>
-                        <td class="text-end text-danger">${formatCurrency(totalCredit)}</td>
+                        <td class="text-end text-success">${parseFloat(totalDebit).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}</td>
+                        <td class="text-end text-danger">${parseFloat(totalCredit).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}</td>
                         <td class="text-end ${(totalDebit - totalCredit) >= 0 ? 'text-success' : 'text-danger'}">
-                            ${formatCurrency(totalDebit - totalCredit)}
+                            ${parseFloat(totalDebit - totalCredit).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}
                         </td>
                     </tr>
                 </tfoot>
@@ -1688,8 +1688,8 @@ function showMoveCopyModal(transactionId, action) {
     // Display transaction info
     const transInfoEl = document.getElementById('moveCopyTransactionInfo');
     const amount = transaction.debit
-        ? `<span class="text-success">Income: ${formatCurrency(transaction.debit)}</span>`
-        : `<span class="text-danger">Expense: ${formatCurrency(transaction.credit)}</span>`;
+        ? `<span class="text-success">Income: ${parseFloat(transaction.debit).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}</span>`
+        : `<span class="text-danger">Expense: ${parseFloat(transaction.credit).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}</span>`;
 
     transInfoEl.innerHTML = `
         <div><strong>${transaction.description}</strong></div>
@@ -2231,11 +2231,11 @@ function displayActiveFilters() {
         hasActiveFilters = true;
         let amountText = '';
         if (activeFilters.minAmount !== null && activeFilters.maxAmount !== null) {
-            amountText = `${formatCurrency(activeFilters.minAmount)} - ${formatCurrency(activeFilters.maxAmount)}`;
+            amountText = `${parseFloat(activeFilters.minAmount).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')} - ${parseFloat(activeFilters.maxAmount).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}`;
         } else if (activeFilters.minAmount !== null) {
-            amountText = `≥ ${formatCurrency(activeFilters.minAmount)}`;
+            amountText = `≥ ${parseFloat(activeFilters.minAmount).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}`;
         } else {
-            amountText = `≤ ${formatCurrency(activeFilters.maxAmount)}`;
+            amountText = `≤ ${parseFloat(activeFilters.maxAmount).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}`;
         }
         listEl.innerHTML += `
             <span class="badge bg-secondary rounded-pill">
