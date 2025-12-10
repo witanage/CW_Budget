@@ -113,8 +113,8 @@
 
                 <!-- Category Breakdown Row -->
                 <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <div class="card">
+                    <div class="col-12 col-lg-6 mb-3">
+                        <div class="card h-100">
                             <div class="card-header bg-success text-white">
                                 <h6 class="card-title mb-0"><i class="fas fa-arrow-up me-2"></i>Top Income Categories</h6>
                             </div>
@@ -123,8 +123,8 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-6 mb-3">
-                        <div class="card">
+                    <div class="col-12 col-lg-6 mb-3">
+                        <div class="card h-100">
                             <div class="card-header bg-danger text-white">
                                 <h6 class="card-title mb-0"><i class="fas fa-arrow-down me-2"></i>Top Expense Categories</h6>
                             </div>
@@ -1368,12 +1368,32 @@
 
 <style>
 /* Transaction Controls Row - Ensure all buttons are same size */
+.row.mb-3.align-items-center {
+    row-gap: 0.5rem;
+}
+
 .row.mb-3.align-items-center .btn-sm {
     min-height: 31px;
     padding: 0.25rem 0.75rem;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    white-space: nowrap;
+}
+
+.row.mb-3.align-items-center .form-control-sm {
+    min-height: 31px;
+}
+
+/* Overview Page Responsiveness */
+#overviewPage .card-body {
+    min-height: 300px;
+}
+
+@media (max-width: 991px) {
+    #overviewPage .card-body {
+        min-height: 250px;
+    }
 }
 
 /* Compact Transaction Table Rows */
