@@ -1743,7 +1743,7 @@ def export_transactions():
                 LEFT JOIN categories c ON t.category_id = c.id
                 LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id
                 WHERE t.monthly_record_id = %s
-                ORDER BY t.display_order ASC, t.id ASC
+                ORDER BY t.display_order DESC, t.id DESC
             """, (monthly_record['id'],))
 
             transactions = cursor.fetchall()
@@ -1773,12 +1773,23 @@ def generate_csv(transactions, year, month):
     # Write header
     writer.writerow(['Date', 'Description', 'Category', 'Debit', 'Credit', 'Balance', 'Notes', 'Payment Method', 'Done', 'Paid', 'Paid At'])
 
-    # Calculate running balance and write rows
+    # Since transactions come in DESC order (newest first),
+    # we need to calculate balance from oldest to newest first
+    transactions_list = list(transactions)
+    transactions_reversed = list(reversed(transactions_list))
+
+    # Calculate running balance from oldest to newest
     balance = 0
-    for t in transactions:
+    for t in transactions_reversed:
         debit = float(t['debit']) if t['debit'] else 0
         credit = float(t['credit']) if t['credit'] else 0
         balance += debit - credit
+        t['calculated_balance'] = balance
+
+    # Write rows in DESC order (newest first) with calculated balances
+    for t in transactions_list:
+        debit = float(t['debit']) if t['debit'] else 0
+        credit = float(t['credit']) if t['credit'] else 0
 
         writer.writerow([
             t['transaction_date'],
@@ -1786,7 +1797,7 @@ def generate_csv(transactions, year, month):
             t['category'] or '',
             f"{debit:.2f}" if debit > 0 else '',
             f"{credit:.2f}" if credit > 0 else '',
-            f"{balance:.2f}",
+            f"{t['calculated_balance']:.2f}",
             t['notes'] or '',
             t['payment_method'] or '',
             'Yes' if t['is_done'] else 'No',
@@ -1832,12 +1843,23 @@ def generate_excel(transactions, year, month):
         cell.fill = header_fill
         cell.alignment = header_alignment
 
-    # Calculate running balance and write rows
+    # Since transactions come in DESC order (newest first),
+    # we need to calculate balance from oldest to newest first
+    transactions_list = list(transactions)
+    transactions_reversed = list(reversed(transactions_list))
+
+    # Calculate running balance from oldest to newest
     balance = 0
-    for t in transactions:
+    for t in transactions_reversed:
         debit = float(t['debit']) if t['debit'] else 0
         credit = float(t['credit']) if t['credit'] else 0
         balance += debit - credit
+        t['calculated_balance'] = balance
+
+    # Write rows in DESC order (newest first) with calculated balances
+    for t in transactions_list:
+        debit = float(t['debit']) if t['debit'] else 0
+        credit = float(t['credit']) if t['credit'] else 0
 
         ws.append([
             str(t['transaction_date']),
@@ -1845,7 +1867,7 @@ def generate_excel(transactions, year, month):
             t['category'] or '',
             debit if debit > 0 else '',
             credit if credit > 0 else '',
-            balance,
+            t['calculated_balance'],
             t['notes'] or '',
             t['payment_method'] or '',
             'Yes' if t['is_done'] else 'No',
@@ -1898,12 +1920,23 @@ def generate_pdf(transactions, year, month):
     # Create table data
     table_data = [['Date', 'Description', 'Category', 'Debit', 'Credit', 'Balance']]
 
-    # Calculate running balance and add rows
+    # Since transactions come in DESC order (newest first),
+    # we need to calculate balance from oldest to newest first
+    transactions_list = list(transactions)
+    transactions_reversed = list(reversed(transactions_list))
+
+    # Calculate running balance from oldest to newest
     balance = 0
-    for t in transactions:
+    for t in transactions_reversed:
         debit = float(t['debit']) if t['debit'] else 0
         credit = float(t['credit']) if t['credit'] else 0
         balance += debit - credit
+        t['calculated_balance'] = balance
+
+    # Add rows in DESC order (newest first) with calculated balances
+    for t in transactions_list:
+        debit = float(t['debit']) if t['debit'] else 0
+        credit = float(t['credit']) if t['credit'] else 0
 
         table_data.append([
             str(t['transaction_date']),
@@ -1911,7 +1944,7 @@ def generate_pdf(transactions, year, month):
             (t['category'] or '')[:15],
             f"${debit:.2f}" if debit > 0 else '',
             f"${credit:.2f}" if credit > 0 else '',
-            f"${balance:.2f}"
+            f"${t['calculated_balance']:.2f}"
         ])
 
     # Create table
