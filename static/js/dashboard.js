@@ -2582,7 +2582,7 @@ function initCharts() {
                     y: {
                         beginAtZero: true,
                         ticks: {
-                            callback: value => 'LKR ' + value.toLocaleString()
+                            callback: value => value.toLocaleString()
                         }
                     }
                 }
@@ -2649,7 +2649,7 @@ function initCharts() {
                                 if (label) {
                                     label += ': ';
                                 }
-                                label += 'LKR ' + context.parsed.toLocaleString();
+                                label += context.parsed.toLocaleString();
                                 return label;
                             }
                         }
@@ -2689,7 +2689,7 @@ function initCharts() {
                                 if (label) {
                                     label += ': ';
                                 }
-                                label += 'LKR ' + context.parsed.toLocaleString();
+                                label += context.parsed.toLocaleString();
                                 return label;
                             }
                         }
@@ -2792,7 +2792,7 @@ function updateMonthlyReportChart(data) {
                 y: {
                     beginAtZero: true,
                     ticks: {
-                        callback: value => 'LKR ' + value.toLocaleString()
+                        callback: value => value.toLocaleString()
                     }
                 }
             }
@@ -2880,7 +2880,7 @@ function updateCategoryReportChart(data, rangeType) {
                         callbacks: {
                             label: ctx => {
                                 const percentage = ((ctx.parsed / totalIncome) * 100).toFixed(1);
-                                return ctx.label + ': LKR ' + ctx.parsed.toLocaleString() + ' (' + percentage + '%)';
+                                return ctx.label + ': ' + ctx.parsed.toLocaleString() + ' (' + percentage + '%)';
                             }
                         }
                     }
@@ -2928,7 +2928,7 @@ function updateCategoryReportChart(data, rangeType) {
                         callbacks: {
                             label: ctx => {
                                 const percentage = ((ctx.parsed / totalExpense) * 100).toFixed(1);
-                                return ctx.label + ': LKR ' + ctx.parsed.toLocaleString() + ' (' + percentage + '%)';
+                                return ctx.label + ': ' + ctx.parsed.toLocaleString() + ' (' + percentage + '%)';
                             }
                         }
                     }
@@ -2997,7 +2997,7 @@ function updateCategorySummaryTables(categoryTotals, totalIncome, totalExpense) 
         return `
             <tr>
                 <td>${row.category}</td>
-                <td class="text-end">LKR ${row.amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td class="text-end">${row.amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td class="text-end">${percentage}%</td>
             </tr>
         `;
@@ -3009,15 +3009,15 @@ function updateCategorySummaryTables(categoryTotals, totalIncome, totalExpense) 
         return `
             <tr>
                 <td>${row.category}</td>
-                <td class="text-end">LKR ${row.amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td class="text-end">${row.amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td class="text-end">${percentage}%</td>
             </tr>
         `;
     }).join('');
 
     // Update totals
-    totalIncomeElement.textContent = `LKR ${totalIncome.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-    totalExpensesElement.textContent = `LKR ${totalExpense.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    totalIncomeElement.textContent = `${totalIncome.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    totalExpensesElement.textContent = `${totalExpense.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
 }
 
 // Update net savings display
@@ -3032,7 +3032,7 @@ function updateNetSavings(totalIncome, totalExpense) {
     const savingsRate = totalIncome > 0 ? ((netSavings / totalIncome) * 100).toFixed(1) : 0;
 
     // Update text
-    netSavingsElement.textContent = `LKR ${netSavings.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    netSavingsElement.textContent = `${netSavings.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
     savingsPercentageElement.textContent = `${savingsRate}% savings rate`;
 
     // Update card styling based on savings
@@ -3110,14 +3110,14 @@ function updateCashFlowChart(data, rangeType) {
                 y: {
                     beginAtZero: true,
                     ticks: {
-                        callback: value => 'LKR ' + value.toLocaleString()
+                        callback: value => value.toLocaleString()
                     }
                 }
             },
             plugins: {
                 tooltip: {
                     callbacks: {
-                        label: ctx => ctx.dataset.label + ': LKR ' + ctx.parsed.y.toLocaleString()
+                        label: ctx => ctx.dataset.label + ': ' + ctx.parsed.y.toLocaleString()
                     }
                 }
             }
@@ -3157,7 +3157,7 @@ function updateTopSpendingChart(data) {
                 x: {
                     beginAtZero: true,
                     ticks: {
-                        callback: value => 'LKR ' + value.toLocaleString()
+                        callback: value => value.toLocaleString()
                     }
                 }
             },
@@ -3167,9 +3167,9 @@ function updateTopSpendingChart(data) {
                         label: ctx => {
                             const index = ctx.dataIndex;
                             return [
-                                'Total: LKR ' + ctx.parsed.x.toLocaleString(),
+                                'Total: ' + ctx.parsed.x.toLocaleString(),
                                 'Transactions: ' + counts[index],
-                                'Average: LKR ' + (amounts[index] / counts[index]).toLocaleString()
+                                'Average: ' + (amounts[index] / counts[index]).toLocaleString()
                             ];
                         }
                     }
@@ -3203,11 +3203,11 @@ function updateForecastChart(data) {
 
         summaryDiv.innerHTML = `
             <h5>Next Month Forecast (Confidence: ${confidenceText})</h5>
-            <p><strong>Predicted Income:</strong> LKR ${forecast.predicted_income.toLocaleString()}</p>
-            <p><strong>Predicted Expenses:</strong> LKR ${forecast.predicted_expenses.toLocaleString()}
+            <p><strong>Predicted Income:</strong> ${forecast.predicted_income.toLocaleString()}</p>
+            <p><strong>Predicted Expenses:</strong> ${forecast.predicted_expenses.toLocaleString()}
                <span class="badge ${forecast.expense_trend > 0 ? 'bg-danger' : 'bg-success'}">${trendText}</span>
             </p>
-            <p><strong>Predicted Savings:</strong> LKR ${forecast.predicted_savings.toLocaleString()}</p>
+            <p><strong>Predicted Savings:</strong> ${forecast.predicted_savings.toLocaleString()}</p>
             <p class="opacity-75">Based on ${data.based_on_months} months of historical data</p>
         `;
     }
@@ -3238,14 +3238,14 @@ function updateForecastChart(data) {
                 y: {
                     beginAtZero: true,
                     ticks: {
-                        callback: value => 'LKR ' + value.toLocaleString()
+                        callback: value => value.toLocaleString()
                     }
                 }
             },
             plugins: {
                 tooltip: {
                     callbacks: {
-                        label: ctx => ctx.dataset.label + ': LKR ' + ctx.parsed.y.toLocaleString()
+                        label: ctx => ctx.dataset.label + ': ' + ctx.parsed.y.toLocaleString()
                     }
                 }
             }

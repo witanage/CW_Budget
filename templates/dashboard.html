@@ -347,7 +347,7 @@
                                                         <tfoot class="fw-bold">
                                                             <tr>
                                                                 <td>Total Income</td>
-                                                                <td class="text-end" id="totalIncome">LKR 0.00</td>
+                                                                <td class="text-end" id="totalIncome">0.00</td>
                                                                 <td class="text-end">100%</td>
                                                             </tr>
                                                         </tfoot>
@@ -371,7 +371,7 @@
                                                         <tfoot class="fw-bold">
                                                             <tr>
                                                                 <td>Total Expenses</td>
-                                                                <td class="text-end" id="totalExpenses">LKR 0.00</td>
+                                                                <td class="text-end" id="totalExpenses">0.00</td>
                                                                 <td class="text-end">100%</td>
                                                             </tr>
                                                         </tfoot>
@@ -386,7 +386,7 @@
                                                 <div class="card" id="netSavingsCard">
                                                     <div class="card-body text-center">
                                                         <h5 class="mb-2">Net Savings</h5>
-                                                        <h3 class="mb-0" id="netSavings">LKR 0.00</h3>
+                                                        <h3 class="mb-0" id="netSavings">0.00</h3>
                                                         <small class="text-muted" id="savingsPercentage">0% savings rate</small>
                                                     </div>
                                                 </div>
@@ -467,7 +467,7 @@
                             </div>
                             <div class="tax-stat-content">
                                 <small class="tax-stat-label">Annual Income</small>
-                                <h5 class="tax-stat-value mb-0" id="annualIncomeSummary">LKR 0</h5>
+                                <h5 class="tax-stat-value mb-0" id="annualIncomeSummary">0</h5>
                             </div>
                         </div>
                     </div>
@@ -478,7 +478,7 @@
                             </div>
                             <div class="tax-stat-content">
                                 <small class="tax-stat-label">Tax-Free Amount</small>
-                                <h5 class="tax-stat-value mb-0" id="taxFreeAmountSummary">LKR 360,000</h5>
+                                <h5 class="tax-stat-value mb-0" id="taxFreeAmountSummary">360,000</h5>
                             </div>
                         </div>
                     </div>
@@ -489,7 +489,7 @@
                             </div>
                             <div class="tax-stat-content">
                                 <small class="tax-stat-label">Total Tax Liability</small>
-                                <h5 class="tax-stat-value mb-0" id="totalTaxSummary">LKR 0</h5>
+                                <h5 class="tax-stat-value mb-0" id="totalTaxSummary">0</h5>
                             </div>
                         </div>
                     </div>
@@ -547,10 +547,7 @@
                                     <!-- Tax-Free Threshold -->
                                     <div class="mb-3">
                                         <label for="taxFreeThreshold" class="form-label">Tax-Free Threshold (Annual)</label>
-                                        <div class="input-group">
-                                            <span class="input-group-text">LKR</span>
-                                            <input type="number" class="form-control" id="taxFreeThreshold" value="1800000" step="1000" min="0">
-                                        </div>
+                                        <input type="number" class="form-control" id="taxFreeThreshold" value="1800000" step="1000" min="0">
                                     </div>
 
                                     <!-- Monthly Data Section (Always Expanded) -->
@@ -601,7 +598,7 @@
                                             <tr>
                                                 <th>Month</th>
                                                 <th class="text-end">Receipts</th>
-                                                <th class="text-end">LKR</th>
+                                                <th class="text-end">Amount</th>
                                                 <th class="text-end">Cumulative</th>
                                                 <th class="text-end">Tax Due</th>
                                                 <th class="text-end">Payment</th>
@@ -619,10 +616,10 @@
                                             <tr class="fw-bold">
                                                 <td>Total</td>
                                                 <td class="text-end" id="totalUSD">$0</td>
-                                                <td class="text-end" id="totalConverted">LKR 0</td>
+                                                <td class="text-end" id="totalConverted">0</td>
                                                 <td class="text-end">-</td>
-                                                <td class="text-end" id="totalTaxLiability">LKR 0</td>
-                                                <td class="text-end" id="totalMonthlyPayments">LKR 0</td>
+                                                <td class="text-end" id="totalTaxLiability">0</td>
+                                                <td class="text-end" id="totalMonthlyPayments">0</td>
                                             </tr>
                                         </tfoot>
                                     </table>
