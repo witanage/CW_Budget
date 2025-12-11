@@ -1005,7 +1005,6 @@ function displayTransactions(transactions) {
 
     // Transactions come from backend sorted by display_order (ASC)
     // Calculate balance from BOTTOM to TOP so top row shows final cumulative balance
-    console.log('Displaying transactions in order:', transactions.map(t => `ID:${t.id} Order:${t.display_order}`));
 
     // Reverse to calculate from bottom to top (last display_order first)
     const reversedForCalc = [...transactions].reverse();
@@ -1079,7 +1078,6 @@ function displayTransactions(transactions) {
 
         // Apply background color to all cells for proper highlighting
         if (isDone && t.payment_method_color) {
-            console.log(`Highlighting transaction ${t.id} with color ${t.payment_method_color}`);
             row.classList.add('transaction-highlighted');
             const cells = row.querySelectorAll('td');
             cells.forEach((cell, index) => {
@@ -1385,10 +1383,6 @@ function saveTransaction() {
         month: parseInt(month)
     };
 
-    console.log('Saving transaction with data:', data);
-    console.log('Debit value:', debitValue, 'Parsed:', debit);
-    console.log('Credit value:', creditValue, 'Parsed:', credit);
-
     const url = isEdit ? `/api/transactions/${editId}` : '/api/transactions';
     const method = isEdit ? 'PUT' : 'POST';
 
@@ -1400,14 +1394,8 @@ function saveTransaction() {
         body: JSON.stringify(data)
     })
     .then(response => {
-        console.log('Response status:', response.status);
-        console.log('Response ok:', response.ok);
-        console.log('Response headers:', response.headers.get('content-type'));
-
         // Get response as text first
         return response.text().then(text => {
-            console.log('Response text (first 500 chars):', text.substring(0, 500));
-
             // Try to parse as JSON
             try {
                 const result = JSON.parse(text);
@@ -1420,7 +1408,6 @@ function saveTransaction() {
         });
     })
     .then(({ status, ok, result }) => {
-        console.log('Parsed result:', result);
         hideLoading();
         if (!ok || result.error) {
             const errorMsg = result.error || `Server error (${status})`;
@@ -1875,7 +1862,6 @@ function getActiveFilters() {
 // ================================
 
 function updateTransactionOrder(transactionIds) {
-    console.log('Updating transaction order:', transactionIds);
     showLoading();
 
     fetch('/api/transactions/reorder', {
@@ -1887,7 +1873,6 @@ function updateTransactionOrder(transactionIds) {
     })
     .then(response => response.json())
     .then(data => {
-        console.log('Reorder response:', data);
         hideLoading();
         if (data.success) {
             showToast('Transaction order updated successfully', 'success');
