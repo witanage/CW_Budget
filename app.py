@@ -1158,9 +1158,6 @@ def transactions():
             transaction_id = cursor.lastrowid
             print(f"[DEBUG] Transaction inserted with ID: {transaction_id}")
 
-            # Log audit trail for CREATE action
-            log_transaction_audit(cursor, transaction_id, user_id, 'CREATE')
-
             connection.commit()
             print(f"[DEBUG] Transaction committed successfully")
 
@@ -1994,17 +1991,6 @@ def reorder_transactions():
                             SET display_order = %s
                             WHERE id = %s
                         """, (new_order, transaction_id))
-
-                        # Log audit trail
-                        log_transaction_audit(
-                            cursor,
-                            transaction_id,
-                            user_id,
-                            'UPDATE',
-                            'display_order',
-                            str(old_order),
-                            str(new_order)
-                        )
 
             connection.commit()
             return jsonify({
