@@ -1,20 +1,23 @@
-import os
-import json
-import logging
-import threading
+import calendar
 import csv
 import io
+import json
+import logging
+import os
+import threading
 from datetime import datetime, timedelta
 from decimal import Decimal
-from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash, send_file, make_response
+from functools import wraps
+
+import mysql.connector
+from dotenv import load_dotenv
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash, make_response
 from flask.json.provider import DefaultJSONProvider
 from flask_cors import CORS
-from werkzeug.security import generate_password_hash, check_password_hash
-import mysql.connector
 from mysql.connector import Error
-from functools import wraps
-import calendar
-from dotenv import load_dotenv
+from werkzeug.security import generate_password_hash, check_password_hash
+
+from services.hnb_exchange_rate_service import get_hnb_exchange_rate_service
 
 # Load environment variables from .env file
 load_dotenv()
@@ -30,6 +33,7 @@ logger = logging.getLogger(__name__)
 try:
     from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment, PatternFill
+
     EXCEL_AVAILABLE = True
 except ImportError:
     EXCEL_AVAILABLE = False
@@ -41,6 +45,7 @@ try:
     from reportlab.lib.units import inch
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
     from reportlab.lib.styles import getSampleStyleSheet
+
     PDF_AVAILABLE = True
 except ImportError:
     PDF_AVAILABLE = False
@@ -48,12 +53,14 @@ except ImportError:
 
 logger.info("Environment variables loaded")
 
+
 # Custom JSON provider to handle Decimal objects
 class DecimalJSONProvider(DefaultJSONProvider):
     def default(self, obj):
         if isinstance(obj, Decimal):
             return float(obj)
         return super().default(obj)
+
 
 # Flask app configuration
 app = Flask(__name__)
@@ -69,6 +76,7 @@ app.config['SESSION_COOKIE_NAME'] = 'session'  # Explicit session cookie name
 
 CORS(app)
 
+
 # Database configuration with proper type conversion and defaults
 def get_db_config():
     """Get database configuration from environment variables."""
@@ -81,7 +89,8 @@ def get_db_config():
     # Validate required fields
     if not all([host, database, user, password]):
         logger.error("Missing required database configuration in environment variables")
-        logger.error(f"DB_HOST: {host}, DB_NAME: {database}, DB_USER: {user}, DB_PASSWORD: {'***' if password else None}")
+        logger.error(
+            f"DB_HOST: {host}, DB_NAME: {database}, DB_USER: {user}, DB_PASSWORD: {'***' if password else None}")
         return None
 
     # Convert port to integer
@@ -101,6 +110,7 @@ def get_db_config():
         'use_unicode': True
     }
 
+
 DB_CONFIG = get_db_config()
 
 # Log database configuration status
@@ -111,6 +121,7 @@ else:
     logger.error("CRITICAL: Database configuration failed to load. Application may not function properly.")
     logger.error("Please check your .env file and ensure all required variables are set:")
     logger.error("Required: DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD")
+
 
 def get_db_connection():
     """Create a database connection."""
@@ -124,24 +135,30 @@ def get_db_connection():
         return connection
     except Error as e:
         logger.error(f"Error connecting to MySQL: {e}")
-        logger.error(f"DB_CONFIG: host={DB_CONFIG.get('host')}, port={DB_CONFIG.get('port')}, database={DB_CONFIG.get('database')}")
+        logger.error(
+            f"DB_CONFIG: host={DB_CONFIG.get('host')}, port={DB_CONFIG.get('port')}, database={DB_CONFIG.get('database')}")
         return None
     except Exception as e:
         logger.error(f"Unexpected error connecting to database: {e}", exc_info=True)
         return None
 
+
 def login_required(f):
     """Decorator to require login for routes."""
+
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
             flash('Please login first.', 'warning')
             return redirect(url_for('login'))
         return f(*args, **kwargs)
+
     return decorated_function
+
 
 def admin_required(f):
     """Decorator to require admin privileges for routes."""
+
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
@@ -168,13 +185,16 @@ def admin_required(f):
             return redirect(url_for('dashboard'))
 
         return f(*args, **kwargs)
+
     return decorated_function
+
 
 # Utility function to serialize Decimal for JSON
 def decimal_default(obj):
     if isinstance(obj, Decimal):
         return float(obj)
     raise TypeError
+
 
 def log_transaction_audit(cursor, transaction_id, user_id, action, field_name=None, old_value=None, new_value=None):
     """
@@ -199,15 +219,17 @@ def log_transaction_audit(cursor, transaction_id, user_id, action, field_name=No
         new_value_str = str(new_value) if new_value is not None else None
 
         cursor.execute("""
-            INSERT INTO transaction_audit_logs
-            (transaction_id, user_id, action, field_name, old_value, new_value, ip_address, user_agent)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        """, (transaction_id, user_id, action, field_name, old_value_str, new_value_str, ip_address, user_agent))
+                       INSERT INTO transaction_audit_logs
+                       (transaction_id, user_id, action, field_name, old_value, new_value, ip_address, user_agent)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                       """, (transaction_id, user_id, action, field_name, old_value_str, new_value_str, ip_address,
+                             user_agent))
 
         logger.info(f"Audit log created: {action} on transaction {transaction_id} by user {user_id}")
     except Exception as e:
         logger.error(f"Failed to create audit log: {e}")
         # Don't fail the main transaction if audit logging fails
+
 
 # Routes
 @app.route('/')
@@ -218,7 +240,7 @@ def index():
         # Detect if mobile device from user agent
         user_agent = request.headers.get('User-Agent', '').lower()
         is_mobile = any(device in user_agent for device in
-                       ['android', 'webos', 'iphone', 'ipad', 'ipod', 'blackberry', 'windows phone'])
+                        ['android', 'webos', 'iphone', 'ipad', 'ipod', 'blackberry', 'windows phone'])
 
         if is_mobile:
             logger.info(f"Redirecting user {session.get('user_id')} to mobile view")
@@ -228,6 +250,7 @@ def index():
     logger.info("No user session found, redirecting to login")
     return redirect(url_for('login'))
 
+
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     """User registration."""
@@ -236,17 +259,17 @@ def register():
         username = data.get('username')
         email = data.get('email')
         password = data.get('password')
-        
+
         connection = get_db_connection()
         if connection:
             cursor = connection.cursor()
             try:
                 # Check if user already exists
-                cursor.execute("SELECT id FROM users WHERE username = %s OR email = %s", 
-                             (username, email))
+                cursor.execute("SELECT id FROM users WHERE username = %s OR email = %s",
+                               (username, email))
                 if cursor.fetchone():
                     return jsonify({'error': 'Username or email already exists'}), 400
-                
+
                 # Create new user (deactivated by default, requires admin activation)
                 password_hash = generate_password_hash(password)
                 cursor.execute(
@@ -263,10 +286,11 @@ def register():
             finally:
                 cursor.close()
                 connection.close()
-        
+
         return jsonify({'error': 'Database connection failed'}), 500
-    
+
     return render_template('register.html')
+
 
 def populate_exchange_rates_background():
     """
@@ -308,9 +332,11 @@ def populate_exchange_rates_background():
             )
             cursor = connection.cursor()
             cursor.execute("""
-                SELECT date FROM exchange_rates
-                WHERE date BETWEEN %s AND %s
-            """, (start_date, end_date))
+                           SELECT date
+                           FROM exchange_rates
+                           WHERE date BETWEEN %s
+                             AND %s
+                           """, (start_date, end_date))
 
             existing_dates = {row[0] for row in cursor.fetchall()}
             cursor.close()
@@ -325,7 +351,8 @@ def populate_exchange_rates_background():
                 current_date += timedelta(days=1)
 
             if missing_dates:
-                logger.info(f"Background task: Found {len(missing_dates)} missing dates in last 10 days: {missing_dates}")
+                logger.info(
+                    f"Background task: Found {len(missing_dates)} missing dates in last 10 days: {missing_dates}")
 
                 # Fetch each missing date
                 fetched = 0
@@ -348,6 +375,7 @@ def populate_exchange_rates_background():
     except Exception as e:
         logger.error(f"Background task: Error populating exchange rates: {str(e)}", exc_info=True)
 
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     """User login."""
@@ -365,14 +393,15 @@ def login():
             try:
                 # Check if username is an email or username
                 cursor.execute("SELECT * FROM users WHERE username = %s OR email = %s",
-                             (username, username))
+                               (username, username))
                 user = cursor.fetchone()
 
                 if user and check_password_hash(user['password_hash'], password):
                     # Check if user account is active
                     if not user.get('is_active', True):
                         logger.warning(f"Login failed for username: {username} - Account is deactivated")
-                        return jsonify({'error': 'Your account has been deactivated. Please contact an administrator.'}), 403
+                        return jsonify(
+                            {'error': 'Your account has been deactivated. Please contact an administrator.'}), 403
 
                     # Update last_login timestamp
                     cursor.execute("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = %s", (user['id'],))
@@ -383,12 +412,13 @@ def login():
                     session['user_id'] = user['id']
                     session['username'] = user['username']
                     session['is_admin'] = user.get('is_admin', False)
-                    logger.info(f"Login successful for user: {username} (ID: {user['id']}), permanent: {remember_me}, is_admin: {user.get('is_admin', False)}")
+                    logger.info(
+                        f"Login successful for user: {username} (ID: {user['id']}), permanent: {remember_me}, is_admin: {user.get('is_admin', False)}")
 
-                    # Start background task to populate exchange rates
-                    background_thread = threading.Thread(target=populate_exchange_rates_background, daemon=True)
+                    # Start background task to populate exchange rates (CBSL + HNB)
+                    background_thread = threading.Thread(target=populate_all_exchange_rates_background, daemon=True)
                     background_thread.start()
-                    logger.info("Background task started to populate exchange rates")
+                    logger.info("Background task started to populate CBSL and HNB exchange rates")
 
                     return jsonify({'message': 'Login successful'}), 200
                 else:
@@ -406,12 +436,130 @@ def login():
 
     return render_template('login.html')
 
+
+# ==================================================
+# UPDATED BACKGROUND TASK - INCLUDES HNB RATES
+# ==================================================
+
+def populate_all_exchange_rates_background():
+    """
+    Background task to populate missing exchange rates from both CBSL and HNB.
+    Runs in a separate thread after user login.
+
+    Strategy:
+    1. Populate CBSL rates (existing logic)
+    2. Fetch current HNB rate
+    """
+    try:
+        logger.info("Background task: Starting exchange rate population (CBSL + HNB)...")
+
+        # ===== PART 1: CBSL RATES (existing logic) =====
+        from services.exchange_rate_service import get_exchange_rate_service
+
+        cbsl_service = get_exchange_rate_service()
+
+        # Check if database is empty
+        if cbsl_service._is_database_empty():
+            logger.info("Background task: Database is empty, triggering CBSL bulk import...")
+            success = cbsl_service._fetch_and_import_bulk_csv()
+            if success:
+                logger.info("Background task: CBSL bulk import completed successfully")
+            else:
+                logger.warning("Background task: CBSL bulk import failed")
+        else:
+            # Database has data, check last 10 days for missing CBSL dates
+            logger.info("Background task: Checking last 10 days for missing CBSL exchange rates...")
+
+            end_date = datetime.now().date()
+            start_date = end_date - timedelta(days=10)
+
+            # Get existing dates in the last 10 days
+            connection = mysql.connector.connect(
+                host=os.environ.get('DB_HOST', 'localhost'),
+                port=int(os.environ.get('DB_PORT', 3306)),
+                user=os.environ.get('DB_USER', 'root'),
+                password=os.environ.get('DB_PASSWORD', ''),
+                database=os.environ.get('DB_NAME', 'budget_app')
+            )
+            cursor = connection.cursor()
+            cursor.execute("""
+                           SELECT date
+                           FROM exchange_rates
+                           WHERE date BETWEEN %s
+                             AND %s
+                           """, (start_date, end_date))
+
+            existing_dates = {row[0] for row in cursor.fetchall()}
+            cursor.close()
+            connection.close()
+
+            # Find missing dates in the last 10 days
+            current_date = start_date
+            missing_dates = []
+            while current_date <= end_date:
+                if current_date not in existing_dates:
+                    missing_dates.append(current_date)
+                current_date += timedelta(days=1)
+
+            if missing_dates:
+                logger.info(f"Background task: Found {len(missing_dates)} missing CBSL dates in last 10 days")
+
+                # Fetch each missing date
+                fetched = 0
+                failed = 0
+                for date in missing_dates:
+                    try:
+                        rate = cbsl_service.get_exchange_rate(datetime.combine(date, datetime.min.time()))
+                        if rate:
+                            fetched += 1
+                        else:
+                            failed += 1
+                    except Exception as e:
+                        logger.error(f"Background task: Error fetching CBSL rate for {date}: {str(e)}")
+                        failed += 1
+
+                logger.info(f"Background task: CBSL completed - {fetched} fetched, {failed} failed")
+            else:
+                logger.info("Background task: No missing CBSL dates in last 10 days")
+
+        # ===== PART 2: HNB RATES (new) =====
+        logger.info("Background task: Fetching current HNB exchange rate...")
+
+        try:
+            hnb_service = get_hnb_exchange_rate_service()
+
+            # Check if today's HNB rate exists
+            today = datetime.now().date()
+            existing_hnb_rate = hnb_service.get_exchange_rate(today)
+
+            if existing_hnb_rate:
+                logger.info(f"Background task: HNB rate for today already cached: {existing_hnb_rate}")
+            else:
+                # Fetch and store current HNB rate
+                hnb_rate = hnb_service.fetch_and_store_current_rate()
+
+                if hnb_rate:
+                    logger.info(
+                        f"Background task: HNB rate fetched successfully: Buy={hnb_rate['buy_rate']}, Sell={hnb_rate['sell_rate']}")
+                else:
+                    logger.warning("Background task: Failed to fetch HNB rate")
+
+        except Exception as e:
+            logger.error(f"Background task: Error fetching HNB rates: {str(e)}")
+
+        logger.info("Background task: Exchange rate population completed (CBSL + HNB)")
+
+    except Exception as e:
+        logger.error(f"Background task: Error populating exchange rates: {str(e)}", exc_info=True)
+
+
 @app.route('/logout')
 def logout():
     """User logout."""
     session.clear()
     flash('You have been logged out.', 'info')
     return redirect(url_for('index'))
+
 
 @app.route('/api/change-password', methods=['POST'])
 @login_required
@@ -462,17 +610,20 @@ def change_password():
         cursor.close()
         connection.close()
 
+
 @app.route('/dashboard')
 @login_required
 def dashboard():
     """Main dashboard."""
     return render_template('dashboard.html', username=session.get('username'))
 
+
 @app.route('/mobile')
 @login_required
 def mobile():
     """Mobile view."""
     return render_template('mobile.html', username=session.get('username'))
+
 
 @app.route('/admin')
 @admin_required
@@ -488,39 +639,36 @@ def admin_dashboard():
         try:
             # Fetch users
             cursor.execute("""
-                SELECT
-                    u.id,
-                    u.username,
-                    u.email,
-                    u.is_admin,
-                    u.is_active,
-                    u.last_login,
-                    u.created_at,
-                    COUNT(DISTINCT mr.id) as monthly_records_count,
-                    COUNT(DISTINCT t.id) as transactions_count
-                FROM users u
-                LEFT JOIN monthly_records mr ON u.id = mr.user_id
-                LEFT JOIN transactions t ON mr.id = t.monthly_record_id
-                GROUP BY u.id, u.username, u.email, u.is_admin, u.is_active, u.last_login, u.created_at
-                ORDER BY u.created_at DESC
-            """)
+                           SELECT u.id,
+                                  u.username,
+                                  u.email,
+                                  u.is_admin,
+                                  u.is_active,
+                                  u.last_login,
+                                  u.created_at,
+                                  COUNT(DISTINCT mr.id) as monthly_records_count,
+                                  COUNT(DISTINCT t.id)  as transactions_count
+                           FROM users u
+                                    LEFT JOIN monthly_records mr ON u.id = mr.user_id
+                                    LEFT JOIN transactions t ON mr.id = t.monthly_record_id
+                           GROUP BY u.id, u.username, u.email, u.is_admin, u.is_active, u.last_login, u.created_at
+                           ORDER BY u.created_at DESC
+                           """)
             users = cursor.fetchall()
 
             # Fetch audit logs
             cursor.execute("""
-                SELECT
-                    al.id,
-                    al.action,
-                    al.details,
-                    al.created_at,
-                    au.username as admin_username,
-                    tu.username as target_username
-                FROM audit_logs al
-                JOIN users au ON al.admin_user_id = au.id
-                LEFT JOIN users tu ON al.target_user_id = tu.id
-                ORDER BY al.created_at DESC
-                LIMIT 50
-            """)
+                           SELECT al.id,
+                                  al.action,
+                                  al.details,
+                                  al.created_at,
+                                  au.username as admin_username,
+                                  tu.username as target_username
+                           FROM audit_logs al
+                                    JOIN users au ON al.admin_user_id = au.id
+                                    LEFT JOIN users tu ON al.target_user_id = tu.id
+                           ORDER BY al.created_at DESC LIMIT 50
+                           """)
             audit_logs = cursor.fetchall()
 
         except Error as e:
@@ -533,11 +681,12 @@ def admin_dashboard():
         error_message = "Database connection failed"
 
     return render_template('admin.html',
-                         username=session.get('username'),
-                         users=users,
-                         audit_logs=audit_logs,
-                         error_message=error_message,
-                         current_user_id=session.get('user_id'))
+                           username=session.get('username'),
+                           users=users,
+                           audit_logs=audit_logs,
+                           error_message=error_message,
+                           current_user_id=session.get('user_id'))
+
 
 @app.route('/api/admin/users', methods=['GET'])
 @admin_required
@@ -551,22 +700,21 @@ def get_all_users():
 
     try:
         cursor.execute("""
-            SELECT
-                u.id,
-                u.username,
-                u.email,
-                u.is_admin,
-                u.is_active,
-                u.last_login,
-                u.created_at,
-                COUNT(DISTINCT mr.id) as monthly_records_count,
-                COUNT(DISTINCT t.id) as transactions_count
-            FROM users u
-            LEFT JOIN monthly_records mr ON u.id = mr.user_id
-            LEFT JOIN transactions t ON mr.id = t.monthly_record_id
-            GROUP BY u.id, u.username, u.email, u.is_admin, u.is_active, u.last_login, u.created_at
-            ORDER BY u.created_at DESC
-        """)
+                       SELECT u.id,
+                              u.username,
+                              u.email,
+                              u.is_admin,
+                              u.is_active,
+                              u.last_login,
+                              u.created_at,
+                              COUNT(DISTINCT mr.id) as monthly_records_count,
+                              COUNT(DISTINCT t.id)  as transactions_count
+                       FROM users u
+                                LEFT JOIN monthly_records mr ON u.id = mr.user_id
+                                LEFT JOIN transactions t ON mr.id = t.monthly_record_id
+                       GROUP BY u.id, u.username, u.email, u.is_admin, u.is_active, u.last_login, u.created_at
+                       ORDER BY u.created_at DESC
+                       """)
 
         users = cursor.fetchall()
         return jsonify(users)
@@ -578,6 +726,7 @@ def get_all_users():
         cursor.close()
         connection.close()
 
+
 def log_audit(admin_user_id, action, target_user_id=None, details=None):
     """Helper function to log admin actions."""
     connection = get_db_connection()
@@ -585,15 +734,16 @@ def log_audit(admin_user_id, action, target_user_id=None, details=None):
         cursor = connection.cursor()
         try:
             cursor.execute("""
-                INSERT INTO audit_logs (admin_user_id, action, target_user_id, details)
-                VALUES (%s, %s, %s, %s)
-            """, (admin_user_id, action, target_user_id, details))
+                           INSERT INTO audit_logs (admin_user_id, action, target_user_id, details)
+                           VALUES (%s, %s, %s, %s)
+                           """, (admin_user_id, action, target_user_id, details))
             connection.commit()
         except Error as e:
             logger.error(f"Error logging audit: {str(e)}")
         finally:
             cursor.close()
             connection.close()
+
 
 @app.route('/api/admin/users/<int:user_id>/toggle-active', methods=['POST'])
 @admin_required
@@ -625,7 +775,8 @@ def toggle_user_active(user_id):
 
         # Log the action
         action = f"{'Activated' if new_status else 'Deactivated'} user"
-        log_audit(admin_id, action, user_id, f"User '{user['username']}' status changed to {'active' if new_status else 'inactive'}")
+        log_audit(admin_id, action, user_id,
+                  f"User '{user['username']}' status changed to {'active' if new_status else 'inactive'}")
 
         logger.info(f"Admin {admin_id} {action.lower()} user {user_id} ({user['username']})")
 
@@ -640,6 +791,7 @@ def toggle_user_active(user_id):
     finally:
         cursor.close()
         connection.close()
+
 
 @app.route('/api/admin/users/<int:user_id>/toggle-admin', methods=['POST'])
 @admin_required
@@ -687,6 +839,7 @@ def toggle_user_admin(user_id):
         cursor.close()
         connection.close()
 
+
 @app.route('/api/admin/users/<int:user_id>', methods=['DELETE'])
 @admin_required
 def delete_user(user_id):
@@ -729,6 +882,7 @@ def delete_user(user_id):
         cursor.close()
         connection.close()
 
+
 @app.route('/api/admin/audit-logs', methods=['GET'])
 @admin_required
 def get_audit_logs():
@@ -743,19 +897,18 @@ def get_audit_logs():
         limit = request.args.get('limit', 100, type=int)
 
         cursor.execute("""
-            SELECT
-                al.id,
-                al.action,
-                al.details,
-                al.created_at,
-                au.username as admin_username,
-                tu.username as target_username
-            FROM audit_logs al
-            JOIN users au ON al.admin_user_id = au.id
-            LEFT JOIN users tu ON al.target_user_id = tu.id
-            ORDER BY al.created_at DESC
-            LIMIT %s
-        """, (limit,))
+                       SELECT al.id,
+                              al.action,
+                              al.details,
+                              al.created_at,
+                              au.username as admin_username,
+                              tu.username as target_username
+                       FROM audit_logs al
+                                JOIN users au ON al.admin_user_id = au.id
+                                LEFT JOIN users tu ON al.target_user_id = tu.id
+                       ORDER BY al.created_at DESC
+                           LIMIT %s
+                       """, (limit,))
 
         logs = cursor.fetchall()
         return jsonify(logs)
@@ -767,6 +920,7 @@ def get_audit_logs():
         cursor.close()
         connection.close()
 
+
 @app.route('/api/dashboard-stats')
 @login_required
 def dashboard_stats():
@@ -776,105 +930,103 @@ def dashboard_stats():
         cursor = connection.cursor(dictionary=True)
         try:
             user_id = session['user_id']
-            
+
             # Get current month stats
             current_year = datetime.now().year
             current_month = datetime.now().month
-            
+
             # Get current month income and expenses
             cursor.execute("""
-                SELECT
-                    SUM(debit) as total_income,
-                    SUM(credit) as total_expenses
-                FROM transactions t
-                JOIN monthly_records mr ON t.monthly_record_id = mr.id
-                WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s
-            """, (user_id, current_year, current_month))
+                           SELECT SUM(debit)  as total_income,
+                                  SUM(credit) as total_expenses
+                           FROM transactions t
+                                    JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                           WHERE mr.user_id = %s
+                             AND mr.year = %s
+                             AND mr.month = %s
+                           """, (user_id, current_year, current_month))
 
             current_stats = cursor.fetchone() or {'total_income': 0, 'total_expenses': 0}
 
             # Balance will be calculated on frontend
-            current_stats['current_balance'] = (current_stats.get('total_income', 0) or 0) - (current_stats.get('total_expenses', 0) or 0)
+            current_stats['current_balance'] = (current_stats.get('total_income', 0) or 0) - (
+                        current_stats.get('total_expenses', 0) or 0)
 
             # Get year-to-date stats
             cursor.execute("""
-                SELECT
-                    SUM(debit) as ytd_income,
-                    SUM(credit) as ytd_expenses
-                FROM transactions t
-                JOIN monthly_records mr ON t.monthly_record_id = mr.id
-                WHERE mr.user_id = %s AND mr.year = %s
-            """, (user_id, current_year))
+                           SELECT SUM(debit)  as ytd_income,
+                                  SUM(credit) as ytd_expenses
+                           FROM transactions t
+                                    JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                           WHERE mr.user_id = %s
+                             AND mr.year = %s
+                           """, (user_id, current_year))
 
             ytd_stats = cursor.fetchone()
 
             # Get recent transactions (balance will be calculated on frontend)
             cursor.execute("""
-                SELECT
-                    t.description,
-                    t.debit,
-                    t.credit,
-                    t.transaction_date,
-                    c.name as category
-                FROM transactions t
-                JOIN monthly_records mr ON t.monthly_record_id = mr.id
-                LEFT JOIN categories c ON t.category_id = c.id
-                WHERE mr.user_id = %s
-                ORDER BY t.created_at DESC
-                LIMIT 10
-            """, (user_id,))
+                           SELECT t.description,
+                                  t.debit,
+                                  t.credit,
+                                  t.transaction_date,
+                                  c.name as category
+                           FROM transactions t
+                                    JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                                    LEFT JOIN categories c ON t.category_id = c.id
+                           WHERE mr.user_id = %s
+                           ORDER BY t.created_at DESC LIMIT 10
+                           """, (user_id,))
 
             recent_transactions = cursor.fetchall()
 
             # Get monthly trend (last 12 months)
             cursor.execute("""
-                SELECT
-                    mr.year,
-                    mr.month,
-                    mr.month_name,
-                    SUM(t.debit) as income,
-                    SUM(t.credit) as expenses
-                FROM monthly_records mr
-                LEFT JOIN transactions t ON mr.id = t.monthly_record_id
-                WHERE mr.user_id = %s
-                GROUP BY mr.year, mr.month, mr.month_name
-                ORDER BY mr.year DESC, mr.month DESC
-                LIMIT 12
-            """, (user_id,))
+                           SELECT mr.year,
+                                  mr.month,
+                                  mr.month_name,
+                                  SUM(t.debit)  as income,
+                                  SUM(t.credit) as expenses
+                           FROM monthly_records mr
+                                    LEFT JOIN transactions t ON mr.id = t.monthly_record_id
+                           WHERE mr.user_id = %s
+                           GROUP BY mr.year, mr.month, mr.month_name
+                           ORDER BY mr.year DESC, mr.month DESC LIMIT 12
+                           """, (user_id,))
 
             monthly_trend = cursor.fetchall()
 
             # Get current month income by category
             cursor.execute("""
-                SELECT
-                    c.name as category,
-                    SUM(t.debit) as amount
-                FROM transactions t
-                JOIN monthly_records mr ON t.monthly_record_id = mr.id
-                LEFT JOIN categories c ON t.category_id = c.id
-                WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s
-                  AND t.debit > 0
-                GROUP BY c.name
-                ORDER BY amount DESC
-                LIMIT 5
-            """, (user_id, current_year, current_month))
+                           SELECT c.name       as category,
+                                  SUM(t.debit) as amount
+                           FROM transactions t
+                                    JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                                    LEFT JOIN categories c ON t.category_id = c.id
+                           WHERE mr.user_id = %s
+                             AND mr.year = %s
+                             AND mr.month = %s
+                             AND t.debit > 0
+                           GROUP BY c.name
+                           ORDER BY amount DESC LIMIT 5
+                           """, (user_id, current_year, current_month))
 
             income_categories = cursor.fetchall()
 
             # Get current month expenses by category
             cursor.execute("""
-                SELECT
-                    c.name as category,
-                    SUM(t.credit) as amount
-                FROM transactions t
-                JOIN monthly_records mr ON t.monthly_record_id = mr.id
-                LEFT JOIN categories c ON t.category_id = c.id
-                WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s
-                  AND t.credit > 0
-                GROUP BY c.name
-                ORDER BY amount DESC
-                LIMIT 5
-            """, (user_id, current_year, current_month))
+                           SELECT c.name        as category,
+                                  SUM(t.credit) as amount
+                           FROM transactions t
+                                    JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                                    LEFT JOIN categories c ON t.category_id = c.id
+                           WHERE mr.user_id = %s
+                             AND mr.year = %s
+                             AND mr.month = %s
+                             AND t.credit > 0
+                           GROUP BY c.name
+                           ORDER BY amount DESC LIMIT 5
+                           """, (user_id, current_year, current_month))
 
             expense_categories = cursor.fetchall()
 
@@ -886,14 +1038,15 @@ def dashboard_stats():
                 'income_categories': income_categories,
                 'expense_categories': expense_categories
             })
-            
+
         except Error as e:
             return jsonify({'error': str(e)}), 500
         finally:
             cursor.close()
             connection.close()
-    
+
     return jsonify({'error': 'Database connection failed'}), 500
+
 
 @app.route('/api/transactions', methods=['GET', 'POST'])
 @login_required
@@ -902,10 +1055,10 @@ def transactions():
     connection = get_db_connection()
     if not connection:
         return jsonify({'error': 'Database connection failed'}), 500
-    
+
     cursor = connection.cursor(dictionary=True)
     user_id = session['user_id']
-    
+
     try:
         if request.method == 'GET':
             # Get query parameters
@@ -986,9 +1139,10 @@ def transactions():
             else:
                 # Normal behavior - get specific monthly record
                 cursor.execute("""
-                    SELECT id FROM monthly_records
-                    WHERE user_id = %s AND year = %s AND month = %s
-                """, (user_id, year, month))
+                               SELECT id
+                               FROM monthly_records
+                               WHERE user_id = %s AND year = %s AND month = %s
+                               """, (user_id, year, month))
 
                 monthly_record = cursor.fetchone()
 
@@ -1088,7 +1242,7 @@ def transactions():
                 return jsonify(transactions)
             else:
                 return jsonify([])
-        
+
         else:  # POST - Create new transaction
             data = request.get_json()
             print(f"[DEBUG] Received transaction data: {data}")
@@ -1099,15 +1253,16 @@ def transactions():
             month_name = calendar.month_name[month]
 
             cursor.execute("""
-                INSERT INTO monthly_records (user_id, year, month, month_name)
-                VALUES (%s, %s, %s, %s)
-                ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP
-            """, (user_id, year, month, month_name))
+                           INSERT INTO monthly_records (user_id, year, month, month_name)
+                           VALUES (%s, %s, %s, %s) ON DUPLICATE KEY
+                           UPDATE updated_at = CURRENT_TIMESTAMP
+                           """, (user_id, year, month, month_name))
 
             cursor.execute("""
-                SELECT id FROM monthly_records
-                WHERE user_id = %s AND year = %s AND month = %s
-            """, (user_id, year, month))
+                           SELECT id
+                           FROM monthly_records
+                           WHERE user_id = %s AND year = %s AND month = %s
+                           """, (user_id, year, month))
 
             monthly_record = cursor.fetchone()
 
@@ -1128,10 +1283,10 @@ def transactions():
             # Push all existing transactions down by incrementing their display_order
             # This makes room for the new transaction at position 1 (top)
             cursor.execute("""
-                UPDATE transactions
-                SET display_order = display_order + 1
-                WHERE monthly_record_id = %s
-            """, (monthly_record['id'],))
+                           UPDATE transactions
+                           SET display_order = display_order + 1
+                           WHERE monthly_record_id = %s
+                           """, (monthly_record['id'],))
 
             # New transaction gets display_order = 1 (appears at top)
             next_display_order = 1
@@ -1150,10 +1305,11 @@ def transactions():
             print(f"[DEBUG] Inserting transaction with values: {insert_values}")
 
             cursor.execute("""
-                INSERT INTO transactions
-                (monthly_record_id, description, category_id, debit, credit, transaction_date, notes, display_order)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            """, insert_values)
+                           INSERT INTO transactions
+                           (monthly_record_id, description, category_id, debit, credit, transaction_date, notes,
+                            display_order)
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                           """, insert_values)
 
             transaction_id = cursor.lastrowid
             print(f"[DEBUG] Transaction inserted with ID: {transaction_id}")
@@ -1162,12 +1318,13 @@ def transactions():
             print(f"[DEBUG] Transaction committed successfully")
 
             return jsonify({'message': 'Transaction created successfully', 'id': transaction_id}), 201
-            
+
     except Error as e:
         return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()
         connection.close()
+
 
 @app.route('/api/transactions/filter', methods=['GET'])
 @login_required
@@ -1195,20 +1352,20 @@ def filter_transactions():
 
         # Build SQL query with filters
         query = """
-            SELECT t.*,
-                   c.name as category_name,
-                   pm.name as payment_method_name,
-                   pm.type as payment_method_type,
-                   pm.color as payment_method_color,
-                   mr.year,
-                   mr.month,
-                   mr.month_name
-            FROM transactions t
-            LEFT JOIN categories c ON t.category_id = c.id
-            LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id
-            INNER JOIN monthly_records mr ON t.monthly_record_id = mr.id
-            WHERE mr.user_id = %s
-        """
+                SELECT t.*,
+                       c.name   as category_name,
+                       pm.name  as payment_method_name,
+                       pm.type  as payment_method_type,
+                       pm.color as payment_method_color,
+                       mr.year,
+                       mr.month,
+                       mr.month_name
+                FROM transactions t
+                         LEFT JOIN categories c ON t.category_id = c.id
+                         LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id
+                         INNER JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                WHERE mr.user_id = %s \
+                """
 
         params = [user_id]
 
@@ -1320,6 +1477,7 @@ def filter_transactions():
         cursor.close()
         connection.close()
 
+
 @app.route('/api/transactions/<int:transaction_id>', methods=['PUT', 'DELETE'])
 @login_required
 def manage_transaction(transaction_id):
@@ -1327,9 +1485,9 @@ def manage_transaction(transaction_id):
     connection = get_db_connection()
     if not connection:
         return jsonify({'error': 'Database connection failed'}), 500
-    
+
     cursor = connection.cursor()
-    
+
     try:
         if request.method == 'PUT':
             data = request.get_json()
@@ -1343,10 +1501,12 @@ def manage_transaction(transaction_id):
             # Get the current transaction data for audit trail
             dict_cursor = connection.cursor(dictionary=True)
             dict_cursor.execute("""
-                SELECT t.* FROM transactions t
-                WHERE t.id = %s AND t.monthly_record_id IN
-                    (SELECT id FROM monthly_records WHERE user_id = %s)
-            """, (transaction_id, session['user_id']))
+                                SELECT t.*
+                                FROM transactions t
+                                WHERE t.id = %s
+                                  AND t.monthly_record_id IN
+                                      (SELECT id FROM monthly_records WHERE user_id = %s)
+                                """, (transaction_id, session['user_id']))
 
             old_transaction = dict_cursor.fetchone()
             dict_cursor.close()
@@ -1374,19 +1534,23 @@ def manage_transaction(transaction_id):
 
             # Update transaction (balance will be calculated on frontend)
             cursor.execute("""
-                UPDATE transactions
-                SET description = %s, category_id = %s, debit = %s,
-                    credit = %s, transaction_date = %s, notes = %s
-                WHERE id = %s
-            """, (
-                data.get('description'),
-                data.get('category_id'),
-                debit if debit > 0 else None,
-                credit if credit > 0 else None,
-                transaction_date,
-                data.get('notes'),
-                transaction_id
-            ))
+                           UPDATE transactions
+                           SET description      = %s,
+                               category_id      = %s,
+                               debit            = %s,
+                               credit           = %s,
+                               transaction_date = %s,
+                               notes            = %s
+                           WHERE id = %s
+                           """, (
+                               data.get('description'),
+                               data.get('category_id'),
+                               debit if debit > 0 else None,
+                               credit if credit > 0 else None,
+                               transaction_date,
+                               data.get('notes'),
+                               transaction_id
+                           ))
 
             print(f"[DEBUG] Transaction {transaction_id} updated successfully")
 
@@ -1405,51 +1569,53 @@ def manage_transaction(transaction_id):
             # Compare description
             if old_transaction['description'] != data.get('description'):
                 log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'description',
-                                    old_transaction['description'], data.get('description'))
+                                      old_transaction['description'], data.get('description'))
 
             # Compare category_id (normalized)
             if old_category != new_category:
                 log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'category_id',
-                                    old_category, new_category)
+                                      old_category, new_category)
 
             # Compare debit (Decimal comparison)
             old_debit_normalized = old_transaction['debit'] if old_transaction['debit'] else None
             if old_debit_normalized != new_debit:
                 log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'debit',
-                                    old_transaction['debit'], new_debit)
+                                      old_transaction['debit'], new_debit)
 
             # Compare credit (Decimal comparison)
             old_credit_normalized = old_transaction['credit'] if old_transaction['credit'] else None
             if old_credit_normalized != new_credit:
                 log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'credit',
-                                    old_transaction['credit'], new_credit)
+                                      old_transaction['credit'], new_credit)
 
             # Compare transaction_date
             if str(old_transaction['transaction_date']) != str(transaction_date):
                 log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'transaction_date',
-                                    old_transaction['transaction_date'], transaction_date)
+                                      old_transaction['transaction_date'], transaction_date)
 
             # Compare notes (handle None/empty string)
             old_notes = old_transaction['notes'] if old_transaction['notes'] else None
             new_notes = data.get('notes') if data.get('notes') else None
             if old_notes != new_notes:
                 log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'notes',
-                                    old_transaction['notes'], data.get('notes'))
+                                      old_transaction['notes'], data.get('notes'))
 
             connection.commit()
             print(f"[DEBUG] Transaction update committed successfully")
             return jsonify({'message': 'Transaction updated successfully'})
-        
+
         else:  # DELETE
             # Log audit trail before deleting
             user_id = session['user_id']
             log_transaction_audit(cursor, transaction_id, user_id, 'DELETE')
 
             cursor.execute("""
-                DELETE FROM transactions
-                WHERE id = %s AND monthly_record_id IN
-                    (SELECT id FROM monthly_records WHERE user_id = %s)
-            """, (transaction_id, user_id))
+                           DELETE
+                           FROM transactions
+                           WHERE id = %s
+                             AND monthly_record_id IN
+                                 (SELECT id FROM monthly_records WHERE user_id = %s)
+                           """, (transaction_id, user_id))
 
             connection.commit()
             return jsonify({'message': 'Transaction deleted successfully'})
@@ -1466,6 +1632,7 @@ def manage_transaction(transaction_id):
         cursor.close()
         connection.close()
 
+
 @app.route('/api/transactions/<int:transaction_id>/audit-logs', methods=['GET'])
 @login_required
 def get_transaction_audit_logs(transaction_id):
@@ -1480,10 +1647,12 @@ def get_transaction_audit_logs(transaction_id):
 
         # Verify the transaction belongs to the user
         cursor.execute("""
-            SELECT t.id FROM transactions t
-            INNER JOIN monthly_records mr ON t.monthly_record_id = mr.id
-            WHERE t.id = %s AND mr.user_id = %s
-        """, (transaction_id, user_id))
+                       SELECT t.id
+                       FROM transactions t
+                                INNER JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                       WHERE t.id = %s
+                         AND mr.user_id = %s
+                       """, (transaction_id, user_id))
 
         transaction = cursor.fetchone()
         if not transaction:
@@ -1491,19 +1660,18 @@ def get_transaction_audit_logs(transaction_id):
 
         # Fetch audit logs for this transaction
         cursor.execute("""
-            SELECT
-                tal.id,
-                tal.action,
-                tal.field_name,
-                tal.old_value,
-                tal.new_value,
-                tal.created_at,
-                u.username
-            FROM transaction_audit_logs tal
-            INNER JOIN users u ON tal.user_id = u.id
-            WHERE tal.transaction_id = %s
-            ORDER BY tal.created_at DESC
-        """, (transaction_id,))
+                       SELECT tal.id,
+                              tal.action,
+                              tal.field_name,
+                              tal.old_value,
+                              tal.new_value,
+                              tal.created_at,
+                              u.username
+                       FROM transaction_audit_logs tal
+                                INNER JOIN users u ON tal.user_id = u.id
+                       WHERE tal.transaction_id = %s
+                       ORDER BY tal.created_at DESC
+                       """, (transaction_id,))
 
         audit_logs = cursor.fetchall()
         return jsonify(audit_logs)
@@ -1514,6 +1682,7 @@ def get_transaction_audit_logs(transaction_id):
     finally:
         cursor.close()
         connection.close()
+
 
 @app.route('/api/transactions/<int:transaction_id>/move', methods=['POST'])
 @login_required
@@ -1536,11 +1705,12 @@ def move_transaction(transaction_id):
 
         # Verify the transaction belongs to the user
         cursor.execute("""
-            SELECT t.*, mr.year, mr.month
-            FROM transactions t
-            INNER JOIN monthly_records mr ON t.monthly_record_id = mr.id
-            WHERE t.id = %s AND mr.user_id = %s
-        """, (transaction_id, user_id))
+                       SELECT t.*, mr.year, mr.month
+                       FROM transactions t
+                                INNER JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                       WHERE t.id = %s
+                         AND mr.user_id = %s
+                       """, (transaction_id, user_id))
 
         transaction = cursor.fetchone()
         if not transaction:
@@ -1553,30 +1723,32 @@ def move_transaction(transaction_id):
         # Get or create target monthly record
         month_name = calendar.month_name[target_month]
         cursor.execute("""
-            INSERT INTO monthly_records (user_id, year, month, month_name)
-            VALUES (%s, %s, %s, %s)
-            ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP
-        """, (user_id, target_year, target_month, month_name))
+                       INSERT INTO monthly_records (user_id, year, month, month_name)
+                       VALUES (%s, %s, %s, %s) ON DUPLICATE KEY
+                       UPDATE updated_at = CURRENT_TIMESTAMP
+                       """, (user_id, target_year, target_month, month_name))
 
         cursor.execute("""
-            SELECT id FROM monthly_records
-            WHERE user_id = %s AND year = %s AND month = %s
-        """, (user_id, target_year, target_month))
+                       SELECT id
+                       FROM monthly_records
+                       WHERE user_id = %s AND year = %s AND month = %s
+                       """, (user_id, target_year, target_month))
 
         target_record = cursor.fetchone()
 
         # Update transaction's monthly_record_id and date
         new_date = datetime(target_year, target_month, 1).date()
         cursor.execute("""
-            UPDATE transactions
-            SET monthly_record_id = %s, transaction_date = %s
-            WHERE id = %s
-        """, (target_record['id'], new_date, transaction_id))
+                       UPDATE transactions
+                       SET monthly_record_id = %s,
+                           transaction_date  = %s
+                       WHERE id = %s
+                       """, (target_record['id'], new_date, transaction_id))
 
         # Log audit trail
         log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'moved_to_month',
-                            f"{transaction['year']}-{transaction['month']:02d}",
-                            f"{target_year}-{target_month:02d}")
+                              f"{transaction['year']}-{transaction['month']:02d}",
+                              f"{target_year}-{target_month:02d}")
 
         connection.commit()
 
@@ -1593,6 +1765,7 @@ def move_transaction(transaction_id):
     finally:
         cursor.close()
         connection.close()
+
 
 @app.route('/api/transactions/<int:transaction_id>/copy', methods=['POST'])
 @login_required
@@ -1615,11 +1788,12 @@ def copy_transaction(transaction_id):
 
         # Verify the transaction belongs to the user and get its data
         cursor.execute("""
-            SELECT t.*
-            FROM transactions t
-            INNER JOIN monthly_records mr ON t.monthly_record_id = mr.id
-            WHERE t.id = %s AND mr.user_id = %s
-        """, (transaction_id, user_id))
+                       SELECT t.*
+                       FROM transactions t
+                                INNER JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                       WHERE t.id = %s
+                         AND mr.user_id = %s
+                       """, (transaction_id, user_id))
 
         transaction = cursor.fetchone()
         if not transaction:
@@ -1628,24 +1802,25 @@ def copy_transaction(transaction_id):
         # Get or create target monthly record
         month_name = calendar.month_name[target_month]
         cursor.execute("""
-            INSERT INTO monthly_records (user_id, year, month, month_name)
-            VALUES (%s, %s, %s, %s)
-            ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP
-        """, (user_id, target_year, target_month, month_name))
+                       INSERT INTO monthly_records (user_id, year, month, month_name)
+                       VALUES (%s, %s, %s, %s) ON DUPLICATE KEY
+                       UPDATE updated_at = CURRENT_TIMESTAMP
+                       """, (user_id, target_year, target_month, month_name))
 
         cursor.execute("""
-            SELECT id FROM monthly_records
-            WHERE user_id = %s AND year = %s AND month = %s
-        """, (user_id, target_year, target_month))
+                       SELECT id
+                       FROM monthly_records
+                       WHERE user_id = %s AND year = %s AND month = %s
+                       """, (user_id, target_year, target_month))
 
         target_record = cursor.fetchone()
 
         # Push all existing transactions down in the target month
         cursor.execute("""
-            UPDATE transactions
-            SET display_order = display_order + 1
-            WHERE monthly_record_id = %s
-        """, (target_record['id'],))
+                       UPDATE transactions
+                       SET display_order = display_order + 1
+                       WHERE monthly_record_id = %s
+                       """, (target_record['id'],))
 
         # Create a copy of the transaction in the target month at position 1 (top)
         new_date = datetime(target_year, target_month, 1).date()
@@ -1653,28 +1828,28 @@ def copy_transaction(transaction_id):
         credit = Decimal(str(transaction['credit'])) if transaction['credit'] else None
 
         cursor.execute("""
-            INSERT INTO transactions
-            (monthly_record_id, description, category_id, debit, credit,
-             transaction_date, notes, payment_method_id, display_order)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (
-            target_record['id'],
-            transaction['description'],
-            transaction['category_id'],
-            debit,
-            credit,
-            new_date,
-            transaction['notes'],
-            transaction['payment_method_id'],
-            1  # Display at top
-        ))
+                       INSERT INTO transactions
+                       (monthly_record_id, description, category_id, debit, credit,
+                        transaction_date, notes, payment_method_id, display_order)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                       """, (
+                           target_record['id'],
+                           transaction['description'],
+                           transaction['category_id'],
+                           debit,
+                           credit,
+                           new_date,
+                           transaction['notes'],
+                           transaction['payment_method_id'],
+                           1  # Display at top
+                       ))
 
         new_transaction_id = cursor.lastrowid
 
         # Log audit trail for the new transaction
         log_transaction_audit(cursor, new_transaction_id, user_id, 'CREATE')
         log_transaction_audit(cursor, new_transaction_id, user_id, 'UPDATE', 'copied_from_transaction',
-                            None, str(transaction_id))
+                              None, str(transaction_id))
 
         connection.commit()
 
@@ -1692,6 +1867,7 @@ def copy_transaction(transaction_id):
     finally:
         cursor.close()
         connection.close()
+
 
 @app.route('/api/transactions/export', methods=['GET'])
 @login_required
@@ -1712,9 +1888,10 @@ def export_transactions():
 
         # Get monthly record
         cursor.execute("""
-            SELECT id FROM monthly_records
-            WHERE user_id = %s AND year = %s AND month = %s
-        """, (user_id, year, month))
+                       SELECT id
+                       FROM monthly_records
+                       WHERE user_id = %s AND year = %s AND month = %s
+                       """, (user_id, year, month))
 
         monthly_record = cursor.fetchone()
 
@@ -1724,24 +1901,23 @@ def export_transactions():
         else:
             # Fetch transactions (DESC order for downloads - oldest first)
             cursor.execute("""
-                SELECT
-                    t.id,
-                    t.transaction_date,
-                    t.description,
-                    c.name as category,
-                    t.debit,
-                    t.credit,
-                    t.notes,
-                    pm.name as payment_method,
-                    t.is_done,
-                    t.is_paid,
-                    t.paid_at
-                FROM transactions t
-                LEFT JOIN categories c ON t.category_id = c.id
-                LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id
-                WHERE t.monthly_record_id = %s
-                ORDER BY t.display_order DESC, t.id DESC
-            """, (monthly_record['id'],))
+                           SELECT t.id,
+                                  t.transaction_date,
+                                  t.description,
+                                  c.name  as category,
+                                  t.debit,
+                                  t.credit,
+                                  t.notes,
+                                  pm.name as payment_method,
+                                  t.is_done,
+                                  t.is_paid,
+                                  t.paid_at
+                           FROM transactions t
+                                    LEFT JOIN categories c ON t.category_id = c.id
+                                    LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id
+                           WHERE t.monthly_record_id = %s
+                           ORDER BY t.display_order DESC, t.id DESC
+                           """, (monthly_record['id'],))
 
             transactions = cursor.fetchall()
 
@@ -1762,13 +1938,16 @@ def export_transactions():
         cursor.close()
         connection.close()
 
+
 def generate_csv(transactions, year, month):
     """Generate CSV file from transactions."""
     output = io.StringIO()
     writer = csv.writer(output)
 
     # Write header
-    writer.writerow(['Date', 'Description', 'Category', 'Debit', 'Credit', 'Balance', 'Notes', 'Payment Method', 'Done', 'Paid', 'Paid At'])
+    writer.writerow(
+        ['Date', 'Description', 'Category', 'Debit', 'Credit', 'Balance', 'Notes', 'Payment Method', 'Done', 'Paid',
+         'Paid At'])
 
     # Transactions come in DESC order (oldest first in downloads)
     # Calculate running balance sequentially from oldest to newest
@@ -1803,6 +1982,7 @@ def generate_csv(transactions, year, month):
 
     return response
 
+
 def generate_excel(transactions, year, month):
     """Generate Excel file from transactions."""
     if not EXCEL_AVAILABLE:
@@ -1821,7 +2001,8 @@ def generate_excel(transactions, year, month):
     header_alignment = Alignment(horizontal="center", vertical="center")
 
     # Write header row
-    headers = ['Date', 'Description', 'Category', 'Debit', 'Credit', 'Balance', 'Notes', 'Payment Method', 'Done', 'Paid', 'Paid At']
+    headers = ['Date', 'Description', 'Category', 'Debit', 'Credit', 'Balance', 'Notes', 'Payment Method', 'Done',
+               'Paid', 'Paid At']
     ws.append(headers)
 
     # Style header row
@@ -1875,6 +2056,7 @@ def generate_excel(transactions, year, month):
 
     return response
 
+
 def generate_pdf(transactions, year, month):
     """Generate PDF file from transactions."""
     if not PDF_AVAILABLE:
@@ -1915,7 +2097,7 @@ def generate_pdf(transactions, year, month):
         ])
 
     # Create table
-    table = Table(table_data, colWidths=[1.0*inch, 2.5*inch, 1.2*inch, 0.9*inch, 0.9*inch, 1.0*inch])
+    table = Table(table_data, colWidths=[1.0 * inch, 2.5 * inch, 1.2 * inch, 0.9 * inch, 0.9 * inch, 1.0 * inch])
 
     # Style the table
     table.setStyle(TableStyle([
@@ -1953,6 +2135,7 @@ def generate_pdf(transactions, year, month):
 
     return response
 
+
 @app.route('/api/transactions/reorder', methods=['POST'])
 @login_required
 def reorder_transactions():
@@ -1975,10 +2158,10 @@ def reorder_transactions():
 
                 # Get old display_order for audit log
                 cursor.execute("""
-                    SELECT display_order
-                    FROM transactions
-                    WHERE id = %s
-                """, (transaction_id,))
+                               SELECT display_order
+                               FROM transactions
+                               WHERE id = %s
+                               """, (transaction_id,))
 
                 result = cursor.fetchone()
                 if result:
@@ -1987,10 +2170,10 @@ def reorder_transactions():
                     # Only update if order changed
                     if old_order != new_order:
                         cursor.execute("""
-                            UPDATE transactions
-                            SET display_order = %s
-                            WHERE id = %s
-                        """, (new_order, transaction_id))
+                                       UPDATE transactions
+                                       SET display_order = %s
+                                       WHERE id = %s
+                                       """, (new_order, transaction_id))
 
             connection.commit()
             return jsonify({
@@ -2006,6 +2189,7 @@ def reorder_transactions():
             connection.close()
 
     return jsonify({'error': 'Database connection failed'}), 500
+
 
 @app.route('/api/categories')
 @login_required
@@ -2025,6 +2209,7 @@ def get_categories():
             connection.close()
 
     return jsonify({'error': 'Database connection failed'}), 500
+
 
 @app.route('/api/categories', methods=['POST'])
 @login_required
@@ -2080,6 +2265,7 @@ def add_category():
             connection.close()
 
     return jsonify({'error': 'Database connection failed'}), 500
+
 
 @app.route('/api/categories/<int:category_id>', methods=['PUT'])
 @login_required
@@ -2142,6 +2328,7 @@ def update_category(category_id):
 
     return jsonify({'error': 'Database connection failed'}), 500
 
+
 @app.route('/api/categories/<int:category_id>', methods=['DELETE'])
 @login_required
 def delete_category(category_id):
@@ -2184,6 +2371,7 @@ def delete_category(category_id):
 
     return jsonify({'error': 'Database connection failed'}), 500
 
+
 @app.route('/api/recalculate-balances', methods=['POST'])
 @login_required
 def recalculate_balances():
@@ -2192,6 +2380,7 @@ def recalculate_balances():
         'message': 'Balance calculation now happens on frontend',
         'transactions_updated': 0
     })
+
 
 @app.route('/api/reports/monthly-summary')
 @login_required
@@ -2205,19 +2394,19 @@ def monthly_summary_report():
             year = request.args.get('year', datetime.now().year, type=int)
 
             cursor.execute("""
-                SELECT
-                    mr.year,
-                    mr.month,
-                    mr.month_name,
-                    COALESCE(SUM(t.debit), 0) as total_income,
-                    COALESCE(SUM(t.credit), 0) as total_expenses,
-                    COALESCE(SUM(t.debit), 0) - COALESCE(SUM(t.credit), 0) as net_savings
-                FROM monthly_records mr
-                LEFT JOIN transactions t ON mr.id = t.monthly_record_id
-                WHERE mr.user_id = %s AND mr.year = %s
-                GROUP BY mr.year, mr.month, mr.month_name
-                ORDER BY mr.month
-            """, (user_id, year))
+                           SELECT mr.year,
+                                  mr.month,
+                                  mr.month_name,
+                                  COALESCE(SUM(t.debit), 0)                              as total_income,
+                                  COALESCE(SUM(t.credit), 0)                             as total_expenses,
+                                  COALESCE(SUM(t.debit), 0) - COALESCE(SUM(t.credit), 0) as net_savings
+                           FROM monthly_records mr
+                                    LEFT JOIN transactions t ON mr.id = t.monthly_record_id
+                           WHERE mr.user_id = %s
+                             AND mr.year = %s
+                           GROUP BY mr.year, mr.month, mr.month_name
+                           ORDER BY mr.month
+                           """, (user_id, year))
 
             summary = cursor.fetchall()
             return jsonify(summary)
@@ -2229,6 +2418,7 @@ def monthly_summary_report():
             connection.close()
 
     return jsonify({'error': 'Database connection failed'}), 500
+
 
 @app.route('/api/reports/category-breakdown')
 @login_required
@@ -2246,61 +2436,65 @@ def category_breakdown_report():
             if range_type == 'weekly':
                 # Get category spending by week for the specified month
                 cursor.execute("""
-                    SELECT
-                        WEEK(t.transaction_date, 1) as week_num,
-                        DATE_FORMAT(MIN(t.transaction_date), '%%Y-%%m-%%d') as week_start,
-                        DATE_FORMAT(MAX(t.transaction_date), '%%Y-%%m-%%d') as week_end,
-                        c.name as category,
-                        c.type,
-                        COALESCE(SUM(CASE WHEN c.type = 'income' THEN t.debit ELSE 0 END), 0) as income,
-                        COALESCE(SUM(CASE WHEN c.type = 'expense' THEN t.credit ELSE 0 END), 0) as expense
-                    FROM transactions t
-                    INNER JOIN monthly_records mr ON t.monthly_record_id = mr.id
-                    INNER JOIN categories c ON t.category_id = c.id
-                    WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s
-                        AND t.category_id IS NOT NULL
-                    GROUP BY WEEK(t.transaction_date, 1), c.id, c.name, c.type
-                    HAVING income > 0 OR expense > 0
-                    ORDER BY week_num, c.type, expense DESC, income DESC
-                """, (user_id, year, month))
+                               SELECT WEEK(t.transaction_date, 1)                                             as week_num,
+                                      DATE_FORMAT(MIN(t.transaction_date), '%%Y-%%m-%%d')                     as week_start,
+                                      DATE_FORMAT(MAX(t.transaction_date), '%%Y-%%m-%%d')                     as week_end,
+                                      c.name                                                                  as category,
+                                      c.type,
+                                      COALESCE(SUM(CASE WHEN c.type = 'income' THEN t.debit ELSE 0 END), 0)   as income,
+                                      COALESCE(SUM(CASE WHEN c.type = 'expense' THEN t.credit ELSE 0 END), 0) as expense
+                               FROM transactions t
+                                        INNER JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                                        INNER JOIN categories c ON t.category_id = c.id
+                               WHERE mr.user_id = %s
+                                 AND mr.year = %s
+                                 AND mr.month = %s
+                                 AND t.category_id IS NOT NULL
+                               GROUP BY WEEK(t.transaction_date, 1), c.id, c.name, c.type
+                               HAVING income > 0
+                                   OR expense > 0
+                               ORDER BY week_num, c.type, expense DESC, income DESC
+                               """, (user_id, year, month))
             elif range_type == 'yearly':
                 # Get category spending by year (all years)
                 cursor.execute("""
-                    SELECT
-                        mr.year,
-                        c.name as category,
-                        c.type,
-                        COALESCE(SUM(CASE WHEN c.type = 'income' THEN t.debit ELSE 0 END), 0) as income,
-                        COALESCE(SUM(CASE WHEN c.type = 'expense' THEN t.credit ELSE 0 END), 0) as expense
-                    FROM transactions t
-                    INNER JOIN monthly_records mr ON t.monthly_record_id = mr.id
-                    INNER JOIN categories c ON t.category_id = c.id
-                    WHERE mr.user_id = %s
-                        AND t.category_id IS NOT NULL
-                    GROUP BY mr.year, c.id, c.name, c.type
-                    HAVING income > 0 OR expense > 0
-                    ORDER BY mr.year DESC, c.type, expense DESC, income DESC
-                """, (user_id,))
+                               SELECT mr.year,
+                                      c.name                                                                  as category,
+                                      c.type,
+                                      COALESCE(SUM(CASE WHEN c.type = 'income' THEN t.debit ELSE 0 END), 0)   as income,
+                                      COALESCE(SUM(CASE WHEN c.type = 'expense' THEN t.credit ELSE 0 END), 0) as expense
+                               FROM transactions t
+                                        INNER JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                                        INNER JOIN categories c ON t.category_id = c.id
+                               WHERE mr.user_id = %s
+                                 AND t.category_id IS NOT NULL
+                               GROUP BY mr.year, c.id, c.name, c.type
+                               HAVING income > 0
+                                   OR expense > 0
+                               ORDER BY mr.year DESC, c.type, expense DESC, income DESC
+                               """, (user_id,))
             else:  # monthly (default)
                 # Get category spending for the specific selected month
                 cursor.execute("""
-                    SELECT
-                        mr.year,
-                        mr.month,
-                        mr.month_name,
-                        c.name as category,
-                        c.type,
-                        COALESCE(SUM(CASE WHEN c.type = 'income' THEN t.debit ELSE 0 END), 0) as income,
-                        COALESCE(SUM(CASE WHEN c.type = 'expense' THEN t.credit ELSE 0 END), 0) as expense
-                    FROM transactions t
-                    INNER JOIN monthly_records mr ON t.monthly_record_id = mr.id
-                    INNER JOIN categories c ON t.category_id = c.id
-                    WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s
-                        AND t.category_id IS NOT NULL
-                    GROUP BY mr.year, mr.month, mr.month_name, c.id, c.name, c.type
-                    HAVING income > 0 OR expense > 0
-                    ORDER BY c.type, expense DESC, income DESC
-                """, (user_id, year, month))
+                               SELECT mr.year,
+                                      mr.month,
+                                      mr.month_name,
+                                      c.name                                                                  as category,
+                                      c.type,
+                                      COALESCE(SUM(CASE WHEN c.type = 'income' THEN t.debit ELSE 0 END), 0)   as income,
+                                      COALESCE(SUM(CASE WHEN c.type = 'expense' THEN t.credit ELSE 0 END), 0) as expense
+                               FROM transactions t
+                                        INNER JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                                        INNER JOIN categories c ON t.category_id = c.id
+                               WHERE mr.user_id = %s
+                                 AND mr.year = %s
+                                 AND mr.month = %s
+                                 AND t.category_id IS NOT NULL
+                               GROUP BY mr.year, mr.month, mr.month_name, c.id, c.name, c.type
+                               HAVING income > 0
+                                   OR expense > 0
+                               ORDER BY c.type, expense DESC, income DESC
+                               """, (user_id, year, month))
 
             breakdown = cursor.fetchall()
             return jsonify(breakdown)
@@ -2312,6 +2506,7 @@ def category_breakdown_report():
             connection.close()
 
     return jsonify({'error': 'Database connection failed'}), 500
+
 
 @app.route('/api/reports/cash-flow')
 @login_required
@@ -2329,46 +2524,40 @@ def cash_flow_report():
             if range_type == 'weekly':
                 # Get weekly cash flow for the specified month
                 cursor.execute("""
-                    SELECT
-                        WEEK(t.transaction_date) as week_num,
-                        DATE_FORMAT(MIN(t.transaction_date), '%%Y-%%m-%%d') as week_start,
-                        DATE_FORMAT(MAX(t.transaction_date), '%%Y-%%m-%%d') as week_end,
-                        COALESCE(SUM(t.debit), 0) as cash_in,
-                        COALESCE(SUM(t.credit), 0) as cash_out,
-                        COALESCE(SUM(t.debit), 0) - COALESCE(SUM(t.credit), 0) as net_flow
-                    FROM transactions t
-                    JOIN monthly_records mr ON t.monthly_record_id = mr.id
-                    WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s
-                    GROUP BY WEEK(t.transaction_date)
-                    ORDER BY week_num
-                """, (user_id, year, month))
+                               SELECT WEEK(t.transaction_date)                               as week_num,
+                                      DATE_FORMAT(MIN(t.transaction_date), '%%Y-%%m-%%d')    as week_start,
+                                      DATE_FORMAT(MAX(t.transaction_date), '%%Y-%%m-%%d')    as week_end,
+                                      COALESCE(SUM(t.debit), 0)                              as cash_in,
+                                      COALESCE(SUM(t.credit), 0)                             as cash_out,
+                                      COALESCE(SUM(t.debit), 0) - COALESCE(SUM(t.credit), 0) as net_flow
+                               FROM transactions t
+                                        JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                               WHERE mr.user_id = %s
+                                 AND mr.year = %s
+                                 AND mr.month = %s
+                               GROUP BY WEEK(t.transaction_date)
+                               ORDER BY week_num
+                               """, (user_id, year, month))
             elif range_type == 'yearly':
                 # Get yearly cash flow using view
                 cursor.execute("""
-                    SELECT
-                        year,
-                        SUM(cash_in) as cash_in,
-                        SUM(cash_out) as cash_out,
-                        SUM(net_flow) as net_flow
-                    FROM v_cash_flow
-                    WHERE user_id = %s
-                    GROUP BY year
-                    ORDER BY year
-                """, (user_id,))
+                               SELECT
+                                   year, SUM (cash_in) as cash_in, SUM (cash_out) as cash_out, SUM (net_flow) as net_flow
+                               FROM v_cash_flow
+                               WHERE user_id = %s
+                               GROUP BY year
+                               ORDER BY year
+                               """, (user_id,))
             else:  # monthly (default)
                 # Get monthly cash flow using view
                 cursor.execute("""
-                    SELECT
-                        year,
-                        month,
-                        month_name,
-                        cash_in,
-                        cash_out,
-                        net_flow
-                    FROM v_cash_flow
-                    WHERE user_id = %s AND year = %s
-                    ORDER BY month
-                """, (user_id, year))
+                               SELECT
+                                   year, month, month_name, cash_in, cash_out, net_flow
+                               FROM v_cash_flow
+                               WHERE user_id = %s
+                                 AND year = %s
+                               ORDER BY month
+                               """, (user_id, year))
 
             cash_flow = cursor.fetchall()
             return jsonify(cash_flow)
@@ -2380,6 +2569,7 @@ def cash_flow_report():
             connection.close()
 
     return jsonify({'error': 'Database connection failed'}), 500
+
 
 @app.route('/api/reports/top-spending')
 @login_required
@@ -2398,46 +2588,43 @@ def top_spending_report():
             if range_type == 'weekly':
                 # Get top spending for the specified month using view
                 cursor.execute("""
-                    SELECT
-                        category,
-                        type,
-                        total_spent,
-                        transaction_count,
-                        avg_amount
-                    FROM v_top_spending
-                    WHERE user_id = %s AND year = %s AND month = %s
-                    ORDER BY total_spent DESC
-                    LIMIT %s
-                """, (user_id, year, month, limit))
+                               SELECT category,
+                                      type,
+                                      total_spent,
+                                      transaction_count,
+                                      avg_amount
+                               FROM v_top_spending
+                               WHERE user_id = %s AND year = %s AND month = %s
+                               ORDER BY total_spent DESC
+                                   LIMIT %s
+                               """, (user_id, year, month, limit))
             elif range_type == 'yearly':
                 # Get top spending for the specified year using view
                 cursor.execute("""
-                    SELECT
-                        category,
-                        type,
-                        SUM(total_spent) as total_spent,
-                        SUM(transaction_count) as transaction_count,
-                        AVG(avg_amount) as avg_amount
-                    FROM v_top_spending
-                    WHERE user_id = %s AND year = %s
-                    GROUP BY category_id, category, type
-                    ORDER BY total_spent DESC
-                    LIMIT %s
-                """, (user_id, year, limit))
+                               SELECT category,
+                                      type,
+                                      SUM(total_spent)       as total_spent,
+                                      SUM(transaction_count) as transaction_count,
+                                      AVG(avg_amount)        as avg_amount
+                               FROM v_top_spending
+                               WHERE user_id = %s AND year = %s
+                               GROUP BY category_id, category, type
+                               ORDER BY total_spent DESC
+                                   LIMIT %s
+                               """, (user_id, year, limit))
             else:  # monthly
                 # Get top spending for the specified month using view
                 cursor.execute("""
-                    SELECT
-                        category,
-                        type,
-                        total_spent,
-                        transaction_count,
-                        avg_amount
-                    FROM v_top_spending
-                    WHERE user_id = %s AND year = %s AND month = %s
-                    ORDER BY total_spent DESC
-                    LIMIT %s
-                """, (user_id, year, month, limit))
+                               SELECT category,
+                                      type,
+                                      total_spent,
+                                      transaction_count,
+                                      avg_amount
+                               FROM v_top_spending
+                               WHERE user_id = %s AND year = %s AND month = %s
+                               ORDER BY total_spent DESC
+                                   LIMIT %s
+                               """, (user_id, year, month, limit))
 
             top_spending = cursor.fetchall()
             return jsonify(top_spending)
@@ -2449,6 +2636,7 @@ def top_spending_report():
             connection.close()
 
     return jsonify({'error': 'Database connection failed'}), 500
+
 
 @app.route('/api/reports/forecast')
 @login_required
@@ -2463,34 +2651,28 @@ def forecast_report():
 
             # Get historical data for the last N months using view
             cursor.execute("""
-                SELECT
-                    year,
-                    month,
-                    month_name,
-                    cash_in as total_income,
-                    cash_out as total_expenses,
-                    net_flow as net_savings
-                FROM v_cash_flow
-                WHERE user_id = %s
-                ORDER BY year DESC, month DESC
-                LIMIT %s
-            """, (user_id, months_to_analyze))
+                           SELECT
+                               year, month, month_name, cash_in as total_income, cash_out as total_expenses, net_flow as net_savings
+                           FROM v_cash_flow
+                           WHERE user_id = %s
+                           ORDER BY year DESC, month DESC
+                               LIMIT %s
+                           """, (user_id, months_to_analyze))
 
             historical_data = cursor.fetchall()
 
             # Get category-wise spending patterns using view
             cursor.execute("""
-                SELECT
-                    category,
-                    AVG(total_spent) as avg_monthly_spending,
-                    MIN(total_spent) as min_spending,
-                    MAX(total_spent) as max_spending,
-                    STDDEV(total_spent) as std_deviation
-                FROM v_top_spending
-                WHERE user_id = %s
-                GROUP BY category_id, category
-                ORDER BY avg_monthly_spending DESC
-            """, (user_id,))
+                           SELECT category,
+                                  AVG(total_spent)    as avg_monthly_spending,
+                                  MIN(total_spent)    as min_spending,
+                                  MAX(total_spent)    as max_spending,
+                                  STDDEV(total_spent) as std_deviation
+                           FROM v_top_spending
+                           WHERE user_id = %s
+                           GROUP BY category_id, category
+                           ORDER BY avg_monthly_spending DESC
+                           """, (user_id,))
 
             category_forecast = cursor.fetchall()
 
@@ -2502,9 +2684,12 @@ def forecast_report():
 
                 # Calculate trend (simple linear)
                 if len(historical_data) >= 2:
-                    recent_avg_expenses = sum(float(row['total_expenses']) for row in historical_data[:3]) / min(3, len(historical_data))
-                    older_avg_expenses = sum(float(row['total_expenses']) for row in historical_data[-3:]) / min(3, len(historical_data))
-                    trend = ((recent_avg_expenses - older_avg_expenses) / older_avg_expenses * 100) if older_avg_expenses > 0 else 0
+                    recent_avg_expenses = sum(float(row['total_expenses']) for row in historical_data[:3]) / min(3,
+                                                                                                                 len(historical_data))
+                    older_avg_expenses = sum(float(row['total_expenses']) for row in historical_data[-3:]) / min(3,
+                                                                                                                 len(historical_data))
+                    trend = ((
+                                         recent_avg_expenses - older_avg_expenses) / older_avg_expenses * 100) if older_avg_expenses > 0 else 0
                 else:
                     trend = 0
 
@@ -2552,6 +2737,7 @@ def forecast_report():
 
     return jsonify({'error': 'Database connection failed'}), 500
 
+
 @app.route('/api/payment-methods', methods=['GET', 'POST'])
 @login_required
 def payment_methods():
@@ -2566,10 +2752,12 @@ def payment_methods():
     try:
         if request.method == 'GET':
             cursor.execute("""
-                SELECT * FROM payment_methods
-                WHERE user_id = %s AND is_active = TRUE
-                ORDER BY type, name
-            """, (user_id,))
+                           SELECT *
+                           FROM payment_methods
+                           WHERE user_id = %s
+                             AND is_active = TRUE
+                           ORDER BY type, name
+                           """, (user_id,))
 
             methods = cursor.fetchall()
             return jsonify(methods)
@@ -2577,14 +2765,14 @@ def payment_methods():
         else:  # POST
             data = request.get_json()
             cursor.execute("""
-                INSERT INTO payment_methods (user_id, name, type, color)
-                VALUES (%s, %s, %s, %s)
-            """, (
-                user_id,
-                data.get('name'),
-                data.get('type', 'credit_card'),
-                data.get('color', '#007bff')
-            ))
+                           INSERT INTO payment_methods (user_id, name, type, color)
+                           VALUES (%s, %s, %s, %s)
+                           """, (
+                               user_id,
+                               data.get('name'),
+                               data.get('type', 'credit_card'),
+                               data.get('color', '#007bff')
+                           ))
 
             connection.commit()
             return jsonify({'message': 'Payment method added successfully', 'id': cursor.lastrowid}), 201
@@ -2594,6 +2782,7 @@ def payment_methods():
     finally:
         cursor.close()
         connection.close()
+
 
 @app.route('/api/payment-methods/<int:method_id>', methods=['DELETE'])
 @login_required
@@ -2607,10 +2796,11 @@ def delete_payment_method(method_id):
 
     try:
         cursor.execute("""
-            UPDATE payment_methods
-            SET is_active = FALSE
-            WHERE id = %s AND user_id = %s
-        """, (method_id, session['user_id']))
+                       UPDATE payment_methods
+                       SET is_active = FALSE
+                       WHERE id = %s
+                         AND user_id = %s
+                       """, (method_id, session['user_id']))
 
         connection.commit()
         return jsonify({'message': 'Payment method deleted successfully'})
@@ -2620,6 +2810,7 @@ def delete_payment_method(method_id):
     finally:
         cursor.close()
         connection.close()
+
 
 @app.route('/api/transactions/<int:transaction_id>/mark-done', methods=['POST'])
 @login_required
@@ -2639,16 +2830,17 @@ def mark_transaction_done(transaction_id):
         accuracy = data.get('accuracy')
 
         cursor.execute("""
-            UPDATE transactions
-            SET is_done = TRUE,
-                payment_method_id = %s,
-                marked_done_at = CURRENT_TIMESTAMP,
-                done_latitude = %s,
-                done_longitude = %s,
-                done_location_accuracy = %s
-            WHERE id = %s AND monthly_record_id IN
-                (SELECT id FROM monthly_records WHERE user_id = %s)
-        """, (payment_method_id, latitude, longitude, accuracy, transaction_id, session['user_id']))
+                       UPDATE transactions
+                       SET is_done                = TRUE,
+                           payment_method_id      = %s,
+                           marked_done_at         = CURRENT_TIMESTAMP,
+                           done_latitude          = %s,
+                           done_longitude         = %s,
+                           done_location_accuracy = %s
+                       WHERE id = %s
+                         AND monthly_record_id IN
+                             (SELECT id FROM monthly_records WHERE user_id = %s)
+                       """, (payment_method_id, latitude, longitude, accuracy, transaction_id, session['user_id']))
 
         connection.commit()
         return jsonify({'message': 'Transaction marked as done'})
@@ -2658,6 +2850,7 @@ def mark_transaction_done(transaction_id):
     finally:
         cursor.close()
         connection.close()
+
 
 @app.route('/api/transactions/<int:transaction_id>/mark-undone', methods=['POST'])
 @login_required
@@ -2671,13 +2864,14 @@ def mark_transaction_undone(transaction_id):
 
     try:
         cursor.execute("""
-            UPDATE transactions
-            SET is_done = FALSE,
-                payment_method_id = NULL,
-                marked_done_at = NULL
-            WHERE id = %s AND monthly_record_id IN
-                (SELECT id FROM monthly_records WHERE user_id = %s)
-        """, (transaction_id, session['user_id']))
+                       UPDATE transactions
+                       SET is_done           = FALSE,
+                           payment_method_id = NULL,
+                           marked_done_at    = NULL
+                       WHERE id = %s
+                         AND monthly_record_id IN
+                             (SELECT id FROM monthly_records WHERE user_id = %s)
+                       """, (transaction_id, session['user_id']))
 
         connection.commit()
         return jsonify({'message': 'Transaction marked as not done'})
@@ -2687,6 +2881,7 @@ def mark_transaction_undone(transaction_id):
     finally:
         cursor.close()
         connection.close()
+
 
 @app.route('/api/transactions/<int:transaction_id>/mark-paid', methods=['POST'])
 @login_required
@@ -2706,18 +2901,19 @@ def mark_transaction_paid(transaction_id):
         accuracy = data.get('accuracy')
 
         cursor.execute("""
-            UPDATE transactions
-            SET is_done = TRUE,
-                is_paid = TRUE,
-                payment_method_id = %s,
-                marked_done_at = CURRENT_TIMESTAMP,
-                paid_at = CURRENT_TIMESTAMP,
-                paid_latitude = %s,
-                paid_longitude = %s,
-                paid_location_accuracy = %s
-            WHERE id = %s AND monthly_record_id IN
-                (SELECT id FROM monthly_records WHERE user_id = %s)
-        """, (payment_method_id, latitude, longitude, accuracy, transaction_id, session['user_id']))
+                       UPDATE transactions
+                       SET is_done                = TRUE,
+                           is_paid                = TRUE,
+                           payment_method_id      = %s,
+                           marked_done_at         = CURRENT_TIMESTAMP,
+                           paid_at                = CURRENT_TIMESTAMP,
+                           paid_latitude          = %s,
+                           paid_longitude         = %s,
+                           paid_location_accuracy = %s
+                       WHERE id = %s
+                         AND monthly_record_id IN
+                             (SELECT id FROM monthly_records WHERE user_id = %s)
+                       """, (payment_method_id, latitude, longitude, accuracy, transaction_id, session['user_id']))
 
         connection.commit()
         return jsonify({'message': 'Transaction marked as paid'})
@@ -2727,6 +2923,7 @@ def mark_transaction_paid(transaction_id):
     finally:
         cursor.close()
         connection.close()
+
 
 @app.route('/api/transactions/<int:transaction_id>/mark-unpaid', methods=['POST'])
 @login_required
@@ -2740,15 +2937,16 @@ def mark_transaction_unpaid(transaction_id):
 
     try:
         cursor.execute("""
-            UPDATE transactions
-            SET is_done = FALSE,
-                is_paid = FALSE,
-                payment_method_id = NULL,
-                marked_done_at = NULL,
-                paid_at = NULL
-            WHERE id = %s AND monthly_record_id IN
-                (SELECT id FROM monthly_records WHERE user_id = %s)
-        """, (transaction_id, session['user_id']))
+                       UPDATE transactions
+                       SET is_done           = FALSE,
+                           is_paid           = FALSE,
+                           payment_method_id = NULL,
+                           marked_done_at    = NULL,
+                           paid_at           = NULL
+                       WHERE id = %s
+                         AND monthly_record_id IN
+                             (SELECT id FROM monthly_records WHERE user_id = %s)
+                       """, (transaction_id, session['user_id']))
 
         connection.commit()
         return jsonify({'message': 'Transaction marked as unpaid'})
@@ -2758,6 +2956,7 @@ def mark_transaction_unpaid(transaction_id):
     finally:
         cursor.close()
         connection.close()
+
 
 @app.route('/api/payment-method-totals', methods=['GET'])
 @login_required
@@ -2776,9 +2975,10 @@ def get_payment_method_totals():
 
         # Get monthly record
         cursor.execute("""
-            SELECT id FROM monthly_records
-            WHERE user_id = %s AND year = %s AND month = %s
-        """, (user_id, year, month))
+                       SELECT id
+                       FROM monthly_records
+                       WHERE user_id = %s AND year = %s AND month = %s
+                       """, (user_id, year, month))
 
         monthly_record = cursor.fetchone()
 
@@ -2787,23 +2987,23 @@ def get_payment_method_totals():
 
         # Get totals by payment method
         cursor.execute("""
-            SELECT
-                pm.id,
-                pm.name,
-                pm.type,
-                pm.color,
-                COUNT(t.id) as transaction_count,
-                SUM(t.debit) as total_debit,
-                SUM(t.credit) as total_credit,
-                SUM(COALESCE(t.debit, 0) - COALESCE(t.credit, 0)) as net_amount
-            FROM payment_methods pm
-            LEFT JOIN transactions t ON pm.id = t.payment_method_id
-                AND t.monthly_record_id = %s
-                AND t.is_done = TRUE
-            WHERE pm.user_id = %s AND pm.is_active = TRUE
-            GROUP BY pm.id, pm.name, pm.type, pm.color
-            ORDER BY pm.type, pm.name
-        """, (monthly_record['id'], user_id))
+                       SELECT pm.id,
+                              pm.name,
+                              pm.type,
+                              pm.color,
+                              COUNT(t.id)                                       as transaction_count,
+                              SUM(t.debit)                                      as total_debit,
+                              SUM(t.credit)                                     as total_credit,
+                              SUM(COALESCE(t.debit, 0) - COALESCE(t.credit, 0)) as net_amount
+                       FROM payment_methods pm
+                                LEFT JOIN transactions t ON pm.id = t.payment_method_id
+                           AND t.monthly_record_id = %s
+                           AND t.is_done = TRUE
+                       WHERE pm.user_id = %s
+                         AND pm.is_active = TRUE
+                       GROUP BY pm.id, pm.name, pm.type, pm.color
+                       ORDER BY pm.type, pm.name
+                       """, (monthly_record['id'], user_id))
 
         totals = cursor.fetchall()
         return jsonify(totals)
@@ -2813,6 +3013,7 @@ def get_payment_method_totals():
     finally:
         cursor.close()
         connection.close()
+
 
 @app.route('/api/clone-month-transactions', methods=['POST'])
 @login_required
@@ -2842,9 +3043,10 @@ def clone_month_transactions():
 
         # Get source monthly record
         cursor.execute("""
-            SELECT id FROM monthly_records
-            WHERE user_id = %s AND year = %s AND month = %s
-        """, (user_id, from_year, from_month))
+                       SELECT id
+                       FROM monthly_records
+                       WHERE user_id = %s AND year = %s AND month = %s
+                       """, (user_id, from_year, from_month))
 
         source_record = cursor.fetchone()
 
@@ -2854,26 +3056,34 @@ def clone_month_transactions():
         # Get or create target monthly record
         month_name = calendar.month_name[to_month]
         cursor.execute("""
-            INSERT INTO monthly_records (user_id, year, month, month_name)
-            VALUES (%s, %s, %s, %s)
-            ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP
-        """, (user_id, to_year, to_month, month_name))
+                       INSERT INTO monthly_records (user_id, year, month, month_name)
+                       VALUES (%s, %s, %s, %s) ON DUPLICATE KEY
+                       UPDATE updated_at = CURRENT_TIMESTAMP
+                       """, (user_id, to_year, to_month, month_name))
 
         cursor.execute("""
-            SELECT id FROM monthly_records
-            WHERE user_id = %s AND year = %s AND month = %s
-        """, (user_id, to_year, to_month))
+                       SELECT id
+                       FROM monthly_records
+                       WHERE user_id = %s AND year = %s AND month = %s
+                       """, (user_id, to_year, to_month))
 
         target_record = cursor.fetchone()
 
         # Get all transactions from source month (preserve order)
         cursor.execute("""
-            SELECT description, category_id, debit, credit, notes,
-                   payment_method_id, is_done, is_paid, display_order
-            FROM transactions
-            WHERE monthly_record_id = %s
-            ORDER BY display_order ASC, id ASC
-        """, (source_record['id'],))
+                       SELECT description,
+                              category_id,
+                              debit,
+                              credit,
+                              notes,
+                              payment_method_id,
+                              is_done,
+                              is_paid,
+                              display_order
+                       FROM transactions
+                       WHERE monthly_record_id = %s
+                       ORDER BY display_order ASC, id ASC
+                       """, (source_record['id'],))
 
         source_transactions = cursor.fetchall()
 
@@ -2893,23 +3103,23 @@ def clone_month_transactions():
             is_paid = trans['is_paid'] if include_payments else False
 
             cursor.execute("""
-                INSERT INTO transactions
-                (monthly_record_id, description, category_id, debit, credit,
-                 transaction_date, notes, payment_method_id, is_done, is_paid, display_order)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, (
-                target_record['id'],
-                trans['description'],
-                trans['category_id'],
-                debit if debit > 0 else None,
-                credit if credit > 0 else None,
-                datetime.now().date(),  # Use current date for cloned transactions
-                trans['notes'],
-                payment_method_id,
-                is_done,
-                is_paid,
-                trans['display_order']  # Preserve order from source
-            ))
+                           INSERT INTO transactions
+                           (monthly_record_id, description, category_id, debit, credit,
+                            transaction_date, notes, payment_method_id, is_done, is_paid, display_order)
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                           """, (
+                               target_record['id'],
+                               trans['description'],
+                               trans['category_id'],
+                               debit if debit > 0 else None,
+                               credit if credit > 0 else None,
+                               datetime.now().date(),  # Use current date for cloned transactions
+                               trans['notes'],
+                               payment_method_id,
+                               is_done,
+                               is_paid,
+                               trans['display_order']  # Preserve order from source
+                           ))
 
             cloned_count += 1
 
@@ -2927,6 +3137,7 @@ def clone_month_transactions():
     finally:
         cursor.close()
         connection.close()
+
 
 # ==================================================
 # TAX CALCULATOR API ENDPOINTS
@@ -2964,23 +3175,24 @@ def save_tax_calculation():
         # If marking as active, deactivate other calculations for this year
         if is_active:
             cursor.execute("""
-                UPDATE tax_calculations
-                SET is_active = FALSE
-                WHERE user_id = %s AND assessment_year = %s
-            """, (user_id, assessment_year))
+                           UPDATE tax_calculations
+                           SET is_active = FALSE
+                           WHERE user_id = %s
+                             AND assessment_year = %s
+                           """, (user_id, assessment_year))
             logger.info(f"Deactivated other calculations for year {assessment_year}")
 
         # Insert income data only (tax calculations computed on load)
         cursor.execute("""
-            INSERT INTO tax_calculations
-            (user_id, calculation_name, assessment_year,
-             tax_rate, tax_free_threshold, start_month, monthly_data, is_active)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        """, (
-            user_id, calculation_name, assessment_year,
-            tax_rate, tax_free_threshold, start_month,
-            json.dumps(monthly_data), is_active
-        ))
+                       INSERT INTO tax_calculations
+                       (user_id, calculation_name, assessment_year,
+                        tax_rate, tax_free_threshold, start_month, monthly_data, is_active)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                       """, (
+                           user_id, calculation_name, assessment_year,
+                           tax_rate, tax_free_threshold, start_month,
+                           json.dumps(monthly_data), is_active
+                       ))
 
         tax_calculation_id = cursor.lastrowid
         connection.commit()
@@ -3020,22 +3232,35 @@ def get_tax_calculations():
         # Build query based on whether year filter is provided
         if year:
             cursor.execute("""
-                SELECT id, calculation_name, assessment_year,
-                       tax_rate, tax_free_threshold, start_month,
-                       is_active, created_at, updated_at
-                FROM tax_calculations
-                WHERE user_id = %s AND assessment_year = %s
-                ORDER BY is_active DESC, created_at DESC
-            """, (user_id, year))
+                           SELECT id,
+                                  calculation_name,
+                                  assessment_year,
+                                  tax_rate,
+                                  tax_free_threshold,
+                                  start_month,
+                                  is_active,
+                                  created_at,
+                                  updated_at
+                           FROM tax_calculations
+                           WHERE user_id = %s
+                             AND assessment_year = %s
+                           ORDER BY is_active DESC, created_at DESC
+                           """, (user_id, year))
         else:
             cursor.execute("""
-                SELECT id, calculation_name, assessment_year,
-                       tax_rate, tax_free_threshold, start_month,
-                       is_active, created_at, updated_at
-                FROM tax_calculations
-                WHERE user_id = %s
-                ORDER BY assessment_year DESC, is_active DESC, created_at DESC
-            """, (user_id,))
+                           SELECT id,
+                                  calculation_name,
+                                  assessment_year,
+                                  tax_rate,
+                                  tax_free_threshold,
+                                  start_month,
+                                  is_active,
+                                  created_at,
+                                  updated_at
+                           FROM tax_calculations
+                           WHERE user_id = %s
+                           ORDER BY assessment_year DESC, is_active DESC, created_at DESC
+                           """, (user_id,))
 
         calculations = cursor.fetchall()
 
@@ -3073,12 +3298,20 @@ def get_tax_calculation(calculation_id):
 
         # Get main calculation with all income data
         cursor.execute("""
-            SELECT id, calculation_name, assessment_year,
-                   tax_rate, tax_free_threshold, start_month, monthly_data,
-                   is_active, created_at, updated_at
-            FROM tax_calculations
-            WHERE id = %s AND user_id = %s
-        """, (calculation_id, user_id))
+                       SELECT id,
+                              calculation_name,
+                              assessment_year,
+                              tax_rate,
+                              tax_free_threshold,
+                              start_month,
+                              monthly_data,
+                              is_active,
+                              created_at,
+                              updated_at
+                       FROM tax_calculations
+                       WHERE id = %s
+                         AND user_id = %s
+                       """, (calculation_id, user_id))
 
         calculation = cursor.fetchone()
 
@@ -3097,7 +3330,8 @@ def get_tax_calculation(calculation_id):
                 calculation['monthly_data'] = json.loads(calculation['monthly_data'])
             # else it's already parsed by MySQL JSON type
 
-        logger.info(f"Loaded calculation ID={calculation['id']}, has {len(calculation.get('monthly_data', []))} monthly entries")
+        logger.info(
+            f"Loaded calculation ID={calculation['id']}, has {len(calculation.get('monthly_data', []))} monthly entries")
         return jsonify(calculation), 200
 
     except Error as e:
@@ -3124,18 +3358,22 @@ def delete_tax_calculation(calculation_id):
 
         # Verify ownership before deleting
         cursor.execute("""
-            SELECT id FROM tax_calculations
-            WHERE id = %s AND user_id = %s
-        """, (calculation_id, user_id))
+                       SELECT id
+                       FROM tax_calculations
+                       WHERE id = %s
+                         AND user_id = %s
+                       """, (calculation_id, user_id))
 
         if not cursor.fetchone():
             return jsonify({'error': 'Tax calculation not found'}), 404
 
         # Delete the calculation
         cursor.execute("""
-            DELETE FROM tax_calculations
-            WHERE id = %s AND user_id = %s
-        """, (calculation_id, user_id))
+                       DELETE
+                       FROM tax_calculations
+                       WHERE id = %s
+                         AND user_id = %s
+                       """, (calculation_id, user_id))
 
         connection.commit()
         logger.info(f"Tax calculation ID={calculation_id} deleted successfully")
@@ -3168,9 +3406,11 @@ def set_active_tax_calculation(calculation_id):
 
         # Verify ownership and get assessment year
         cursor.execute("""
-            SELECT assessment_year FROM tax_calculations
-            WHERE id = %s AND user_id = %s
-        """, (calculation_id, user_id))
+                       SELECT assessment_year
+                       FROM tax_calculations
+                       WHERE id = %s
+                         AND user_id = %s
+                       """, (calculation_id, user_id))
 
         calculation = cursor.fetchone()
 
@@ -3181,17 +3421,20 @@ def set_active_tax_calculation(calculation_id):
 
         # Deactivate all calculations for this year
         cursor.execute("""
-            UPDATE tax_calculations
-            SET is_active = FALSE
-            WHERE user_id = %s AND assessment_year = %s
-        """, (user_id, assessment_year))
+                       UPDATE tax_calculations
+                       SET is_active = FALSE
+                       WHERE user_id = %s
+                         AND assessment_year = %s
+                       """, (user_id, assessment_year))
 
         # Activate the specified calculation
         cursor.execute("""
-            UPDATE tax_calculations
-            SET is_active = TRUE, updated_at = CURRENT_TIMESTAMP
-            WHERE id = %s AND user_id = %s
-        """, (calculation_id, user_id))
+                       UPDATE tax_calculations
+                       SET is_active  = TRUE,
+                           updated_at = CURRENT_TIMESTAMP
+                       WHERE id = %s
+                         AND user_id = %s
+                       """, (calculation_id, user_id))
 
         connection.commit()
         logger.info(f"Tax calculation ID={calculation_id} set as active for year {assessment_year}")
@@ -3212,6 +3455,7 @@ def set_active_tax_calculation(calculation_id):
             cursor.close()
         if connection:
             connection.close()
+
 
 @app.route('/api/exchange-rate', methods=['GET'])
 @login_required
@@ -3259,6 +3503,7 @@ def get_exchange_rate_api():
     except Exception as e:
         logger.error(f"Error fetching exchange rate: {str(e)}")
         return jsonify({'error': 'Failed to fetch exchange rate', 'details': str(e)}), 500
+
 
 @app.route('/api/exchange-rate/month', methods=['GET'])
 @login_required
@@ -3309,6 +3554,7 @@ def get_month_exchange_rates():
         logger.error(f"Error fetching monthly exchange rates: {str(e)}")
         return jsonify({'error': 'Failed to fetch exchange rates', 'details': str(e)}), 500
 
+
 @app.route('/api/exchange-rate/import-csv', methods=['POST'])
 @login_required
 def import_exchange_rates_csv():
@@ -3347,10 +3593,10 @@ def import_exchange_rates_csv():
             try:
                 date_obj = datetime.strptime(date_str, '%Y-%m-%d')
                 if service.save_exchange_rate(
-                    date_obj,
-                    rate_data['buy_rate'],
-                    rate_data['sell_rate'],
-                    source='CSV'
+                        date_obj,
+                        rate_data['buy_rate'],
+                        rate_data['sell_rate'],
+                        source='CSV'
                 ):
                     success_count += 1
                 else:
@@ -3371,6 +3617,7 @@ def import_exchange_rates_csv():
     except Exception as e:
         logger.error(f"Error importing CSV exchange rates: {str(e)}")
         return jsonify({'error': 'Failed to import exchange rates', 'details': str(e)}), 500
+
 
 @app.route('/api/exchange-rate/bulk-cache', methods=['POST'])
 @login_required
@@ -3437,9 +3684,11 @@ def bulk_cache_exchange_rates():
         )
         cursor = connection.cursor()
         cursor.execute("""
-            SELECT date FROM exchange_rates
-            WHERE date BETWEEN %s AND %s
-        """, (start_date, end_date))
+                       SELECT date
+                       FROM exchange_rates
+                       WHERE date BETWEEN %s
+                         AND %s
+                       """, (start_date, end_date))
 
         existing_dates = {row[0] for row in cursor.fetchall()}
         cursor.close()
@@ -3489,6 +3738,284 @@ def bulk_cache_exchange_rates():
         logger.error(f"Error in bulk cache exchange rates: {str(e)}")
         return jsonify({'error': 'Failed to cache exchange rates', 'details': str(e)}), 500
 
+
+@app.route('/api/exchange-rate/hnb/current', methods=['GET'])
+@login_required
+def get_hnb_current_rate():
+    """
+    Fetch current USD to LKR exchange rate from HNB bank.
+
+    This will:
+    1. Fetch the latest rate from HNB API
+    2. Store it in the database
+    3. Return the rate data
+
+    Returns:
+        JSON with buy_rate, sell_rate, date, and source
+    """
+    try:
+        from services.hnb_exchange_rate_service import get_hnb_exchange_rate_service
+
+        service = get_hnb_exchange_rate_service()
+        rate_data = service.fetch_and_store_current_rate()
+
+        if rate_data:
+            logger.info(f"HNB current rate fetched and stored: {rate_data}")
+            return jsonify(rate_data), 200
+        else:
+            return jsonify({'error': 'Failed to fetch current rate from HNB'}), 500
+
+    except Exception as e:
+        logger.error(f"Error fetching HNB current rate: {str(e)}")
+        return jsonify({'error': 'Failed to fetch exchange rate', 'details': str(e)}), 500
+
+
+@app.route('/api/exchange-rate/hnb/refresh', methods=['POST'])
+@login_required
+def refresh_hnb_rate():
+    """
+    Manually refresh today's exchange rate from HNB.
+
+    This forces a fresh fetch from the HNB API and updates the database.
+
+    Returns:
+        JSON with updated rate data
+    """
+    try:
+        from services.hnb_exchange_rate_service import get_hnb_exchange_rate_service
+
+        service = get_hnb_exchange_rate_service()
+        rate_data = service.fetch_and_store_current_rate()
+
+        if rate_data:
+            logger.info(f"HNB rate refreshed: {rate_data}")
+            return jsonify({
+                'message': 'Exchange rate refreshed successfully',
+                'rate': rate_data
+            }), 200
+        else:
+            return jsonify({'error': 'Failed to refresh rate from HNB'}), 500
+
+    except Exception as e:
+        logger.error(f"Error refreshing HNB rate: {str(e)}")
+        return jsonify({'error': 'Failed to refresh exchange rate', 'details': str(e)}), 500
+
+
+def token_required(f):
+    """
+    Decorator to require token authentication for routes.
+    Extracts token from Authorization header: Bearer <token>
+
+    IMPORTANT: This must be defined BEFORE any endpoints that use it.
+    """
+
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        import jwt
+
+        token = None
+
+        # Get token from Authorization header
+        if 'Authorization' in request.headers:
+            auth_header = request.headers['Authorization']
+            try:
+                # Expected format: "Bearer <token>"
+                token = auth_header.split(' ')[1]
+            except IndexError:
+                return jsonify({'error': 'Invalid authorization header format. Use: Bearer <token>'}), 401
+
+        if not token:
+            return jsonify({'error': 'Token is missing. Please provide token in Authorization header.'}), 401
+
+        try:
+            # Decode token
+            payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+
+            # Store user info in request context
+            request.current_user = {
+                'user_id': payload['user_id'],
+                'username': payload['username'],
+                'is_admin': payload.get('is_admin', False)
+            }
+
+        except jwt.ExpiredSignatureError:
+            return jsonify({'error': 'Token has expired. Please generate a new token.'}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({'error': 'Invalid token. Please provide a valid token.'}), 401
+        except Exception as e:
+            logger.error(f"Error validating token: {str(e)}")
+            return jsonify({'error': 'Token validation failed'}), 401
+
+        return f(*args, **kwargs)
+
+    return decorated_function
+
+
+# ==================================================
+# TOKEN GENERATION ENDPOINT (ADD THIS SECOND)
+# ==================================================
+
+@app.route('/api/auth/token', methods=['POST'])
+def generate_token():
+    """
+    Generate authentication token using username and password.
+
+    Request Body (JSON):
+        {
+            "username": "user@example.com",
+            "password": "password123"
+        }
+
+    Returns:
+        JSON with token and expiry or error message
+    """
+    try:
+        import jwt
+        from datetime import datetime, timedelta
+
+        data = request.get_json()
+
+        if not data:
+            return jsonify({'error': 'Request body is required'}), 400
+
+        username = data.get('username')
+        password = data.get('password')
+
+        if not username or not password:
+            return jsonify({'error': 'Username and password are required'}), 400
+
+        logger.info(f"Token generation attempt for username: {username}")
+
+        connection = get_db_connection()
+        if not connection:
+            return jsonify({'error': 'Database connection failed'}), 500
+
+        cursor = connection.cursor(dictionary=True)
+
+        try:
+            # Check if username is an email or username
+            cursor.execute("SELECT * FROM users WHERE username = %s OR email = %s",
+                           (username, username))
+            user = cursor.fetchone()
+
+            if user and check_password_hash(user['password_hash'], password):
+                # Check if user account is active
+                if not user.get('is_active', True):
+                    logger.warning(f"Token generation failed for username: {username} - Account is deactivated")
+                    return jsonify(
+                        {'error': 'Your account has been deactivated. Please contact an administrator.'}), 403
+
+                # Generate JWT token
+                # Token expires in 24 hours
+                expiry = datetime.utcnow() + timedelta(hours=24)
+
+                payload = {
+                    'user_id': user['id'],
+                    'username': user['username'],
+                    'is_admin': user.get('is_admin', False),
+                    'exp': expiry,
+                    'iat': datetime.utcnow()
+                }
+
+                # Use app secret key for JWT encoding
+                token = jwt.encode(payload, app.config['SECRET_KEY'], algorithm='HS256')
+
+                logger.info(f"Token generated successfully for user: {username} (ID: {user['id']})")
+
+                return jsonify({
+                    'token': token,
+                    'expires_at': expiry.isoformat(),
+                    'user': {
+                        'id': user['id'],
+                        'username': user['username'],
+                        'email': user['email'],
+                        'is_admin': user.get('is_admin', False)
+                    }
+                }), 200
+            else:
+                logger.warning(f"Token generation failed for username: {username} - Invalid credentials")
+                return jsonify({'error': 'Invalid credentials'}), 401
+
+        except Error as e:
+            logger.error(f"Database error during token generation: {str(e)}")
+            return jsonify({'error': str(e)}), 500
+        finally:
+            cursor.close()
+            connection.close()
+
+    except ImportError:
+        logger.error("PyJWT library not installed")
+        return jsonify({'error': 'Token authentication not available. Install PyJWT library.'}), 500
+    except Exception as e:
+        logger.error(f"Error generating token: {str(e)}")
+        return jsonify({'error': 'Failed to generate token', 'details': str(e)}), 500
+
+
+@app.route('/api/exchange-rate/hnb', methods=['GET'])
+@token_required
+def get_hnb_rate_for_date():
+    """
+    Get HNB exchange rate for a specific date.
+
+    This will:
+    1. Check database cache first
+    2. If date is today and not cached, fetch from HNB API
+    3. Return the rate or error
+
+    Query Parameters:
+        date: Date in ddmmyyyy format (optional, defaults to today)
+              Example: 01022026 for February 1, 2026
+
+    Returns:
+        JSON with buy_rate, sell_rate, date, and source
+
+    Example Usage:
+        GET /api/exchange-rate/hnb?date=01022026
+        GET /api/exchange-rate/hnb  (returns today's rate)
+    """
+    try:
+        from services.hnb_exchange_rate_service import get_hnb_exchange_rate_service
+        from datetime import datetime
+
+        date_str = request.args.get('date')
+
+        if date_str:
+            try:
+                # Parse date in ddmmyyyy format
+                if len(date_str) != 8:
+                    return jsonify({
+                        'error': 'Invalid date format. Use ddmmyyyy (e.g., 01022026 for Feb 1, 2026)'
+                    }), 400
+
+                # Convert ddmmyyyy to date object
+                date = datetime.strptime(date_str, '%d%m%Y').date()
+
+            except ValueError:
+                return jsonify({
+                    'error': 'Invalid date format. Use ddmmyyyy (e.g., 01022026 for Feb 1, 2026)'
+                }), 400
+        else:
+            date = None  # Will use today's date
+
+        service = get_hnb_exchange_rate_service()
+        rate = service.get_or_fetch_rate(date)
+
+        if rate:
+            logger.info(f"HNB rate retrieved for {date_str or 'today'}: {rate}")
+            return jsonify(rate), 200
+        else:
+            return jsonify({
+                'error': 'Exchange rate not available for this date'
+            }), 404
+
+    except Exception as e:
+        logger.error(f"Error getting HNB rate: {str(e)}")
+        return jsonify({
+            'error': 'Failed to get exchange rate',
+            'details': str(e)
+        }), 500
+
+
 # Global error handlers (must be outside if __name__ block)
 @app.errorhandler(500)
 def internal_error(error):
@@ -3498,6 +4025,7 @@ def internal_error(error):
         return jsonify({'error': 'Internal server error'}), 500
     # For page requests, render error template or return HTML
     return render_template('error.html', error_code=500, error_message='Internal Server Error'), 500
+
 
 @app.errorhandler(404)
 def not_found(error):
@@ -3510,6 +4038,7 @@ def not_found(error):
         return redirect(url_for('dashboard'))
     return redirect(url_for('login'))
 
+
 @app.errorhandler(Exception)
 def handle_exception(error):
     logger.error(f"Unhandled exception: {str(error)}", exc_info=True)
@@ -3518,6 +4047,7 @@ def handle_exception(error):
         return jsonify({'error': 'An unexpected error occurred'}), 500
     # For page requests, render error template
     return render_template('error.html', error_code=500, error_message='An unexpected error occurred'), 500
+
 
 if __name__ == '__main__':
     logger.info("Starting Personal Finance Budget application...")
