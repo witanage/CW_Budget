@@ -14,7 +14,11 @@ from decimal import Decimal
 
 import mysql.connector
 import requests
+from dotenv import load_dotenv
 from mysql.connector import Error
+
+# Load environment variables from .env file
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 

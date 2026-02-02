@@ -3801,6 +3801,7 @@ def refresh_hnb_rate():
         return jsonify({'error': 'Failed to refresh exchange rate', 'details': str(e)}), 500
 
 
+
 def token_required(f):
     """
     Decorator to require token authentication for routes.
@@ -3949,6 +3950,134 @@ def generate_token():
     except Exception as e:
         logger.error(f"Error generating token: {str(e)}")
         return jsonify({'error': 'Failed to generate token', 'details': str(e)}), 500
+
+
+# ==================================================
+# BANK EXCHANGE RATE API ENDPOINTS
+# ==================================================
+
+@app.route('/api/exchange-rate/banks', methods=['GET'])
+@token_required
+def get_all_bank_rates_for_date():
+    """
+    Get all bank exchange rates for a specific date.
+    Query Parameters:
+        date: Date in YYYY-MM-DD format (required)
+    Returns:
+        JSON list of rates for all banks on that date
+    """
+    try:
+        from services.hnb_exchange_rate_service import get_hnb_exchange_rate_service
+        from services.exchange_rate_service import get_exchange_rate_service
+        from datetime import datetime
+
+        date_str = request.args.get('date')
+        if not date_str:
+            return jsonify({'error': 'Date is required (YYYY-MM-DD)'}), 400
+        try:
+            date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({'error': 'Invalid date format. Use YYYY-MM-DD.'}), 400
+
+        rates = []
+        
+        # Get HNB rate (fetch and store for current date)
+        try:
+            hnb_service = get_hnb_exchange_rate_service()
+            today = datetime.now().date()
+            
+            if date == today:
+                # For today, fetch from API and store in database
+                hnb_rate = hnb_service.fetch_and_store_current_rate()
+                if hnb_rate:
+                    rates.append(hnb_rate)
+            else:
+                # For historical dates, try cache
+                hnb_rate = hnb_service.get_exchange_rate(date)
+                if hnb_rate and hnb_rate.get('source') == 'HNB':
+                    rates.append(hnb_rate)
+        except Exception as e:
+            logger.warning(f"Failed to get HNB rate for {date_str}: {str(e)}")
+
+        # Get CBSL rate
+        try:
+            cbsl_service = get_exchange_rate_service()
+            cbsl_rate = cbsl_service.get_exchange_rate(date)
+            if cbsl_rate and isinstance(cbsl_rate, dict):
+                cbsl_rate['bank'] = 'CBSL'
+                rates.append(cbsl_rate)
+        except Exception as e:
+            logger.warning(f"Failed to get CBSL rate for {date_str}: {str(e)}")
+
+        if rates:
+            return jsonify(rates), 200
+        else:
+            return jsonify({'error': 'No rates found for this date'}), 404
+    except Exception as e:
+        logger.error(f"Error fetching all bank rates: {str(e)}")
+        return jsonify({'error': 'Failed to fetch bank rates', 'details': str(e)}), 500
+
+
+@app.route('/api/exchange-rate/bank/<bank_code>', methods=['GET'])
+@token_required
+def get_bank_rate_for_date(bank_code):
+    """
+    Get exchange rate for a specific bank and date.
+    Query Parameters:
+        date: Date in YYYY-MM-DD format (required)
+    Returns:
+        JSON with buy_rate, sell_rate, date, source, bank
+    """
+    try:
+        from services.hnb_exchange_rate_service import get_hnb_exchange_rate_service
+        from services.exchange_rate_service import get_exchange_rate_service
+        from datetime import datetime
+
+        date_str = request.args.get('date')
+        if not date_str:
+            return jsonify({'error': 'Date is required (YYYY-MM-DD)'}), 400
+        try:
+            date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({'error': 'Invalid date format. Use YYYY-MM-DD.'}), 400
+
+        bank_code_lower = bank_code.lower()
+        rate = None
+        
+        if bank_code_lower == 'hnb':
+            try:
+                service = get_hnb_exchange_rate_service()
+                today = datetime.now().date()
+                
+                if date == today:
+                    # For today, fetch from API and store in database
+                    rate = service.fetch_and_store_current_rate()
+                else:
+                    # For historical dates, try cache
+                    rate = service.get_exchange_rate(date)
+                    if rate and rate.get('source') != 'HNB':
+                        rate = None
+            except Exception as e:
+                logger.error(f"Error fetching HNB rate for {date_str}: {str(e)}")
+                return jsonify({'error': f'Failed to fetch HNB rate', 'details': str(e)}), 500
+        elif bank_code_lower == 'cbsl':
+            try:
+                service = get_exchange_rate_service()
+                rate = service.get_exchange_rate(date)
+            except Exception as e:
+                logger.error(f"Error fetching CBSL rate for {date_str}: {str(e)}")
+                return jsonify({'error': f'Failed to fetch CBSL rate', 'details': str(e)}), 500
+        else:
+            return jsonify({'error': f'Unknown bank code: {bank_code}. Supported: hnb, cbsl'}), 400
+
+        if rate and isinstance(rate, dict):
+            rate['bank'] = bank_code_lower.upper()
+            return jsonify(rate), 200
+        else:
+            return jsonify({'error': f'Exchange rate not available for {bank_code_lower.upper()} on {date_str}'}), 404
+    except Exception as e:
+        logger.error(f"Error fetching {bank_code} rate: {str(e)}")
+        return jsonify({'error': 'Failed to fetch bank rate', 'details': str(e)}), 500
 
 
 @app.route('/api/exchange-rate/hnb', methods=['GET'])
