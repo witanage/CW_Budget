@@ -4148,6 +4148,9 @@ def get_all_bank_rates_for_date():
             if date == today:
                 # For today, fetch from API and store in database
                 hnb_rate = hnb_service.fetch_and_store_current_rate()
+                if not hnb_rate:
+                    # Live fetch failed — fall back to cached value
+                    hnb_rate = hnb_service.get_exchange_rate(date)
                 if hnb_rate:
                     hnb_rate['bank'] = 'HNB'
                     rates.append(hnb_rate)
@@ -4167,6 +4170,9 @@ def get_all_bank_rates_for_date():
 
             if date == today:
                 pb_rate = pb_service.fetch_and_store_current_rate()
+                if not pb_rate:
+                    # Live scrape failed — fall back to cached value
+                    pb_rate = pb_service.get_exchange_rate(date)
                 if pb_rate:
                     pb_rate['bank'] = 'PB'
                     rates.append(pb_rate)
@@ -4227,12 +4233,12 @@ def get_bank_rate_for_date(bank_code):
             try:
                 service = get_hnb_exchange_rate_service()
                 today = datetime.now().date()
-                
+
                 if date == today:
-                    # For today, fetch from API and store in database
                     rate = service.fetch_and_store_current_rate()
+                    if not rate:
+                        rate = service.get_exchange_rate(date)
                 else:
-                    # For historical dates, try cache
                     rate = service.get_exchange_rate(date)
                     if rate and rate.get('source') != 'HNB':
                         rate = None
@@ -4246,6 +4252,8 @@ def get_bank_rate_for_date(bank_code):
 
                 if date == today:
                     rate = service.fetch_and_store_current_rate()
+                    if not rate:
+                        rate = service.get_exchange_rate(date)
                 else:
                     rate = service.get_exchange_rate(date)
                     if rate and rate.get('source') != 'PB':

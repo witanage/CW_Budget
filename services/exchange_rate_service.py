@@ -108,7 +108,7 @@ class ExchangeRateService:
             cursor.execute("""
                 SELECT date, buy_rate, sell_rate, source
                 FROM exchange_rates
-                WHERE date = %s AND source != 'HNB'
+                WHERE date = %s AND source IN ('CBSL', 'CBSL_BULK')
                 LIMIT 1
             """, (date.strftime('%Y-%m-%d'),))
 
@@ -139,7 +139,7 @@ class ExchangeRateService:
             cursor.execute("""
                 SELECT date, buy_rate, sell_rate, source
                 FROM exchange_rates
-                WHERE date <= %s AND source != 'HNB'
+                WHERE date <= %s AND source IN ('CBSL', 'CBSL_BULK')
                 ORDER BY date DESC
                 LIMIT 1
             """, (date.strftime('%Y-%m-%d'),))
@@ -337,7 +337,7 @@ class ExchangeRateService:
         try:
             connection = mysql.connector.connect(**self.db_config)
             cursor = connection.cursor()
-            cursor.execute("SELECT COUNT(*) FROM exchange_rates WHERE source != 'HNB'")
+            cursor.execute("SELECT COUNT(*) FROM exchange_rates WHERE source IN ('CBSL', 'CBSL_BULK')")
             count = cursor.fetchone()[0]
             cursor.close()
             connection.close()
