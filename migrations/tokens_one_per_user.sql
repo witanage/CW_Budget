@@ -16,9 +16,16 @@ WHERE id NOT IN (
     ) AS keep
 );
 
--- Step 2: Replace the non-unique index with a UNIQUE index.
-ALTER TABLE tokens DROP INDEX idx_user_id;
-ALTER TABLE tokens ADD UNIQUE INDEX idx_user_id (user_id);
+-- Step 2: Add the UNIQUE index and drop the old non-unique index in
+-- a single ALTER TABLE.  The FK on user_id requires at least one
+-- index to exist at all times; splitting into two statements causes
+-- "Error 1553: Cannot drop index needed in a foreign key constraint".
+ALTER TABLE tokens
+    ADD UNIQUE INDEX idx_user_id_unique (user_id),
+    DROP INDEX idx_user_id;
+
+-- Step 3: Rename back to the original index name.
+ALTER TABLE tokens RENAME INDEX idx_user_id_unique TO idx_user_id;
 
 -- ============================================================
 -- Verification Query (run manually to check):
