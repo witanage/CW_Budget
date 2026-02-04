@@ -115,6 +115,10 @@ def get_db_config():
 
 DB_CONFIG = get_db_config()
 
+# Scheduler instance — assigned in the __main__ block; referenced by the hourly job
+# so it can reschedule itself when the interval setting changes.
+scheduler = None
+
 # Log database configuration status
 if DB_CONFIG:
     logger.info(f"Database configuration loaded successfully")
@@ -143,6 +147,27 @@ def get_db_connection():
     except Exception as e:
         logger.error(f"Unexpected error connecting to database: {e}", exc_info=True)
         return None
+
+
+def get_setting(key, default=None):
+    """Read a single value from the app_settings table. Returns *default* when
+    the table does not exist yet, the key is missing, or the DB is unreachable."""
+    connection = get_db_connection()
+    if not connection:
+        return default
+    cursor = None
+    try:
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute("SELECT value FROM app_settings WHERE key = %s", (key,))
+        row = cursor.fetchone()
+        return row['value'] if row else default
+    except Exception as e:
+        logger.warning(f"get_setting('{key}'): {e} — using default {default}")
+        return default
+    finally:
+        if cursor:
+            cursor.close()
+        connection.close()
 
 
 def login_required(f):
@@ -332,7 +357,21 @@ def refresh_all_exchange_rates():
     except Exception as e:
         logger.error(f"Scheduler: Error fetching CBSL rate: {str(e)}")
 
-    logger.info("Scheduler: Hourly exchange rate refresh completed")
+    # Check whether the admin changed the interval since the last run.
+    # reschedule_job() is a no-op-equivalent when the value hasn't changed.
+    if scheduler:
+        try:
+            new_minutes = int(get_setting('exchange_rate_refresh_interval_minutes', '60'))
+            job = scheduler.get_job('refresh_exchange_rates')
+            if job:
+                current_minutes = int(job.trigger.interval.total_seconds() // 60)
+                if new_minutes != current_minutes:
+                    scheduler.reschedule_job('refresh_exchange_rates', trigger='interval', minutes=new_minutes)
+                    logger.info(f"Scheduler: Interval changed {current_minutes} -> {new_minutes} min")
+        except Exception as e:
+            logger.error(f"Scheduler: Error checking interval setting: {str(e)}")
+
+    logger.info("Scheduler: Exchange rate refresh completed")
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -848,6 +887,78 @@ def get_audit_logs():
 
     except Error as e:
         logger.error(f"Error fetching audit logs: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@app.route('/api/admin/settings', methods=['GET'])
+@admin_required
+def get_admin_settings():
+    """Get all application settings."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT key, value, description, updated_at FROM app_settings ORDER BY key")
+        settings = cursor.fetchall()
+        for row in settings:
+            if row.get('updated_at'):
+                row['updated_at'] = str(row['updated_at'])
+        return jsonify(settings), 200
+    except Error as e:
+        logger.error(f"Error fetching settings: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@app.route('/api/admin/settings/<string:key>', methods=['PUT'])
+@admin_required
+def update_admin_setting(key):
+    """Update a single application setting.  Only keys that already exist in
+    app_settings may be written — arbitrary keys are rejected."""
+    data = request.get_json()
+    if not data or 'value' not in data:
+        return jsonify({'error': "'value' field is required"}), 400
+
+    new_value = str(data['value'])
+
+    # Key-specific validation
+    if key == 'exchange_rate_refresh_interval_minutes':
+        try:
+            interval = int(new_value)
+            if interval < 1:
+                return jsonify({'error': 'Interval must be at least 1 minute'}), 400
+            new_value = str(interval)
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Interval must be a positive integer'}), 400
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor(dictionary=True)
+    try:
+        # Guard: only allow updating pre-existing keys
+        cursor.execute("SELECT key FROM app_settings WHERE key = %s", (key,))
+        if not cursor.fetchone():
+            return jsonify({'error': f'Unknown setting: {key}'}), 404
+
+        cursor.execute("UPDATE app_settings SET value = %s WHERE key = %s", (new_value, key))
+        connection.commit()
+
+        username = session.get('username')
+        logger.info(f"Admin setting updated: {key} = {new_value} (by {username})")
+        log_audit(session['user_id'], 'UPDATE_SETTING', details=f'{key} = {new_value}')
+
+        return jsonify({'message': 'Setting updated', 'key': key, 'value': new_value}), 200
+    except Error as e:
+        logger.error(f"Error updating setting '{key}': {str(e)}")
         return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()
@@ -4292,18 +4403,21 @@ if __name__ == '__main__':
     logger.info(f"Debug mode: False (Production)")
     logger.info(f"Host: 0.0.0.0, Port: 5003")
 
-    # Start hourly exchange-rate refresh scheduler.
-    # next_run_time=datetime.now() ensures the first fetch runs immediately on startup
-    # so the cache is warm before any GET request arrives.
+    # Start exchange-rate refresh scheduler.
+    # Interval is read from app_settings; falls back to 60 min when the table
+    # does not exist yet or the DB is unreachable.
+    # next_run_time=datetime.now() warms the cache before the first request.
+    interval_minutes = int(get_setting('exchange_rate_refresh_interval_minutes', '60'))
     scheduler = BackgroundScheduler()
     scheduler.add_job(
         func=refresh_all_exchange_rates,
         trigger='interval',
-        hours=1,
-        next_run_time=datetime.now()
+        minutes=interval_minutes,
+        next_run_time=datetime.now(),
+        id='refresh_exchange_rates'
     )
     scheduler.start()
-    logger.info("Exchange rate refresh scheduler started (runs every hour)")
+    logger.info(f"Exchange rate refresh scheduler started (interval: {interval_minutes} min)")
 
     # Use debug=False for production
     # Set to True for development (detailed error messages)
