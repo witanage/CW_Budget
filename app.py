@@ -158,7 +158,7 @@ def get_setting(key, default=None):
     cursor = None
     try:
         cursor = connection.cursor(dictionary=True)
-        cursor.execute("SELECT value FROM app_settings WHERE key = %s", (key,))
+        cursor.execute("SELECT value FROM app_settings WHERE setting_key = %s", (key,))
         row = cursor.fetchone()
         return row['value'] if row else default
     except Exception as e:
@@ -903,7 +903,7 @@ def get_admin_settings():
 
     cursor = connection.cursor(dictionary=True)
     try:
-        cursor.execute("SELECT key, value, description, updated_at FROM app_settings ORDER BY key")
+        cursor.execute("SELECT setting_key, value, description, updated_at FROM app_settings ORDER BY setting_key")
         settings = cursor.fetchall()
         for row in settings:
             if row.get('updated_at'):
@@ -945,11 +945,11 @@ def update_admin_setting(key):
     cursor = connection.cursor(dictionary=True)
     try:
         # Guard: only allow updating pre-existing keys
-        cursor.execute("SELECT key FROM app_settings WHERE key = %s", (key,))
+        cursor.execute("SELECT setting_key FROM app_settings WHERE setting_key = %s", (key,))
         if not cursor.fetchone():
             return jsonify({'error': f'Unknown setting: {key}'}), 404
 
-        cursor.execute("UPDATE app_settings SET value = %s WHERE key = %s", (new_value, key))
+        cursor.execute("UPDATE app_settings SET value = %s WHERE setting_key = %s", (new_value, key))
         connection.commit()
 
         username = session.get('username')

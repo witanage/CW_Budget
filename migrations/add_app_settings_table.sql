@@ -3,7 +3,7 @@
 --   mysql -h <host> -P <port> -u <user> -p <db> < migrations/add_app_settings_table.sql
 
 CREATE TABLE IF NOT EXISTS app_settings (
-    key VARCHAR(100) PRIMARY KEY,
+    setting_key VARCHAR(100) PRIMARY KEY,
     value TEXT NOT NULL,
     description TEXT NULL,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -11,6 +11,6 @@ CREATE TABLE IF NOT EXISTS app_settings (
 COMMENT='Runtime application settings (key-value store)';
 
 -- Seed default settings (INSERT IGNORE keeps any value you have already customised)
-INSERT IGNORE INTO app_settings (key, value, description) VALUES
+INSERT IGNORE INTO app_settings (setting_key, value, description) VALUES
 ('exchange_rate_refresh_interval_minutes', '60',
  'How often (in minutes) the background scheduler fetches fresh exchange rates from all banks');
