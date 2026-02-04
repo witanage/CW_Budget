@@ -3918,7 +3918,7 @@ def token_required(f):
         cursor = connection.cursor(dictionary=True)
         try:
             cursor.execute(
-                "SELECT id, is_revoked, expires_at FROM tokens WHERE token = %s AND user_id = %s",
+                "SELECT id, is_revoked, expires_at < UTC_TIMESTAMP() AS is_expired FROM tokens WHERE token = %s AND user_id = %s",
                 (token, payload['user_id'])
             )
             token_record = cursor.fetchone()
@@ -3927,7 +3927,7 @@ def token_required(f):
                 return jsonify({'error': 'Token not recognized. Please generate a new token.'}), 401
             if token_record['is_revoked']:
                 return jsonify({'error': 'Token has been revoked. Please generate a new token.'}), 401
-            if token_record['expires_at'] < datetime.utcnow():
+            if token_record['is_expired']:
                 return jsonify({'error': 'Token has expired. Please generate a new token.'}), 401
 
             cursor.execute(
