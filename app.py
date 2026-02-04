@@ -604,6 +604,7 @@ def admin_dashboard():
     connection = get_db_connection()
     users = []
     audit_logs = []
+    settings = {}
     error_message = None
 
     if connection:
@@ -643,6 +644,10 @@ def admin_dashboard():
                            """)
             audit_logs = cursor.fetchall()
 
+            # Fetch app settings
+            cursor.execute("SELECT setting_key, value, description FROM app_settings ORDER BY setting_key")
+            settings = {row['setting_key']: row for row in cursor.fetchall()}
+
         except Error as e:
             logger.error(f"Error fetching admin data: {str(e)}")
             error_message = str(e)
@@ -656,6 +661,7 @@ def admin_dashboard():
                            username=session.get('username'),
                            users=users,
                            audit_logs=audit_logs,
+                           settings=settings,
                            error_message=error_message,
                            current_user_id=session.get('user_id'))
 
