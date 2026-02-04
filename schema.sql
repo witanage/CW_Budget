@@ -408,13 +408,14 @@ COMMENT='Stores income input data only - tax calculations computed on-the-fly wh
 
 CREATE TABLE IF NOT EXISTS exchange_rates (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    date DATE NOT NULL UNIQUE COMMENT 'Date for the exchange rate',
+    date DATE NOT NULL COMMENT 'Date for the exchange rate',
     buy_rate DECIMAL(10, 4) NOT NULL COMMENT 'USD to LKR buy rate',
     sell_rate DECIMAL(10, 4) NOT NULL COMMENT 'USD to LKR sell rate',
-    source VARCHAR(50) DEFAULT 'CBSL' COMMENT 'Source of the rate (CBSL, Manual, CSV)',
+    source VARCHAR(50) DEFAULT 'CBSL' COMMENT 'Source of the rate (CBSL, HNB, Manual, CSV)',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_date_source (date, source),
     INDEX idx_date (date),
     INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-COMMENT='Stores USD to LKR exchange rates from Central Bank of Sri Lanka';
+COMMENT='Stores USD to LKR exchange rates (one row per bank per date)';

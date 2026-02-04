@@ -108,7 +108,7 @@ class ExchangeRateService:
             cursor.execute("""
                 SELECT date, buy_rate, sell_rate, source
                 FROM exchange_rates
-                WHERE date = %s
+                WHERE date = %s AND source != 'HNB'
                 LIMIT 1
             """, (date.strftime('%Y-%m-%d'),))
 
@@ -139,7 +139,7 @@ class ExchangeRateService:
             cursor.execute("""
                 SELECT date, buy_rate, sell_rate, source
                 FROM exchange_rates
-                WHERE date <= %s
+                WHERE date <= %s AND source != 'HNB'
                 ORDER BY date DESC
                 LIMIT 1
             """, (date.strftime('%Y-%m-%d'),))
@@ -282,7 +282,7 @@ class ExchangeRateService:
                 cells = row.find_all('td')
                 if len(cells) >= 3:
                     row_date_str = cells[0].text.strip()
-                    row_date = datetime.strptime(row_date_str, '%Y-%m-%d')
+                    row_date = datetime.strptime(row_date_str, '%Y-%m-%d').date()
 
                     # Find the most recent date before or equal to target date
                     if row_date <= target_date:
@@ -337,7 +337,7 @@ class ExchangeRateService:
         try:
             connection = mysql.connector.connect(**self.db_config)
             cursor = connection.cursor()
-            cursor.execute("SELECT COUNT(*) FROM exchange_rates")
+            cursor.execute("SELECT COUNT(*) FROM exchange_rates WHERE source != 'HNB'")
             count = cursor.fetchone()[0]
             cursor.close()
             connection.close()

@@ -3990,11 +3990,13 @@ def get_all_bank_rates_for_date():
                 # For today, fetch from API and store in database
                 hnb_rate = hnb_service.fetch_and_store_current_rate()
                 if hnb_rate:
+                    hnb_rate['bank'] = 'HNB'
                     rates.append(hnb_rate)
             else:
                 # For historical dates, try cache
                 hnb_rate = hnb_service.get_exchange_rate(date)
                 if hnb_rate and hnb_rate.get('source') == 'HNB':
+                    hnb_rate['bank'] = 'HNB'
                     rates.append(hnb_rate)
         except Exception as e:
             logger.warning(f"Failed to get HNB rate for {date_str}: {str(e)}")
