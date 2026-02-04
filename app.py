@@ -18,6 +18,7 @@ from mysql.connector import Error
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from services.hnb_exchange_rate_service import get_hnb_exchange_rate_service
+from services.pb_exchange_rate_service import get_pb_exchange_rate_service
 
 # Load environment variables from .env file
 load_dotenv()
@@ -547,7 +548,30 @@ def populate_all_exchange_rates_background():
         except Exception as e:
             logger.error(f"Background task: Error fetching HNB rates: {str(e)}")
 
-        logger.info("Background task: Exchange rate population completed (CBSL + HNB)")
+        # ===== PART 3: PEOPLE'S BANK RATES =====
+        logger.info("Background task: Fetching current People's Bank exchange rate...")
+
+        try:
+            pb_service = get_pb_exchange_rate_service()
+
+            today = datetime.now().date()
+            existing_pb_rate = pb_service.get_exchange_rate(today)
+
+            if existing_pb_rate:
+                logger.info(f"Background task: PB rate for today already cached: {existing_pb_rate}")
+            else:
+                pb_rate = pb_service.fetch_and_store_current_rate()
+
+                if pb_rate:
+                    logger.info(
+                        f"Background task: PB rate fetched successfully: Buy={pb_rate['buy_rate']}, Sell={pb_rate['sell_rate']}")
+                else:
+                    logger.warning("Background task: Failed to fetch PB rate")
+
+        except Exception as e:
+            logger.error(f"Background task: Error fetching PB rates: {str(e)}")
+
+        logger.info("Background task: Exchange rate population completed (CBSL + HNB + PB)")
 
     except Exception as e:
         logger.error(f"Background task: Error populating exchange rates: {str(e)}", exc_info=True)
@@ -3801,6 +3825,65 @@ def refresh_hnb_rate():
         return jsonify({'error': 'Failed to refresh exchange rate', 'details': str(e)}), 500
 
 
+@app.route('/api/exchange-rate/pb/current', methods=['GET'])
+@login_required
+def get_pb_current_rate():
+    """
+    Fetch current USD to LKR exchange rate from People's Bank.
+
+    This will:
+    1. Scrape the latest rate from People's Bank website
+    2. Store it in the database
+    3. Return the rate data
+
+    Returns:
+        JSON with buy_rate, sell_rate, date, and source
+    """
+    try:
+        service = get_pb_exchange_rate_service()
+        rate_data = service.fetch_and_store_current_rate()
+
+        if rate_data:
+            logger.info(f"PB current rate fetched and stored: {rate_data}")
+            return jsonify(rate_data), 200
+        else:
+            return jsonify({'error': 'Failed to fetch current rate from People\'s Bank'}), 500
+
+    except Exception as e:
+        logger.error(f"Error fetching PB current rate: {str(e)}")
+        return jsonify({'error': 'Failed to fetch exchange rate', 'details': str(e)}), 500
+
+
+@app.route('/api/exchange-rate/pb/refresh', methods=['POST'])
+@login_required
+def refresh_pb_rate():
+    """
+    Manually refresh today's exchange rate from People's Bank.
+
+    This forces a fresh scrape from the People's Bank website and
+    updates the database.
+
+    Returns:
+        JSON with updated rate data
+    """
+    try:
+        service = get_pb_exchange_rate_service()
+        rate_data = service.fetch_and_store_current_rate()
+
+        if rate_data:
+            logger.info(f"PB rate refreshed: {rate_data}")
+            return jsonify({
+                'message': 'Exchange rate refreshed successfully',
+                'rate': rate_data
+            }), 200
+        else:
+            return jsonify({'error': 'Failed to refresh rate from People\'s Bank'}), 500
+
+    except Exception as e:
+        logger.error(f"Error refreshing PB rate: {str(e)}")
+        return jsonify({'error': 'Failed to refresh exchange rate', 'details': str(e)}), 500
+
+
 
 def token_required(f):
     """
@@ -4077,6 +4160,24 @@ def get_all_bank_rates_for_date():
         except Exception as e:
             logger.warning(f"Failed to get HNB rate for {date_str}: {str(e)}")
 
+        # Get People's Bank rate
+        try:
+            pb_service = get_pb_exchange_rate_service()
+            today = datetime.now().date()
+
+            if date == today:
+                pb_rate = pb_service.fetch_and_store_current_rate()
+                if pb_rate:
+                    pb_rate['bank'] = 'PB'
+                    rates.append(pb_rate)
+            else:
+                pb_rate = pb_service.get_exchange_rate(date)
+                if pb_rate and pb_rate.get('source') == 'PB':
+                    pb_rate['bank'] = 'PB'
+                    rates.append(pb_rate)
+        except Exception as e:
+            logger.warning(f"Failed to get PB rate for {date_str}: {str(e)}")
+
         # Get CBSL rate
         try:
             cbsl_service = get_exchange_rate_service()
@@ -4138,6 +4239,20 @@ def get_bank_rate_for_date(bank_code):
             except Exception as e:
                 logger.error(f"Error fetching HNB rate for {date_str}: {str(e)}")
                 return jsonify({'error': f'Failed to fetch HNB rate', 'details': str(e)}), 500
+        elif bank_code_lower == 'pb':
+            try:
+                service = get_pb_exchange_rate_service()
+                today = datetime.now().date()
+
+                if date == today:
+                    rate = service.fetch_and_store_current_rate()
+                else:
+                    rate = service.get_exchange_rate(date)
+                    if rate and rate.get('source') != 'PB':
+                        rate = None
+            except Exception as e:
+                logger.error(f"Error fetching PB rate for {date_str}: {str(e)}")
+                return jsonify({'error': f'Failed to fetch PB rate', 'details': str(e)}), 500
         elif bank_code_lower == 'cbsl':
             try:
                 service = get_exchange_rate_service()
@@ -4146,7 +4261,7 @@ def get_bank_rate_for_date(bank_code):
                 logger.error(f"Error fetching CBSL rate for {date_str}: {str(e)}")
                 return jsonify({'error': f'Failed to fetch CBSL rate', 'details': str(e)}), 500
         else:
-            return jsonify({'error': f'Unknown bank code: {bank_code}. Supported: hnb, cbsl'}), 400
+            return jsonify({'error': f'Unknown bank code: {bank_code}. Supported: hnb, pb, cbsl'}), 400
 
         if rate and isinstance(rate, dict):
             rate['bank'] = bank_code_lower.upper()
@@ -4217,6 +4332,68 @@ def get_hnb_rate_for_date():
 
     except Exception as e:
         logger.error(f"Error getting HNB rate: {str(e)}")
+        return jsonify({
+            'error': 'Failed to get exchange rate',
+            'details': str(e)
+        }), 500
+
+
+@app.route('/api/exchange-rate/pb', methods=['GET'])
+@token_required
+def get_pb_rate_for_date():
+    """
+    Get People's Bank exchange rate for a specific date.
+
+    This will:
+    1. Check database cache first
+    2. If date is today and not cached, scrape from People's Bank
+    3. Return the rate or error
+
+    Query Parameters:
+        date: Date in ddmmyyyy format (optional, defaults to today)
+              Example: 01022026 for February 1, 2026
+
+    Returns:
+        JSON with buy_rate, sell_rate, date, and source
+
+    Example Usage:
+        GET /api/exchange-rate/pb?date=01022026
+        GET /api/exchange-rate/pb  (returns today's rate)
+    """
+    try:
+        from datetime import datetime
+
+        date_str = request.args.get('date')
+
+        if date_str:
+            try:
+                if len(date_str) != 8:
+                    return jsonify({
+                        'error': 'Invalid date format. Use ddmmyyyy (e.g., 01022026 for Feb 1, 2026)'
+                    }), 400
+
+                date = datetime.strptime(date_str, '%d%m%Y').date()
+
+            except ValueError:
+                return jsonify({
+                    'error': 'Invalid date format. Use ddmmyyyy (e.g., 01022026 for Feb 1, 2026)'
+                }), 400
+        else:
+            date = None  # Will use today's date
+
+        service = get_pb_exchange_rate_service()
+        rate = service.get_or_fetch_rate(date)
+
+        if rate:
+            logger.info(f"PB rate retrieved for {date_str or 'today'}: {rate}")
+            return jsonify(rate), 200
+        else:
+            return jsonify({
+                'error': 'Exchange rate not available for this date'
+            }), 404
+
+    except Exception as e:
+        logger.error(f"Error getting PB rate: {str(e)}")
         return jsonify({
             'error': 'Failed to get exchange rate',
             'details': str(e)
