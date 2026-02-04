@@ -35,43 +35,6 @@ let filterDropdownsInitialized = false;
 let loadedReportTabs = new Set(); // Track which report tabs have been loaded
 let reportTabsInitialized = false; // Track if tab listeners are initialized
 
-// Geolocation helper function
-function getGeolocation() {
-    return new Promise((resolve) => {
-        // Check if geolocation is supported
-        if (!navigator.geolocation) {
-            console.log('Geolocation is not supported by this browser');
-            resolve(null);
-            return;
-        }
-
-        // Get current position with timeout
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                // Success callback
-                const location = {
-                    latitude: position.coords.latitude,
-                    longitude: position.coords.longitude,
-                    accuracy: position.coords.accuracy
-                };
-                console.log('Geolocation captured:', location);
-                resolve(location);
-            },
-            (error) => {
-                // Error callback - don't block the transaction
-                console.log('Geolocation error:', error.message);
-                resolve(null);
-            },
-            {
-                // Options
-                enableHighAccuracy: true,
-                timeout: 5000, // 5 seconds timeout
-                maximumAge: 0 // Don't use cached position
-            }
-        );
-    });
-}
-
 // Initialize everything when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
     console.log('=== Dashboard Loading ===');
@@ -3380,38 +3343,26 @@ function showPaymentMethodModal(transactionId, isPaidClick = false) {
 function markTransactionWithPaymentMethod(transactionId, paymentMethodId) {
     showLoading();
 
-    // Get geolocation if available
-    getGeolocation().then(location => {
-        const requestBody = { payment_method_id: paymentMethodId };
-
-        // Add location data if available
-        if (location) {
-            requestBody.latitude = location.latitude;
-            requestBody.longitude = location.longitude;
-            requestBody.accuracy = location.accuracy;
+    fetch(`/api/transactions/${transactionId}/mark-done`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payment_method_id: paymentMethodId })
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.error) {
+            showToast(data.error, 'danger');
+        } else {
+            showToast('Transaction marked as done', 'success');
+            closeModal('paymentMethodModal');
+            loadTransactions();
         }
-
-        fetch(`/api/transactions/${transactionId}/mark-done`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody)
-        })
-        .then(response => response.json())
-        .then(data => {
-            hideLoading();
-            if (data.error) {
-                showToast(data.error, 'danger');
-            } else {
-                showToast('Transaction marked as done', 'success');
-                closeModal('paymentMethodModal');
-                loadTransactions();
-            }
-        })
-        .catch(error => {
-            hideLoading();
-            console.error('Error:', error);
-            showToast('Error marking transaction', 'danger');
-        });
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Error:', error);
+        showToast('Error marking transaction', 'danger');
     });
 }
 
@@ -3437,38 +3388,26 @@ function unmarkTransaction(transactionId) {
 function markTransactionAsPaid(transactionId, paymentMethodId) {
     showLoading();
 
-    // Get geolocation if available
-    getGeolocation().then(location => {
-        const requestBody = { payment_method_id: paymentMethodId };
-
-        // Add location data if available
-        if (location) {
-            requestBody.latitude = location.latitude;
-            requestBody.longitude = location.longitude;
-            requestBody.accuracy = location.accuracy;
+    fetch(`/api/transactions/${transactionId}/mark-paid`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payment_method_id: paymentMethodId })
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.error) {
+            showToast(data.error, 'danger');
+        } else {
+            showToast('Transaction marked as paid', 'success');
+            closeModal('paymentMethodModal');
+            loadTransactions();
         }
-
-        fetch(`/api/transactions/${transactionId}/mark-paid`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody)
-        })
-        .then(response => response.json())
-        .then(data => {
-            hideLoading();
-            if (data.error) {
-                showToast(data.error, 'danger');
-            } else {
-                showToast('Transaction marked as paid', 'success');
-                closeModal('paymentMethodModal');
-                loadTransactions();
-            }
-        })
-        .catch(error => {
-            hideLoading();
-            console.error('Error:', error);
-            showToast('Error marking transaction as paid', 'danger');
-        });
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Error:', error);
+        showToast('Error marking transaction as paid', 'danger');
     });
 }
 

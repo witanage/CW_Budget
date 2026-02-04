@@ -45,8 +45,8 @@ CREATE TABLE IF NOT EXISTS users (
 -- ============================================================
 -- Tokens Table
 -- ============================================================
--- Stores JWT tokens so they can be tracked and revoked before expiry.
--- A token is inserted here when issued and looked up on every request.
+-- Stores the current JWT token per user for tracking and revocation.
+-- One row per user; re-login overwrites the previous token in place.
 CREATE TABLE IF NOT EXISTS tokens (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS tokens (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_used_at TIMESTAMP NULL,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    INDEX idx_user_id (user_id),
+    UNIQUE INDEX idx_user_id (user_id),
     INDEX idx_expires_at (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 COMMENT='JWT tokens for session tracking and revocation';
@@ -136,12 +136,6 @@ CREATE TABLE IF NOT EXISTS transactions (
     is_paid BOOLEAN DEFAULT FALSE,
     marked_done_at TIMESTAMP NULL,
     paid_at TIMESTAMP NULL,
-    done_latitude DECIMAL(10, 8) NULL COMMENT 'Latitude when marked as done',
-    done_longitude DECIMAL(11, 8) NULL COMMENT 'Longitude when marked as done',
-    done_location_accuracy DECIMAL(10, 2) NULL COMMENT 'Location accuracy in meters when marked as done',
-    paid_latitude DECIMAL(10, 8) NULL COMMENT 'Latitude when marked as paid',
-    paid_longitude DECIMAL(11, 8) NULL COMMENT 'Longitude when marked as paid',
-    paid_location_accuracy DECIMAL(10, 2) NULL COMMENT 'Location accuracy in meters when marked as paid',
     display_order INT NOT NULL DEFAULT 0 COMMENT 'Order for displaying transactions (lower numbers first)',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (monthly_record_id) REFERENCES monthly_records(id) ON DELETE CASCADE,

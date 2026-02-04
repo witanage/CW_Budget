@@ -136,11 +136,28 @@ item.innerHTML = `
 <span style="flex: 1;">${method.name}</span>
 `;
 item.onclick = () => {
+// Close payment method modal first so confirmation does not stack on top
+const paymentModal = bootstrap.Modal.getInstance(document.getElementById('paymentMethodModal'));
+if (paymentModal) paymentModal.hide();
+
+const actionLabel = isPaidClick ? 'Mark as Paid' : 'Mark as Done';
+const actionMessage = isPaidClick
+? `Mark this transaction as paid using ${method.name}?`
+: `Mark this transaction as done using ${method.name}?`;
+
+showConfirmModal(
+actionLabel,
+actionMessage,
+function() {
 if (isPaidClick) {
 markTransactionAsPaid(selectedTransactionIdForPayment, method.id);
 } else {
 markTransactionWithPaymentMethod(selectedTransactionIdForPayment, method.id);
 }
+},
+actionLabel,
+'btn-primary'
+);
 };
 listContainer.appendChild(item);
 });
@@ -627,8 +644,15 @@ showPaymentMethodModal(t.id, false);
 
 if (undoneBtn) {
 undoneBtn.addEventListener('click', function() {
-// Mark transaction as undone (same as desktop checkbox behavior)
+showConfirmModal(
+'Mark as Undone',
+'Remove the done status from this transaction?',
+function() {
 markTransactionAsUndone(t.id);
+},
+'Mark Undone',
+'btn-warning'
+);
 });
 }
 
