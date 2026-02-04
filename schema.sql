@@ -45,8 +45,8 @@ CREATE TABLE IF NOT EXISTS users (
 -- ============================================================
 -- Tokens Table
 -- ============================================================
--- Stores JWT tokens so they can be tracked and revoked before expiry.
--- A token is inserted here when issued and looked up on every request.
+-- Stores the current JWT token per user for tracking and revocation.
+-- One row per user; re-login overwrites the previous token in place.
 CREATE TABLE IF NOT EXISTS tokens (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS tokens (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_used_at TIMESTAMP NULL,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    INDEX idx_user_id (user_id),
+    UNIQUE INDEX idx_user_id (user_id),
     INDEX idx_expires_at (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 COMMENT='JWT tokens for session tracking and revocation';

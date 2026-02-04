@@ -4021,11 +4021,17 @@ def generate_token():
                 # Use app secret key for JWT encoding
                 token = jwt.encode(payload, app.config['SECRET_KEY'], algorithm='HS256')
 
-                # Persist token for tracking and revocation
-                cursor.execute(
-                    "INSERT INTO tokens (user_id, token, expires_at) VALUES (%s, %s, %s)",
-                    (user['id'], token, expiry)
-                )
+                # Upsert: one active token row per user
+                cursor.execute("""
+                    INSERT INTO tokens (user_id, token, expires_at)
+                    VALUES (%s, %s, %s)
+                    ON DUPLICATE KEY UPDATE
+                        token = VALUES(token),
+                        expires_at = VALUES(expires_at),
+                        is_revoked = FALSE,
+                        created_at = CURRENT_TIMESTAMP,
+                        last_used_at = NULL
+                """, (user['id'], token, expiry))
                 connection.commit()
 
                 logger.info(f"Token generated successfully for user: {username} (ID: {user['id']})")
