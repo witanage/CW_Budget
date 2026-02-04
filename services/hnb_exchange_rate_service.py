@@ -224,7 +224,7 @@ class HNBExchangeRateService:
             cursor.execute("""
                            SELECT date, buy_rate, sell_rate, source, updated_at
                            FROM exchange_rates
-                           WHERE date = %s
+                           WHERE date = %s AND source = 'HNB'
                            """, (date_str,))
 
             result = cursor.fetchone()
@@ -344,8 +344,8 @@ class HNBExchangeRateService:
             cursor.execute("""
                            SELECT date
                            FROM exchange_rates
-                           WHERE date BETWEEN %s
-                             AND %s
+                           WHERE date BETWEEN %s AND %s
+                             AND source = 'HNB'
                            """, (start_date, end_date))
 
             existing_dates = {row[0] for row in cursor.fetchall()}

@@ -43,6 +43,25 @@ CREATE TABLE IF NOT EXISTS users (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
+-- Tokens Table
+-- ============================================================
+-- Stores JWT tokens so they can be tracked and revoked before expiry.
+-- A token is inserted here when issued and looked up on every request.
+CREATE TABLE IF NOT EXISTS tokens (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    token VARCHAR(500) NOT NULL UNIQUE,
+    is_revoked BOOLEAN DEFAULT FALSE,
+    expires_at DATETIME NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_used_at TIMESTAMP NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_id (user_id),
+    INDEX idx_expires_at (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+COMMENT='JWT tokens for session tracking and revocation';
+
+-- ============================================================
 -- Categories Table
 -- ============================================================
 -- Stores income and expense categories for transaction classification
@@ -408,13 +427,14 @@ COMMENT='Stores income input data only - tax calculations computed on-the-fly wh
 
 CREATE TABLE IF NOT EXISTS exchange_rates (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    date DATE NOT NULL UNIQUE COMMENT 'Date for the exchange rate',
+    date DATE NOT NULL COMMENT 'Date for the exchange rate',
     buy_rate DECIMAL(10, 4) NOT NULL COMMENT 'USD to LKR buy rate',
     sell_rate DECIMAL(10, 4) NOT NULL COMMENT 'USD to LKR sell rate',
-    source VARCHAR(50) DEFAULT 'CBSL' COMMENT 'Source of the rate (CBSL, Manual, CSV)',
+    source VARCHAR(50) DEFAULT 'CBSL' COMMENT 'Source of the rate (CBSL, HNB, Manual, CSV)',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_date_source (date, source),
     INDEX idx_date (date),
     INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-COMMENT='Stores USD to LKR exchange rates from Central Bank of Sri Lanka';
+COMMENT='Stores USD to LKR exchange rates (one row per bank per date)';

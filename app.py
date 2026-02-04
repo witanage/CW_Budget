@@ -3829,16 +3829,8 @@ def token_required(f):
             return jsonify({'error': 'Token is missing. Please provide token in Authorization header.'}), 401
 
         try:
-            # Decode token
+            # Decode token (also verifies signature and expiry)
             payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
-
-            # Store user info in request context
-            request.current_user = {
-                'user_id': payload['user_id'],
-                'username': payload['username'],
-                'is_admin': payload.get('is_admin', False)
-            }
-
         except jwt.ExpiredSignatureError:
             return jsonify({'error': 'Token has expired. Please generate a new token.'}), 401
         except jwt.InvalidTokenError:
@@ -3846,6 +3838,42 @@ def token_required(f):
         except Exception as e:
             logger.error(f"Error validating token: {str(e)}")
             return jsonify({'error': 'Token validation failed'}), 401
+
+        # Validate token against the tokens table
+        connection = get_db_connection()
+        if not connection:
+            return jsonify({'error': 'Token validation failed'}), 401
+        cursor = connection.cursor(dictionary=True)
+        try:
+            cursor.execute(
+                "SELECT id, is_revoked FROM tokens WHERE token = %s AND user_id = %s",
+                (token, payload['user_id'])
+            )
+            token_record = cursor.fetchone()
+
+            if not token_record:
+                return jsonify({'error': 'Token not recognized. Please generate a new token.'}), 401
+            if token_record['is_revoked']:
+                return jsonify({'error': 'Token has been revoked. Please generate a new token.'}), 401
+
+            cursor.execute(
+                "UPDATE tokens SET last_used_at = CURRENT_TIMESTAMP WHERE id = %s",
+                (token_record['id'],)
+            )
+            connection.commit()
+        except Exception as e:
+            logger.error(f"Error validating token in database: {str(e)}")
+            return jsonify({'error': 'Token validation failed'}), 401
+        finally:
+            cursor.close()
+            connection.close()
+
+        # Store user info in request context
+        request.current_user = {
+            'user_id': payload['user_id'],
+            'username': payload['username'],
+            'is_admin': payload.get('is_admin', False)
+        }
 
         return f(*args, **kwargs)
 
@@ -3921,6 +3949,13 @@ def generate_token():
                 # Use app secret key for JWT encoding
                 token = jwt.encode(payload, app.config['SECRET_KEY'], algorithm='HS256')
 
+                # Persist token for tracking and revocation
+                cursor.execute(
+                    "INSERT INTO tokens (user_id, token, expires_at) VALUES (%s, %s, %s)",
+                    (user['id'], token, expiry)
+                )
+                connection.commit()
+
                 logger.info(f"Token generated successfully for user: {username} (ID: {user['id']})")
 
                 return jsonify({
@@ -3950,6 +3985,47 @@ def generate_token():
     except Exception as e:
         logger.error(f"Error generating token: {str(e)}")
         return jsonify({'error': 'Failed to generate token', 'details': str(e)}), 500
+
+
+# ==================================================
+# TOKEN REVOCATION ENDPOINT
+# ==================================================
+
+@app.route('/api/auth/token/revoke', methods=['POST'])
+@token_required
+def revoke_token():
+    """
+    Revoke the token that was used to make this request.
+    The token is marked as revoked in the database and will be
+    rejected on all subsequent requests.
+
+    Returns:
+        JSON with confirmation message
+    """
+    try:
+        token = request.headers['Authorization'].split(' ')[1]
+
+        connection = get_db_connection()
+        if not connection:
+            return jsonify({'error': 'Database connection failed'}), 500
+
+        cursor = connection.cursor()
+        try:
+            cursor.execute(
+                "UPDATE tokens SET is_revoked = TRUE WHERE token = %s",
+                (token,)
+            )
+            connection.commit()
+            return jsonify({'message': 'Token revoked successfully'}), 200
+        except Error as e:
+            logger.error(f"Database error revoking token: {str(e)}")
+            return jsonify({'error': 'Failed to revoke token'}), 500
+        finally:
+            cursor.close()
+            connection.close()
+    except Exception as e:
+        logger.error(f"Error revoking token: {str(e)}")
+        return jsonify({'error': 'Failed to revoke token', 'details': str(e)}), 500
 
 
 # ==================================================
@@ -3990,11 +4066,13 @@ def get_all_bank_rates_for_date():
                 # For today, fetch from API and store in database
                 hnb_rate = hnb_service.fetch_and_store_current_rate()
                 if hnb_rate:
+                    hnb_rate['bank'] = 'HNB'
                     rates.append(hnb_rate)
             else:
                 # For historical dates, try cache
                 hnb_rate = hnb_service.get_exchange_rate(date)
                 if hnb_rate and hnb_rate.get('source') == 'HNB':
+                    hnb_rate['bank'] = 'HNB'
                     rates.append(hnb_rate)
         except Exception as e:
             logger.warning(f"Failed to get HNB rate for {date_str}: {str(e)}")
