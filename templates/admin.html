@@ -281,6 +281,38 @@
         </div>
     </div>
 
+    <!-- System Settings Section -->
+    <div class="section-card">
+        <div class="section-header">
+            <h2 style="margin: 0; font-size: 1.5rem; color: var(--text-primary);">
+                <i class="fas fa-cog"></i> System Settings
+            </h2>
+        </div>
+        <div class="section-body">
+            <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                <label style="color: var(--text-primary); font-weight: 600; min-width: 300px;">
+                    <i class="fas fa-sync-alt"></i> Exchange Rate Refresh Interval
+                </label>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <input type="number"
+                           id="refreshIntervalInput"
+                           value="{{ settings.get('exchange_rate_refresh_interval_minutes', {}).get('value', '60') }}"
+                           min="1"
+                           style="width: 80px; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 1rem;"
+                           oninput="markIntervalDirty()">
+                    <span style="color: var(--text-secondary); font-weight: 500;">minutes</span>
+                    <button class="btn-sm btn-primary" id="saveIntervalBtn" onclick="saveRefreshInterval()" disabled>
+                        <i class="fas fa-save"></i> Save
+                    </button>
+                </div>
+            </div>
+            <p style="color: var(--text-secondary); margin-top: 10px; font-size: 0.9rem;">
+                {{ settings.get('exchange_rate_refresh_interval_minutes', {}).get('description', '') }}
+                <em>— change takes effect after the next scheduled run, no restart needed.</em>
+            </p>
+        </div>
+    </div>
+
     <!-- User Management Section -->
     <div class="section-card">
         <div class="section-header">
@@ -662,5 +694,53 @@
     }, 2000);
 
     console.log('Admin Dashboard fully initialized - All overlays cleared');
+
+    // ── System Settings: refresh interval ──────────────────────
+    // Save button stays disabled until the value actually changes
+    const _intervalOriginal = document.getElementById('refreshIntervalInput').value;
+
+    function markIntervalDirty() {
+        const current = document.getElementById('refreshIntervalInput').value;
+        document.getElementById('saveIntervalBtn').disabled = (current === _intervalOriginal);
+    }
+
+    async function saveRefreshInterval() {
+        const input = document.getElementById('refreshIntervalInput');
+        const value = input.value.trim();
+
+        if (!value || parseInt(value) < 1) {
+            showAlert('Interval must be at least 1 minute', 'danger');
+            return;
+        }
+
+        const btn = document.getElementById('saveIntervalBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…';
+
+        try {
+            const response = await fetch('/api/admin/settings/exchange_rate_refresh_interval_minutes', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ value: value })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                showAlert('Refresh interval updated to ' + value + ' minutes', 'success');
+                btn.innerHTML = '<i class="fas fa-save"></i> Save';
+                // keep button disabled — value now matches what the server has
+            } else {
+                showAlert(data.error || 'Failed to update setting', 'danger');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-save"></i> Save';
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showAlert('Network error: ' + error.message, 'danger');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-save"></i> Save';
+        }
+    }
 </script>
 {% endblock %}
