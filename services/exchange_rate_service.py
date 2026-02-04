@@ -254,7 +254,8 @@ class ExchangeRateService:
                         return {
                             'buy_rate': buy_rate,
                             'sell_rate': sell_rate,
-                            'date': target_date_str
+                            'date': target_date_str,
+                            'source': 'CBSL'
                         }
 
             # If exact date not found, try to find the nearest previous date

@@ -488,6 +488,7 @@ def populate_all_exchange_rates_background():
                            FROM exchange_rates
                            WHERE date BETWEEN %s
                              AND %s
+                             AND source IN ('CBSL', 'CBSL_BULK')
                            """, (start_date, end_date))
 
             existing_dates = {row[0] for row in cursor.fetchall()}
@@ -4189,8 +4190,11 @@ def get_all_bank_rates_for_date():
             cbsl_service = get_exchange_rate_service()
             cbsl_rate = cbsl_service.get_exchange_rate(date)
             if cbsl_rate and isinstance(cbsl_rate, dict):
-                cbsl_rate['bank'] = 'CBSL'
-                rates.append(cbsl_rate)
+                # Guard: only label as CBSL if source is actually CBSL (or absent = live scrape)
+                source = cbsl_rate.get('source')
+                if source is None or source in ('CBSL', 'CBSL_BULK'):
+                    cbsl_rate['bank'] = 'CBSL'
+                    rates.append(cbsl_rate)
         except Exception as e:
             logger.warning(f"Failed to get CBSL rate for {date_str}: {str(e)}")
 
@@ -4265,6 +4269,9 @@ def get_bank_rate_for_date(bank_code):
             try:
                 service = get_exchange_rate_service()
                 rate = service.get_exchange_rate(date)
+                # Guard: reject if the service returned another bank's row
+                if rate and rate.get('source') in ('HNB', 'PB'):
+                    rate = None
             except Exception as e:
                 logger.error(f"Error fetching CBSL rate for {date_str}: {str(e)}")
                 return jsonify({'error': f'Failed to fetch CBSL rate', 'details': str(e)}), 500
