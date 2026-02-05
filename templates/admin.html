@@ -289,9 +289,38 @@
             </h2>
         </div>
         <div class="section-body">
+            <!-- Refresh-mode radio toggle -->
             <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
                 <label style="color: var(--text-primary); font-weight: 600; min-width: 300px;">
-                    <i class="fas fa-sync-alt"></i> Exchange Rate Refresh Interval
+                    <i class="fas fa-sync-alt"></i> Exchange Rate Refresh Mode
+                </label>
+                <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-primary);">
+                        <input type="radio" name="refreshMode" id="modeBackground" value="background"
+                               {% if settings.get('exchange_rate_refresh_mode', {}).get('value', 'background') == 'background' %}checked{% endif %}
+                               oninput="onModeChange()">
+                        <span>Background (automatic)</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-primary);">
+                        <input type="radio" name="refreshMode" id="modeManual" value="manual"
+                               {% if settings.get('exchange_rate_refresh_mode', {}).get('value', 'background') == 'manual' %}checked{% endif %}
+                               oninput="onModeChange()">
+                        <span>Manual</span>
+                    </label>
+                    <button class="btn-sm btn-primary" id="saveModeBtn" onclick="saveRefreshMode()" disabled>
+                        <i class="fas fa-save"></i> Save
+                    </button>
+                </div>
+            </div>
+            <p style="color: var(--text-secondary); margin-top: 8px; font-size: 0.9rem;">
+                {{ settings.get('exchange_rate_refresh_mode', {}).get('description', '') }}
+            </p>
+
+            <!-- Refresh interval (visible only when mode = background) -->
+            <div id="intervalRow"
+                 style="display: {% if settings.get('exchange_rate_refresh_mode', {}).get('value', 'background') == 'background' %}flex{% else %}none{% endif %}; align-items: center; gap: 15px; flex-wrap: wrap; margin-top: 18px;">
+                <label style="color: var(--text-primary); font-weight: 600; min-width: 300px;">
+                    <i class="fas fa-clock"></i> Refresh Interval
                 </label>
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <input type="number"
@@ -306,10 +335,21 @@
                     </button>
                 </div>
             </div>
-            <p style="color: var(--text-secondary); margin-top: 10px; font-size: 0.9rem;">
+            <p id="intervalDesc"
+               style="color: var(--text-secondary); margin-top: 8px; font-size: 0.9rem; display: {% if settings.get('exchange_rate_refresh_mode', {}).get('value', 'background') == 'background' %}block{% else %}none{% endif %};">
                 {{ settings.get('exchange_rate_refresh_interval_minutes', {}).get('description', '') }}
                 <em>— change takes effect after the next scheduled run, no restart needed.</em>
             </p>
+
+            <!-- Manual "Refresh All" button (always visible) -->
+            <div style="margin-top: 18px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <button class="btn-sm btn-primary" id="refreshAllBtn" onclick="refreshAllRates()">
+                    <i class="fas fa-sync-alt"></i> Refresh All Rates Now
+                </button>
+                <span style="color: var(--text-secondary); font-size: 0.9rem;">
+                    Fetch fresh rates from HNB, People's Bank, and CBSL on demand.
+                </span>
+            </div>
         </div>
     </div>
 
@@ -694,6 +734,85 @@
     }, 2000);
 
     console.log('Admin Dashboard fully initialized - All overlays cleared');
+
+    // ── System Settings: refresh mode ───────────────────────────
+    const _modeOriginal = document.querySelector('input[name="refreshMode"]:checked').value;
+
+    function onModeChange() {
+        const current = document.querySelector('input[name="refreshMode"]:checked').value;
+        document.getElementById('saveModeBtn').disabled = (current === _modeOriginal);
+        const isBackground = (current === 'background');
+        document.getElementById('intervalRow').style.display  = isBackground ? 'flex'  : 'none';
+        document.getElementById('intervalDesc').style.display = isBackground ? 'block' : 'none';
+    }
+
+    async function saveRefreshMode() {
+        const value = document.querySelector('input[name="refreshMode"]:checked').value;
+        const btn   = document.getElementById('saveModeBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving\u2026';
+
+        try {
+            const response = await fetch('/api/admin/settings/exchange_rate_refresh_mode', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ value: value })
+            });
+            const data = await response.json();
+            if (response.ok) {
+                showAlert('Refresh mode set to \u201c' + value + '\u201d', 'success');
+                btn.innerHTML = '<i class="fas fa-save"></i> Save';
+                // keep disabled — value now matches server
+            } else {
+                showAlert(data.error || 'Failed to update setting', 'danger');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-save"></i> Save';
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showAlert('Network error: ' + error.message, 'danger');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-save"></i> Save';
+        }
+    }
+
+    // ── System Settings: on-demand refresh ───────────────────────
+    async function refreshAllRates() {
+        const btn = document.getElementById('refreshAllBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing\u2026';
+
+        try {
+            const response = await fetch('/api/exchange-rate/refresh-all');
+            const data = await response.json();
+
+            if (data.sources) {
+                // Build a per-source summary from the detailed response
+                const lines = Object.entries(data.sources).map(([name, info]) => {
+                    if (info.status === 'success') {
+                        return name + ': Buy ' + info.buy_rate + ' / Sell ' + info.sell_rate;
+                    }
+                    return name + ': FAILED \u2014 ' + (info.error || 'unknown');
+                });
+
+                const anyFailed = (data.failed && data.failed.length > 0);
+                const allFailed = (data.succeeded && data.succeeded.length === 0);
+                showAlert(
+                    data.message + '<br>' + lines.join('<br>'),
+                    allFailed ? 'danger' : anyFailed ? 'warning' : 'success'
+                );
+            } else if (response.ok) {
+                showAlert(data.message || 'Exchange rates refreshed', 'success');
+            } else {
+                showAlert(data.error || 'Refresh failed', 'danger');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showAlert('Network error: ' + error.message, 'danger');
+        }
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh All Rates Now';
+    }
 
     // ── System Settings: refresh interval ──────────────────────
     // Save button stays disabled until the value actually changes

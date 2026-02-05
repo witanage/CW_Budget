@@ -320,9 +320,23 @@ def register():
     return render_template('register.html')
 
 
-def refresh_all_exchange_rates():
-    """Hourly scheduled job: fetch today's exchange rates from all banks and cache in the database."""
-    logger.info("Scheduler: Starting hourly exchange rate refresh...")
+def refresh_all_exchange_rates(force=False):
+    """Fetch today's exchange rates from all banks and cache in the database.
+
+    Called by the background scheduler every *interval* minutes.  When the
+    admin switches the mode to ``manual`` the scheduler still fires but the
+    function returns immediately — unless *force* is ``True`` (used by the
+    admin "Refresh All" endpoint).
+    """
+    if not force:
+        mode = get_setting('exchange_rate_refresh_mode', 'background')
+        if mode != 'background':
+            logger.info("Scheduler: refresh mode is '%s' — skipping automatic refresh.", mode)
+            return
+
+    logger.info("Scheduler: Starting exchange rate refresh (force=%s)...", force)
+
+    results = {}
 
     # HNB
     hnb_start = time.time()
@@ -336,16 +350,19 @@ def refresh_all_exchange_rates():
                                      buy_rate=hnb_rate['buy_rate'],
                                      sell_rate=hnb_rate['sell_rate'],
                                      duration_ms=hnb_ms)
+            results['HNB'] = {'status': 'success', 'buy_rate': hnb_rate['buy_rate'], 'sell_rate': hnb_rate['sell_rate']}
         else:
             logger.warning("Scheduler: Failed to fetch HNB rate")
             log_exchange_rate_refresh('HNB', 'failure',
                                      error_message='No rate returned by HNB API',
                                      duration_ms=hnb_ms)
+            results['HNB'] = {'status': 'failure', 'error': 'No rate returned by HNB API'}
     except Exception as e:
         logger.error(f"Scheduler: Error fetching HNB rate: {str(e)}")
         log_exchange_rate_refresh('HNB', 'failure',
                                  error_message=str(e),
                                  duration_ms=int((time.time() - hnb_start) * 1000))
+        results['HNB'] = {'status': 'failure', 'error': str(e)}
 
     # People's Bank
     pb_start = time.time()
@@ -359,16 +376,19 @@ def refresh_all_exchange_rates():
                                      buy_rate=pb_rate['buy_rate'],
                                      sell_rate=pb_rate['sell_rate'],
                                      duration_ms=pb_ms)
+            results['PB'] = {'status': 'success', 'buy_rate': pb_rate['buy_rate'], 'sell_rate': pb_rate['sell_rate']}
         else:
             logger.warning("Scheduler: Failed to fetch PB rate")
             log_exchange_rate_refresh('PB', 'failure',
                                      error_message='No rate returned by PB scraper',
                                      duration_ms=pb_ms)
+            results['PB'] = {'status': 'failure', 'error': 'No rate returned by PB scraper'}
     except Exception as e:
         logger.error(f"Scheduler: Error fetching PB rate: {str(e)}")
         log_exchange_rate_refresh('PB', 'failure',
                                  error_message=str(e),
                                  duration_ms=int((time.time() - pb_start) * 1000))
+        results['PB'] = {'status': 'failure', 'error': str(e)}
 
     # CBSL (for today)
     cbsl_start = time.time()
@@ -383,16 +403,19 @@ def refresh_all_exchange_rates():
                                      buy_rate=cbsl_rate['buy_rate'],
                                      sell_rate=cbsl_rate['sell_rate'],
                                      duration_ms=cbsl_ms)
+            results['CBSL'] = {'status': 'success', 'buy_rate': cbsl_rate['buy_rate'], 'sell_rate': cbsl_rate['sell_rate']}
         else:
             logger.warning("Scheduler: No CBSL rate available for today")
             log_exchange_rate_refresh('CBSL', 'failure',
                                      error_message='No CBSL rate available for today',
                                      duration_ms=cbsl_ms)
+            results['CBSL'] = {'status': 'failure', 'error': 'No CBSL rate available for today'}
     except Exception as e:
         logger.error(f"Scheduler: Error fetching CBSL rate: {str(e)}")
         log_exchange_rate_refresh('CBSL', 'failure',
                                  error_message=str(e),
                                  duration_ms=int((time.time() - cbsl_start) * 1000))
+        results['CBSL'] = {'status': 'failure', 'error': str(e)}
 
     # Check whether the admin changed the interval since the last run.
     # reschedule_job() is a no-op-equivalent when the value hasn't changed.
@@ -408,7 +431,46 @@ def refresh_all_exchange_rates():
         except Exception as e:
             logger.error(f"Scheduler: Error checking interval setting: {str(e)}")
 
-    logger.info("Scheduler: Exchange rate refresh completed")
+    logger.info("Scheduler: Exchange rate refresh completed — results: %s", results)
+    return results
+
+
+def _resolve_rate(service, date):
+    """Return the rate from *service* for *date*, hitting the 3rd-party
+    source when appropriate.
+
+    background mode
+        The scheduler keeps the DB warm.  A plain cache read is enough.
+
+    manual mode + today
+        Nothing runs in the background, so we must fetch live ourselves.
+        ``fetch_and_store_current_rate()`` always contacts the external
+        source, writes via ``ON DUPLICATE KEY UPDATE`` (overwriting any
+        stale cached row), and returns the fresh value.  We fall back to
+        the cached row only when the live fetch itself fails (network
+        error, parse error, etc.).
+
+    manual mode + historical date
+        HNB and PB APIs only expose current rates; the DB is the only
+        source for past dates.
+
+    CBSL
+        ``ExchangeRateService`` has no ``fetch_and_store_current_rate``;
+        its ``get_exchange_rate`` already does cache-then-live-scrape
+        internally, so no special handling is needed.
+    """
+    mode = get_setting('exchange_rate_refresh_mode', 'background')
+    if mode == 'manual' and hasattr(service, 'fetch_and_store_current_rate'):
+        today = datetime.now().date()
+        if date == today:
+            live = service.fetch_and_store_current_rate()
+            if live:
+                return live
+            # live fetch failed — return whatever is cached
+            return service.get_exchange_rate(date)
+        # historical date — cache is the only option
+        return service.get_exchange_rate(date)
+    return service.get_exchange_rate(date)
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -999,6 +1061,10 @@ def update_admin_setting(key):
             new_value = str(interval)
         except (ValueError, TypeError):
             return jsonify({'error': 'Interval must be a positive integer'}), 400
+
+    if key == 'exchange_rate_refresh_mode':
+        if new_value not in ('background', 'manual'):
+            return jsonify({'error': "Value must be 'background' or 'manual'"}), 400
 
     connection = get_db_connection()
     if not connection:
@@ -3847,13 +3913,13 @@ def get_hnb_current_rate():
     """
     try:
         service = get_hnb_exchange_rate_service()
-        rate_data = service.get_exchange_rate(datetime.now().date())
+        rate_data = _resolve_rate(service, datetime.now().date())
 
         if rate_data:
-            logger.info(f"HNB current rate returned from cache: {rate_data}")
+            logger.info(f"HNB current rate: {rate_data}")
             return jsonify(rate_data), 200
         else:
-            return jsonify({'error': 'HNB rate not yet available. Scheduler will refresh shortly.'}), 404
+            return jsonify({'error': 'HNB rate not yet available.'}), 404
 
     except Exception as e:
         logger.error(f"Error fetching HNB current rate: {str(e)}")
@@ -3905,13 +3971,13 @@ def get_pb_current_rate():
     """
     try:
         service = get_pb_exchange_rate_service()
-        rate_data = service.get_exchange_rate(datetime.now().date())
+        rate_data = _resolve_rate(service, datetime.now().date())
 
         if rate_data:
-            logger.info(f"PB current rate returned from cache: {rate_data}")
+            logger.info(f"PB current rate: {rate_data}")
             return jsonify(rate_data), 200
         else:
-            return jsonify({'error': "People's Bank rate not yet available. Scheduler will refresh shortly."}), 404
+            return jsonify({'error': "People's Bank rate not yet available."}), 404
 
     except Exception as e:
         logger.error(f"Error fetching PB current rate: {str(e)}")
@@ -3947,6 +4013,30 @@ def refresh_pb_rate():
         logger.error(f"Error refreshing PB rate: {str(e)}")
         return jsonify({'error': 'Failed to refresh exchange rate', 'details': str(e)}), 500
 
+
+@app.route('/api/exchange-rate/refresh-all', methods=['GET'])
+@admin_required
+def refresh_all_rates_manually():
+    """Admin-only: trigger an immediate refresh of all exchange-rate sources
+    regardless of the current refresh-mode setting.  Returns per-source
+    results so the caller can see exactly which banks succeeded or failed."""
+    try:
+        results = refresh_all_exchange_rates(force=True)
+        log_audit(session['user_id'], 'MANUAL_EXCHANGE_RATE_REFRESH')
+
+        succeeded = [k for k, v in results.items() if v.get('status') == 'success']
+        failed    = [k for k, v in results.items() if v.get('status') != 'success']
+
+        status_code = 200 if succeeded else 500
+        return jsonify({
+            'message': f"{len(succeeded)} of {len(results)} source(s) refreshed successfully",
+            'sources': results,
+            'succeeded': succeeded,
+            'failed': failed
+        }), status_code
+    except Exception as e:
+        logger.error(f"Error in manual refresh-all: {str(e)}")
+        return jsonify({'error': 'Refresh failed', 'details': str(e)}), 500
 
 
 def token_required(f):
@@ -4210,20 +4300,20 @@ def get_all_bank_rates_for_date():
 
         rates = []
 
-        # Get HNB rate from cache (refreshed hourly by scheduler)
+        # Get HNB rate (live-fetch in manual mode when today is missing)
         try:
             hnb_service = get_hnb_exchange_rate_service()
-            hnb_rate = hnb_service.get_exchange_rate(date)
+            hnb_rate = _resolve_rate(hnb_service, date)
             if hnb_rate:
                 hnb_rate['bank'] = 'HNB'
                 rates.append(hnb_rate)
         except Exception as e:
             logger.warning(f"Failed to get HNB rate for {date_str}: {str(e)}")
 
-        # Get People's Bank rate from cache (refreshed hourly by scheduler)
+        # Get People's Bank rate (live-fetch in manual mode when today is missing)
         try:
             pb_service = get_pb_exchange_rate_service()
-            pb_rate = pb_service.get_exchange_rate(date)
+            pb_rate = _resolve_rate(pb_service, date)
             if pb_rate:
                 pb_rate['bank'] = 'PB'
                 rates.append(pb_rate)
@@ -4279,14 +4369,14 @@ def get_bank_rate_for_date(bank_code):
         if bank_code_lower == 'hnb':
             try:
                 service = get_hnb_exchange_rate_service()
-                rate = service.get_exchange_rate(date)
+                rate = _resolve_rate(service, date)
             except Exception as e:
                 logger.error(f"Error fetching HNB rate for {date_str}: {str(e)}")
                 return jsonify({'error': f'Failed to fetch HNB rate', 'details': str(e)}), 500
         elif bank_code_lower == 'pb':
             try:
                 service = get_pb_exchange_rate_service()
-                rate = service.get_exchange_rate(date)
+                rate = _resolve_rate(service, date)
             except Exception as e:
                 logger.error(f"Error fetching PB rate for {date_str}: {str(e)}")
                 return jsonify({'error': f'Failed to fetch PB rate', 'details': str(e)}), 500
@@ -4352,7 +4442,7 @@ def get_hnb_rate_for_date():
             date = datetime.now().date()
 
         service = get_hnb_exchange_rate_service()
-        rate = service.get_exchange_rate(date)
+        rate = _resolve_rate(service, date)
 
         if rate:
             logger.info(f"HNB rate retrieved for {date_str or 'today'}: {rate}")
@@ -4409,7 +4499,7 @@ def get_pb_rate_for_date():
             date = datetime.now().date()
 
         service = get_pb_exchange_rate_service()
-        rate = service.get_exchange_rate(date)
+        rate = _resolve_rate(service, date)
 
         if rate:
             logger.info(f"PB rate retrieved for {date_str or 'today'}: {rate}")
