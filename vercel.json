@@ -1,0 +1,8 @@
+{
+  "cron": [
+    {
+      "matchers": ["/api/cron/refresh-exchange-rates"],
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}

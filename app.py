@@ -4460,6 +4460,66 @@ def handle_exception(error):
     return render_template('error.html', error_code=500, error_message='An unexpected error occurred'), 500
 
 
+# ---------------------------------------------------------------------------
+# Vercel Cron endpoint – replaces APScheduler on serverless deployments.
+# Vercel cannot keep a BackgroundScheduler alive; instead vercel.json defines
+# a cron job that hits this route every 5 minutes.  The endpoint gates on the
+# configured interval (exchange_rate_refresh_interval_minutes) so the actual
+# refresh only fires when enough time has passed since the last one.
+#
+# Security: set CRON_SECRET as an Environment Variable in the Vercel dashboard.
+# Vercel automatically forwards it as  Authorization: Bearer <value>  on every
+# cron-triggered request.
+# ---------------------------------------------------------------------------
+@app.route('/api/cron/refresh-exchange-rates', methods=['GET'])
+def cron_refresh_exchange_rates():
+    """Vercel-cron entry-point for the exchange-rate refresh job."""
+
+    # --- auth ---------------------------------------------------------------
+    secret = os.environ.get('CRON_SECRET')
+    if not secret:
+        logger.error("Cron: CRON_SECRET env var is not set")
+        return jsonify({'error': 'CRON_SECRET not configured on the server'}), 500
+
+    if request.headers.get('Authorization') != f'Bearer {secret}':
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    # --- interval gate ------------------------------------------------------
+    interval_minutes = int(get_setting('exchange_rate_refresh_interval_minutes', '60'))
+    connection = get_db_connection()
+    if connection:
+        try:
+            cursor = connection.cursor(dictionary=True)
+            cursor.execute(
+                "SELECT created_at FROM exchange_rate_refresh_logs "
+                "ORDER BY created_at DESC LIMIT 1"
+            )
+            row = cursor.fetchone()
+            if row:
+                last_refresh = row['created_at']
+                if isinstance(last_refresh, str):
+                    last_refresh = datetime.strptime(last_refresh, '%Y-%m-%d %H:%M:%S')
+                elapsed_minutes = (datetime.now() - last_refresh).total_seconds() / 60
+                if elapsed_minutes < interval_minutes:
+                    logger.info(
+                        f"Cron: Skipped – last refresh {elapsed_minutes:.1f} min ago "
+                        f"(interval {interval_minutes} min)"
+                    )
+                    return jsonify({
+                        'status': 'skipped',
+                        'elapsed_minutes': round(elapsed_minutes, 1),
+                        'interval_minutes': interval_minutes
+                    }), 200
+        except Exception as e:
+            logger.warning(f"Cron: Could not check last refresh time, proceeding: {e}")
+        finally:
+            connection.close()
+
+    # --- run refresh --------------------------------------------------------
+    refresh_all_exchange_rates()
+    return jsonify({'status': 'ok', 'message': 'Exchange rates refreshed'}), 200
+
+
 if __name__ == '__main__':
     logger.info("Starting Personal Finance Budget application...")
     logger.info(f"Debug mode: False (Production)")
