@@ -436,19 +436,40 @@ def refresh_all_exchange_rates(force=False):
 
 
 def _resolve_rate(service, date):
-    """Return today's rate from *service*, using the live-fetch-on-miss path
-    when the refresh mode is ``manual``.
+    """Return the rate from *service* for *date*, hitting the 3rd-party
+    source when appropriate.
 
-    In *background* mode the scheduler keeps the cache warm so a plain
-    DB read is sufficient.  In *manual* mode nothing populates the cache
-    automatically, so we delegate to ``get_or_fetch_rate`` which hits the
-    cache first and falls back to the 3rd-party source only for today's
-    date.  CBSL's ``get_exchange_rate`` already does live-fetch internally,
-    so no special branch is needed for that source.
+    background mode
+        The scheduler keeps the DB warm.  A plain cache read is enough.
+
+    manual mode + today
+        Nothing runs in the background, so we must fetch live ourselves.
+        ``fetch_and_store_current_rate()`` always contacts the external
+        source, writes via ``ON DUPLICATE KEY UPDATE`` (overwriting any
+        stale cached row), and returns the fresh value.  We fall back to
+        the cached row only when the live fetch itself fails (network
+        error, parse error, etc.).
+
+    manual mode + historical date
+        HNB and PB APIs only expose current rates; the DB is the only
+        source for past dates.
+
+    CBSL
+        ``ExchangeRateService`` has no ``fetch_and_store_current_rate``;
+        its ``get_exchange_rate`` already does cache-then-live-scrape
+        internally, so no special handling is needed.
     """
     mode = get_setting('exchange_rate_refresh_mode', 'background')
-    if mode == 'manual' and hasattr(service, 'get_or_fetch_rate'):
-        return service.get_or_fetch_rate(date)
+    if mode == 'manual' and hasattr(service, 'fetch_and_store_current_rate'):
+        today = datetime.now().date()
+        if date == today:
+            live = service.fetch_and_store_current_rate()
+            if live:
+                return live
+            # live fetch failed — return whatever is cached
+            return service.get_exchange_rate(date)
+        # historical date — cache is the only option
+        return service.get_exchange_rate(date)
     return service.get_exchange_rate(date)
 
 
