@@ -320,9 +320,21 @@ def register():
     return render_template('register.html')
 
 
-def refresh_all_exchange_rates():
-    """Hourly scheduled job: fetch today's exchange rates from all banks and cache in the database."""
-    logger.info("Scheduler: Starting hourly exchange rate refresh...")
+def refresh_all_exchange_rates(force=False):
+    """Fetch today's exchange rates from all banks and cache in the database.
+
+    Called by the background scheduler every *interval* minutes.  When the
+    admin switches the mode to ``manual`` the scheduler still fires but the
+    function returns immediately — unless *force* is ``True`` (used by the
+    admin "Refresh All" endpoint).
+    """
+    if not force:
+        mode = get_setting('exchange_rate_refresh_mode', 'background')
+        if mode != 'background':
+            logger.info("Scheduler: refresh mode is '%s' — skipping automatic refresh.", mode)
+            return
+
+    logger.info("Scheduler: Starting exchange rate refresh (force=%s)...", force)
 
     # HNB
     hnb_start = time.time()
@@ -999,6 +1011,10 @@ def update_admin_setting(key):
             new_value = str(interval)
         except (ValueError, TypeError):
             return jsonify({'error': 'Interval must be a positive integer'}), 400
+
+    if key == 'exchange_rate_refresh_mode':
+        if new_value not in ('background', 'manual'):
+            return jsonify({'error': "Value must be 'background' or 'manual'"}), 400
 
     connection = get_db_connection()
     if not connection:
@@ -3947,6 +3963,19 @@ def refresh_pb_rate():
         logger.error(f"Error refreshing PB rate: {str(e)}")
         return jsonify({'error': 'Failed to refresh exchange rate', 'details': str(e)}), 500
 
+
+@app.route('/api/exchange-rate/refresh-all', methods=['GET'])
+@admin_required
+def refresh_all_rates_manually():
+    """Admin-only: trigger an immediate refresh of all exchange-rate sources
+    regardless of the current refresh-mode setting."""
+    try:
+        refresh_all_exchange_rates(force=True)
+        log_audit(session['user_id'], 'MANUAL_EXCHANGE_RATE_REFRESH')
+        return jsonify({'message': 'All exchange rates refreshed'}), 200
+    except Exception as e:
+        logger.error(f"Error in manual refresh-all: {str(e)}")
+        return jsonify({'error': 'Refresh failed', 'details': str(e)}), 500
 
 
 def token_required(f):
