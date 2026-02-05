@@ -454,3 +454,26 @@ COMMENT='Runtime application settings (key-value store)';
 INSERT IGNORE INTO app_settings (setting_key, value, description) VALUES
 ('exchange_rate_refresh_interval_minutes', '60',
  'How often (in minutes) the background scheduler fetches fresh exchange rates from all banks');
+
+-- ============================================================
+-- Exchange-Rate Refresh Logs Table
+-- ============================================================
+-- One row per source per scheduler run.  Captures whether the
+-- fetch succeeded or failed, the rates that were stored (or the
+-- error message), and the wall-clock time the attempt took.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS exchange_rate_refresh_logs (
+    id            INT AUTO_INCREMENT PRIMARY KEY,
+    source        VARCHAR(50)  NOT NULL COMMENT 'Bank / API source (HNB, PB, CBSL)',
+    status        ENUM('success','failure') NOT NULL COMMENT 'Outcome of the fetch attempt',
+    buy_rate      DECIMAL(10,4) NULL COMMENT 'Buy rate that was stored (NULL on failure)',
+    sell_rate     DECIMAL(10,4) NULL COMMENT 'Sell rate that was stored (NULL on failure)',
+    error_message TEXT          NULL COMMENT 'Error detail when status = failure',
+    duration_ms   INT UNSIGNED  NULL COMMENT 'Wall-clock time of the fetch in milliseconds',
+    created_at    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_source     (source),
+    INDEX idx_status     (status),
+    INDEX idx_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+COMMENT='Logs every exchange-rate refresh attempt made by the background scheduler';
