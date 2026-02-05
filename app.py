@@ -336,6 +336,8 @@ def refresh_all_exchange_rates(force=False):
 
     logger.info("Scheduler: Starting exchange rate refresh (force=%s)...", force)
 
+    results = {}
+
     # HNB
     hnb_start = time.time()
     try:
@@ -348,16 +350,19 @@ def refresh_all_exchange_rates(force=False):
                                      buy_rate=hnb_rate['buy_rate'],
                                      sell_rate=hnb_rate['sell_rate'],
                                      duration_ms=hnb_ms)
+            results['HNB'] = {'status': 'success', 'buy_rate': hnb_rate['buy_rate'], 'sell_rate': hnb_rate['sell_rate']}
         else:
             logger.warning("Scheduler: Failed to fetch HNB rate")
             log_exchange_rate_refresh('HNB', 'failure',
                                      error_message='No rate returned by HNB API',
                                      duration_ms=hnb_ms)
+            results['HNB'] = {'status': 'failure', 'error': 'No rate returned by HNB API'}
     except Exception as e:
         logger.error(f"Scheduler: Error fetching HNB rate: {str(e)}")
         log_exchange_rate_refresh('HNB', 'failure',
                                  error_message=str(e),
                                  duration_ms=int((time.time() - hnb_start) * 1000))
+        results['HNB'] = {'status': 'failure', 'error': str(e)}
 
     # People's Bank
     pb_start = time.time()
@@ -371,16 +376,19 @@ def refresh_all_exchange_rates(force=False):
                                      buy_rate=pb_rate['buy_rate'],
                                      sell_rate=pb_rate['sell_rate'],
                                      duration_ms=pb_ms)
+            results['PB'] = {'status': 'success', 'buy_rate': pb_rate['buy_rate'], 'sell_rate': pb_rate['sell_rate']}
         else:
             logger.warning("Scheduler: Failed to fetch PB rate")
             log_exchange_rate_refresh('PB', 'failure',
                                      error_message='No rate returned by PB scraper',
                                      duration_ms=pb_ms)
+            results['PB'] = {'status': 'failure', 'error': 'No rate returned by PB scraper'}
     except Exception as e:
         logger.error(f"Scheduler: Error fetching PB rate: {str(e)}")
         log_exchange_rate_refresh('PB', 'failure',
                                  error_message=str(e),
                                  duration_ms=int((time.time() - pb_start) * 1000))
+        results['PB'] = {'status': 'failure', 'error': str(e)}
 
     # CBSL (for today)
     cbsl_start = time.time()
@@ -395,16 +403,19 @@ def refresh_all_exchange_rates(force=False):
                                      buy_rate=cbsl_rate['buy_rate'],
                                      sell_rate=cbsl_rate['sell_rate'],
                                      duration_ms=cbsl_ms)
+            results['CBSL'] = {'status': 'success', 'buy_rate': cbsl_rate['buy_rate'], 'sell_rate': cbsl_rate['sell_rate']}
         else:
             logger.warning("Scheduler: No CBSL rate available for today")
             log_exchange_rate_refresh('CBSL', 'failure',
                                      error_message='No CBSL rate available for today',
                                      duration_ms=cbsl_ms)
+            results['CBSL'] = {'status': 'failure', 'error': 'No CBSL rate available for today'}
     except Exception as e:
         logger.error(f"Scheduler: Error fetching CBSL rate: {str(e)}")
         log_exchange_rate_refresh('CBSL', 'failure',
                                  error_message=str(e),
                                  duration_ms=int((time.time() - cbsl_start) * 1000))
+        results['CBSL'] = {'status': 'failure', 'error': str(e)}
 
     # Check whether the admin changed the interval since the last run.
     # reschedule_job() is a no-op-equivalent when the value hasn't changed.
@@ -420,7 +431,8 @@ def refresh_all_exchange_rates(force=False):
         except Exception as e:
             logger.error(f"Scheduler: Error checking interval setting: {str(e)}")
 
-    logger.info("Scheduler: Exchange rate refresh completed")
+    logger.info("Scheduler: Exchange rate refresh completed — results: %s", results)
+    return results
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -3968,11 +3980,22 @@ def refresh_pb_rate():
 @admin_required
 def refresh_all_rates_manually():
     """Admin-only: trigger an immediate refresh of all exchange-rate sources
-    regardless of the current refresh-mode setting."""
+    regardless of the current refresh-mode setting.  Returns per-source
+    results so the caller can see exactly which banks succeeded or failed."""
     try:
-        refresh_all_exchange_rates(force=True)
+        results = refresh_all_exchange_rates(force=True)
         log_audit(session['user_id'], 'MANUAL_EXCHANGE_RATE_REFRESH')
-        return jsonify({'message': 'All exchange rates refreshed'}), 200
+
+        succeeded = [k for k, v in results.items() if v.get('status') == 'success']
+        failed    = [k for k, v in results.items() if v.get('status') != 'success']
+
+        status_code = 200 if succeeded else 500
+        return jsonify({
+            'message': f"{len(succeeded)} of {len(results)} source(s) refreshed successfully",
+            'sources': results,
+            'succeeded': succeeded,
+            'failed': failed
+        }), status_code
     except Exception as e:
         logger.error(f"Error in manual refresh-all: {str(e)}")
         return jsonify({'error': 'Refresh failed', 'details': str(e)}), 500

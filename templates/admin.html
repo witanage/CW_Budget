@@ -785,8 +785,24 @@
         try {
             const response = await fetch('/api/exchange-rate/refresh-all');
             const data = await response.json();
-            if (response.ok) {
-                showAlert('All exchange rates refreshed successfully', 'success');
+
+            if (data.sources) {
+                // Build a per-source summary from the detailed response
+                const lines = Object.entries(data.sources).map(([name, info]) => {
+                    if (info.status === 'success') {
+                        return name + ': Buy ' + info.buy_rate + ' / Sell ' + info.sell_rate;
+                    }
+                    return name + ': FAILED \u2014 ' + (info.error || 'unknown');
+                });
+
+                const anyFailed = (data.failed && data.failed.length > 0);
+                const allFailed = (data.succeeded && data.succeeded.length === 0);
+                showAlert(
+                    data.message + '<br>' + lines.join('<br>'),
+                    allFailed ? 'danger' : anyFailed ? 'warning' : 'success'
+                );
+            } else if (response.ok) {
+                showAlert(data.message || 'Exchange rates refreshed', 'success');
             } else {
                 showAlert(data.error || 'Refresh failed', 'danger');
             }
