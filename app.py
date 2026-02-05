@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import threading
+import time
 from datetime import datetime, timedelta
 from decimal import Decimal
 from functools import wraps
@@ -324,38 +325,74 @@ def refresh_all_exchange_rates():
     logger.info("Scheduler: Starting hourly exchange rate refresh...")
 
     # HNB
+    hnb_start = time.time()
     try:
         hnb_service = get_hnb_exchange_rate_service()
         hnb_rate = hnb_service.fetch_and_store_current_rate()
+        hnb_ms = int((time.time() - hnb_start) * 1000)
         if hnb_rate:
             logger.info(f"Scheduler: HNB rate updated: Buy={hnb_rate['buy_rate']}, Sell={hnb_rate['sell_rate']}")
+            log_exchange_rate_refresh('HNB', 'success',
+                                     buy_rate=hnb_rate['buy_rate'],
+                                     sell_rate=hnb_rate['sell_rate'],
+                                     duration_ms=hnb_ms)
         else:
             logger.warning("Scheduler: Failed to fetch HNB rate")
+            log_exchange_rate_refresh('HNB', 'failure',
+                                     error_message='No rate returned by HNB API',
+                                     duration_ms=hnb_ms)
     except Exception as e:
         logger.error(f"Scheduler: Error fetching HNB rate: {str(e)}")
+        log_exchange_rate_refresh('HNB', 'failure',
+                                 error_message=str(e),
+                                 duration_ms=int((time.time() - hnb_start) * 1000))
 
     # People's Bank
+    pb_start = time.time()
     try:
         pb_service = get_pb_exchange_rate_service()
         pb_rate = pb_service.fetch_and_store_current_rate()
+        pb_ms = int((time.time() - pb_start) * 1000)
         if pb_rate:
             logger.info(f"Scheduler: PB rate updated: Buy={pb_rate['buy_rate']}, Sell={pb_rate['sell_rate']}")
+            log_exchange_rate_refresh('PB', 'success',
+                                     buy_rate=pb_rate['buy_rate'],
+                                     sell_rate=pb_rate['sell_rate'],
+                                     duration_ms=pb_ms)
         else:
             logger.warning("Scheduler: Failed to fetch PB rate")
+            log_exchange_rate_refresh('PB', 'failure',
+                                     error_message='No rate returned by PB scraper',
+                                     duration_ms=pb_ms)
     except Exception as e:
         logger.error(f"Scheduler: Error fetching PB rate: {str(e)}")
+        log_exchange_rate_refresh('PB', 'failure',
+                                 error_message=str(e),
+                                 duration_ms=int((time.time() - pb_start) * 1000))
 
     # CBSL (for today)
+    cbsl_start = time.time()
     try:
         from services.exchange_rate_service import get_exchange_rate_service
         cbsl_service = get_exchange_rate_service()
         cbsl_rate = cbsl_service.get_exchange_rate(datetime.now())
+        cbsl_ms = int((time.time() - cbsl_start) * 1000)
         if cbsl_rate:
             logger.info(f"Scheduler: CBSL rate for today: Buy={cbsl_rate['buy_rate']}, Sell={cbsl_rate['sell_rate']}")
+            log_exchange_rate_refresh('CBSL', 'success',
+                                     buy_rate=cbsl_rate['buy_rate'],
+                                     sell_rate=cbsl_rate['sell_rate'],
+                                     duration_ms=cbsl_ms)
         else:
             logger.warning("Scheduler: No CBSL rate available for today")
+            log_exchange_rate_refresh('CBSL', 'failure',
+                                     error_message='No CBSL rate available for today',
+                                     duration_ms=cbsl_ms)
     except Exception as e:
         logger.error(f"Scheduler: Error fetching CBSL rate: {str(e)}")
+        log_exchange_rate_refresh('CBSL', 'failure',
+                                 error_message=str(e),
+                                 duration_ms=int((time.time() - cbsl_start) * 1000))
 
     # Check whether the admin changed the interval since the last run.
     # reschedule_job() is a no-op-equivalent when the value hasn't changed.
@@ -718,6 +755,25 @@ def log_audit(admin_user_id, action, target_user_id=None, details=None):
             connection.commit()
         except Error as e:
             logger.error(f"Error logging audit: {str(e)}")
+        finally:
+            cursor.close()
+            connection.close()
+
+
+def log_exchange_rate_refresh(source, status, buy_rate=None, sell_rate=None, error_message=None, duration_ms=None):
+    """Write one row to exchange_rate_refresh_logs for a single source attempt."""
+    connection = get_db_connection()
+    if connection:
+        cursor = connection.cursor()
+        try:
+            cursor.execute("""
+                INSERT INTO exchange_rate_refresh_logs
+                    (source, status, buy_rate, sell_rate, error_message, duration_ms)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (source, status, buy_rate, sell_rate, error_message, duration_ms))
+            connection.commit()
+        except Error as e:
+            logger.error(f"Error writing exchange_rate_refresh_logs: {str(e)}")
         finally:
             cursor.close()
             connection.close()
