@@ -423,26 +423,40 @@ transform: skewX(-25deg);
 }
 
 /* Smaller stat cards */
+.stat-card {
+border-radius: 10px;
+}
+
 .stat-card .card-body {
-padding: 8px 14px;
+padding: 6px 12px;
+}
+
+.stat-card .card-body > .row {
+margin: 0;
+}
+
+.stat-card .card-body > .row > .col {
+padding: 0;
 }
 
 .stat-card h6 {
-font-size: 0.7rem;
-margin-bottom: 0.15rem !important;
+font-size: 0.65rem;
+margin-bottom: 0 !important;
+line-height: 1.2;
 }
 
 .stat-card h3 {
-font-size: 1.1rem;
+font-size: 1rem;
 margin-bottom: 0 !important;
+line-height: 1.2;
 }
 
 .stat-icon {
-font-size: 1.5rem;
+font-size: 1.2rem;
 opacity: 0.15;
 position: absolute;
-right: 12px;
-top: 10px;
+right: 10px;
+top: 6px;
 }
 
 /* Stat card color overrides - align with base theme */
