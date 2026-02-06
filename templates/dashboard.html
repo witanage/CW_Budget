@@ -795,7 +795,22 @@
                             </div>
                         </div>
 
-                        <!-- Main Trend Chart -->
+                        <!-- Bank Comparison (first) -->
+                        <div class="card mb-3">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h6 class="card-title mb-0"><i class="fas fa-balance-scale me-2"></i>Bank Comparison</h6>
+                                <select class="form-select form-select-sm" id="ertCompMonths" style="width:auto;">
+                                    <option value="1">1M</option>
+                                    <option value="3" selected>3M</option>
+                                    <option value="6">6M</option>
+                                </select>
+                            </div>
+                            <div class="card-body">
+                                <div class="ert-chart-container"><canvas id="ertSourceChart"></canvas></div>
+                            </div>
+                        </div>
+
+                        <!-- Exchange Rate History -->
                         <div class="card mb-3">
                             <div class="card-header">
                                 <h6 class="card-title mb-0"><i class="fas fa-chart-area me-2"></i>Exchange Rate History</h6>
@@ -805,53 +820,38 @@
                             </div>
                         </div>
 
-                        <!-- Forecast Chart -->
-                        <div class="card mb-3">
-                            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-                                <h6 class="card-title mb-0"><i class="fas fa-magic me-2"></i>Forecast (Linear Trend)</h6>
-                                <div class="d-flex align-items-center gap-2">
-                                    <label class="form-label mb-0 small">Days:</label>
-                                    <select class="form-select form-select-sm" id="ertForecastDays" style="width:auto;">
-                                        <option value="7">7</option>
-                                        <option value="14">14</option>
-                                        <option value="30" selected>30</option>
-                                        <option value="60">60</option>
-                                        <option value="90">90</option>
-                                    </select>
-                                    <label class="form-label mb-0 small">Based on:</label>
-                                    <select class="form-select form-select-sm" id="ertForecastHistory" style="width:auto;">
-                                        <option value="1">1M</option>
-                                        <option value="3" selected>3M</option>
-                                        <option value="6">6M</option>
-                                        <option value="12">1Y</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <div class="ert-chart-container"><canvas id="ertForecastChart"></canvas></div>
-                                <div id="ertModelInfo" class="mt-2 small text-muted" style="display:none;">
-                                    <span><strong>Slope:</strong> <span id="ertSlope">--</span> LKR/day</span> &middot;
-                                    <span><strong>R&sup2;:</strong> <span id="ertR2">--</span></span> &middot;
-                                    <span><strong>Data:</strong> <span id="ertDataPts">--</span> points</span> &middot;
-                                    <span>95% Confidence Band</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Source Comparison + Volatility -->
+                        <!-- Forecast + Volatility -->
                         <div class="row mb-3">
                             <div class="col-12 col-lg-7 mb-3 mb-lg-0">
                                 <div class="card h-100">
-                                    <div class="card-header d-flex justify-content-between align-items-center">
-                                        <h6 class="card-title mb-0"><i class="fas fa-balance-scale me-2"></i>Bank Comparison</h6>
-                                        <select class="form-select form-select-sm" id="ertCompMonths" style="width:auto;">
-                                            <option value="1">1M</option>
-                                            <option value="3" selected>3M</option>
-                                            <option value="6">6M</option>
-                                        </select>
+                                    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                        <h6 class="card-title mb-0"><i class="fas fa-magic me-2"></i>Forecast (Linear Trend)</h6>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <label class="form-label mb-0 small">Days:</label>
+                                            <select class="form-select form-select-sm" id="ertForecastDays" style="width:auto;">
+                                                <option value="7">7</option>
+                                                <option value="14">14</option>
+                                                <option value="30" selected>30</option>
+                                                <option value="60">60</option>
+                                                <option value="90">90</option>
+                                            </select>
+                                            <label class="form-label mb-0 small">Based on:</label>
+                                            <select class="form-select form-select-sm" id="ertForecastHistory" style="width:auto;">
+                                                <option value="1">1M</option>
+                                                <option value="3" selected>3M</option>
+                                                <option value="6">6M</option>
+                                                <option value="12">1Y</option>
+                                            </select>
+                                        </div>
                                     </div>
                                     <div class="card-body">
-                                        <div class="ert-chart-container"><canvas id="ertSourceChart"></canvas></div>
+                                        <div class="ert-chart-container"><canvas id="ertForecastChart"></canvas></div>
+                                        <div id="ertModelInfo" class="mt-2 small text-muted" style="display:none;">
+                                            <span><strong>Slope:</strong> <span id="ertSlope">--</span> LKR/day</span> &middot;
+                                            <span><strong>R&sup2;:</strong> <span id="ertR2">--</span></span> &middot;
+                                            <span><strong>Data:</strong> <span id="ertDataPts">--</span> points</span> &middot;
+                                            <span>95% Confidence Band</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
