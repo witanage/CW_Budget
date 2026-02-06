@@ -136,6 +136,35 @@
     padding-top: 0.5rem;
 }
 
+/* Dark mode text fixes for Rate Trends */
+[data-theme="dark"] .ert-container .text-muted {
+    color: #b0b0b0 !important;
+}
+
+[data-theme="dark"] .ert-container p.text-muted.mb-0.small {
+    color: #c0c0c0 !important;
+}
+
+[data-theme="dark"] .ert-stat-card h4 {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .ert-stat-card h6 {
+    color: #b0b0b0 !important;
+}
+
+[data-theme="dark"] .ert-stat-card small.text-muted {
+    color: #a0a0a0 !important;
+}
+
+[data-theme="dark"] .ert-container .form-label {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] #ertModelInfo {
+    color: #b0b0b0;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .ert-container {
