@@ -77,8 +77,9 @@ function setupNavigation() {
 
     navLinks.forEach(link => {
         link.addEventListener('click', function(e) {
-            e.preventDefault();
             const pageName = this.getAttribute('data-page');
+            if (!pageName) return; // Allow normal navigation for real links
+            e.preventDefault();
             navigateToPage(pageName);
         });
     });
@@ -134,6 +135,9 @@ function loadPageData(pageName) {
             break;
         case 'tax':
             loadTaxCalculator();
+            break;
+        case 'rateTrends':
+            if (typeof loadRateTrends === 'function') loadRateTrends();
             break;
     }
 }
