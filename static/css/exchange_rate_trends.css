@@ -1,5 +1,5 @@
 /* ============================================================
-   Exchange Rate Trends Page Styles
+   Exchange Rate Trends — Dashboard SPA Page Styles
    ============================================================ */
 
 .ert-container {
@@ -50,7 +50,7 @@
 .ert-stat-icon.bg-warning { background: var(--warning-color); color: #333; }
 .ert-stat-icon.bg-info    { background: #17a2b8; }
 
-/* Cards */
+/* Cards inside Rate Trends */
 .ert-container .card {
     background: var(--card-bg);
     border: 1px solid var(--border-color);
@@ -73,6 +73,16 @@
     padding: 0.75rem 1rem;
 }
 
+/* Prevent card hover transform inside rate trends page */
+#rateTrendsPage .card:hover {
+    transform: none !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+}
+
+[data-theme="light"] #rateTrendsPage .card:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+}
+
 /* Chart containers */
 .ert-chart-container {
     position: relative;
@@ -81,13 +91,13 @@
 }
 
 /* Period selector buttons */
-#periodSelector .btn-outline-primary {
+#ertPeriodSelector .btn-outline-primary {
     border-color: var(--accent-color);
     color: var(--accent-color);
 }
 
-#periodSelector .btn-outline-primary.active,
-#periodSelector .btn-outline-primary:hover {
+#ertPeriodSelector .btn-outline-primary.active,
+#ertPeriodSelector .btn-outline-primary:hover {
     background: var(--accent-color);
     color: #fff;
     border-color: var(--accent-color);
@@ -121,7 +131,7 @@
 }
 
 /* Forecast model info */
-#forecastModelInfo {
+#ertModelInfo {
     border-top: 1px solid var(--border-color);
     padding-top: 0.5rem;
 }

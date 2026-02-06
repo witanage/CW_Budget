@@ -1,369 +1,478 @@
 // ============================================================
-// Exchange Rate Trends - Chart.js Visualisations
-// Single API call, single DB connection
+// Exchange Rate Trends — SPA page integration
+// Called by dashboard.js → loadPageData('rateTrends')
 // ============================================================
 
-let ertCharts = { mainTrend: null, forecast: null, sourceComparison: null, volatility: null, spread: null };
-let ertCache = null; // cached API response
+(function () {
+    'use strict';
 
-let ertSettings = {
-    period: 'daily',
-    months: 6,
-    forecastDays: 30,
-    forecastHistory: 3,
-    comparisonMonths: 3,
-    showBuySell: true
-};
+    // --------------- State ---------------
+    var _charts = {};
+    var _cache  = null;
+    var _bound  = false;
 
-const COLORS = {
-    mid:       { line: '#0d6efd', fill: 'rgba(13, 110, 253, 0.10)' },
-    buy:       { line: '#198754', fill: 'rgba(25, 135, 84, 0.08)' },
-    sell:      { line: '#dc3545', fill: 'rgba(220, 53, 69, 0.08)' },
-    forecast:  { line: '#6f42c1', fill: 'rgba(111, 66, 193, 0.10)' },
-    band:      'rgba(111, 66, 193, 0.08)',
-    cbsl: '#0d6efd', hnb: '#198754', pb: '#fd7e14', csv: '#6c757d', manual: '#20c997',
-    spread:    { line: '#fd7e14', fill: 'rgba(253, 126, 20, 0.15)' },
-    volatility: '#17a2b8'
-};
-const SOURCE_COLORS = { CBSL: COLORS.cbsl, HNB: COLORS.hnb, PB: COLORS.pb, CSV: COLORS.csv, Manual: COLORS.manual };
-
-// ============================================================
-// Init
-// ============================================================
-document.addEventListener('DOMContentLoaded', function () {
-    setupControls();
-    fetchAndRenderAll();
-});
-
-function setupControls() {
-    document.querySelectorAll('#periodSelector .btn').forEach(btn => {
-        btn.addEventListener('click', function () {
-            document.querySelectorAll('#periodSelector .btn').forEach(b => b.classList.remove('active'));
-            this.classList.add('active');
-            ertSettings.period = this.dataset.period;
-            fetchAndRenderAll();
-        });
-    });
-
-    document.getElementById('monthsSelector').addEventListener('change', function () {
-        ertSettings.months = parseInt(this.value);
-        fetchAndRenderAll();
-    });
-
-    document.getElementById('showBuySellToggle').addEventListener('change', function () {
-        ertSettings.showBuySell = this.checked;
-        if (ertCache) renderMainTrend(ertCache.trend);
-    });
-
-    document.getElementById('forecastDaysSelector').addEventListener('change', function () {
-        ertSettings.forecastDays = parseInt(this.value);
-        fetchAndRenderAll();
-    });
-    document.getElementById('forecastHistorySelector').addEventListener('change', function () {
-        ertSettings.forecastHistory = parseInt(this.value);
-        fetchAndRenderAll();
-    });
-
-    document.getElementById('comparisonMonthsSelector').addEventListener('change', function () {
-        ertSettings.comparisonMonths = parseInt(this.value);
-        fetchAndRenderAll();
-    });
-
-    document.getElementById('refreshAllChartsBtn').addEventListener('click', fetchAndRenderAll);
-}
-
-// ============================================================
-// Single fetch  -> render all charts from one response
-// ============================================================
-async function fetchAndRenderAll() {
-    try {
-        const params = new URLSearchParams({
-            period: ertSettings.period,
-            months: ertSettings.months,
-            forecast_days: ertSettings.forecastDays,
-            forecast_history: ertSettings.forecastHistory,
-            comparison_months: ertSettings.comparisonMonths
-        });
-        const res = await fetch(`/api/exchange-rate/trends/all?${params}`);
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error || 'API error');
-
-        ertCache = json;
-
-        renderMainTrend(json.trend || []);
-        renderForecast(json.forecast);
-        renderSourceComparison(json.source_comparison || {});
-        renderVolatility(json.monthly_volatility || []);
-        renderSpread(json.trend || []);
-    } catch (err) {
-        console.error('Trends fetch error:', err);
-        ['mainTrendChart', 'forecastChart', 'sourceComparisonChart', 'volatilityChart', 'spreadChart']
-            .forEach(id => renderEmptyChart(id, err.message));
-    }
-}
-
-// ============================================================
-// Theme helper
-// ============================================================
-function chartDefaults() {
-    const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
-    return {
-        gridColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
-        textColor: isDark ? '#ccc' : '#555'
+    var _s = {
+        period: 'daily',
+        months: 6,
+        forecastDays: 30,
+        forecastHistory: 3,
+        compMonths: 3,
+        showBuySell: true
     };
-}
 
-// ============================================================
-// 1. Main Trend
-// ============================================================
-function renderMainTrend(data) {
-    if (!data || data.length === 0) { renderEmptyChart('mainTrendChart', 'No exchange rate data available'); return; }
+    // --------------- Colours ---------------
+    var C = {
+        mid:    { line: '#0d6efd', fill: 'rgba(13,110,253,0.10)' },
+        buy:    { line: '#198754', fill: 'rgba(25,135,84,0.08)' },
+        sell:   { line: '#dc3545', fill: 'rgba(220,53,69,0.08)' },
+        fc:     { line: '#6f42c1', fill: 'rgba(111,66,193,0.10)' },
+        band:   'rgba(111,66,193,0.08)',
+        vol:    '#17a2b8'
+    };
+    var SRC_CLR = { CBSL: '#0d6efd', HNB: '#198754', PB: '#fd7e14', CSV: '#6c757d', Manual: '#20c997' };
 
-    updateSummaryCards(data);
+    // ===================================================================
+    // Public entry — called each time the user navigates to Rate Trends
+    // ===================================================================
+    window.loadRateTrends = function () {
+        if (!_bound) {
+            _bindControls();
+            _bound = true;
+        }
+        _fetchAll();
+    };
 
-    const labels = data.map(d => {
-        if (ertSettings.period === 'monthly') return `${d.year}-${String(d.month).padStart(2, '0')}`;
-        if (ertSettings.period === 'weekly') return d.week_start;
-        return d.date;
-    });
-
-    const midKey  = data[0].mid_rate !== undefined ? 'mid_rate' : 'avg_mid_rate';
-    const buyKey  = 'avg_buy_rate';
-    const sellKey = 'avg_sell_rate';
-
-    const datasets = [{
-        label: 'Mid Rate', data: data.map(d => d[midKey]),
-        borderColor: COLORS.mid.line, backgroundColor: COLORS.mid.fill,
-        borderWidth: 2, fill: true, tension: 0.3,
-        pointRadius: data.length > 90 ? 0 : 2, pointHoverRadius: 5, order: 1
-    }];
-
-    if (ertSettings.showBuySell) {
-        datasets.push({
-            label: 'Buy Rate', data: data.map(d => d[buyKey]),
-            borderColor: COLORS.buy.line, backgroundColor: COLORS.buy.fill,
-            borderWidth: 1.5, borderDash: [4, 3], fill: false, tension: 0.3,
-            pointRadius: 0, pointHoverRadius: 4, order: 2
-        }, {
-            label: 'Sell Rate', data: data.map(d => d[sellKey]),
-            borderColor: COLORS.sell.line, backgroundColor: COLORS.sell.fill,
-            borderWidth: 1.5, borderDash: [4, 3], fill: false, tension: 0.3,
-            pointRadius: 0, pointHoverRadius: 4, order: 3
+    // ===================================================================
+    // Bind controls (once)
+    // ===================================================================
+    function _bindControls() {
+        // Period buttons
+        var btns = document.querySelectorAll('#ertPeriodSelector .btn');
+        btns.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                btns.forEach(function (b) { b.classList.remove('active'); });
+                btn.classList.add('active');
+                _s.period = btn.getAttribute('data-period');
+                _fetchAll();
+            });
         });
-    }
-    renderLineChart('mainTrendChart', 'mainTrend', labels, datasets, 'LKR per USD');
-}
 
-// ============================================================
-// 2. Forecast
-// ============================================================
-function renderForecast(fc) {
-    if (!fc) { renderEmptyChart('forecastChart', 'Not enough data for forecast'); document.getElementById('forecastModelInfo').style.display = 'none'; return; }
-
-    const history  = fc.history || [];
-    const forecast = fc.points  || [];
-    const model    = fc.model   || {};
-
-    if (history.length === 0) { renderEmptyChart('forecastChart', 'Not enough data for forecast'); return; }
-
-    const historyTail = history.slice(-Math.min(60, history.length));
-    const allLabels = [...historyTail.map(d => d.date), ...forecast.map(d => d.date)];
-    const histLen = historyTail.length;
-    const lastMid = historyTail[historyTail.length - 1].mid_rate;
-
-    const historicalData = [...historyTail.map(d => d.mid_rate), ...forecast.map(() => null)];
-    const forecastData   = [...historyTail.slice(0, -1).map(() => null), lastMid, ...forecast.map(d => d.predicted_mid_rate)];
-    const upperBand      = [...historyTail.slice(0, -1).map(() => null), lastMid, ...forecast.map(d => d.upper_bound)];
-    const lowerBand      = [...historyTail.slice(0, -1).map(() => null), lastMid, ...forecast.map(d => d.lower_bound)];
-
-    const datasets = [
-        { label: 'Historical', data: historicalData, borderColor: COLORS.mid.line, backgroundColor: COLORS.mid.fill, borderWidth: 2, fill: true, tension: 0.3, pointRadius: 0, pointHoverRadius: 4, order: 2 },
-        { label: 'Forecast', data: forecastData, borderColor: COLORS.forecast.line, backgroundColor: COLORS.forecast.fill, borderWidth: 2.5, borderDash: [6, 4], fill: true, tension: 0.3, pointRadius: 0, pointHoverRadius: 4, order: 1 },
-        { label: 'Upper 95%', data: upperBand, borderColor: 'rgba(111,66,193,0.3)', backgroundColor: COLORS.band, borderWidth: 1, borderDash: [2, 2], fill: '+1', tension: 0.3, pointRadius: 0, order: 3 },
-        { label: 'Lower 95%', data: lowerBand, borderColor: 'rgba(111,66,193,0.3)', backgroundColor: COLORS.band, borderWidth: 1, borderDash: [2, 2], fill: false, tension: 0.3, pointRadius: 0, order: 4 }
-    ];
-
-    renderLineChart('forecastChart', 'forecast', allLabels, datasets, 'LKR per USD');
-    addForecastDivider('forecastChart', 'forecast', histLen - 1);
-
-    document.getElementById('forecastModelInfo').style.display = '';
-    document.getElementById('modelSlope').textContent      = model.slope_per_day != null ? model.slope_per_day.toFixed(4) : '--';
-    document.getElementById('modelRSquared').textContent    = model.r_squared    != null ? model.r_squared.toFixed(4)    : '--';
-    document.getElementById('modelDataPoints').textContent  = model.data_points  || '--';
-}
-
-// ============================================================
-// 3. Source Comparison
-// ============================================================
-function renderSourceComparison(sources) {
-    const sourceNames = Object.keys(sources);
-    if (sourceNames.length === 0) { renderEmptyChart('sourceComparisonChart', 'No multi-source data available'); return; }
-
-    const dateSet = new Set();
-    sourceNames.forEach(s => sources[s].forEach(d => dateSet.add(d.date)));
-    const labels = Array.from(dateSet).sort();
-
-    const datasets = sourceNames.map(src => {
-        const dateMap = {};
-        sources[src].forEach(d => { dateMap[d.date] = d.mid_rate; });
-        return {
-            label: src, data: labels.map(date => dateMap[date] ?? null),
-            borderColor: SOURCE_COLORS[src] || '#6c757d', borderWidth: 2,
-            fill: false, tension: 0.3, pointRadius: labels.length > 60 ? 0 : 2,
-            pointHoverRadius: 4, spanGaps: true
-        };
-    });
-    renderLineChart('sourceComparisonChart', 'sourceComparison', labels, datasets, 'Mid Rate (LKR)');
-}
-
-// ============================================================
-// 4. Volatility
-// ============================================================
-function renderVolatility(data) {
-    if (!data || data.length === 0) { renderEmptyChart('volatilityChart', 'No monthly data'); return; }
-
-    const labels    = data.map(d => `${d.year}-${String(d.month).padStart(2, '0')}`);
-    const volData   = data.map(d => d.buy_rate_volatility || 0);
-    const rangeData = data.map(d => d.month_range || 0);
-    const { gridColor, textColor } = chartDefaults();
-
-    if (ertCharts.volatility) ertCharts.volatility.destroy();
-    const ctx = document.getElementById('volatilityChart').getContext('2d');
-    ertCharts.volatility = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels,
-            datasets: [
-                { label: 'Volatility (Std Dev)', data: volData, backgroundColor: 'rgba(23,162,184,0.6)', borderColor: COLORS.volatility, borderWidth: 1, borderRadius: 3, yAxisID: 'y' },
-                { label: 'Month Range', data: rangeData, type: 'line', borderColor: COLORS.sell.line, backgroundColor: 'transparent', borderWidth: 2, tension: 0.3, pointRadius: 3, yAxisID: 'y1' }
-            ]
-        },
-        options: {
-            responsive: true, maintainAspectRatio: false,
-            interaction: { mode: 'index', intersect: false },
-            plugins: { legend: { labels: { color: textColor, font: { size: 11 } } }, tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y?.toFixed(4) || '--'}` } } },
-            scales: {
-                x: { ticks: { color: textColor, font: { size: 10 } }, grid: { color: gridColor } },
-                y:  { position: 'left',  title: { display: true, text: 'Std Dev', color: textColor, font: { size: 10 } }, ticks: { color: textColor, font: { size: 10 } }, grid: { color: gridColor } },
-                y1: { position: 'right', title: { display: true, text: 'Range (LKR)', color: textColor, font: { size: 10 } }, ticks: { color: textColor, font: { size: 10 } }, grid: { drawOnChartArea: false } }
-            }
-        }
-    });
-}
-
-// ============================================================
-// 5. Spread (reuses trend data - no extra fetch)
-// ============================================================
-function renderSpread(data) {
-    if (!data || data.length === 0) { renderEmptyChart('spreadChart', 'No spread data'); return; }
-
-    const labels = data.map(d => d.date || `${d.year}-${String(d.month).padStart(2, '0')}`);
-    const spreadData = data.map(d => {
-        const buy  = d.avg_buy_rate || 0;
-        const sell = d.avg_sell_rate || 0;
-        return parseFloat((sell - buy).toFixed(4));
-    });
-
-    renderLineChart('spreadChart', 'spread', labels, [{
-        label: 'Buy-Sell Spread', data: spreadData,
-        borderColor: COLORS.spread.line, backgroundColor: COLORS.spread.fill,
-        borderWidth: 1.5, fill: true, tension: 0.3, pointRadius: 0, pointHoverRadius: 4
-    }], 'Spread (LKR)');
-}
-
-// ============================================================
-// Summary Cards
-// ============================================================
-function updateSummaryCards(data) {
-    if (!data || data.length === 0) return;
-    const latest  = data[data.length - 1];
-    const midKey  = latest.mid_rate !== undefined ? 'mid_rate' : 'avg_mid_rate';
-    const buyKey  = 'avg_buy_rate';
-    const sellKey = 'avg_sell_rate';
-
-    const todayMid = latest[midKey];
-    document.getElementById('todayMidRate').textContent = todayMid != null ? todayMid.toFixed(2) : '--';
-    document.getElementById('todayRateDate').textContent = latest.date || latest.month_start || '';
-
-    const thirtyIdx = Math.max(0, data.length - 31);
-    const thirtyAgo = data[thirtyIdx];
-    if (thirtyAgo && todayMid != null) {
-        const oldMid = thirtyAgo[midKey];
-        if (oldMid != null) {
-            const diff = todayMid - oldMid;
-            const pct  = ((diff / oldMid) * 100).toFixed(2);
-            const el   = document.getElementById('thirtyDayChange');
-            const pctEl = document.getElementById('thirtyDayPct');
-            const iconEl = document.getElementById('changeIcon');
-            el.textContent  = (diff >= 0 ? '+' : '') + diff.toFixed(2);
-            pctEl.textContent = (diff >= 0 ? '+' : '') + pct + '%';
-            if (diff > 0)      { el.className = 'mb-0 ert-change-up';      iconEl.className = 'ert-stat-icon bg-danger';  iconEl.innerHTML = '<i class="fas fa-arrow-up"></i>'; }
-            else if (diff < 0) { el.className = 'mb-0 ert-change-down';    iconEl.className = 'ert-stat-icon bg-success'; iconEl.innerHTML = '<i class="fas fa-arrow-down"></i>'; }
-            else               { el.className = 'mb-0 ert-change-neutral'; iconEl.className = 'ert-stat-icon bg-secondary'; iconEl.innerHTML = '<i class="fas fa-minus"></i>'; }
-        }
+        _on('ertMonthsSelector', 'change', function () { _s.months = +this.value; _fetchAll(); });
+        _on('ertShowBuySell',    'change', function () {
+            _s.showBuySell = this.checked;
+            if (_cache) _renderTrend(_cache.trend || []);
+        });
+        _on('ertForecastDays',    'change', function () { _s.forecastDays    = +this.value; _fetchAll(); });
+        _on('ertForecastHistory', 'change', function () { _s.forecastHistory = +this.value; _fetchAll(); });
+        _on('ertCompMonths',      'change', function () { _s.compMonths      = +this.value; _fetchAll(); });
+        _on('ertRefreshBtn',      'click',  function () { _cache = null; _fetchAll(); });
     }
 
-    const spreads = data.map(d => (d[sellKey] || 0) - (d[buyKey] || 0)).filter(v => v > 0);
-    if (spreads.length > 0) document.getElementById('avgSpread').textContent = (spreads.reduce((a, b) => a + b, 0) / spreads.length).toFixed(2);
+    function _on(id, evt, fn) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener(evt, fn);
+    }
 
-    if (latest.buy_rate_volatility != null) document.getElementById('volatilityValue').textContent = latest.buy_rate_volatility.toFixed(4);
-}
+    // ===================================================================
+    // Single API fetch
+    // ===================================================================
+    function _fetchAll() {
+        _show('ertLoading', true);
+        _show('ertError',   false);
+        _show('ertContent',  false);
 
-// ============================================================
-// Shared chart helpers
-// ============================================================
-function renderLineChart(canvasId, chartKey, labels, datasets, yLabel) {
-    const { gridColor, textColor } = chartDefaults();
-    if (ertCharts[chartKey]) ertCharts[chartKey].destroy();
+        var params = new URLSearchParams({
+            period:            _s.period,
+            months:            _s.months,
+            forecast_days:     _s.forecastDays,
+            forecast_history:  _s.forecastHistory,
+            comparison_months: _s.compMonths
+        });
 
-    const ctx = document.getElementById(canvasId).getContext('2d');
-    ertCharts[chartKey] = new Chart(ctx, {
-        type: 'line',
-        data: { labels, datasets },
-        options: {
-            responsive: true, maintainAspectRatio: false,
-            interaction: { mode: 'index', intersect: false },
-            plugins: {
-                legend: { labels: { color: textColor, font: { size: 11 }, usePointStyle: true, pointStyle: 'line' } },
-                tooltip: {
-                    backgroundColor: 'rgba(0,0,0,0.85)', titleColor: '#fff', bodyColor: '#ddd',
-                    borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1, padding: 10,
-                    callbacks: { label: ctx => { const v = ctx.parsed.y; return v != null ? `${ctx.dataset.label}: ${v.toFixed(4)}` : ''; } }
+        fetch('/api/exchange-rate/trends/all?' + params)
+            .then(function (res) {
+                if (!res.ok) {
+                    return res.json().catch(function () { return {}; }).then(function (j) {
+                        throw new Error(j.error || 'Server error ' + res.status);
+                    });
                 }
+                return res.json();
+            })
+            .then(function (data) {
+                _cache = data;
+                _show('ertLoading', false);
+                _show('ertContent', true);
+
+                _renderTrend(data.trend || []);
+                _renderForecast(data.forecast);
+                _renderSources(data.source_comparison || {});
+                _renderVolatility(data.monthly_volatility || []);
+            })
+            .catch(function (err) {
+                console.error('ERT fetch error:', err);
+                _show('ertLoading', false);
+                _show('ertError', true);
+                var msg = document.getElementById('ertErrorMsg');
+                if (msg) msg.textContent = err.message || 'Failed to load exchange rate data.';
+            });
+    }
+
+    // ===================================================================
+    // Helpers
+    // ===================================================================
+    function _show(id, vis) {
+        var el = document.getElementById(id);
+        if (el) el.style.display = vis ? '' : 'none';
+    }
+
+    function _txt(id, val) {
+        var el = document.getElementById(id);
+        if (el) el.textContent = val;
+    }
+
+    function _theme() {
+        var dark = document.documentElement.getAttribute('data-theme') !== 'light';
+        return {
+            grid: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+            text: dark ? '#ccc' : '#555'
+        };
+    }
+
+    function _destroy(key) {
+        if (_charts[key]) { _charts[key].destroy(); _charts[key] = null; }
+    }
+
+    // ===================================================================
+    // 1. Main Trend Chart
+    // ===================================================================
+    function _renderTrend(data) {
+        if (!data.length) { _emptyCanvas('ertTrendChart', 'No exchange rate data available'); return; }
+
+        _updateCards(data);
+
+        var labels = data.map(function (d) {
+            if (_s.period === 'monthly') return d.year + '-' + String(d.month).padStart(2, '0');
+            if (_s.period === 'weekly')  return d.week_start;
+            return d.date;
+        });
+
+        var midK = data[0].mid_rate !== undefined ? 'mid_rate' : 'avg_mid_rate';
+
+        var ds = [{
+            label: 'Mid Rate',
+            data: data.map(function (d) { return d[midK]; }),
+            borderColor: C.mid.line, backgroundColor: C.mid.fill,
+            borderWidth: 2, fill: true, tension: 0.3,
+            pointRadius: data.length > 90 ? 0 : 2, pointHoverRadius: 5, order: 1
+        }];
+
+        if (_s.showBuySell) {
+            ds.push({
+                label: 'Buy Rate',
+                data: data.map(function (d) { return d.avg_buy_rate; }),
+                borderColor: C.buy.line, borderWidth: 1.5, borderDash: [4, 3],
+                fill: false, tension: 0.3, pointRadius: 0, pointHoverRadius: 4, order: 2
+            }, {
+                label: 'Sell Rate',
+                data: data.map(function (d) { return d.avg_sell_rate; }),
+                borderColor: C.sell.line, borderWidth: 1.5, borderDash: [4, 3],
+                fill: false, tension: 0.3, pointRadius: 0, pointHoverRadius: 4, order: 3
+            });
+        }
+
+        _lineChart('ertTrendChart', 'trend', labels, ds, 'LKR per USD');
+    }
+
+    // ===================================================================
+    // 2. Forecast Chart
+    // ===================================================================
+    function _renderForecast(fc) {
+        var info = document.getElementById('ertModelInfo');
+
+        if (!fc || !fc.history || fc.history.length < 7) {
+            _emptyCanvas('ertForecastChart', 'Not enough data for forecast');
+            if (info) info.style.display = 'none';
+            return;
+        }
+
+        var hist  = fc.history.slice(-60);
+        var pts   = fc.points || [];
+        var model = fc.model  || {};
+
+        var allLabels = hist.map(function (d) { return d.date; })
+                            .concat(pts.map(function (d) { return d.date; }));
+
+        var lastMid = hist[hist.length - 1].mid_rate;
+
+        // Build arrays: history has values then nulls; forecast has nulls then values
+        var hData = hist.map(function (d) { return d.mid_rate; })
+                        .concat(pts.map(function () { return null; }));
+
+        var pad = hist.slice(0, -1).map(function () { return null; });
+
+        var fData = pad.concat([lastMid]).concat(pts.map(function (d) { return d.predicted_mid_rate; }));
+        var upper = pad.concat([lastMid]).concat(pts.map(function (d) { return d.upper_bound; }));
+        var lower = pad.concat([lastMid]).concat(pts.map(function (d) { return d.lower_bound; }));
+
+        var ds = [
+            { label: 'Historical', data: hData, borderColor: C.mid.line, backgroundColor: C.mid.fill,
+              borderWidth: 2, fill: true, tension: 0.3, pointRadius: 0, order: 2 },
+            { label: 'Forecast', data: fData, borderColor: C.fc.line, backgroundColor: C.fc.fill,
+              borderWidth: 2.5, borderDash: [6, 4], fill: true, tension: 0.3, pointRadius: 0, order: 1 },
+            { label: 'Upper 95%', data: upper, borderColor: 'rgba(111,66,193,0.3)', backgroundColor: C.band,
+              borderWidth: 1, borderDash: [2, 2], fill: '+1', tension: 0.3, pointRadius: 0, order: 3 },
+            { label: 'Lower 95%', data: lower, borderColor: 'rgba(111,66,193,0.3)', backgroundColor: C.band,
+              borderWidth: 1, borderDash: [2, 2], fill: false, tension: 0.3, pointRadius: 0, order: 4 }
+        ];
+
+        _lineChart('ertForecastChart', 'forecast', allLabels, ds, 'LKR per USD');
+
+        // Draw vertical divider at history/forecast boundary
+        var divIdx = hist.length - 1;
+        var chart  = _charts.forecast;
+        if (chart) {
+            var origDraw = chart.draw.bind(chart);
+            chart.draw = function () {
+                origDraw();
+                var meta = chart.getDatasetMeta(0);
+                if (!meta.data[divIdx]) return;
+                var x   = meta.data[divIdx].x;
+                var yA  = chart.scales.y;
+                var ctx = chart.ctx;
+                ctx.save();
+                ctx.beginPath();
+                ctx.setLineDash([5, 5]);
+                ctx.strokeStyle = 'rgba(150,150,150,0.6)';
+                ctx.lineWidth   = 1.5;
+                ctx.moveTo(x, yA.top);
+                ctx.lineTo(x, yA.bottom);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.font      = '10px sans-serif';
+                ctx.fillStyle = 'rgba(150,150,150,0.8)';
+                ctx.textAlign = 'center';
+                ctx.fillText('Forecast \u2192', x + 40, yA.top + 12);
+                ctx.restore();
+            };
+            chart.draw();
+        }
+
+        // Model info
+        if (info) {
+            info.style.display = '';
+            _txt('ertSlope',   model.slope_per_day != null ? model.slope_per_day.toFixed(4) : '--');
+            _txt('ertR2',      model.r_squared     != null ? model.r_squared.toFixed(4)     : '--');
+            _txt('ertDataPts', model.data_points    || '--');
+        }
+    }
+
+    // ===================================================================
+    // 3. Source Comparison
+    // ===================================================================
+    function _renderSources(sources) {
+        var names = Object.keys(sources);
+        if (!names.length) { _emptyCanvas('ertSourceChart', 'No multi-source data available'); return; }
+
+        var dateSet = {};
+        names.forEach(function (s) {
+            sources[s].forEach(function (d) { dateSet[d.date] = true; });
+        });
+        var labels = Object.keys(dateSet).sort();
+
+        var ds = names.map(function (src) {
+            var map = {};
+            sources[src].forEach(function (d) { map[d.date] = d.mid_rate; });
+            return {
+                label: src,
+                data: labels.map(function (dt) { return map[dt] != null ? map[dt] : null; }),
+                borderColor: SRC_CLR[src] || '#6c757d', borderWidth: 2,
+                fill: false, tension: 0.3,
+                pointRadius: labels.length > 60 ? 0 : 2,
+                pointHoverRadius: 4, spanGaps: true
+            };
+        });
+
+        _lineChart('ertSourceChart', 'source', labels, ds, 'Mid Rate (LKR)');
+    }
+
+    // ===================================================================
+    // 4. Volatility (bar + line combo)
+    // ===================================================================
+    function _renderVolatility(data) {
+        if (!data.length) { _emptyCanvas('ertVolChart', 'No monthly data available'); return; }
+
+        var labels = data.map(function (d) { return d.year + '-' + String(d.month).padStart(2, '0'); });
+        var vol    = data.map(function (d) { return d.buy_rate_volatility || 0; });
+        var rng    = data.map(function (d) { return d.month_range || 0; });
+        var t      = _theme();
+
+        _destroy('vol');
+        var ctx = document.getElementById('ertVolChart');
+        if (!ctx) return;
+
+        _charts.vol = new Chart(ctx.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Volatility (Std Dev)', data: vol,
+                        backgroundColor: 'rgba(23,162,184,0.6)',
+                        borderColor: C.vol, borderWidth: 1, borderRadius: 3, yAxisID: 'y'
+                    },
+                    {
+                        label: 'Month Range', data: rng, type: 'line',
+                        borderColor: C.sell.line, backgroundColor: 'transparent',
+                        borderWidth: 2, tension: 0.3, pointRadius: 3, yAxisID: 'y1'
+                    }
+                ]
             },
-            scales: {
-                x: { ticks: { color: textColor, font: { size: 10 }, maxRotation: 45, autoSkip: true, maxTicksLimit: 20 }, grid: { color: gridColor } },
-                y: { title: { display: true, text: yLabel, color: textColor, font: { size: 11 } }, ticks: { color: textColor, font: { size: 10 } }, grid: { color: gridColor } }
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { labels: { color: t.text, font: { size: 11 } } },
+                    tooltip: {
+                        callbacks: {
+                            label: function (ctx) {
+                                return ctx.dataset.label + ': ' + (ctx.parsed.y != null ? ctx.parsed.y.toFixed(4) : '--');
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x:  { ticks: { color: t.text, font: { size: 10 } }, grid: { color: t.grid } },
+                    y:  { position: 'left',  title: { display: true, text: 'Std Dev',    color: t.text, font: { size: 10 } }, ticks: { color: t.text, font: { size: 10 } }, grid: { color: t.grid } },
+                    y1: { position: 'right', title: { display: true, text: 'Range (LKR)', color: t.text, font: { size: 10 } }, ticks: { color: t.text, font: { size: 10 } }, grid: { drawOnChartArea: false } }
+                }
+            }
+        });
+    }
+
+    // ===================================================================
+    // Summary Cards
+    // ===================================================================
+    function _updateCards(data) {
+        if (!data.length) return;
+
+        var last = data[data.length - 1];
+        var midK = last.mid_rate !== undefined ? 'mid_rate' : 'avg_mid_rate';
+        var mid  = last[midK];
+
+        _txt('ertTodayRate', mid != null ? mid.toFixed(2) : '--');
+        _txt('ertTodayDate', last.date || last.month_start || '');
+
+        // 30-day change
+        var agoIdx = Math.max(0, data.length - 31);
+        var ago    = data[agoIdx];
+        if (ago && mid != null) {
+            var old = ago[midK];
+            if (old != null) {
+                var diff = mid - old;
+                var pct  = ((diff / old) * 100).toFixed(2);
+
+                var el   = document.getElementById('ert30DayChange');
+                var pEl  = document.getElementById('ert30DayPct');
+                var icon = document.getElementById('ertChangeIcon');
+
+                if (el) {
+                    el.textContent = (diff >= 0 ? '+' : '') + diff.toFixed(2);
+                    el.className   = 'mb-0 ert-change-' + (diff > 0 ? 'up' : diff < 0 ? 'down' : 'neutral');
+                }
+                if (pEl) {
+                    pEl.textContent = (diff >= 0 ? '+' : '') + pct + '%';
+                }
+                if (icon) {
+                    icon.className = 'ert-stat-icon ' + (diff > 0 ? 'bg-danger' : diff < 0 ? 'bg-success' : 'bg-secondary');
+                    icon.innerHTML = '<i class="fas fa-arrow-' + (diff > 0 ? 'up' : diff < 0 ? 'down' : 'right') + '"></i>';
+                }
             }
         }
-    });
-}
 
-function renderEmptyChart(canvasId, message) {
-    const chartKey = Object.keys(ertCharts).find(k => { const c = document.getElementById(canvasId); return c && ertCharts[k] && ertCharts[k].canvas === c; });
-    if (chartKey && ertCharts[chartKey]) ertCharts[chartKey].destroy();
-    const { textColor } = chartDefaults();
-    const ctx = document.getElementById(canvasId).getContext('2d');
-    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-    ctx.font = '14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-    ctx.fillStyle = textColor; ctx.textAlign = 'center';
-    ctx.fillText(message || 'No data available', ctx.canvas.width / 2, ctx.canvas.height / 2);
-}
+        // Avg Spread
+        var spreads = data.map(function (d) { return (d.avg_sell_rate || 0) - (d.avg_buy_rate || 0); })
+                         .filter(function (v) { return v > 0; });
+        if (spreads.length) {
+            var sum = spreads.reduce(function (a, b) { return a + b; }, 0);
+            _txt('ertAvgSpread', (sum / spreads.length).toFixed(2));
+        }
 
-function addForecastDivider(canvasId, chartKey, xIndex) {
-    const chart = ertCharts[chartKey];
-    if (!chart) return;
-    const originalDraw = chart.draw.bind(chart);
-    chart.draw = function () {
-        originalDraw();
-        const meta = chart.getDatasetMeta(0);
-        if (!meta.data[xIndex]) return;
-        const x = meta.data[xIndex].x, yAxis = chart.scales.y, ctx = chart.ctx;
-        ctx.save();
-        ctx.beginPath(); ctx.setLineDash([5, 5]); ctx.strokeStyle = 'rgba(150,150,150,0.6)'; ctx.lineWidth = 1.5;
-        ctx.moveTo(x, yAxis.top); ctx.lineTo(x, yAxis.bottom); ctx.stroke();
-        ctx.setLineDash([]); ctx.font = '10px sans-serif'; ctx.fillStyle = 'rgba(150,150,150,0.8)'; ctx.textAlign = 'center';
-        ctx.fillText('Forecast', x + 35, yAxis.top + 12); ctx.restore();
-    };
-    chart.draw();
-}
+        // Volatility
+        if (last.buy_rate_volatility != null) {
+            _txt('ertVolatility', last.buy_rate_volatility.toFixed(4));
+        }
+    }
+
+    // ===================================================================
+    // Shared line chart renderer
+    // ===================================================================
+    function _lineChart(canvasId, key, labels, datasets, yLabel) {
+        var t = _theme();
+        _destroy(key);
+        var el = document.getElementById(canvasId);
+        if (!el) return;
+
+        _charts[key] = new Chart(el.getContext('2d'), {
+            type: 'line',
+            data: { labels: labels, datasets: datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: {
+                        labels: { color: t.text, font: { size: 11 }, usePointStyle: true, pointStyle: 'line' }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0,0,0,0.85)',
+                        titleColor: '#fff', bodyColor: '#ddd',
+                        borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1, padding: 10,
+                        callbacks: {
+                            label: function (ctx) {
+                                var v = ctx.parsed.y;
+                                return v != null ? ctx.dataset.label + ': ' + v.toFixed(4) : '';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: t.text, font: { size: 10 }, maxRotation: 45, autoSkip: true, maxTicksLimit: 20 },
+                        grid:  { color: t.grid }
+                    },
+                    y: {
+                        title: { display: true, text: yLabel, color: t.text, font: { size: 11 } },
+                        ticks: { color: t.text, font: { size: 10 } },
+                        grid:  { color: t.grid }
+                    }
+                }
+            }
+        });
+    }
+
+    // ===================================================================
+    // Empty canvas message
+    // ===================================================================
+    function _emptyCanvas(canvasId, msg) {
+        var el = document.getElementById(canvasId);
+        if (!el) return;
+
+        // Destroy any existing chart on this canvas
+        for (var k in _charts) {
+            if (_charts[k] && _charts[k].canvas === el) {
+                _charts[k].destroy();
+                _charts[k] = null;
+                break;
+            }
+        }
+
+        var ctx = el.getContext('2d');
+        ctx.clearRect(0, 0, el.width, el.height);
+        var t = _theme();
+        ctx.font      = '14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.fillStyle = t.text;
+        ctx.textAlign = 'center';
+        ctx.fillText(msg || 'No data available', el.width / 2, el.height / 2);
+    }
+
+})();

@@ -4521,13 +4521,6 @@ def get_pb_rate_for_date():
 # Exchange Rate Trends Page & API
 # ============================================================
 
-@app.route('/exchange-rate-trends')
-@login_required
-def exchange_rate_trends():
-    """Exchange rate trends page with charts."""
-    return render_template('exchange_rate_trends.html', username=session.get('username'))
-
-
 def _serialise_rows(rows):
     """Convert date/Decimal objects in a list of dicts to JSON-safe types."""
     for row in rows:

@@ -136,6 +136,9 @@ function loadPageData(pageName) {
         case 'tax':
             loadTaxCalculator();
             break;
+        case 'rateTrends':
+            if (typeof loadRateTrends === 'function') loadRateTrends();
+            break;
     }
 }
 
