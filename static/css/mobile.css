@@ -344,7 +344,7 @@ white-space: nowrap;
 overflow: hidden;
 text-overflow: ellipsis;
 max-width: 150px;
-color: #000000;
+color: #ffffff;
 }
 
 .excel-table tbody tr:nth-child(even) {
@@ -419,7 +419,7 @@ white-space: nowrap;
 overflow: hidden;
 text-overflow: ellipsis;
 max-width: 150px;
-color: #000000;
+color: #ffffff;
 }
 
 .swipe-actions {
@@ -521,11 +521,11 @@ background: #138496;
 transition: none;
 }
 
-/* Override text colors to black for table */
+/* Override text colors for table on dark background */
 .excel-table .text-success,
 .excel-table .text-danger,
 .excel-table .fw-bold {
-color: #000000 !important;
+color: #ffffff !important;
 font-weight: normal !important;
 }
 

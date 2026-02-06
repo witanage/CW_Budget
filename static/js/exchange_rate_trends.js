@@ -1,6 +1,6 @@
 // ============================================================
 // Exchange Rate Trends — SPA page integration
-// Called by dashboard.js → loadPageData('rateTrends')
+// Buy Rate only — called by dashboard.js → loadPageData('rateTrends')
 // ============================================================
 
 (function () {
@@ -16,18 +16,16 @@
         months: 6,
         forecastDays: 30,
         forecastHistory: 3,
-        compMonths: 3,
-        showBuySell: true
+        compMonths: 3
     };
 
     // --------------- Colours ---------------
     var C = {
-        mid:    { line: '#0d6efd', fill: 'rgba(13,110,253,0.10)' },
-        buy:    { line: '#198754', fill: 'rgba(25,135,84,0.08)' },
-        sell:   { line: '#dc3545', fill: 'rgba(220,53,69,0.08)' },
-        fc:     { line: '#6f42c1', fill: 'rgba(111,66,193,0.10)' },
-        band:   'rgba(111,66,193,0.08)',
-        vol:    '#17a2b8'
+        buy:  { line: '#0d6efd', fill: 'rgba(13,110,253,0.10)' },
+        fc:   { line: '#6f42c1', fill: 'rgba(111,66,193,0.10)' },
+        band: 'rgba(111,66,193,0.08)',
+        vol:  '#17a2b8',
+        range: '#dc3545'
     };
     var SRC_CLR = { CBSL: '#0d6efd', HNB: '#198754', PB: '#fd7e14', CSV: '#6c757d', Manual: '#20c997' };
 
@@ -46,7 +44,6 @@
     // Bind controls (once)
     // ===================================================================
     function _bindControls() {
-        // Period buttons
         var btns = document.querySelectorAll('#ertPeriodSelector .btn');
         btns.forEach(function (btn) {
             btn.addEventListener('click', function () {
@@ -57,11 +54,7 @@
             });
         });
 
-        _on('ertMonthsSelector', 'change', function () { _s.months = +this.value; _fetchAll(); });
-        _on('ertShowBuySell',    'change', function () {
-            _s.showBuySell = this.checked;
-            if (_cache) _renderTrend(_cache.trend || []);
-        });
+        _on('ertMonthsSelector',  'change', function () { _s.months          = +this.value; _fetchAll(); });
         _on('ertForecastDays',    'change', function () { _s.forecastDays    = +this.value; _fetchAll(); });
         _on('ertForecastHistory', 'change', function () { _s.forecastHistory = +this.value; _fetchAll(); });
         _on('ertCompMonths',      'change', function () { _s.compMonths      = +this.value; _fetchAll(); });
@@ -143,7 +136,7 @@
     }
 
     // ===================================================================
-    // 1. Main Trend Chart
+    // 1. Main Trend Chart (buy rate only)
     // ===================================================================
     function _renderTrend(data) {
         if (!data.length) { _emptyCanvas('ertTrendChart', 'No exchange rate data available'); return; }
@@ -156,35 +149,19 @@
             return d.date;
         });
 
-        var midK = data[0].mid_rate !== undefined ? 'mid_rate' : 'avg_mid_rate';
-
         var ds = [{
-            label: 'Mid Rate',
-            data: data.map(function (d) { return d[midK]; }),
-            borderColor: C.mid.line, backgroundColor: C.mid.fill,
+            label: 'Buy Rate (USD/LKR)',
+            data: data.map(function (d) { return d.buy_rate; }),
+            borderColor: C.buy.line, backgroundColor: C.buy.fill,
             borderWidth: 2, fill: true, tension: 0.3,
-            pointRadius: data.length > 90 ? 0 : 2, pointHoverRadius: 5, order: 1
+            pointRadius: data.length > 90 ? 0 : 2, pointHoverRadius: 5
         }];
 
-        if (_s.showBuySell) {
-            ds.push({
-                label: 'Buy Rate',
-                data: data.map(function (d) { return d.avg_buy_rate; }),
-                borderColor: C.buy.line, borderWidth: 1.5, borderDash: [4, 3],
-                fill: false, tension: 0.3, pointRadius: 0, pointHoverRadius: 4, order: 2
-            }, {
-                label: 'Sell Rate',
-                data: data.map(function (d) { return d.avg_sell_rate; }),
-                borderColor: C.sell.line, borderWidth: 1.5, borderDash: [4, 3],
-                fill: false, tension: 0.3, pointRadius: 0, pointHoverRadius: 4, order: 3
-            });
-        }
-
-        _lineChart('ertTrendChart', 'trend', labels, ds, 'LKR per USD');
+        _lineChart('ertTrendChart', 'trend', labels, ds, 'Buy Rate (LKR)');
     }
 
     // ===================================================================
-    // 2. Forecast Chart
+    // 2. Forecast Chart (buy rate)
     // ===================================================================
     function _renderForecast(fc) {
         var info = document.getElementById('ertModelInfo');
@@ -202,20 +179,19 @@
         var allLabels = hist.map(function (d) { return d.date; })
                             .concat(pts.map(function (d) { return d.date; }));
 
-        var lastMid = hist[hist.length - 1].mid_rate;
+        var lastRate = hist[hist.length - 1].buy_rate;
 
-        // Build arrays: history has values then nulls; forecast has nulls then values
-        var hData = hist.map(function (d) { return d.mid_rate; })
+        var hData = hist.map(function (d) { return d.buy_rate; })
                         .concat(pts.map(function () { return null; }));
 
         var pad = hist.slice(0, -1).map(function () { return null; });
 
-        var fData = pad.concat([lastMid]).concat(pts.map(function (d) { return d.predicted_mid_rate; }));
-        var upper = pad.concat([lastMid]).concat(pts.map(function (d) { return d.upper_bound; }));
-        var lower = pad.concat([lastMid]).concat(pts.map(function (d) { return d.lower_bound; }));
+        var fData = pad.concat([lastRate]).concat(pts.map(function (d) { return d.predicted_buy_rate; }));
+        var upper = pad.concat([lastRate]).concat(pts.map(function (d) { return d.upper_bound; }));
+        var lower = pad.concat([lastRate]).concat(pts.map(function (d) { return d.lower_bound; }));
 
         var ds = [
-            { label: 'Historical', data: hData, borderColor: C.mid.line, backgroundColor: C.mid.fill,
+            { label: 'Historical Buy Rate', data: hData, borderColor: C.buy.line, backgroundColor: C.buy.fill,
               borderWidth: 2, fill: true, tension: 0.3, pointRadius: 0, order: 2 },
             { label: 'Forecast', data: fData, borderColor: C.fc.line, backgroundColor: C.fc.fill,
               borderWidth: 2.5, borderDash: [6, 4], fill: true, tension: 0.3, pointRadius: 0, order: 1 },
@@ -225,7 +201,7 @@
               borderWidth: 1, borderDash: [2, 2], fill: false, tension: 0.3, pointRadius: 0, order: 4 }
         ];
 
-        _lineChart('ertForecastChart', 'forecast', allLabels, ds, 'LKR per USD');
+        _lineChart('ertForecastChart', 'forecast', allLabels, ds, 'Buy Rate (LKR)');
 
         // Draw vertical divider at history/forecast boundary
         var divIdx = hist.length - 1;
@@ -267,7 +243,7 @@
     }
 
     // ===================================================================
-    // 3. Source Comparison
+    // 3. Source Comparison (buy rate per bank)
     // ===================================================================
     function _renderSources(sources) {
         var names = Object.keys(sources);
@@ -281,7 +257,7 @@
 
         var ds = names.map(function (src) {
             var map = {};
-            sources[src].forEach(function (d) { map[d.date] = d.mid_rate; });
+            sources[src].forEach(function (d) { map[d.date] = d.buy_rate; });
             return {
                 label: src,
                 data: labels.map(function (dt) { return map[dt] != null ? map[dt] : null; }),
@@ -292,11 +268,11 @@
             };
         });
 
-        _lineChart('ertSourceChart', 'source', labels, ds, 'Mid Rate (LKR)');
+        _lineChart('ertSourceChart', 'source', labels, ds, 'Buy Rate (LKR)');
     }
 
     // ===================================================================
-    // 4. Volatility (bar + line combo)
+    // 4. Volatility (bar + line combo, buy rate)
     // ===================================================================
     function _renderVolatility(data) {
         if (!data.length) { _emptyCanvas('ertVolChart', 'No monthly data available'); return; }
@@ -321,8 +297,8 @@
                         borderColor: C.vol, borderWidth: 1, borderRadius: 3, yAxisID: 'y'
                     },
                     {
-                        label: 'Month Range', data: rng, type: 'line',
-                        borderColor: C.sell.line, backgroundColor: 'transparent',
+                        label: 'Buy Rate Range', data: rng, type: 'line',
+                        borderColor: C.range, backgroundColor: 'transparent',
                         borderWidth: 2, tension: 0.3, pointRadius: 3, yAxisID: 'y1'
                     }
                 ]
@@ -350,25 +326,24 @@
     }
 
     // ===================================================================
-    // Summary Cards
+    // Summary Cards (buy rate)
     // ===================================================================
     function _updateCards(data) {
         if (!data.length) return;
 
         var last = data[data.length - 1];
-        var midK = last.mid_rate !== undefined ? 'mid_rate' : 'avg_mid_rate';
-        var mid  = last[midK];
+        var rate = last.buy_rate;
 
-        _txt('ertTodayRate', mid != null ? mid.toFixed(2) : '--');
+        _txt('ertTodayRate', rate != null ? rate.toFixed(2) : '--');
         _txt('ertTodayDate', last.date || last.month_start || '');
 
         // 30-day change
         var agoIdx = Math.max(0, data.length - 31);
         var ago    = data[agoIdx];
-        if (ago && mid != null) {
-            var old = ago[midK];
+        if (ago && rate != null) {
+            var old = ago.buy_rate;
             if (old != null) {
-                var diff = mid - old;
+                var diff = rate - old;
                 var pct  = ((diff / old) * 100).toFixed(2);
 
                 var el   = document.getElementById('ert30DayChange');
@@ -389,17 +364,22 @@
             }
         }
 
-        // Avg Spread
-        var spreads = data.map(function (d) { return (d.avg_sell_rate || 0) - (d.avg_buy_rate || 0); })
-                         .filter(function (v) { return v > 0; });
-        if (spreads.length) {
-            var sum = spreads.reduce(function (a, b) { return a + b; }, 0);
-            _txt('ertAvgSpread', (sum / spreads.length).toFixed(2));
-        }
-
         // Volatility
         if (last.buy_rate_volatility != null) {
             _txt('ertVolatility', last.buy_rate_volatility.toFixed(4));
+        }
+
+        // Min/Max
+        var minRate = null, maxRate = null;
+        data.forEach(function (d) {
+            var r = d.buy_rate;
+            if (r != null) {
+                if (minRate === null || r < minRate) minRate = r;
+                if (maxRate === null || r > maxRate) maxRate = r;
+            }
+        });
+        if (minRate != null && maxRate != null) {
+            _txt('ertMinMax', minRate.toFixed(2) + ' - ' + maxRate.toFixed(2));
         }
     }
 
@@ -457,7 +437,6 @@
         var el = document.getElementById(canvasId);
         if (!el) return;
 
-        // Destroy any existing chart on this canvas
         for (var k in _charts) {
             if (_charts[k] && _charts[k].canvas === el) {
                 _charts[k].destroy();
