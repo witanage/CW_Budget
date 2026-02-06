@@ -130,10 +130,7 @@ function loadPageData(pageName) {
         case 'reports':
             loadReports();
             break;
-        case 'overview':
-            loadDashboardStats();
-            break;
-        case 'tax':
+case 'tax':
             loadTaxCalculator();
             break;
         case 'rateTrends':
@@ -689,94 +686,6 @@ function showEditCategoryMessage(text, type) {
         message.textContent = text;
         message.style.display = 'block';
     }
-}
-
-// ================================
-// DASHBOARD / OVERVIEW
-// ================================
-
-function loadDashboardStats() {
-    showLoading();
-
-    fetch('/api/dashboard-stats')
-        .then(response => response.json())
-        .then(data => {
-            updateStatsCards(data.current_stats);
-            updateTrendChart(data.monthly_trend);
-            updateIncomeBreakdownChart(data.income_categories);
-            updateExpenseBreakdownChart(data.expense_categories);
-            hideLoading();
-        })
-        .catch(error => {
-            console.error('Error loading dashboard stats:', error);
-            hideLoading();
-        });
-}
-
-function updateStatsCards(stats) {
-    if (!stats) return;
-
-    // Current Balance
-    const balanceEl = document.getElementById('currentBalance');
-    if (balanceEl) {
-        balanceEl.textContent = formatCurrency(stats.current_balance || 0);
-    }
-
-    // Monthly Income
-    const incomeEl = document.getElementById('monthlyIncome');
-    if (incomeEl) {
-        incomeEl.textContent = formatCurrency(stats.total_income || 0);
-    }
-
-    // Monthly Expenses
-    const expensesEl = document.getElementById('monthlyExpenses');
-    if (expensesEl) {
-        expensesEl.textContent = formatCurrency(stats.total_expenses || 0);
-    }
-
-    // Savings Rate
-    const savingsEl = document.getElementById('savingsRate');
-    if (savingsEl && stats.total_income > 0) {
-        const rate = ((stats.total_income - stats.total_expenses) / stats.total_income * 100).toFixed(1);
-        savingsEl.textContent = rate + '%';
-    }
-}
-
-function updateRecentTransactions(transactions) {
-    const tbody = document.querySelector('#recentTransactionsTable tbody');
-    if (!tbody) return;
-
-    tbody.innerHTML = '';
-
-    if (!transactions || transactions.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center">No transactions found</td></tr>';
-        return;
-    }
-
-    // Calculate running balance for recent transactions
-    // Note: transactions come sorted by created_at DESC, so we need to reverse to calculate
-    const sortedTransactions = [...transactions].reverse();
-    let runningBalance = 0;
-    sortedTransactions.forEach(t => {
-        const debit = parseFloat(t.debit) || 0;
-        const credit = parseFloat(t.credit) || 0;
-        runningBalance += debit - credit;
-        t.calculatedBalance = runningBalance;
-    });
-
-    // Display in original order (newest first)
-    sortedTransactions.reverse().forEach(t => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td>${t.transaction_date ? formatDate(t.transaction_date) : '-'}</td>
-            <td>${t.description}</td>
-            <td><span class="badge bg-secondary">${t.category || 'Uncategorized'}</span></td>
-            <td class="text-success">${t.debit ? parseFloat(t.debit).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,') : '-'}</td>
-            <td class="text-danger">${t.credit ? parseFloat(t.credit).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,') : '-'}</td>
-            <td class="fw-bold">${parseFloat(t.calculatedBalance).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}</td>
-        `;
-        tbody.appendChild(row);
-    });
 }
 
 // ================================
@@ -1394,7 +1303,6 @@ function saveTransaction() {
             }
 
             loadTransactions();
-            loadDashboardStats();
         }
     })
     .catch(error => {
@@ -1416,8 +1324,7 @@ function deleteTransaction(id) {
                     hideLoading();
                     showToast('Transaction deleted successfully', 'success');
                     loadTransactions();
-                    loadDashboardStats();
-                })
+                        })
                 .catch(error => {
                     hideLoading();
                     console.error('Error deleting transaction:', error);
@@ -1732,7 +1639,6 @@ function performMoveCopyTransaction(transactionId, action, targetYear, targetMon
 
             // Reload transactions
             loadTransactions();
-            loadDashboardStats();
         }
     })
     .catch(error => {
@@ -2506,205 +2412,7 @@ function loadForecastReport() {
 // ================================
 
 function initCharts() {
-    // Trend Chart
-    const trendCtx = document.getElementById('trendChart');
-    if (trendCtx) {
-        charts.trend = new Chart(trendCtx, {
-            type: 'line',
-            data: {
-                labels: [],
-                datasets: [{
-                    label: 'Income',
-                    data: [],
-                    borderColor: 'rgb(75, 192, 192)',
-                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                    tension: 0.1
-                }, {
-                    label: 'Expenses',
-                    data: [],
-                    borderColor: 'rgb(255, 99, 132)',
-                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                    tension: 0.1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            callback: value => 'LKR ' + value.toLocaleString()
-                        }
-                    }
-                }
-            }
-        });
-    }
-
-    // Category Chart
-    const categoryCtx = document.getElementById('categoryChart');
-    if (categoryCtx) {
-        charts.category = new Chart(categoryCtx, {
-            type: 'doughnut',
-            data: {
-                labels: [],
-                datasets: [{
-                    data: [],
-                    backgroundColor: [
-                        'rgba(255, 99, 132, 0.8)',
-                        'rgba(54, 162, 235, 0.8)',
-                        'rgba(255, 206, 86, 0.8)',
-                        'rgba(75, 192, 192, 0.8)',
-                        'rgba(153, 102, 255, 0.8)',
-                        'rgba(255, 159, 64, 0.8)'
-                    ]
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'bottom' }
-                }
-            }
-        });
-    }
-
-    // Income Breakdown Chart
-    const incomeBreakdownCtx = document.getElementById('incomeBreakdownChart');
-    if (incomeBreakdownCtx) {
-        charts.incomeBreakdown = new Chart(incomeBreakdownCtx, {
-            type: 'doughnut',
-            data: {
-                labels: [],
-                datasets: [{
-                    data: [],
-                    backgroundColor: [
-                        'rgba(75, 192, 192, 0.8)',
-                        'rgba(54, 162, 235, 0.8)',
-                        'rgba(153, 102, 255, 0.8)',
-                        'rgba(255, 206, 86, 0.8)',
-                        'rgba(255, 159, 64, 0.8)'
-                    ]
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'bottom' },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                let label = context.label || '';
-                                if (label) {
-                                    label += ': ';
-                                }
-                                label += 'LKR ' + context.parsed.toLocaleString();
-                                return label;
-                            }
-                        }
-                    }
-                }
-            }
-        });
-    }
-
-    // Expense Breakdown Chart
-    const expenseBreakdownCtx = document.getElementById('expenseBreakdownChart');
-    if (expenseBreakdownCtx) {
-        charts.expenseBreakdown = new Chart(expenseBreakdownCtx, {
-            type: 'doughnut',
-            data: {
-                labels: [],
-                datasets: [{
-                    data: [],
-                    backgroundColor: [
-                        'rgba(255, 99, 132, 0.8)',
-                        'rgba(255, 159, 64, 0.8)',
-                        'rgba(255, 206, 86, 0.8)',
-                        'rgba(153, 102, 255, 0.8)',
-                        'rgba(54, 162, 235, 0.8)'
-                    ]
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'bottom' },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                let label = context.label || '';
-                                if (label) {
-                                    label += ': ';
-                                }
-                                label += 'LKR ' + context.parsed.toLocaleString();
-                                return label;
-                            }
-                        }
-                    }
-                }
-            }
-        });
-    }
-}
-
-function updateTrendChart(data) {
-    if (!charts.trend || !data) return;
-
-    const labels = [];
-    const income = [];
-    const expenses = [];
-
-    data.slice().reverse().forEach(item => {
-        labels.push(`${item.month_name} ${item.year}`);
-        income.push(item.income || 0);
-        expenses.push(item.expenses || 0);
-    });
-
-    charts.trend.data.labels = labels;
-    charts.trend.data.datasets[0].data = income;
-    charts.trend.data.datasets[1].data = expenses;
-    charts.trend.update();
-}
-
-function updateIncomeBreakdownChart(data) {
-    if (!charts.incomeBreakdown) return;
-
-    if (!data || data.length === 0) {
-        charts.incomeBreakdown.data.labels = ['No Data'];
-        charts.incomeBreakdown.data.datasets[0].data = [1];
-        charts.incomeBreakdown.update();
-        return;
-    }
-
-    const labels = data.map(item => item.category || 'Uncategorized');
-    const amounts = data.map(item => parseFloat(item.amount) || 0);
-
-    charts.incomeBreakdown.data.labels = labels;
-    charts.incomeBreakdown.data.datasets[0].data = amounts;
-    charts.incomeBreakdown.update();
-}
-
-function updateExpenseBreakdownChart(data) {
-    if (!charts.expenseBreakdown) return;
-
-    if (!data || data.length === 0) {
-        charts.expenseBreakdown.data.labels = ['No Data'];
-        charts.expenseBreakdown.data.datasets[0].data = [1];
-        charts.expenseBreakdown.update();
-        return;
-    }
-
-    const labels = data.map(item => item.category || 'Uncategorized');
-    const amounts = data.map(item => parseFloat(item.amount) || 0);
-
-    charts.expenseBreakdown.data.labels = labels;
-    charts.expenseBreakdown.data.datasets[0].data = amounts;
-    charts.expenseBreakdown.update();
+    // Overview charts removed
 }
 
 function updateMonthlyReportChart(data) {

@@ -406,107 +406,11 @@ background-color: #3a3a3a;
 border-color: #4a4a4a;
 }
 
-.stat-card {
-position: relative;
-overflow: hidden;
-}
-
-.stat-card::before {
-content: '';
-position: absolute;
-top: 0;
-right: -50px;
-width: 100px;
-height: 100%;
-background: rgba(255,255,255,0.03);
-transform: skewX(-25deg);
-}
-
-/* Smaller stat cards */
-.stat-card {
-border-radius: 10px;
-}
-
-.stat-card .card-body {
-padding: 6px 12px !important;
-}
-
-.stat-card .card-body > .row {
-margin: 0;
-}
-
-.stat-card .card-body > .row > .col {
-padding: 0;
-}
-
-.stat-card h6 {
-font-size: 0.65rem;
-margin-bottom: 0 !important;
-line-height: 1.2;
-}
-
-.stat-card h3 {
-font-size: 1rem;
-margin-bottom: 0 !important;
-line-height: 1.2;
-}
-
-.stat-icon {
-font-size: 1.2rem;
-opacity: 0.15;
-position: absolute;
-right: 10px;
-top: 6px;
-}
-
-/* Stat card color overrides - align with base theme */
-.stat-card.bg-primary {
-background: var(--bg-tertiary) !important;
-border: 1px solid var(--border-color);
-}
-
-.stat-card.bg-success {
-background: var(--bg-tertiary) !important;
-border: 1px solid var(--border-color);
-}
-
-.stat-card.bg-danger {
-background: var(--bg-tertiary) !important;
-border: 1px solid var(--border-color);
-}
-
-.stat-card.bg-info {
-background: var(--bg-tertiary) !important;
-border: 1px solid var(--border-color);
-}
-
-/* Overview page scrolling */
-#overviewPage {
-overflow-y: auto !important;
-overflow-x: hidden !important;
-}
 
 /* Reports page scrolling */
 #reportsPage {
 overflow-y: auto !important;
 overflow-x: hidden !important;
-}
-
-/* Smaller chart cards */
-#overviewPage .card-header {
-padding: 10px 16px;
-}
-
-#overviewPage .card-body {
-padding: 15px;
-}
-
-#overviewPage .row.mb-4 {
-margin-bottom: 1rem !important;
-}
-
-#overviewPage .row.mb-3 {
-margin-bottom: 0.75rem !important;
 }
 
 /* Reduce chart height */
