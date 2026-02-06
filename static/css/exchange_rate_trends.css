@@ -1,0 +1,152 @@
+/* ============================================================
+   Exchange Rate Trends Page Styles
+   ============================================================ */
+
+.ert-container {
+    padding: 1rem 1.5rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* Stat cards */
+.ert-stat-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    box-shadow: var(--card-shadow);
+    transition: var(--transition);
+}
+
+.ert-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.ert-stat-card .card-body {
+    min-height: 80px;
+}
+
+.ert-rate-value {
+    font-family: 'Courier New', monospace;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.ert-stat-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+}
+
+.ert-stat-icon.bg-primary { background: var(--accent-color); }
+.ert-stat-icon.bg-success { background: var(--success-color); }
+.ert-stat-icon.bg-danger  { background: var(--danger-color); }
+.ert-stat-icon.bg-warning { background: var(--warning-color); color: #333; }
+.ert-stat-icon.bg-info    { background: #17a2b8; }
+
+/* Cards */
+.ert-container .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    box-shadow: var(--card-shadow);
+}
+
+.ert-container .card-header {
+    background: var(--card-header-bg);
+    border-bottom: 1px solid var(--border-color);
+    padding: 0.6rem 1rem;
+}
+
+.ert-container .card-header .card-title {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.ert-container .card-body {
+    padding: 0.75rem 1rem;
+}
+
+/* Chart containers */
+.ert-chart-container {
+    position: relative;
+    height: 320px;
+    width: 100%;
+}
+
+/* Period selector buttons */
+#periodSelector .btn-outline-primary {
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+}
+
+#periodSelector .btn-outline-primary.active,
+#periodSelector .btn-outline-primary:hover {
+    background: var(--accent-color);
+    color: #fff;
+    border-color: var(--accent-color);
+}
+
+/* Form controls */
+.ert-container .form-select,
+.ert-container .form-control {
+    background: var(--input-bg);
+    border-color: var(--input-border);
+    color: var(--text-primary);
+    font-size: 0.8rem;
+}
+
+.ert-container .form-check-input:checked {
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+}
+
+/* Change indicator colors */
+.ert-change-up {
+    color: var(--danger-color);
+}
+
+.ert-change-down {
+    color: var(--success-color);
+}
+
+.ert-change-neutral {
+    color: var(--text-secondary);
+}
+
+/* Forecast model info */
+#forecastModelInfo {
+    border-top: 1px solid var(--border-color);
+    padding-top: 0.5rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .ert-container {
+        padding: 0.5rem 0.75rem;
+    }
+
+    .ert-chart-container {
+        height: 250px;
+    }
+
+    .ert-container h4 {
+        font-size: 1.1rem;
+    }
+
+    .ert-stat-card .card-body h4 {
+        font-size: 1rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .ert-chart-container {
+        height: 220px;
+    }
+}
