@@ -4517,6 +4517,277 @@ def get_pb_rate_for_date():
         }), 500
 
 
+# ============================================================
+# Exchange Rate Trends Page & API
+# ============================================================
+
+@app.route('/exchange-rate-trends')
+@login_required
+def exchange_rate_trends():
+    """Exchange rate trends page with charts."""
+    return render_template('exchange_rate_trends.html', username=session.get('username'))
+
+
+@app.route('/api/exchange-rate/trends', methods=['GET'])
+@login_required
+def get_exchange_rate_trends():
+    """
+    Get exchange rate trend data for charts.
+
+    Query Parameters:
+        period: 'daily', 'weekly', or 'monthly' (default: 'daily')
+        months: Number of months of history (default: 6, max: 36)
+        source: Filter by source (optional, e.g. 'CBSL', 'HNB', 'PB')
+
+    Returns:
+        JSON with trend data arrays for charting
+    """
+    try:
+        period = request.args.get('period', 'daily')
+        months = min(int(request.args.get('months', 6)), 36)
+        source_filter = request.args.get('source', None)
+
+        connection = get_db_connection()
+        if not connection:
+            return jsonify({'error': 'Database connection failed'}), 500
+
+        cursor = connection.cursor(dictionary=True)
+
+        try:
+            if period == 'monthly':
+                query = """
+                    SELECT year, month, month_start, month_end,
+                           avg_buy_rate, avg_sell_rate, avg_mid_rate,
+                           min_buy_rate, max_sell_rate, month_range,
+                           buy_rate_volatility, sell_rate_volatility, trading_days
+                    FROM v_exchange_rate_monthly
+                    WHERE month_start >= DATE_SUB(CURDATE(), INTERVAL %s MONTH)
+                    ORDER BY year, month
+                """
+                cursor.execute(query, (months,))
+
+            elif period == 'weekly':
+                query = """
+                    SELECT week_start, week_end, year, week_number,
+                           avg_buy_rate, avg_sell_rate, avg_mid_rate,
+                           min_buy_rate, max_sell_rate, week_range, trading_days
+                    FROM v_exchange_rate_weekly
+                    WHERE week_start >= DATE_SUB(CURDATE(), INTERVAL %s MONTH)
+                    ORDER BY year, week_number
+                """
+                cursor.execute(query, (months,))
+
+            else:  # daily
+                if source_filter:
+                    query = """
+                        SELECT date, buy_rate, sell_rate,
+                               ROUND((buy_rate + sell_rate) / 2, 4) AS mid_rate,
+                               source
+                        FROM exchange_rates
+                        WHERE date >= DATE_SUB(CURDATE(), INTERVAL %s MONTH)
+                          AND source = %s
+                        ORDER BY date
+                    """
+                    cursor.execute(query, (months, source_filter))
+                else:
+                    query = """
+                        SELECT date, avg_buy_rate, avg_sell_rate, mid_rate,
+                               spread, source_count, sources
+                        FROM v_exchange_rate_daily
+                        WHERE date >= DATE_SUB(CURDATE(), INTERVAL %s MONTH)
+                        ORDER BY date
+                    """
+                    cursor.execute(query, (months,))
+
+            rows = cursor.fetchall()
+
+            # Convert date objects to strings
+            for row in rows:
+                for key, val in row.items():
+                    if hasattr(val, 'isoformat'):
+                        row[key] = val.isoformat()
+                    elif isinstance(val, Decimal):
+                        row[key] = float(val)
+
+            return jsonify({'data': rows, 'period': period, 'months': months}), 200
+
+        finally:
+            cursor.close()
+            connection.close()
+
+    except Exception as e:
+        logger.error(f"Error fetching exchange rate trends: {str(e)}")
+        return jsonify({'error': 'Failed to fetch trend data', 'details': str(e)}), 500
+
+
+@app.route('/api/exchange-rate/trends/forecast', methods=['GET'])
+@login_required
+def get_exchange_rate_forecast():
+    """
+    Generate a simple exchange rate forecast using linear regression
+    on recent data, computed in SQL for performance.
+
+    Query Parameters:
+        days: Number of days to forecast (default: 30, max: 90)
+        history_months: Months of history to base forecast on (default: 3)
+
+    Returns:
+        JSON with historical tail + forecast data points
+    """
+    try:
+        forecast_days = min(int(request.args.get('days', 30)), 90)
+        history_months = min(int(request.args.get('history_months', 3)), 12)
+
+        connection = get_db_connection()
+        if not connection:
+            return jsonify({'error': 'Database connection failed'}), 500
+
+        cursor = connection.cursor(dictionary=True)
+
+        try:
+            # Fetch historical data for regression
+            cursor.execute("""
+                SELECT date, avg_buy_rate AS buy_rate, avg_sell_rate AS sell_rate, mid_rate
+                FROM v_exchange_rate_daily
+                WHERE date >= DATE_SUB(CURDATE(), INTERVAL %s MONTH)
+                ORDER BY date
+            """, (history_months,))
+            history = cursor.fetchall()
+
+            if len(history) < 7:
+                return jsonify({'error': 'Not enough historical data for forecast'}), 400
+
+            # Convert to serialisable format
+            for row in history:
+                for key, val in row.items():
+                    if hasattr(val, 'isoformat'):
+                        row[key] = val.isoformat()
+                    elif isinstance(val, Decimal):
+                        row[key] = float(val)
+
+            # Simple linear regression in Python on the mid_rate
+            from datetime import date as date_cls
+            base_date = datetime.strptime(history[0]['date'], '%Y-%m-%d').date()
+            xs = [(datetime.strptime(r['date'], '%Y-%m-%d').date() - base_date).days for r in history]
+            ys = [r['mid_rate'] for r in history]
+            n = len(xs)
+            sum_x = sum(xs)
+            sum_y = sum(ys)
+            sum_xy = sum(x * y for x, y in zip(xs, ys))
+            sum_xx = sum(x * x for x in xs)
+
+            denom = n * sum_xx - sum_x * sum_x
+            if denom == 0:
+                slope = 0.0
+                intercept = sum_y / n
+            else:
+                slope = (n * sum_xy - sum_x * sum_y) / denom
+                intercept = (sum_y - slope * sum_x) / n
+
+            # Calculate R-squared
+            y_mean = sum_y / n
+            ss_tot = sum((y - y_mean) ** 2 for y in ys)
+            ss_res = sum((y - (slope * x + intercept)) ** 2 for x, y in zip(xs, ys))
+            r_squared = 1 - (ss_res / ss_tot) if ss_tot != 0 else 0
+
+            # Calculate residual std for confidence bands
+            residuals = [y - (slope * x + intercept) for x, y in zip(xs, ys)]
+            res_std = (sum(r ** 2 for r in residuals) / max(n - 2, 1)) ** 0.5
+
+            # Generate forecast points
+            last_date = datetime.strptime(history[-1]['date'], '%Y-%m-%d').date()
+            last_x = xs[-1]
+            forecast = []
+            for i in range(1, forecast_days + 1):
+                fx = last_x + i
+                fdate = last_date + timedelta(days=i)
+                predicted = slope * fx + intercept
+                forecast.append({
+                    'date': fdate.isoformat(),
+                    'predicted_mid_rate': round(predicted, 4),
+                    'upper_bound': round(predicted + 1.96 * res_std, 4),
+                    'lower_bound': round(predicted - 1.96 * res_std, 4),
+                    'is_forecast': True
+                })
+
+            return jsonify({
+                'history': history,
+                'forecast': forecast,
+                'model': {
+                    'slope_per_day': round(slope, 6),
+                    'intercept': round(intercept, 4),
+                    'r_squared': round(r_squared, 4),
+                    'residual_std': round(res_std, 4),
+                    'data_points': n,
+                    'history_months': history_months,
+                    'forecast_days': forecast_days
+                }
+            }), 200
+
+        finally:
+            cursor.close()
+            connection.close()
+
+    except Exception as e:
+        logger.error(f"Error generating exchange rate forecast: {str(e)}")
+        return jsonify({'error': 'Failed to generate forecast', 'details': str(e)}), 500
+
+
+@app.route('/api/exchange-rate/trends/source-comparison', methods=['GET'])
+@login_required
+def get_exchange_rate_source_comparison():
+    """
+    Get exchange rates from all sources for comparison.
+
+    Query Parameters:
+        months: Number of months of history (default: 3, max: 12)
+
+    Returns:
+        JSON with rates grouped by source
+    """
+    try:
+        months = min(int(request.args.get('months', 3)), 12)
+
+        connection = get_db_connection()
+        if not connection:
+            return jsonify({'error': 'Database connection failed'}), 500
+
+        cursor = connection.cursor(dictionary=True)
+
+        try:
+            cursor.execute("""
+                SELECT date, source, buy_rate, sell_rate, mid_rate, spread
+                FROM v_exchange_rate_source_comparison
+                WHERE date >= DATE_SUB(CURDATE(), INTERVAL %s MONTH)
+                ORDER BY date, source
+            """, (months,))
+            rows = cursor.fetchall()
+
+            # Group by source
+            sources = {}
+            for row in rows:
+                src = row['source']
+                if src not in sources:
+                    sources[src] = []
+                sources[src].append({
+                    'date': row['date'].isoformat() if hasattr(row['date'], 'isoformat') else row['date'],
+                    'buy_rate': float(row['buy_rate']) if isinstance(row['buy_rate'], Decimal) else row['buy_rate'],
+                    'sell_rate': float(row['sell_rate']) if isinstance(row['sell_rate'], Decimal) else row['sell_rate'],
+                    'mid_rate': float(row['mid_rate']) if isinstance(row['mid_rate'], Decimal) else row['mid_rate'],
+                    'spread': float(row['spread']) if isinstance(row['spread'], Decimal) else row['spread']
+                })
+
+            return jsonify({'sources': sources, 'months': months}), 200
+
+        finally:
+            cursor.close()
+            connection.close()
+
+    except Exception as e:
+        logger.error(f"Error fetching source comparison: {str(e)}")
+        return jsonify({'error': 'Failed to fetch comparison data', 'details': str(e)}), 500
+
+
 # Global error handlers (must be outside if __name__ block)
 @app.errorhandler(500)
 def internal_error(error):
