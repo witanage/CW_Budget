@@ -1525,7 +1525,7 @@ function displayAuditLogs(auditLogs) {
     if (deleteLogs.length > 0) {
         deleteLogs.forEach(log => {
             html += `
-                <div class="audit-log-entry mb-3 p-3 border rounded" style="background-color: rgba(248, 249, 250, 0.5);">
+                <div class="audit-log-entry mb-3 p-3 border rounded" style="background-color: var(--bg-tertiary);">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <div>
                             ${getActionBadge(log.action)}
@@ -1574,7 +1574,7 @@ function displayAuditLogs(auditLogs) {
     if (createLogs.length > 0) {
         createLogs.forEach(log => {
             html += `
-                <div class="audit-log-entry mb-3 p-3 border rounded" style="background-color: rgba(248, 249, 250, 0.5);">
+                <div class="audit-log-entry mb-3 p-3 border rounded" style="background-color: var(--bg-tertiary);">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <div>
                             ${getActionBadge(log.action)}
