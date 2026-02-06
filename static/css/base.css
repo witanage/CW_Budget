@@ -424,25 +424,25 @@ transform: skewX(-25deg);
 
 /* Smaller stat cards */
 .stat-card .card-body {
-padding: 12px 16px;
+padding: 8px 14px;
 }
 
 .stat-card h6 {
-font-size: 0.75rem;
-margin-bottom: 0.3rem !important;
+font-size: 0.7rem;
+margin-bottom: 0.15rem !important;
 }
 
 .stat-card h3 {
-font-size: 1.3rem;
+font-size: 1.1rem;
 margin-bottom: 0 !important;
 }
 
 .stat-icon {
-font-size: 2rem;
+font-size: 1.5rem;
 opacity: 0.15;
 position: absolute;
-right: 15px;
-top: 15px;
+right: 12px;
+top: 10px;
 }
 
 /* Stat card color overrides - align with base theme */
