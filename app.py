@@ -4570,14 +4570,10 @@ def get_exchange_rate_trends_all():
                 cursor.execute("""
                     SELECT YEAR(date) AS year, MONTH(date) AS month,
                            MIN(date) AS month_start, MAX(date) AS month_end,
-                           ROUND(AVG(buy_rate), 4)  AS avg_buy_rate,
-                           ROUND(AVG(sell_rate), 4)  AS avg_sell_rate,
-                           ROUND((AVG(buy_rate) + AVG(sell_rate)) / 2, 4) AS avg_mid_rate,
+                           ROUND(AVG(buy_rate), 4)  AS buy_rate,
                            ROUND(MIN(buy_rate), 4)   AS min_buy_rate,
-                           ROUND(MAX(sell_rate), 4)   AS max_sell_rate,
-                           ROUND(MAX(sell_rate) - MIN(buy_rate), 4) AS month_range,
+                           ROUND(MAX(buy_rate), 4)   AS max_buy_rate,
                            ROUND(STDDEV(buy_rate), 4) AS buy_rate_volatility,
-                           ROUND(STDDEV(sell_rate), 4) AS sell_rate_volatility,
                            COUNT(DISTINCT date) AS trading_days
                     FROM exchange_rates
                     WHERE date >= DATE_SUB(CURDATE(), INTERVAL %s MONTH)
@@ -4588,12 +4584,9 @@ def get_exchange_rate_trends_all():
                 cursor.execute("""
                     SELECT MIN(date) AS week_start, MAX(date) AS week_end,
                            YEAR(date) AS year, WEEK(date, 1) AS week_number,
-                           ROUND(AVG(buy_rate), 4) AS avg_buy_rate,
-                           ROUND(AVG(sell_rate), 4) AS avg_sell_rate,
-                           ROUND((AVG(buy_rate) + AVG(sell_rate)) / 2, 4) AS avg_mid_rate,
+                           ROUND(AVG(buy_rate), 4) AS buy_rate,
                            ROUND(MIN(buy_rate), 4) AS min_buy_rate,
-                           ROUND(MAX(sell_rate), 4) AS max_sell_rate,
-                           ROUND(MAX(sell_rate) - MIN(buy_rate), 4) AS week_range,
+                           ROUND(MAX(buy_rate), 4) AS max_buy_rate,
                            COUNT(DISTINCT date) AS trading_days
                     FROM exchange_rates
                     WHERE date >= DATE_SUB(CURDATE(), INTERVAL %s MONTH)
@@ -4603,10 +4596,7 @@ def get_exchange_rate_trends_all():
             else:  # daily
                 cursor.execute("""
                     SELECT date,
-                           ROUND(AVG(buy_rate), 4) AS avg_buy_rate,
-                           ROUND(AVG(sell_rate), 4) AS avg_sell_rate,
-                           ROUND((AVG(buy_rate) + AVG(sell_rate)) / 2, 4) AS mid_rate,
-                           ROUND(AVG(sell_rate) - AVG(buy_rate), 4) AS spread,
+                           ROUND(AVG(buy_rate), 4) AS buy_rate,
                            COUNT(DISTINCT source) AS source_count
                     FROM exchange_rates
                     WHERE date >= DATE_SUB(CURDATE(), INTERVAL %s MONTH)
@@ -4618,12 +4608,10 @@ def get_exchange_rate_trends_all():
             result['period'] = period
             result['months'] = months
 
-            # --- 2. Forecast (linear regression on daily averages) ----
+            # --- 2. Forecast (linear regression on daily avg buy_rate) -
             cursor.execute("""
                 SELECT date,
-                       ROUND(AVG(buy_rate), 4) AS buy_rate,
-                       ROUND(AVG(sell_rate), 4) AS sell_rate,
-                       ROUND((AVG(buy_rate) + AVG(sell_rate)) / 2, 4) AS mid_rate
+                       ROUND(AVG(buy_rate), 4) AS buy_rate
                 FROM exchange_rates
                 WHERE date >= DATE_SUB(CURDATE(), INTERVAL %s MONTH)
                 GROUP BY date
@@ -4634,7 +4622,7 @@ def get_exchange_rate_trends_all():
             if len(fc_history) >= 7:
                 base_date = datetime.strptime(fc_history[0]['date'], '%Y-%m-%d').date()
                 xs = [(datetime.strptime(r['date'], '%Y-%m-%d').date() - base_date).days for r in fc_history]
-                ys = [r['mid_rate'] for r in fc_history]
+                ys = [r['buy_rate'] for r in fc_history]
                 n = len(xs)
                 sum_x  = sum(xs)
                 sum_y  = sum(ys)
@@ -4661,7 +4649,7 @@ def get_exchange_rate_trends_all():
                     predicted = slope * fx + intercept
                     fc_points.append({
                         'date': (last_date + timedelta(days=i)).isoformat(),
-                        'predicted_mid_rate': round(predicted, 4),
+                        'predicted_buy_rate': round(predicted, 4),
                         'upper_bound': round(predicted + 1.96 * res_std, 4),
                         'lower_bound': round(predicted - 1.96 * res_std, 4),
                     })
@@ -4680,11 +4668,9 @@ def get_exchange_rate_trends_all():
             else:
                 result['forecast'] = None
 
-            # --- 3. Source comparison ----------------------------------
+            # --- 3. Source comparison (buy rate per bank) ---------------
             cursor.execute("""
-                SELECT date, source, buy_rate, sell_rate,
-                       ROUND((buy_rate + sell_rate) / 2, 4) AS mid_rate,
-                       ROUND(sell_rate - buy_rate, 4) AS spread
+                SELECT date, source, buy_rate
                 FROM exchange_rates
                 WHERE date >= DATE_SUB(CURDATE(), INTERVAL %s MONTH)
                 ORDER BY date, source
@@ -4699,17 +4685,14 @@ def get_exchange_rate_trends_all():
                 sources[src].append({
                     'date': row['date'].isoformat() if hasattr(row['date'], 'isoformat') else row['date'],
                     'buy_rate': float(row['buy_rate']) if isinstance(row['buy_rate'], Decimal) else row['buy_rate'],
-                    'sell_rate': float(row['sell_rate']) if isinstance(row['sell_rate'], Decimal) else row['sell_rate'],
-                    'mid_rate': float(row['mid_rate']) if isinstance(row['mid_rate'], Decimal) else row['mid_rate'],
-                    'spread': float(row['spread']) if isinstance(row['spread'], Decimal) else row['spread'],
                 })
             result['source_comparison'] = sources
 
-            # --- 4. Monthly volatility (last 12 months) ---------------
+            # --- 4. Monthly volatility (last 12 months, buy rate) ------
             cursor.execute("""
                 SELECT YEAR(date) AS year, MONTH(date) AS month,
                        ROUND(STDDEV(buy_rate), 4) AS buy_rate_volatility,
-                       ROUND(MAX(sell_rate) - MIN(buy_rate), 4) AS month_range,
+                       ROUND(MAX(buy_rate) - MIN(buy_rate), 4) AS month_range,
                        COUNT(DISTINCT date) AS trading_days
                 FROM exchange_rates
                 WHERE date >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
