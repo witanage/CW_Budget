@@ -428,7 +428,7 @@ border-radius: 10px;
 }
 
 .stat-card .card-body {
-padding: 6px 12px;
+padding: 6px 12px !important;
 }
 
 .stat-card .card-body > .row {
