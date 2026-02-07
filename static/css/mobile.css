@@ -365,7 +365,7 @@ width: 40%;
 white-space: normal;
 word-wrap: break-word;
 cursor: pointer;
-font-weight: bold;
+font-weight: normal;
 }
 
 .col-debit, .col-credit {
@@ -556,6 +556,16 @@ background: rgba(31, 111, 235, 0.9);
 /* Payment method highlighting */
 .transaction-highlighted {
 /* Payment method color will be set inline */
+}
+
+.transaction-highlighted td {
+color: #000000 !important;
+}
+
+.transaction-highlighted .text-success,
+.transaction-highlighted .text-danger,
+.transaction-highlighted .fw-bold {
+color: #000000 !important;
 }
 
 .no-transactions {

@@ -931,6 +931,7 @@ font-weight: 500;
 border-color: rgba(0,0,0,0.1) !important;
 }
 
+
 /* Hover effect - slightly darker for both themes */
 [data-theme="light"] .transaction-highlighted:hover td {
 filter: brightness(0.95) !important;
