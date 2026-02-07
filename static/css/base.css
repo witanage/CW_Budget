@@ -931,26 +931,6 @@ font-weight: 500;
 border-color: rgba(0,0,0,0.1) !important;
 }
 
-/* Mobile: remove bold and make highlighted row text black */
-@media (max-width: 768px) {
-.transaction-highlighted {
-font-weight: normal;
-}
-
-.transaction-highlighted td {
-color: #000000 !important;
-}
-
-.transaction-highlighted td .text-success,
-.transaction-highlighted td .text-danger,
-.transaction-highlighted td .badge {
-color: #000000 !important;
-}
-
-.transaction-highlighted td .form-check-input {
-border-color: #000000;
-}
-}
 
 /* Hover effect - slightly darker for both themes */
 [data-theme="light"] .transaction-highlighted:hover td {
