@@ -590,6 +590,61 @@
     </div>
 </div>
 
+<!-- CSV Import Confirmation Modal -->
+<div class="modal fade" id="csvImportModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content" style="background: var(--card-bg); color: var(--text-primary);">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border-color, #dee2e6);">
+                <h5 class="modal-title">
+                    <i class="fas fa-file-import"></i> Confirm CSV Import
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Summary -->
+                <p style="margin-bottom: 15px;">
+                    Importing <strong id="csvModalRowCount"></strong> transactions
+                    for <strong id="csvModalTarget"></strong>.
+                </p>
+
+                <!-- Payment Method Mapping -->
+                <div id="csvMethodMappingArea" style="display: none;">
+                    <h6 style="margin: 0 0 10px 0; font-weight: 600;">
+                        <i class="fas fa-exchange-alt"></i> Map Payment Methods
+                    </h6>
+                    <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 10px;">
+                        Map each CSV payment method to an existing one, or choose to create a new one.
+                    </p>
+                    <div style="overflow-x: auto; border: 1px solid var(--border-color); border-radius: 6px;">
+                        <table class="user-table" id="csvMethodMappingTable" style="margin: 0;">
+                            <thead>
+                                <tr>
+                                    <th style="min-width: 150px;">CSV Method</th>
+                                    <th>Used In</th>
+                                    <th style="min-width: 220px;">Map To</th>
+                                </tr>
+                            </thead>
+                            <tbody id="csvMethodMappingBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="csvNoMethodsNote" style="display: none; color: var(--text-secondary); font-size: 0.9rem; font-style: italic;">
+                    No payment methods found in the CSV — none to map.
+                </div>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid var(--border-color, #dee2e6);">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+                <button type="button" class="btn btn-success" id="csvModalConfirmBtn" onclick="executeImport()">
+                    <i class="fas fa-upload"></i> Import
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Delete Confirmation Modal -->
 <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
@@ -968,12 +1023,28 @@
     }
 
     // ── CSV Import ──────────────────────────────────────────────
+    let csvImportModalInstance = null;
+    // Unique CSV methods extracted during preview (for method mapping)
+    let csvUniqueMethods = [];
+    // Payment methods fetched from DB for the selected user
+    let userPaymentMethods = [];
+
+    const MONTH_NAMES = ['', 'January','February','March','April','May','June',
+                         'July','August','September','October','November','December'];
+
     // Set default year/month to current
     (function() {
         const now = new Date();
         document.getElementById('csvYear').value = now.getFullYear();
         document.getElementById('csvMonth').value = now.getMonth() + 1;
     })();
+
+    document.addEventListener('DOMContentLoaded', function() {
+        csvImportModalInstance = new bootstrap.Modal(document.getElementById('csvImportModal'));
+        document.getElementById('csvImportModal').addEventListener('hidden.bs.modal', function() {
+            setTimeout(clearModalBackdrops, 100);
+        });
+    });
 
     function previewCsv() {
         const fileInput = document.getElementById('csvFileInput');
@@ -985,6 +1056,7 @@
         previewBody.innerHTML = '';
         previewArea.style.display = 'none';
         importBtn.disabled = true;
+        csvUniqueMethods = [];
 
         const file = fileInput.files[0];
         if (!file) return;
@@ -1012,11 +1084,19 @@
                 return;
             }
 
+            // Track method usage counts
+            const methodCounts = {};
             let rowCount = 0;
+
             for (let i = 1; i < lines.length; i++) {
                 const cols = parseCSVLine(lines[i]);
                 const desc = (cols[descIdx] || '').trim();
                 if (!desc) continue;
+
+                const method = methodIdx >= 0 ? (cols[methodIdx] || '').trim() : '';
+                if (method) {
+                    methodCounts[method] = (methodCounts[method] || 0) + 1;
+                }
 
                 rowCount++;
                 const tr = document.createElement('tr');
@@ -1026,9 +1106,14 @@
                     '<td>' + escHtml(creditIdx >= 0 ? (cols[creditIdx] || '').trim() : '') + '</td>' +
                     '<td>' + escHtml(debitIdx >= 0 ? (cols[debitIdx] || '').trim() : '') + '</td>' +
                     '<td>' + escHtml(noteIdx >= 0 ? (cols[noteIdx] || '').trim() : '') + '</td>' +
-                    '<td>' + escHtml(methodIdx >= 0 ? (cols[methodIdx] || '').trim() : '') + '</td>';
+                    '<td>' + escHtml(method) + '</td>';
                 previewBody.appendChild(tr);
             }
+
+            // Store unique methods with counts
+            csvUniqueMethods = Object.entries(methodCounts).map(
+                ([name, count]) => ({ name, count })
+            );
 
             if (rowCount > 0) {
                 previewCount.textContent = rowCount + ' row' + (rowCount !== 1 ? 's' : '');
@@ -1078,6 +1163,7 @@
         return div.innerHTML;
     }
 
+    // Called when user clicks "Import Transactions" — opens the mapping modal
     async function importCsv() {
         const userId = document.getElementById('csvUserId').value;
         const year = document.getElementById('csvYear').value;
@@ -1088,17 +1174,127 @@
         if (!year) { showAlert('Please enter a year', 'danger'); return; }
         if (!fileInput.files[0]) { showAlert('Please select a CSV file', 'danger'); return; }
 
-        const monthNames = ['', 'January','February','March','April','May','June',
-                            'July','August','September','October','November','December'];
-        if (!confirm('Import ' + document.getElementById('csvPreviewBody').children.length +
-                      ' transactions for ' + monthNames[parseInt(month)] + ' ' + year + '?')) {
-            return;
+        const rowCount = document.getElementById('csvPreviewBody').children.length;
+        const selectedUser = document.getElementById('csvUserId');
+        const username = selectedUser.options[selectedUser.selectedIndex].text;
+
+        // Populate modal summary
+        document.getElementById('csvModalRowCount').textContent = rowCount + ' row' + (rowCount !== 1 ? 's' : '');
+        document.getElementById('csvModalTarget').textContent = username + ' — ' + MONTH_NAMES[parseInt(month)] + ' ' + year;
+
+        // Fetch payment methods for the selected user
+        const mappingArea = document.getElementById('csvMethodMappingArea');
+        const noMethodsNote = document.getElementById('csvNoMethodsNote');
+        const mappingBody = document.getElementById('csvMethodMappingBody');
+        mappingBody.innerHTML = '';
+        mappingArea.style.display = 'none';
+        noMethodsNote.style.display = 'none';
+
+        if (csvUniqueMethods.length > 0) {
+            try {
+                const resp = await fetch('/api/admin/users/' + userId + '/payment-methods');
+                userPaymentMethods = resp.ok ? await resp.json() : [];
+            } catch (e) {
+                userPaymentMethods = [];
+            }
+
+            // Build mapping rows
+            csvUniqueMethods.forEach(function(m) {
+                const tr = document.createElement('tr');
+
+                // CSV Method name
+                const tdName = document.createElement('td');
+                tdName.innerHTML = '<strong>' + escHtml(m.name) + '</strong>';
+                tr.appendChild(tdName);
+
+                // Usage count
+                const tdCount = document.createElement('td');
+                tdCount.textContent = m.count + ' row' + (m.count !== 1 ? 's' : '');
+                tdCount.style.color = 'var(--text-secondary)';
+                tr.appendChild(tdCount);
+
+                // Mapping dropdown
+                const tdMap = document.createElement('td');
+                const select = document.createElement('select');
+                select.setAttribute('data-csv-method', m.name);
+                select.style.cssText = 'width:100%;padding:6px 8px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-tertiary);color:var(--text-primary);font-size:0.9rem;';
+
+                // Check if there's an auto-match (case-insensitive)
+                const autoMatch = userPaymentMethods.find(
+                    pm => pm.name.toLowerCase() === m.name.toLowerCase()
+                );
+
+                // Option: Create new
+                const optCreate = document.createElement('option');
+                optCreate.value = '__create__';
+                optCreate.textContent = '+ Create new "' + m.name + '"';
+                select.appendChild(optCreate);
+
+                // Option: Skip (no method)
+                const optSkip = document.createElement('option');
+                optSkip.value = '__skip__';
+                optSkip.textContent = '— None (skip)';
+                select.appendChild(optSkip);
+
+                // Separator
+                if (userPaymentMethods.length > 0) {
+                    const optSep = document.createElement('option');
+                    optSep.disabled = true;
+                    optSep.textContent = '── Existing methods ──';
+                    select.appendChild(optSep);
+                }
+
+                // Existing methods
+                userPaymentMethods.forEach(function(pm) {
+                    const opt = document.createElement('option');
+                    opt.value = pm.id;
+                    opt.textContent = pm.name;
+                    if (autoMatch && autoMatch.id === pm.id) {
+                        opt.selected = true;
+                    }
+                    select.appendChild(opt);
+                });
+
+                // If auto-match found, select it; otherwise default stays on __create__
+                if (autoMatch) {
+                    select.value = String(autoMatch.id);
+                }
+
+                tdMap.appendChild(select);
+                tr.appendChild(tdMap);
+                mappingBody.appendChild(tr);
+            });
+
+            mappingArea.style.display = 'block';
+        } else {
+            noMethodsNote.style.display = 'block';
         }
 
-        const btn = document.getElementById('csvImportBtn');
+        // Reset confirm button state
+        const confirmBtn = document.getElementById('csvModalConfirmBtn');
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = '<i class="fas fa-upload"></i> Import';
+
+        csvImportModalInstance.show();
+    }
+
+    // Called when user clicks "Import" inside the modal
+    async function executeImport() {
+        const userId = document.getElementById('csvUserId').value;
+        const year = document.getElementById('csvYear').value;
+        const month = document.getElementById('csvMonth').value;
+        const fileInput = document.getElementById('csvFileInput');
+
+        // Build method mapping from dropdown selections
+        const methodMapping = {};
+        document.querySelectorAll('#csvMethodMappingBody select[data-csv-method]').forEach(function(sel) {
+            methodMapping[sel.getAttribute('data-csv-method')] = sel.value;
+        });
+
+        const confirmBtn = document.getElementById('csvModalConfirmBtn');
         const statusEl = document.getElementById('csvImportStatus');
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importing...';
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importing...';
         statusEl.textContent = '';
 
         const formData = new FormData();
@@ -1106,6 +1302,9 @@
         formData.append('user_id', userId);
         formData.append('year', year);
         formData.append('month', month);
+        if (Object.keys(methodMapping).length > 0) {
+            formData.append('method_mapping', JSON.stringify(methodMapping));
+        }
 
         try {
             const response = await fetch('/api/admin/import-csv', {
@@ -1113,6 +1312,8 @@
                 body: formData
             });
             const data = await response.json();
+
+            csvImportModalInstance.hide();
 
             if (response.ok) {
                 showAlert(data.message, 'success');
@@ -1124,18 +1325,21 @@
                 fileInput.value = '';
                 document.getElementById('csvPreviewArea').style.display = 'none';
                 document.getElementById('csvPreviewBody').innerHTML = '';
+                document.getElementById('csvImportBtn').disabled = true;
+                csvUniqueMethods = [];
             } else {
                 showAlert(data.error || 'Import failed', 'danger');
                 statusEl.textContent = data.error || 'Import failed';
             }
         } catch (error) {
+            csvImportModalInstance.hide();
             console.error('Error:', error);
             showAlert('Network error: ' + error.message, 'danger');
             statusEl.textContent = 'Network error';
         }
 
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-upload"></i> Import Transactions';
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = '<i class="fas fa-upload"></i> Import';
     }
 </script>
 {% endblock %}

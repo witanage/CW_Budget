@@ -1093,6 +1093,30 @@ def update_admin_setting(key):
         connection.close()
 
 
+@app.route('/api/admin/users/<int:user_id>/payment-methods', methods=['GET'])
+@admin_required
+def admin_get_user_payment_methods(user_id):
+    """Return active payment methods for a given user (admin only)."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute("""
+                       SELECT id, name, type, color
+                       FROM payment_methods
+                       WHERE user_id = %s AND is_active = TRUE
+                       ORDER BY name
+                       """, (user_id,))
+        return jsonify(cursor.fetchall())
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+
 @app.route('/api/admin/import-csv', methods=['POST'])
 @admin_required
 def admin_import_csv():
@@ -1100,6 +1124,15 @@ def admin_import_csv():
 
     CSV format: Description, Credit, Debit, Note, Method
     Amounts may have a currency prefix (e.g. "Rs") and thousand-separators.
+
+    Accepts an optional ``method_mapping`` JSON field (form-data string):
+        { "CsvMethodName": <payment_method_id | "__create__"  | "__skip__"> , ... }
+
+    - An integer id means "map to this existing payment method".
+    - ``"__create__"`` means "create a new payment method with that name".
+    - ``"__skip__"`` means "leave payment_method_id NULL for those rows".
+    - If a CSV method name is not in the mapping it falls back to
+      auto-matching by name (case-insensitive) or creating a new method.
     """
     # ── Validate inputs ──────────────────────────────────────────
     if 'file' not in request.files:
@@ -1118,6 +1151,15 @@ def admin_import_csv():
 
     if month < 1 or month > 12:
         return jsonify({'error': 'month must be between 1 and 12'}), 400
+
+    # Optional method mapping from the frontend
+    method_mapping_raw = request.form.get('method_mapping')
+    method_mapping = {}
+    if method_mapping_raw:
+        try:
+            method_mapping = json.loads(method_mapping_raw)
+        except (json.JSONDecodeError, TypeError):
+            return jsonify({'error': 'Invalid method_mapping JSON'}), 400
 
     # ── Parse CSV ────────────────────────────────────────────────
     import re
@@ -1228,21 +1270,45 @@ def admin_import_csv():
         methods_created = []
 
         for idx, row in enumerate(rows):
-            # Resolve payment method
+            # Resolve payment method via explicit mapping first, then auto-match
             payment_method_id = None
             if row['method']:
-                method_key = row['method'].lower()
-                if method_key in existing_methods:
-                    payment_method_id = existing_methods[method_key]
+                mapping_value = method_mapping.get(row['method'])  # exact key from CSV
+
+                if mapping_value == '__skip__':
+                    payment_method_id = None
+                elif mapping_value == '__create__':
+                    # Create new payment method
+                    method_key = row['method'].lower()
+                    if method_key in existing_methods:
+                        payment_method_id = existing_methods[method_key]
+                    else:
+                        cursor.execute("""
+                                       INSERT INTO payment_methods (user_id, name, type, color)
+                                       VALUES (%s, %s, %s, %s)
+                                       """, (target_user_id, row['method'], 'other', '#6c757d'))
+                        payment_method_id = cursor.lastrowid
+                        existing_methods[method_key] = payment_method_id
+                        methods_created.append(row['method'])
+                elif mapping_value is not None:
+                    # Map to an existing payment method id
+                    try:
+                        payment_method_id = int(mapping_value)
+                    except (ValueError, TypeError):
+                        payment_method_id = None
                 else:
-                    # Create the payment method for this user
-                    cursor.execute("""
-                                   INSERT INTO payment_methods (user_id, name, type, color)
-                                   VALUES (%s, %s, %s, %s)
-                                   """, (target_user_id, row['method'], 'other', '#6c757d'))
-                    payment_method_id = cursor.lastrowid
-                    existing_methods[method_key] = payment_method_id
-                    methods_created.append(row['method'])
+                    # No explicit mapping — auto-match by name
+                    method_key = row['method'].lower()
+                    if method_key in existing_methods:
+                        payment_method_id = existing_methods[method_key]
+                    else:
+                        cursor.execute("""
+                                       INSERT INTO payment_methods (user_id, name, type, color)
+                                       VALUES (%s, %s, %s, %s)
+                                       """, (target_user_id, row['method'], 'other', '#6c757d'))
+                        payment_method_id = cursor.lastrowid
+                        existing_methods[method_key] = payment_method_id
+                        methods_created.append(row['method'])
 
             current_max_order += 1
 
