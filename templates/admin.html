@@ -448,13 +448,67 @@
                 </div>
             </div>
 
-            <!-- Import button -->
+            <!-- Import / Clear buttons -->
             <div style="display: flex; gap: 10px; align-items: center;">
                 <button class="btn-sm btn-success" id="csvImportBtn" onclick="importCsv()" disabled>
                     <i class="fas fa-upload"></i> Import Transactions
                 </button>
+                <button class="btn-sm btn-secondary" id="csvClearBtn" onclick="clearCsvForm()" style="display: none;">
+                    <i class="fas fa-times"></i> Clear
+                </button>
                 <span id="csvImportStatus" style="color: var(--text-secondary); font-size: 0.9rem;"></span>
             </div>
+        </div>
+    </div>
+
+    <!-- Delete Monthly Record Section -->
+    <div class="section-card">
+        <div class="section-header">
+            <h2 style="margin: 0; font-size: 1.5rem; color: var(--text-primary);">
+                <i class="fas fa-calendar-times"></i> Delete Monthly Record
+            </h2>
+        </div>
+        <div class="section-body">
+            <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9rem;">
+                Delete a monthly record and <strong>all its transactions</strong> for a specific user. This action cannot be undone.
+            </p>
+
+            <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 15px;">
+                <!-- User selector -->
+                <div style="flex: 1; min-width: 180px;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 5px; color: var(--text-primary); font-size: 0.9rem;">
+                        <i class="fas fa-user"></i> User
+                    </label>
+                    <select id="delRecordUserId" onchange="loadMonthlyRecords()"
+                            style="width: 100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.95rem;">
+                        <option value="">-- Select User --</option>
+                        {% for user in users %}
+                        {% if user.is_active %}
+                        <option value="{{ user.id }}">{{ user.username }}</option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Monthly record selector (populated dynamically) -->
+                <div style="flex: 2; min-width: 260px;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 5px; color: var(--text-primary); font-size: 0.9rem;">
+                        <i class="fas fa-calendar-alt"></i> Monthly Record
+                    </label>
+                    <select id="delRecordSelect" disabled
+                            style="width: 100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.95rem;">
+                        <option value="">-- Select a user first --</option>
+                    </select>
+                </div>
+
+                <!-- Delete button -->
+                <div>
+                    <button class="btn-sm btn-danger" id="delRecordBtn" onclick="showDeleteRecordModal()" disabled>
+                        <i class="fas fa-trash"></i> Delete Record
+                    </button>
+                </div>
+            </div>
+            <span id="delRecordStatus" style="color: var(--text-secondary); font-size: 0.9rem;"></span>
         </div>
     </div>
 
@@ -639,6 +693,36 @@
                 </button>
                 <button type="button" class="btn btn-success" id="csvModalConfirmBtn" onclick="executeImport()">
                     <i class="fas fa-upload"></i> Import
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Monthly Record Confirmation Modal -->
+<div class="modal fade" id="deleteRecordModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content" style="background: var(--card-bg); color: var(--text-primary);">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border-color, #dee2e6);">
+                <h5 class="modal-title">
+                    <i class="fas fa-exclamation-triangle text-danger"></i> Delete Monthly Record
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete <strong id="delRecordLabel"></strong>?</p>
+                <div class="alert alert-danger" role="alert" style="margin-bottom: 0;">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <strong>Warning:</strong> This will permanently delete the monthly record and
+                    <strong id="delRecordTxnCount"></strong> transaction(s). This action cannot be undone.
+                </div>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid var(--border-color, #dee2e6);">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteRecordBtn" onclick="executeDeleteRecord()">
+                    <i class="fas fa-trash"></i> Delete
                 </button>
             </div>
         </div>
@@ -1044,6 +1128,10 @@
         document.getElementById('csvImportModal').addEventListener('hidden.bs.modal', function() {
             setTimeout(clearModalBackdrops, 100);
         });
+        deleteRecordModalInstance = new bootstrap.Modal(document.getElementById('deleteRecordModal'));
+        document.getElementById('deleteRecordModal').addEventListener('hidden.bs.modal', function() {
+            setTimeout(clearModalBackdrops, 100);
+        });
     });
 
     function previewCsv() {
@@ -1119,11 +1207,22 @@
                 previewCount.textContent = rowCount + ' row' + (rowCount !== 1 ? 's' : '');
                 previewArea.style.display = 'block';
                 importBtn.disabled = false;
+                document.getElementById('csvClearBtn').style.display = '';
             } else {
                 showAlert('No valid data rows found in CSV', 'danger');
             }
         };
         reader.readAsText(file);
+    }
+
+    function clearCsvForm() {
+        document.getElementById('csvFileInput').value = '';
+        document.getElementById('csvPreviewArea').style.display = 'none';
+        document.getElementById('csvPreviewBody').innerHTML = '';
+        document.getElementById('csvImportBtn').disabled = true;
+        document.getElementById('csvClearBtn').style.display = 'none';
+        document.getElementById('csvImportStatus').textContent = '';
+        csvUniqueMethods = [];
     }
 
     // Simple CSV line parser that handles quoted fields
@@ -1326,6 +1425,7 @@
                 document.getElementById('csvPreviewArea').style.display = 'none';
                 document.getElementById('csvPreviewBody').innerHTML = '';
                 document.getElementById('csvImportBtn').disabled = true;
+                document.getElementById('csvClearBtn').style.display = 'none';
                 csvUniqueMethods = [];
             } else {
                 showAlert(data.error || 'Import failed', 'danger');
@@ -1340,6 +1440,123 @@
 
         confirmBtn.disabled = false;
         confirmBtn.innerHTML = '<i class="fas fa-upload"></i> Import';
+    }
+
+    // ── Delete Monthly Record ───────────────────────────────────
+    let deleteRecordModalInstance = null;
+    let deleteRecordMeta = null; // { userId, recordId, label, txnCount }
+
+    async function loadMonthlyRecords() {
+        const userId = document.getElementById('delRecordUserId').value;
+        const select = document.getElementById('delRecordSelect');
+        const btn = document.getElementById('delRecordBtn');
+
+        select.innerHTML = '';
+        btn.disabled = true;
+
+        if (!userId) {
+            select.innerHTML = '<option value="">-- Select a user first --</option>';
+            select.disabled = true;
+            return;
+        }
+
+        select.innerHTML = '<option value="">Loading...</option>';
+        select.disabled = true;
+
+        try {
+            const resp = await fetch('/api/admin/users/' + userId + '/monthly-records');
+            const records = resp.ok ? await resp.json() : [];
+
+            select.innerHTML = '';
+
+            if (records.length === 0) {
+                select.innerHTML = '<option value="">No records found</option>';
+                select.disabled = true;
+                return;
+            }
+
+            const optDefault = document.createElement('option');
+            optDefault.value = '';
+            optDefault.textContent = '-- Select a month --';
+            select.appendChild(optDefault);
+
+            records.forEach(function(r) {
+                const opt = document.createElement('option');
+                opt.value = r.id;
+                opt.setAttribute('data-txn-count', r.transaction_count);
+                opt.textContent = r.month_name + ' ' + r.year +
+                    ' (' + r.transaction_count + ' txn' + (r.transaction_count !== 1 ? 's' : '') + ')';
+                select.appendChild(opt);
+            });
+
+            select.disabled = false;
+            select.onchange = function() {
+                btn.disabled = !select.value;
+            };
+        } catch (e) {
+            select.innerHTML = '<option value="">Failed to load</option>';
+            select.disabled = true;
+        }
+    }
+
+    function showDeleteRecordModal() {
+        const userId = document.getElementById('delRecordUserId').value;
+        const select = document.getElementById('delRecordSelect');
+        const recordId = select.value;
+
+        if (!userId || !recordId) return;
+
+        const selectedOpt = select.options[select.selectedIndex];
+        const label = selectedOpt.textContent.split(' (')[0]; // e.g. "January 2025"
+        const txnCount = selectedOpt.getAttribute('data-txn-count') || '0';
+
+        deleteRecordMeta = { userId, recordId, label, txnCount };
+
+        document.getElementById('delRecordLabel').textContent = label;
+        document.getElementById('delRecordTxnCount').textContent = txnCount;
+
+        const confirmBtn = document.getElementById('confirmDeleteRecordBtn');
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = '<i class="fas fa-trash"></i> Delete';
+
+        deleteRecordModalInstance.show();
+    }
+
+    async function executeDeleteRecord() {
+        if (!deleteRecordMeta) return;
+
+        const confirmBtn = document.getElementById('confirmDeleteRecordBtn');
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+
+        try {
+            const resp = await fetch(
+                '/api/admin/users/' + deleteRecordMeta.userId +
+                '/monthly-records/' + deleteRecordMeta.recordId,
+                { method: 'DELETE' }
+            );
+            const data = await resp.json();
+
+            deleteRecordModalInstance.hide();
+
+            if (resp.ok) {
+                showAlert(data.message, 'success');
+                document.getElementById('delRecordStatus').textContent = data.message;
+                // Refresh the records dropdown
+                loadMonthlyRecords();
+            } else {
+                showAlert(data.error || 'Delete failed', 'danger');
+                document.getElementById('delRecordStatus').textContent = data.error || 'Delete failed';
+            }
+        } catch (error) {
+            deleteRecordModalInstance.hide();
+            console.error('Error:', error);
+            showAlert('Network error: ' + error.message, 'danger');
+        }
+
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = '<i class="fas fa-trash"></i> Delete';
+        deleteRecordMeta = null;
     }
 </script>
 {% endblock %}

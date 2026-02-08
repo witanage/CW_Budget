@@ -1362,6 +1362,84 @@ def admin_import_csv():
         connection.close()
 
 
+@app.route('/api/admin/users/<int:user_id>/monthly-records', methods=['GET'])
+@admin_required
+def admin_get_user_monthly_records(user_id):
+    """Return monthly records for a given user with transaction counts (admin only)."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute("""
+                       SELECT mr.id, mr.year, mr.month, mr.month_name,
+                              COUNT(t.id) AS transaction_count,
+                              COALESCE(SUM(t.debit), 0) AS total_debit,
+                              COALESCE(SUM(t.credit), 0) AS total_credit
+                       FROM monthly_records mr
+                       LEFT JOIN transactions t ON mr.id = t.monthly_record_id
+                       WHERE mr.user_id = %s
+                       GROUP BY mr.id, mr.year, mr.month, mr.month_name
+                       ORDER BY mr.year DESC, mr.month DESC
+                       """, (user_id,))
+        return jsonify(cursor.fetchall())
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@app.route('/api/admin/users/<int:user_id>/monthly-records/<int:record_id>', methods=['DELETE'])
+@admin_required
+def admin_delete_monthly_record(user_id, record_id):
+    """Delete a monthly record and all its transactions for a given user (admin only)."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor(dictionary=True)
+    admin_id = session['user_id']
+
+    try:
+        # Verify the record belongs to the specified user
+        cursor.execute("""
+                       SELECT mr.id, mr.year, mr.month, mr.month_name, u.username
+                       FROM monthly_records mr
+                       JOIN users u ON mr.user_id = u.id
+                       WHERE mr.id = %s AND mr.user_id = %s
+                       """, (record_id, user_id))
+        record = cursor.fetchone()
+        if not record:
+            return jsonify({'error': 'Monthly record not found for this user'}), 404
+
+        # Count transactions that will be deleted
+        cursor.execute("SELECT COUNT(*) AS cnt FROM transactions WHERE monthly_record_id = %s", (record_id,))
+        txn_count = cursor.fetchone()['cnt']
+
+        # Delete the monthly record (CASCADE will remove transactions)
+        cursor.execute("DELETE FROM monthly_records WHERE id = %s", (record_id,))
+        connection.commit()
+
+        details = (f"Deleted {record['month_name']} {record['year']} "
+                   f"({txn_count} transactions) for user {record['username']}")
+        log_audit(admin_id, 'DELETE_MONTHLY_RECORD', target_user_id=user_id, details=details)
+
+        return jsonify({
+            'message': f"Deleted {record['month_name']} {record['year']} ({txn_count} transactions)",
+            'deleted_transactions': txn_count,
+        }), 200
+
+    except Error as e:
+        connection.rollback()
+        logger.error(f"Delete monthly record error: {e}")
+        return jsonify({'error': f'Database error: {str(e)}'}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+
 @app.route('/api/dashboard-stats')
 @login_required
 def dashboard_stats():
