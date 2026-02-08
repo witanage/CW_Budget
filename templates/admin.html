@@ -353,6 +353,111 @@
         </div>
     </div>
 
+    <!-- CSV Import Section -->
+    <div class="section-card">
+        <div class="section-header">
+            <h2 style="margin: 0; font-size: 1.5rem; color: var(--text-primary);">
+                <i class="fas fa-file-csv"></i> Import Transactions from CSV
+            </h2>
+        </div>
+        <div class="section-body">
+            <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9rem;">
+                Upload a CSV file with columns: <strong>Description, Credit, Debit, Note, Method</strong>.
+                Amounts may include currency prefixes (e.g. Rs) and thousand-separators.
+            </p>
+
+            <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 15px;">
+                <!-- User selector -->
+                <div style="flex: 1; min-width: 180px;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 5px; color: var(--text-primary); font-size: 0.9rem;">
+                        <i class="fas fa-user"></i> User
+                    </label>
+                    <select id="csvUserId"
+                            style="width: 100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.95rem;">
+                        <option value="">-- Select User --</option>
+                        {% for user in users %}
+                        {% if user.is_active %}
+                        <option value="{{ user.id }}">{{ user.username }}</option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Year -->
+                <div style="min-width: 110px;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 5px; color: var(--text-primary); font-size: 0.9rem;">
+                        <i class="fas fa-calendar"></i> Year
+                    </label>
+                    <input type="number" id="csvYear" min="2000" max="2099"
+                           style="width: 100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.95rem;">
+                </div>
+
+                <!-- Month -->
+                <div style="min-width: 150px;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 5px; color: var(--text-primary); font-size: 0.9rem;">
+                        <i class="fas fa-calendar-alt"></i> Month
+                    </label>
+                    <select id="csvMonth"
+                            style="width: 100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.95rem;">
+                        <option value="1">January</option>
+                        <option value="2">February</option>
+                        <option value="3">March</option>
+                        <option value="4">April</option>
+                        <option value="5">May</option>
+                        <option value="6">June</option>
+                        <option value="7">July</option>
+                        <option value="8">August</option>
+                        <option value="9">September</option>
+                        <option value="10">October</option>
+                        <option value="11">November</option>
+                        <option value="12">December</option>
+                    </select>
+                </div>
+
+                <!-- File picker -->
+                <div style="flex: 1; min-width: 220px;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 5px; color: var(--text-primary); font-size: 0.9rem;">
+                        <i class="fas fa-file-upload"></i> CSV File
+                    </label>
+                    <input type="file" id="csvFileInput" accept=".csv"
+                           style="width: 100%; padding: 6px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.9rem;"
+                           onchange="previewCsv()">
+                </div>
+            </div>
+
+            <!-- Preview area -->
+            <div id="csvPreviewArea" style="display: none; margin-bottom: 15px;">
+                <h4 style="margin: 0 0 10px 0; color: var(--text-primary); font-size: 1rem;">
+                    <i class="fas fa-eye"></i> Preview
+                    <span id="csvPreviewCount" class="badge badge-info" style="font-size: 0.8rem; margin-left: 8px;"></span>
+                </h4>
+                <div style="overflow-x: auto; max-height: 300px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px;">
+                    <table class="user-table" id="csvPreviewTable" style="margin: 0;">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Description</th>
+                                <th>Credit</th>
+                                <th>Debit</th>
+                                <th>Note</th>
+                                <th>Method</th>
+                            </tr>
+                        </thead>
+                        <tbody id="csvPreviewBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Import button -->
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <button class="btn-sm btn-success" id="csvImportBtn" onclick="importCsv()" disabled>
+                    <i class="fas fa-upload"></i> Import Transactions
+                </button>
+                <span id="csvImportStatus" style="color: var(--text-secondary); font-size: 0.9rem;"></span>
+            </div>
+        </div>
+    </div>
+
     <!-- User Management Section -->
     <div class="section-card">
         <div class="section-header">
@@ -860,6 +965,177 @@
             btn.disabled = false;
             btn.innerHTML = '<i class="fas fa-save"></i> Save';
         }
+    }
+
+    // ── CSV Import ──────────────────────────────────────────────
+    // Set default year/month to current
+    (function() {
+        const now = new Date();
+        document.getElementById('csvYear').value = now.getFullYear();
+        document.getElementById('csvMonth').value = now.getMonth() + 1;
+    })();
+
+    function previewCsv() {
+        const fileInput = document.getElementById('csvFileInput');
+        const previewArea = document.getElementById('csvPreviewArea');
+        const previewBody = document.getElementById('csvPreviewBody');
+        const previewCount = document.getElementById('csvPreviewCount');
+        const importBtn = document.getElementById('csvImportBtn');
+
+        previewBody.innerHTML = '';
+        previewArea.style.display = 'none';
+        importBtn.disabled = true;
+
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const text = e.target.result;
+            const lines = text.split(/\r?\n/).filter(l => l.trim());
+            if (lines.length < 2) {
+                showAlert('CSV file must have a header row and at least one data row', 'danger');
+                return;
+            }
+
+            // Parse header
+            const headerLine = lines[0];
+            const headers = parseCSVLine(headerLine).map(h => h.trim().toLowerCase());
+            const descIdx = headers.indexOf('description');
+            const creditIdx = headers.indexOf('credit');
+            const debitIdx = headers.indexOf('debit');
+            const noteIdx = headers.findIndex(h => h === 'note' || h === 'notes');
+            const methodIdx = headers.findIndex(h => h === 'method' || h === 'payment method');
+
+            if (descIdx === -1) {
+                showAlert('CSV must have a "Description" column', 'danger');
+                return;
+            }
+
+            let rowCount = 0;
+            for (let i = 1; i < lines.length; i++) {
+                const cols = parseCSVLine(lines[i]);
+                const desc = (cols[descIdx] || '').trim();
+                if (!desc) continue;
+
+                rowCount++;
+                const tr = document.createElement('tr');
+                tr.innerHTML =
+                    '<td>' + rowCount + '</td>' +
+                    '<td>' + escHtml(desc) + '</td>' +
+                    '<td>' + escHtml(creditIdx >= 0 ? (cols[creditIdx] || '').trim() : '') + '</td>' +
+                    '<td>' + escHtml(debitIdx >= 0 ? (cols[debitIdx] || '').trim() : '') + '</td>' +
+                    '<td>' + escHtml(noteIdx >= 0 ? (cols[noteIdx] || '').trim() : '') + '</td>' +
+                    '<td>' + escHtml(methodIdx >= 0 ? (cols[methodIdx] || '').trim() : '') + '</td>';
+                previewBody.appendChild(tr);
+            }
+
+            if (rowCount > 0) {
+                previewCount.textContent = rowCount + ' row' + (rowCount !== 1 ? 's' : '');
+                previewArea.style.display = 'block';
+                importBtn.disabled = false;
+            } else {
+                showAlert('No valid data rows found in CSV', 'danger');
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    // Simple CSV line parser that handles quoted fields
+    function parseCSVLine(line) {
+        const result = [];
+        let current = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+            const ch = line[i];
+            if (inQuotes) {
+                if (ch === '"' && line[i + 1] === '"') {
+                    current += '"';
+                    i++;
+                } else if (ch === '"') {
+                    inQuotes = false;
+                } else {
+                    current += ch;
+                }
+            } else {
+                if (ch === '"') {
+                    inQuotes = true;
+                } else if (ch === ',') {
+                    result.push(current);
+                    current = '';
+                } else {
+                    current += ch;
+                }
+            }
+        }
+        result.push(current);
+        return result;
+    }
+
+    function escHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    async function importCsv() {
+        const userId = document.getElementById('csvUserId').value;
+        const year = document.getElementById('csvYear').value;
+        const month = document.getElementById('csvMonth').value;
+        const fileInput = document.getElementById('csvFileInput');
+
+        if (!userId) { showAlert('Please select a user', 'danger'); return; }
+        if (!year) { showAlert('Please enter a year', 'danger'); return; }
+        if (!fileInput.files[0]) { showAlert('Please select a CSV file', 'danger'); return; }
+
+        const monthNames = ['', 'January','February','March','April','May','June',
+                            'July','August','September','October','November','December'];
+        if (!confirm('Import ' + document.getElementById('csvPreviewBody').children.length +
+                      ' transactions for ' + monthNames[parseInt(month)] + ' ' + year + '?')) {
+            return;
+        }
+
+        const btn = document.getElementById('csvImportBtn');
+        const statusEl = document.getElementById('csvImportStatus');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importing...';
+        statusEl.textContent = '';
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        formData.append('user_id', userId);
+        formData.append('year', year);
+        formData.append('month', month);
+
+        try {
+            const response = await fetch('/api/admin/import-csv', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+
+            if (response.ok) {
+                showAlert(data.message, 'success');
+                statusEl.textContent = data.message;
+                if (data.methods_created && data.methods_created.length > 0) {
+                    statusEl.textContent += ' | New payment methods: ' + data.methods_created.join(', ');
+                }
+                // Reset form
+                fileInput.value = '';
+                document.getElementById('csvPreviewArea').style.display = 'none';
+                document.getElementById('csvPreviewBody').innerHTML = '';
+            } else {
+                showAlert(data.error || 'Import failed', 'danger');
+                statusEl.textContent = data.error || 'Import failed';
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showAlert('Network error: ' + error.message, 'danger');
+            statusEl.textContent = 'Network error';
+        }
+
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-upload"></i> Import Transactions';
     }
 </script>
 {% endblock %}
