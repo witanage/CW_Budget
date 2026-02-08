@@ -1315,8 +1315,10 @@ def admin_import_csv():
             cursor.execute("""
                            INSERT INTO transactions
                            (monthly_record_id, description, category_id, debit, credit,
-                            transaction_date, notes, payment_method_id, display_order)
-                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            transaction_date, notes, payment_method_id, display_order,
+                            is_done, is_paid, marked_done_at, paid_at)
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s,
+                                   TRUE, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                            """, (
                 monthly_record['id'],
                 row['description'],
