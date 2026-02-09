@@ -407,6 +407,9 @@
                         backgroundColor: 'rgba(0,0,0,0.85)',
                         titleColor: '#fff', bodyColor: '#ddd',
                         borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1, padding: 10,
+                        itemSort: function (a, b) {
+                            return (b.parsed.y || 0) - (a.parsed.y || 0);
+                        },
                         callbacks: {
                             label: function (ctx) {
                                 var v = ctx.parsed.y;
