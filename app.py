@@ -21,6 +21,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from apscheduler.schedulers.background import BackgroundScheduler
 from services.hnb_exchange_rate_service import get_hnb_exchange_rate_service
 from services.pb_exchange_rate_service import get_pb_exchange_rate_service
+from services.sampath_exchange_rate_service import get_sampath_exchange_rate_service
 
 # Load environment variables from .env file
 load_dotenv()
@@ -389,6 +390,32 @@ def refresh_all_exchange_rates(force=False):
                                  error_message=str(e),
                                  duration_ms=int((time.time() - pb_start) * 1000))
         results['PB'] = {'status': 'failure', 'error': str(e)}
+
+    # Sampath Bank
+    sampath_start = time.time()
+    try:
+        sampath_service = get_sampath_exchange_rate_service()
+        sampath_rate = sampath_service.fetch_and_store_current_rate()
+        sampath_ms = int((time.time() - sampath_start) * 1000)
+        if sampath_rate:
+            logger.info(f"Scheduler: Sampath rate updated: Buy={sampath_rate['buy_rate']}, Sell={sampath_rate['sell_rate']}")
+            log_exchange_rate_refresh('SAMPATH', 'success',
+                                     buy_rate=sampath_rate['buy_rate'],
+                                     sell_rate=sampath_rate['sell_rate'],
+                                     duration_ms=sampath_ms)
+            results['SAMPATH'] = {'status': 'success', 'buy_rate': sampath_rate['buy_rate'], 'sell_rate': sampath_rate['sell_rate']}
+        else:
+            logger.warning("Scheduler: Failed to fetch Sampath rate")
+            log_exchange_rate_refresh('SAMPATH', 'failure',
+                                     error_message='No rate returned by Sampath API',
+                                     duration_ms=sampath_ms)
+            results['SAMPATH'] = {'status': 'failure', 'error': 'No rate returned by Sampath API'}
+    except Exception as e:
+        logger.error(f"Scheduler: Error fetching Sampath rate: {str(e)}")
+        log_exchange_rate_refresh('SAMPATH', 'failure',
+                                 error_message=str(e),
+                                 duration_ms=int((time.time() - sampath_start) * 1000))
+        results['SAMPATH'] = {'status': 'failure', 'error': str(e)}
 
     # CBSL (for today)
     cbsl_start = time.time()
@@ -4361,6 +4388,62 @@ def refresh_pb_rate():
         return jsonify({'error': 'Failed to refresh exchange rate', 'details': str(e)}), 500
 
 
+@app.route('/api/exchange-rate/sampath/current', methods=['GET'])
+@login_required
+def get_sampath_current_rate():
+    """
+    Get the latest cached USD to LKR exchange rate from Sampath Bank.
+
+    Rates are refreshed automatically every hour by the background scheduler.
+    Use POST /api/exchange-rate/sampath/refresh to force an immediate update.
+
+    Returns:
+        JSON with buy_rate, sell_rate, date, source, and updated_at
+    """
+    try:
+        service = get_sampath_exchange_rate_service()
+        rate_data = _resolve_rate(service, datetime.now().date())
+
+        if rate_data:
+            logger.info(f"Sampath current rate: {rate_data}")
+            return jsonify(rate_data), 200
+        else:
+            return jsonify({'error': 'Sampath Bank rate not yet available.'}), 404
+
+    except Exception as e:
+        logger.error(f"Error fetching Sampath current rate: {str(e)}")
+        return jsonify({'error': 'Failed to fetch exchange rate', 'details': str(e)}), 500
+
+
+@app.route('/api/exchange-rate/sampath/refresh', methods=['POST'])
+@login_required
+def refresh_sampath_rate():
+    """
+    Manually refresh today's exchange rate from Sampath Bank.
+
+    This forces a fresh fetch from the Sampath Bank API and updates the database.
+
+    Returns:
+        JSON with updated rate data
+    """
+    try:
+        service = get_sampath_exchange_rate_service()
+        rate_data = service.fetch_and_store_current_rate()
+
+        if rate_data:
+            logger.info(f"Sampath rate refreshed: {rate_data}")
+            return jsonify({
+                'message': 'Exchange rate refreshed successfully',
+                'rate': rate_data
+            }), 200
+        else:
+            return jsonify({'error': 'Failed to refresh rate from Sampath Bank'}), 500
+
+    except Exception as e:
+        logger.error(f"Error refreshing Sampath rate: {str(e)}")
+        return jsonify({'error': 'Failed to refresh exchange rate', 'details': str(e)}), 500
+
+
 @app.route('/api/exchange-rate/refresh-all', methods=['GET'])
 @admin_required
 def refresh_all_rates_manually():
@@ -4667,6 +4750,16 @@ def get_all_bank_rates_for_date():
         except Exception as e:
             logger.warning(f"Failed to get PB rate for {date_str}: {str(e)}")
 
+        # Get Sampath Bank rate (live-fetch in manual mode when today is missing)
+        try:
+            sampath_service = get_sampath_exchange_rate_service()
+            sampath_rate = _resolve_rate(sampath_service, date)
+            if sampath_rate:
+                sampath_rate['bank'] = 'SAMPATH'
+                rates.append(sampath_rate)
+        except Exception as e:
+            logger.warning(f"Failed to get Sampath rate for {date_str}: {str(e)}")
+
         # Get CBSL rate
         try:
             cbsl_service = get_exchange_rate_service()
@@ -4727,18 +4820,25 @@ def get_bank_rate_for_date(bank_code):
             except Exception as e:
                 logger.error(f"Error fetching PB rate for {date_str}: {str(e)}")
                 return jsonify({'error': f'Failed to fetch PB rate', 'details': str(e)}), 500
+        elif bank_code_lower == 'sampath':
+            try:
+                service = get_sampath_exchange_rate_service()
+                rate = _resolve_rate(service, date)
+            except Exception as e:
+                logger.error(f"Error fetching Sampath rate for {date_str}: {str(e)}")
+                return jsonify({'error': f'Failed to fetch Sampath rate', 'details': str(e)}), 500
         elif bank_code_lower == 'cbsl':
             try:
                 service = get_exchange_rate_service()
                 rate = service.get_exchange_rate(date)
                 # Guard: reject if the service returned another bank's row
-                if rate and rate.get('source') in ('HNB', 'PB'):
+                if rate and rate.get('source') in ('HNB', 'PB', 'SAMPATH'):
                     rate = None
             except Exception as e:
                 logger.error(f"Error fetching CBSL rate for {date_str}: {str(e)}")
                 return jsonify({'error': f'Failed to fetch CBSL rate', 'details': str(e)}), 500
         else:
-            return jsonify({'error': f'Unknown bank code: {bank_code}. Supported: hnb, pb, cbsl'}), 400
+            return jsonify({'error': f'Unknown bank code: {bank_code}. Supported: hnb, pb, sampath, cbsl'}), 400
 
         if rate and isinstance(rate, dict):
             rate['bank'] = bank_code_lower.upper()
@@ -4748,63 +4848,6 @@ def get_bank_rate_for_date(bank_code):
     except Exception as e:
         logger.error(f"Error fetching {bank_code} rate: {str(e)}")
         return jsonify({'error': 'Failed to fetch bank rate', 'details': str(e)}), 500
-
-
-@app.route('/api/exchange-rate/hnb', methods=['GET'])
-@token_required
-def get_hnb_rate_for_date():
-    """
-    Get HNB exchange rate for a specific date from cache.
-
-    Rates are refreshed automatically every hour by the background scheduler.
-
-    Query Parameters:
-        date: Date in ddmmyyyy format (optional, defaults to today)
-              Example: 01022026 for February 1, 2026
-
-    Returns:
-        JSON with buy_rate, sell_rate, date, and source
-
-    Example Usage:
-        GET /api/exchange-rate/hnb?date=01022026
-        GET /api/exchange-rate/hnb  (returns today's rate)
-    """
-    try:
-        date_str = request.args.get('date')
-
-        if date_str:
-            try:
-                if len(date_str) != 8:
-                    return jsonify({
-                        'error': 'Invalid date format. Use ddmmyyyy (e.g., 01022026 for Feb 1, 2026)'
-                    }), 400
-
-                date = datetime.strptime(date_str, '%d%m%Y').date()
-
-            except ValueError:
-                return jsonify({
-                    'error': 'Invalid date format. Use ddmmyyyy (e.g., 01022026 for Feb 1, 2026)'
-                }), 400
-        else:
-            date = datetime.now().date()
-
-        service = get_hnb_exchange_rate_service()
-        rate = _resolve_rate(service, date)
-
-        if rate:
-            logger.info(f"HNB rate retrieved for {date_str or 'today'}: {rate}")
-            return jsonify(rate), 200
-        else:
-            return jsonify({
-                'error': 'Exchange rate not available for this date'
-            }), 404
-
-    except Exception as e:
-        logger.error(f"Error getting HNB rate: {str(e)}")
-        return jsonify({
-            'error': 'Failed to get exchange rate',
-            'details': str(e)
-        }), 500
 
 
 @app.route('/api/exchange-rate/pb', methods=['GET'])
@@ -4862,6 +4905,7 @@ def get_pb_rate_for_date():
             'error': 'Failed to get exchange rate',
             'details': str(e)
         }), 500
+
 
 
 # ============================================================
