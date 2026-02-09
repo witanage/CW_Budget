@@ -27,7 +27,7 @@
         vol:  '#17a2b8',
         range: '#dc3545'
     };
-    var SRC_CLR = { CBSL: '#0d6efd', HNB: '#198754', PB: '#fd7e14', CSV: '#6c757d', Manual: '#20c997' };
+    var SRC_CLR = { CBSL: '#0d6efd', HNB: '#198754', PB: '#fd7e14', SAMPATH: '#dc3545', CSV: '#6c757d', Manual: '#20c997' };
 
     // ===================================================================
     // Public entry — called each time the user navigates to Rate Trends
