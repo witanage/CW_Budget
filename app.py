@@ -1093,6 +1093,353 @@ def update_admin_setting(key):
         connection.close()
 
 
+@app.route('/api/admin/users/<int:user_id>/payment-methods', methods=['GET'])
+@admin_required
+def admin_get_user_payment_methods(user_id):
+    """Return active payment methods for a given user (admin only)."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute("""
+                       SELECT id, name, type, color
+                       FROM payment_methods
+                       WHERE user_id = %s AND is_active = TRUE
+                       ORDER BY name
+                       """, (user_id,))
+        return jsonify(cursor.fetchall())
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@app.route('/api/admin/import-csv', methods=['POST'])
+@admin_required
+def admin_import_csv():
+    """Import transactions from a CSV file for a specific user/month/year.
+
+    CSV format: Description, Credit, Debit, Note, Method
+    Amounts may have a currency prefix (e.g. "Rs") and thousand-separators.
+
+    Accepts an optional ``method_mapping`` JSON field (form-data string):
+        { "CsvMethodName": <payment_method_id | "__create__"  | "__skip__"> , ... }
+
+    - An integer id means "map to this existing payment method".
+    - ``"__create__"`` means "create a new payment method with that name".
+    - ``"__skip__"`` means "leave payment_method_id NULL for those rows".
+    - If a CSV method name is not in the mapping it falls back to
+      auto-matching by name (case-insensitive) or creating a new method.
+    """
+    # ── Validate inputs ──────────────────────────────────────────
+    if 'file' not in request.files:
+        return jsonify({'error': 'No CSV file provided'}), 400
+
+    csv_file = request.files['file']
+    if not csv_file.filename or not csv_file.filename.lower().endswith('.csv'):
+        return jsonify({'error': 'File must be a .csv file'}), 400
+
+    target_user_id = request.form.get('user_id', type=int)
+    year = request.form.get('year', type=int)
+    month = request.form.get('month', type=int)
+
+    if not target_user_id or not year or not month:
+        return jsonify({'error': 'user_id, year and month are required'}), 400
+
+    if month < 1 or month > 12:
+        return jsonify({'error': 'month must be between 1 and 12'}), 400
+
+    # Optional method mapping from the frontend
+    method_mapping_raw = request.form.get('method_mapping')
+    method_mapping = {}
+    if method_mapping_raw:
+        try:
+            method_mapping = json.loads(method_mapping_raw)
+        except (json.JSONDecodeError, TypeError):
+            return jsonify({'error': 'Invalid method_mapping JSON'}), 400
+
+    # ── Parse CSV ────────────────────────────────────────────────
+    import re
+
+    def parse_amount(raw):
+        """Strip currency prefix/symbols and thousand-separators, return Decimal or None."""
+        if raw is None:
+            return None
+        raw = str(raw).strip()
+        if not raw:
+            return None
+        # Remove common currency prefixes (Rs, Rs., LKR, $, etc.) and spaces
+        raw = re.sub(r'^[A-Za-z$.\s]+', '', raw)
+        # Remove thousand-separators
+        raw = raw.replace(',', '')
+        if not raw:
+            return None
+        try:
+            val = Decimal(raw)
+            return val if val > 0 else None
+        except Exception:
+            return None
+
+    try:
+        stream = io.StringIO(csv_file.read().decode('utf-8-sig'))
+        reader = csv.DictReader(stream)
+
+        # Normalise header names (strip whitespace, lowercase)
+        if reader.fieldnames:
+            reader.fieldnames = [f.strip() for f in reader.fieldnames]
+
+        rows = []
+        for line_no, row in enumerate(reader, start=2):
+            # Normalise keys
+            row = {k.strip().lower(): v for k, v in row.items() if k}
+            description = (row.get('description') or '').strip()
+            if not description:
+                continue  # skip blank rows
+
+            debit = parse_amount(row.get('debit'))
+            credit = parse_amount(row.get('credit'))
+            note = (row.get('note') or row.get('notes') or '').strip()
+            method = (row.get('method') or row.get('payment method') or '').strip()
+
+            rows.append({
+                'description': description,
+                'debit': debit,
+                'credit': credit,
+                'note': note,
+                'method': method,
+            })
+
+        if not rows:
+            return jsonify({'error': 'CSV file contains no valid rows'}), 400
+
+    except UnicodeDecodeError:
+        return jsonify({'error': 'File encoding not supported. Please use UTF-8.'}), 400
+    except Exception as e:
+        logger.error(f"CSV parse error: {e}")
+        return jsonify({'error': f'Failed to parse CSV: {str(e)}'}), 400
+
+    # ── Database operations ──────────────────────────────────────
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor(dictionary=True)
+    admin_id = session['user_id']
+
+    try:
+        # Verify target user exists
+        cursor.execute("SELECT id, username FROM users WHERE id = %s", (target_user_id,))
+        target_user = cursor.fetchone()
+        if not target_user:
+            return jsonify({'error': 'Target user not found'}), 404
+
+        # Get or create monthly record
+        month_name = calendar.month_name[month]
+        cursor.execute("""
+                       INSERT INTO monthly_records (user_id, year, month, month_name)
+                       VALUES (%s, %s, %s, %s) ON DUPLICATE KEY
+                       UPDATE updated_at = CURRENT_TIMESTAMP
+                       """, (target_user_id, year, month, month_name))
+        cursor.execute("""
+                       SELECT id FROM monthly_records
+                       WHERE user_id = %s AND year = %s AND month = %s
+                       """, (target_user_id, year, month))
+        monthly_record = cursor.fetchone()
+
+        # Pre-load existing payment methods for the target user
+        cursor.execute("""
+                       SELECT id, name FROM payment_methods
+                       WHERE user_id = %s AND is_active = TRUE
+                       """, (target_user_id,))
+        existing_methods = {pm['name'].lower(): pm['id'] for pm in cursor.fetchall()}
+
+        # Get current max display_order for appending at the end
+        cursor.execute("""
+                       SELECT COALESCE(MAX(display_order), 0) AS max_order
+                       FROM transactions WHERE monthly_record_id = %s
+                       """, (monthly_record['id'],))
+        current_max_order = cursor.fetchone()['max_order']
+
+        transaction_date = datetime(year, month, 1).date()
+
+        imported_count = 0
+        skipped_count = 0
+        methods_created = []
+
+        for idx, row in enumerate(rows):
+            # Resolve payment method via explicit mapping first, then auto-match
+            payment_method_id = None
+            if row['method']:
+                mapping_value = method_mapping.get(row['method'])  # exact key from CSV
+
+                if mapping_value == '__skip__':
+                    payment_method_id = None
+                elif mapping_value == '__create__':
+                    # Create new payment method
+                    method_key = row['method'].lower()
+                    if method_key in existing_methods:
+                        payment_method_id = existing_methods[method_key]
+                    else:
+                        cursor.execute("""
+                                       INSERT INTO payment_methods (user_id, name, type, color)
+                                       VALUES (%s, %s, %s, %s)
+                                       """, (target_user_id, row['method'], 'other', '#6c757d'))
+                        payment_method_id = cursor.lastrowid
+                        existing_methods[method_key] = payment_method_id
+                        methods_created.append(row['method'])
+                elif mapping_value is not None:
+                    # Map to an existing payment method id
+                    try:
+                        payment_method_id = int(mapping_value)
+                    except (ValueError, TypeError):
+                        payment_method_id = None
+                else:
+                    # No explicit mapping — auto-match by name
+                    method_key = row['method'].lower()
+                    if method_key in existing_methods:
+                        payment_method_id = existing_methods[method_key]
+                    else:
+                        cursor.execute("""
+                                       INSERT INTO payment_methods (user_id, name, type, color)
+                                       VALUES (%s, %s, %s, %s)
+                                       """, (target_user_id, row['method'], 'other', '#6c757d'))
+                        payment_method_id = cursor.lastrowid
+                        existing_methods[method_key] = payment_method_id
+                        methods_created.append(row['method'])
+
+            current_max_order += 1
+
+            cursor.execute("""
+                           INSERT INTO transactions
+                           (monthly_record_id, description, category_id, debit, credit,
+                            transaction_date, notes, payment_method_id, display_order,
+                            is_done, is_paid, marked_done_at, paid_at)
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s,
+                                   TRUE, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                           """, (
+                monthly_record['id'],
+                row['description'],
+                None,
+                row['debit'],
+                row['credit'],
+                transaction_date,
+                row['note'] if row['note'] else None,
+                payment_method_id,
+                current_max_order,
+            ))
+
+            txn_id = cursor.lastrowid
+            log_transaction_audit(cursor, txn_id, admin_id, 'CREATE',
+                                  field_name='csv_import',
+                                  new_value=f"Imported for user {target_user['username']}")
+            imported_count += 1
+
+        connection.commit()
+
+        # Audit log
+        details = (f"Imported {imported_count} transactions from CSV "
+                   f"for {month_name} {year} (user: {target_user['username']})")
+        if methods_created:
+            details += f". Created payment methods: {', '.join(methods_created)}"
+        log_audit(admin_id, 'CSV_IMPORT', target_user_id=target_user_id, details=details)
+
+        return jsonify({
+            'message': f'Successfully imported {imported_count} transactions for {month_name} {year}',
+            'imported': imported_count,
+            'skipped': skipped_count,
+            'methods_created': methods_created,
+        }), 201
+
+    except Error as e:
+        connection.rollback()
+        logger.error(f"CSV import DB error: {e}")
+        return jsonify({'error': f'Database error: {str(e)}'}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@app.route('/api/admin/users/<int:user_id>/monthly-records', methods=['GET'])
+@admin_required
+def admin_get_user_monthly_records(user_id):
+    """Return monthly records for a given user with transaction counts (admin only)."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute("""
+                       SELECT mr.id, mr.year, mr.month, mr.month_name,
+                              COUNT(t.id) AS transaction_count,
+                              COALESCE(SUM(t.debit), 0) AS total_debit,
+                              COALESCE(SUM(t.credit), 0) AS total_credit
+                       FROM monthly_records mr
+                       LEFT JOIN transactions t ON mr.id = t.monthly_record_id
+                       WHERE mr.user_id = %s
+                       GROUP BY mr.id, mr.year, mr.month, mr.month_name
+                       ORDER BY mr.year DESC, mr.month DESC
+                       """, (user_id,))
+        return jsonify(cursor.fetchall())
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@app.route('/api/admin/users/<int:user_id>/monthly-records/<int:record_id>', methods=['DELETE'])
+@admin_required
+def admin_delete_monthly_record(user_id, record_id):
+    """Delete a monthly record and all its transactions for a given user (admin only)."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor(dictionary=True)
+    admin_id = session['user_id']
+
+    try:
+        # Verify the record belongs to the specified user
+        cursor.execute("""
+                       SELECT mr.id, mr.year, mr.month, mr.month_name, u.username
+                       FROM monthly_records mr
+                       JOIN users u ON mr.user_id = u.id
+                       WHERE mr.id = %s AND mr.user_id = %s
+                       """, (record_id, user_id))
+        record = cursor.fetchone()
+        if not record:
+            return jsonify({'error': 'Monthly record not found for this user'}), 404
+
+        # Count transactions that will be deleted
+        cursor.execute("SELECT COUNT(*) AS cnt FROM transactions WHERE monthly_record_id = %s", (record_id,))
+        txn_count = cursor.fetchone()['cnt']
+
+        # Delete the monthly record (CASCADE will remove transactions)
+        cursor.execute("DELETE FROM monthly_records WHERE id = %s", (record_id,))
+        connection.commit()
+
+        details = (f"Deleted {record['month_name']} {record['year']} "
+                   f"({txn_count} transactions) for user {record['username']}")
+        log_audit(admin_id, 'DELETE_MONTHLY_RECORD', target_user_id=user_id, details=details)
+
+        return jsonify({
+            'message': f"Deleted {record['month_name']} {record['year']} ({txn_count} transactions)",
+            'deleted_transactions': txn_count,
+        }), 200
+
+    except Error as e:
+        connection.rollback()
+        logger.error(f"Delete monthly record error: {e}")
+        return jsonify({'error': f'Database error: {str(e)}'}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+
 @app.route('/api/dashboard-stats')
 @login_required
 def dashboard_stats():
