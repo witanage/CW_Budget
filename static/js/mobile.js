@@ -596,7 +596,7 @@ descCell.style.cursor = 'pointer';
 // Set description text color based on payment status
 // White for unpaid (is_paid = 0), current color for paid (is_paid = 1)
 if (!isPaid) {
-descCell.style.color = '#ffffff';
+descCell.style.setProperty('color', '#ffffff', 'important');
 }
 
 descCell.addEventListener('click', function(e) {
