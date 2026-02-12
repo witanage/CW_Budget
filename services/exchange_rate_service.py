@@ -6,9 +6,9 @@ from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 import logging
 from typing import Optional, Dict
-import mysql.connector
 from mysql.connector import Error
-import os
+
+from db import get_db_connection
 
 logger = logging.getLogger(__name__)
 
@@ -18,17 +18,9 @@ class ExchangeRateService:
     CBSL_URL = "https://www.cbsl.gov.lk/cbsl_custom/exratestt/exrates_resultstt.php"
 
     def __init__(self, db_config=None):
-        self.db_config = db_config or self._get_db_config()
-
-    def _get_db_config(self):
-        """Get database configuration from environment variables"""
-        return {
-            'host': os.environ.get('DB_HOST', 'localhost'),
-            'port': int(os.environ.get('DB_PORT', 3306)),
-            'user': os.environ.get('DB_USER', 'root'),
-            'password': os.environ.get('DB_PASSWORD', ''),
-            'database': os.environ.get('DB_NAME', 'budget_app')
-        }
+        # db_config kept for backward compatibility but is no longer used;
+        # all connections now come from the shared pool in db.py.
+        pass
 
     def get_exchange_rate(self, date: datetime) -> Optional[Dict[str, float]]:
         """
@@ -101,8 +93,10 @@ class ExchangeRateService:
 
     def _get_rate_from_db(self, date: datetime) -> Optional[Dict[str, float]]:
         """Get exchange rate from database for specific date"""
+        connection = None
+        cursor = None
         try:
-            connection = mysql.connector.connect(**self.db_config)
+            connection = get_db_connection()
             cursor = connection.cursor(dictionary=True)
 
             cursor.execute("""
@@ -113,8 +107,6 @@ class ExchangeRateService:
             """, (date.strftime('%Y-%m-%d'),))
 
             result = cursor.fetchone()
-            cursor.close()
-            connection.close()
 
             if result:
                 return {
@@ -129,11 +121,18 @@ class ExchangeRateService:
         except Error as e:
             logger.error(f"Database error getting exchange rate: {str(e)}")
             return None
+        finally:
+            if cursor:
+                cursor.close()
+            if connection:
+                connection.close()
 
     def _get_nearest_rate_from_db(self, date: datetime) -> Optional[Dict[str, float]]:
         """Get nearest previous exchange rate from database"""
+        connection = None
+        cursor = None
         try:
-            connection = mysql.connector.connect(**self.db_config)
+            connection = get_db_connection()
             cursor = connection.cursor(dictionary=True)
 
             cursor.execute("""
@@ -145,8 +144,6 @@ class ExchangeRateService:
             """, (date.strftime('%Y-%m-%d'),))
 
             result = cursor.fetchone()
-            cursor.close()
-            connection.close()
 
             if result:
                 return {
@@ -162,12 +159,19 @@ class ExchangeRateService:
         except Error as e:
             logger.error(f"Database error getting nearest exchange rate: {str(e)}")
             return None
+        finally:
+            if cursor:
+                cursor.close()
+            if connection:
+                connection.close()
 
     def save_exchange_rate(self, date: datetime, buy_rate: float, sell_rate: float,
                           source: str = 'CBSL') -> bool:
         """Save exchange rate to database"""
+        connection = None
+        cursor = None
         try:
-            connection = mysql.connector.connect(**self.db_config)
+            connection = get_db_connection()
             cursor = connection.cursor()
 
             cursor.execute("""
@@ -181,15 +185,19 @@ class ExchangeRateService:
             """, (date.strftime('%Y-%m-%d'), buy_rate, sell_rate, source))
 
             connection.commit()
-            cursor.close()
-            connection.close()
-
             logger.info(f"Saved exchange rate for {date.strftime('%Y-%m-%d')}: {buy_rate}/{sell_rate}")
             return True
 
         except Error as e:
             logger.error(f"Database error saving exchange rate: {str(e)}")
+            if connection:
+                connection.rollback()
             return False
+        finally:
+            if cursor:
+                cursor.close()
+            if connection:
+                connection.close()
 
     def _fetch_from_cbsl(self, date: datetime) -> Optional[Dict[str, float]]:
         """
@@ -335,17 +343,22 @@ class ExchangeRateService:
 
     def _is_database_empty(self) -> bool:
         """Check if the exchange_rates table is empty"""
+        connection = None
+        cursor = None
         try:
-            connection = mysql.connector.connect(**self.db_config)
+            connection = get_db_connection()
             cursor = connection.cursor()
             cursor.execute("SELECT COUNT(*) FROM exchange_rates WHERE source IN ('CBSL', 'CBSL_BULK')")
             count = cursor.fetchone()[0]
-            cursor.close()
-            connection.close()
             return count == 0
         except Error as e:
             logger.error(f"Database error checking if empty: {str(e)}")
             return False
+        finally:
+            if cursor:
+                cursor.close()
+            if connection:
+                connection.close()
 
     def _fetch_and_import_bulk_csv(self) -> bool:
         """

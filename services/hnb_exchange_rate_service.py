@@ -8,17 +8,13 @@ API Endpoint: https://venus.hnb.lk/api/get_rates_contents_web
 """
 
 import logging
-import os
 from datetime import datetime, timedelta
 from decimal import Decimal
 
-import mysql.connector
 import requests
-from dotenv import load_dotenv
 from mysql.connector import Error
 
-# Load environment variables from .env file
-load_dotenv()
+from db import get_db_connection
 
 logger = logging.getLogger(__name__)
 
@@ -28,24 +24,6 @@ class HNBExchangeRateService:
 
     def __init__(self):
         self.api_url = "https://venus.hnb.lk/api/get_rates_contents_web"
-        self.db_config = {
-            'host': os.environ.get('DB_HOST'),
-            'port': int(os.environ.get('DB_PORT', 3306)),
-            'database': os.environ.get('DB_NAME'),
-            'user': os.environ.get('DB_USER'),
-            'password': os.environ.get('DB_PASSWORD'),
-            'charset': 'utf8mb4',
-            'use_unicode': True
-        }
-
-    def _get_db_connection(self):
-        """Create a database connection."""
-        try:
-            connection = mysql.connector.connect(**self.db_config)
-            return connection
-        except Error as e:
-            logger.error(f"Error connecting to MySQL: {e}")
-            return None
 
     def fetch_hnb_rates(self):
         """
@@ -156,7 +134,7 @@ class HNBExchangeRateService:
             buy_rate_decimal = Decimal(str(buy_rate))
             sell_rate_decimal = Decimal(str(sell_rate))
 
-            connection = self._get_db_connection()
+            connection = get_db_connection()
             if not connection:
                 return False
 
@@ -215,7 +193,7 @@ class HNBExchangeRateService:
 
             date_str = date.strftime('%Y-%m-%d')
 
-            connection = self._get_db_connection()
+            connection = get_db_connection()
             if not connection:
                 return None
 
@@ -335,7 +313,7 @@ class HNBExchangeRateService:
             today = datetime.now().date()
 
             # Get existing dates from database
-            connection = self._get_db_connection()
+            connection = get_db_connection()
             if not connection:
                 return {'error': 'Database connection failed'}
 
