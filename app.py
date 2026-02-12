@@ -446,7 +446,7 @@ def login():
         data = request.get_json() if request.is_json else request.form
         username = data.get('username')
         password = data.get('password')
-        remember_me = data.get('remember_me', False)
+        remember_me = bool(data.get('remember_me', False))
 
         logger.info(f"Login attempt for username: {username}, remember_me: {remember_me}")
 
@@ -475,6 +475,7 @@ def login():
                     session['user_id'] = user['id']
                     session['username'] = user['username']
                     session['is_admin'] = user.get('is_admin', False)
+                    session.modified = True
                     logger.info(
                         f"Login successful for user: {username} (ID: {user['id']}), permanent: {remember_me}, is_admin: {user.get('is_admin', False)}")
 
@@ -496,6 +497,15 @@ def login():
         else:
             logger.error("Failed to establish database connection during login")
             return jsonify({'error': 'Database connection failed'}), 500
+
+    # If user is already authenticated, redirect to dashboard/mobile
+    if 'user_id' in session:
+        user_agent = request.headers.get('User-Agent', '').lower()
+        is_mobile = any(device in user_agent for device in
+                        ['android', 'webos', 'iphone', 'ipad', 'ipod', 'blackberry', 'windows phone'])
+        if is_mobile:
+            return redirect(url_for('mobile'))
+        return redirect(url_for('dashboard'))
 
     return render_template('login.html')
 
