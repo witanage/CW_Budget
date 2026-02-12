@@ -189,6 +189,60 @@
         font-style: italic;
     }
 
+    /* Admin Tabs */
+    .admin-tabs {
+        border-bottom: 2px solid var(--border-color);
+        margin-bottom: 0;
+        gap: 4px;
+        flex-wrap: wrap;
+    }
+    .admin-tabs .nav-link {
+        border: 1px solid transparent;
+        border-bottom: none;
+        border-radius: 8px 8px 0 0;
+        padding: 12px 20px;
+        color: var(--text-secondary);
+        font-weight: 500;
+        font-size: 0.95rem;
+        background: transparent;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .admin-tabs .nav-link:hover {
+        color: var(--text-primary);
+        background: var(--bg-tertiary);
+        border-color: var(--border-color) var(--border-color) transparent;
+    }
+    .admin-tabs .nav-link.active {
+        color: #007bff;
+        background: var(--card-bg);
+        border-color: var(--border-color) var(--border-color) var(--card-bg);
+        font-weight: 600;
+        margin-bottom: -2px;
+    }
+    .admin-tabs .nav-link i {
+        font-size: 0.9rem;
+    }
+    .admin-tab-content {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-top: none;
+        border-radius: 0 0 10px 10px;
+        padding: 0;
+        min-height: 300px;
+    }
+    .admin-tab-content .section-card {
+        margin-bottom: 0;
+        border: none;
+        border-radius: 0 0 10px 10px;
+        box-shadow: none;
+    }
+    .admin-tab-content .section-card .section-header {
+        border-radius: 0;
+    }
+
     /* CRITICAL: Fix for overlay/layer blocking clicks */
     .admin-container {
         position: relative;
@@ -281,367 +335,416 @@
         </div>
     </div>
 
-    <!-- System Settings Section -->
-    <div class="section-card">
-        <div class="section-header">
-            <h2 style="margin: 0; font-size: 1.5rem; color: var(--text-primary);">
-                <i class="fas fa-cog"></i> System Settings
-            </h2>
+    <!-- Tab Navigation -->
+    <ul class="nav nav-tabs admin-tabs" id="adminTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="settings-tab" data-bs-toggle="tab" data-bs-target="#settings-pane"
+                    type="button" role="tab" aria-controls="settings-pane" aria-selected="true">
+                <i class="fas fa-cog"></i> <span class="tab-label">Settings</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="csv-tab" data-bs-toggle="tab" data-bs-target="#csv-pane"
+                    type="button" role="tab" aria-controls="csv-pane" aria-selected="false">
+                <i class="fas fa-file-csv"></i> <span class="tab-label">CSV Import</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="records-tab" data-bs-toggle="tab" data-bs-target="#records-pane"
+                    type="button" role="tab" aria-controls="records-pane" aria-selected="false">
+                <i class="fas fa-calendar-times"></i> <span class="tab-label">Delete Records</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="users-tab" data-bs-toggle="tab" data-bs-target="#users-pane"
+                    type="button" role="tab" aria-controls="users-pane" aria-selected="false">
+                <i class="fas fa-users"></i> <span class="tab-label">Users</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="audit-tab" data-bs-toggle="tab" data-bs-target="#audit-pane"
+                    type="button" role="tab" aria-controls="audit-pane" aria-selected="false">
+                <i class="fas fa-history"></i> <span class="tab-label">Audit Logs</span>
+            </button>
+        </li>
+    </ul>
+
+    <!-- Tab Content -->
+    <div class="tab-content admin-tab-content" id="adminTabContent">
+
+        <!-- System Settings Tab -->
+        <div class="tab-pane fade show active" id="settings-pane" role="tabpanel" aria-labelledby="settings-tab">
+            <div class="section-card">
+                <div class="section-header">
+                    <h2 style="margin: 0; font-size: 1.5rem; color: var(--text-primary);">
+                        <i class="fas fa-cog"></i> System Settings
+                    </h2>
+                </div>
+                <div class="section-body">
+                    <!-- Refresh-mode radio toggle -->
+                    <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                        <label style="color: var(--text-primary); font-weight: 600; min-width: 300px;">
+                            <i class="fas fa-sync-alt"></i> Exchange Rate Refresh Mode
+                        </label>
+                        <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-primary);">
+                                <input type="radio" name="refreshMode" id="modeBackground" value="background"
+                                       {% if settings.get('exchange_rate_refresh_mode', {}).get('value', 'background') == 'background' %}checked{% endif %}
+                                       oninput="onModeChange()">
+                                <span>Background (automatic)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-primary);">
+                                <input type="radio" name="refreshMode" id="modeManual" value="manual"
+                                       {% if settings.get('exchange_rate_refresh_mode', {}).get('value', 'background') == 'manual' %}checked{% endif %}
+                                       oninput="onModeChange()">
+                                <span>Manual</span>
+                            </label>
+                            <button class="btn-sm btn-primary" id="saveModeBtn" onclick="saveRefreshMode()" disabled>
+                                <i class="fas fa-save"></i> Save
+                            </button>
+                        </div>
+                    </div>
+                    <p style="color: var(--text-secondary); margin-top: 8px; font-size: 0.9rem;">
+                        {{ settings.get('exchange_rate_refresh_mode', {}).get('description', '') }}
+                    </p>
+
+                    <!-- Refresh interval (visible only when mode = background) -->
+                    <div id="intervalRow"
+                         style="display: {% if settings.get('exchange_rate_refresh_mode', {}).get('value', 'background') == 'background' %}flex{% else %}none{% endif %}; align-items: center; gap: 15px; flex-wrap: wrap; margin-top: 18px;">
+                        <label style="color: var(--text-primary); font-weight: 600; min-width: 300px;">
+                            <i class="fas fa-clock"></i> Refresh Interval
+                        </label>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <input type="number"
+                                   id="refreshIntervalInput"
+                                   value="{{ settings.get('exchange_rate_refresh_interval_minutes', {}).get('value', '60') }}"
+                                   min="1"
+                                   style="width: 80px; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 1rem;"
+                                   oninput="markIntervalDirty()">
+                            <span style="color: var(--text-secondary); font-weight: 500;">minutes</span>
+                            <button class="btn-sm btn-primary" id="saveIntervalBtn" onclick="saveRefreshInterval()" disabled>
+                                <i class="fas fa-save"></i> Save
+                            </button>
+                        </div>
+                    </div>
+                    <p id="intervalDesc"
+                       style="color: var(--text-secondary); margin-top: 8px; font-size: 0.9rem; display: {% if settings.get('exchange_rate_refresh_mode', {}).get('value', 'background') == 'background' %}block{% else %}none{% endif %};">
+                        {{ settings.get('exchange_rate_refresh_interval_minutes', {}).get('description', '') }}
+                        <em>— change takes effect after the next scheduled run, no restart needed.</em>
+                    </p>
+
+                    <!-- Manual "Refresh All" button (always visible) -->
+                    <div style="margin-top: 18px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                        <button class="btn-sm btn-primary" id="refreshAllBtn" onclick="refreshAllRates()">
+                            <i class="fas fa-sync-alt"></i> Refresh All Rates Now
+                        </button>
+                        <span style="color: var(--text-secondary); font-size: 0.9rem;">
+                            Fetch fresh rates from HNB, People's Bank, and CBSL on demand.
+                        </span>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="section-body">
-            <!-- Refresh-mode radio toggle -->
-            <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
-                <label style="color: var(--text-primary); font-weight: 600; min-width: 300px;">
-                    <i class="fas fa-sync-alt"></i> Exchange Rate Refresh Mode
-                </label>
-                <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
-                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-primary);">
-                        <input type="radio" name="refreshMode" id="modeBackground" value="background"
-                               {% if settings.get('exchange_rate_refresh_mode', {}).get('value', 'background') == 'background' %}checked{% endif %}
-                               oninput="onModeChange()">
-                        <span>Background (automatic)</span>
-                    </label>
-                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-primary);">
-                        <input type="radio" name="refreshMode" id="modeManual" value="manual"
-                               {% if settings.get('exchange_rate_refresh_mode', {}).get('value', 'background') == 'manual' %}checked{% endif %}
-                               oninput="onModeChange()">
-                        <span>Manual</span>
-                    </label>
-                    <button class="btn-sm btn-primary" id="saveModeBtn" onclick="saveRefreshMode()" disabled>
-                        <i class="fas fa-save"></i> Save
-                    </button>
-                </div>
-            </div>
-            <p style="color: var(--text-secondary); margin-top: 8px; font-size: 0.9rem;">
-                {{ settings.get('exchange_rate_refresh_mode', {}).get('description', '') }}
-            </p>
 
-            <!-- Refresh interval (visible only when mode = background) -->
-            <div id="intervalRow"
-                 style="display: {% if settings.get('exchange_rate_refresh_mode', {}).get('value', 'background') == 'background' %}flex{% else %}none{% endif %}; align-items: center; gap: 15px; flex-wrap: wrap; margin-top: 18px;">
-                <label style="color: var(--text-primary); font-weight: 600; min-width: 300px;">
-                    <i class="fas fa-clock"></i> Refresh Interval
-                </label>
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <input type="number"
-                           id="refreshIntervalInput"
-                           value="{{ settings.get('exchange_rate_refresh_interval_minutes', {}).get('value', '60') }}"
-                           min="1"
-                           style="width: 80px; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 1rem;"
-                           oninput="markIntervalDirty()">
-                    <span style="color: var(--text-secondary); font-weight: 500;">minutes</span>
-                    <button class="btn-sm btn-primary" id="saveIntervalBtn" onclick="saveRefreshInterval()" disabled>
-                        <i class="fas fa-save"></i> Save
-                    </button>
+        <!-- CSV Import Tab -->
+        <div class="tab-pane fade" id="csv-pane" role="tabpanel" aria-labelledby="csv-tab">
+            <div class="section-card">
+                <div class="section-header">
+                    <h2 style="margin: 0; font-size: 1.5rem; color: var(--text-primary);">
+                        <i class="fas fa-file-csv"></i> Import Transactions from CSV
+                    </h2>
                 </div>
-            </div>
-            <p id="intervalDesc"
-               style="color: var(--text-secondary); margin-top: 8px; font-size: 0.9rem; display: {% if settings.get('exchange_rate_refresh_mode', {}).get('value', 'background') == 'background' %}block{% else %}none{% endif %};">
-                {{ settings.get('exchange_rate_refresh_interval_minutes', {}).get('description', '') }}
-                <em>— change takes effect after the next scheduled run, no restart needed.</em>
-            </p>
+                <div class="section-body">
+                    <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9rem;">
+                        Upload a CSV file with columns: <strong>Description, Credit, Debit, Note, Method</strong>.
+                        Amounts may include currency prefixes (e.g. Rs) and thousand-separators.
+                    </p>
 
-            <!-- Manual "Refresh All" button (always visible) -->
-            <div style="margin-top: 18px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                <button class="btn-sm btn-primary" id="refreshAllBtn" onclick="refreshAllRates()">
-                    <i class="fas fa-sync-alt"></i> Refresh All Rates Now
-                </button>
-                <span style="color: var(--text-secondary); font-size: 0.9rem;">
-                    Fetch fresh rates from HNB, People's Bank, and CBSL on demand.
-                </span>
+                    <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 15px;">
+                        <!-- User selector -->
+                        <div style="flex: 1; min-width: 180px;">
+                            <label style="display: block; font-weight: 600; margin-bottom: 5px; color: var(--text-primary); font-size: 0.9rem;">
+                                <i class="fas fa-user"></i> User
+                            </label>
+                            <select id="csvUserId"
+                                    style="width: 100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.95rem;">
+                                <option value="">-- Select User --</option>
+                                {% for user in users %}
+                                {% if user.is_active %}
+                                <option value="{{ user.id }}">{{ user.username }}</option>
+                                {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Year -->
+                        <div style="min-width: 110px;">
+                            <label style="display: block; font-weight: 600; margin-bottom: 5px; color: var(--text-primary); font-size: 0.9rem;">
+                                <i class="fas fa-calendar"></i> Year
+                            </label>
+                            <input type="number" id="csvYear" min="2000" max="2099"
+                                   style="width: 100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.95rem;">
+                        </div>
+
+                        <!-- Month -->
+                        <div style="min-width: 150px;">
+                            <label style="display: block; font-weight: 600; margin-bottom: 5px; color: var(--text-primary); font-size: 0.9rem;">
+                                <i class="fas fa-calendar-alt"></i> Month
+                            </label>
+                            <select id="csvMonth"
+                                    style="width: 100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.95rem;">
+                                <option value="1">January</option>
+                                <option value="2">February</option>
+                                <option value="3">March</option>
+                                <option value="4">April</option>
+                                <option value="5">May</option>
+                                <option value="6">June</option>
+                                <option value="7">July</option>
+                                <option value="8">August</option>
+                                <option value="9">September</option>
+                                <option value="10">October</option>
+                                <option value="11">November</option>
+                                <option value="12">December</option>
+                            </select>
+                        </div>
+
+                        <!-- File picker -->
+                        <div style="flex: 1; min-width: 220px;">
+                            <label style="display: block; font-weight: 600; margin-bottom: 5px; color: var(--text-primary); font-size: 0.9rem;">
+                                <i class="fas fa-file-upload"></i> CSV File
+                            </label>
+                            <input type="file" id="csvFileInput" accept=".csv"
+                                   style="width: 100%; padding: 6px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.9rem;"
+                                   onchange="previewCsv()">
+                        </div>
+                    </div>
+
+                    <!-- Preview area -->
+                    <div id="csvPreviewArea" style="display: none; margin-bottom: 15px;">
+                        <h4 style="margin: 0 0 10px 0; color: var(--text-primary); font-size: 1rem;">
+                            <i class="fas fa-eye"></i> Preview
+                            <span id="csvPreviewCount" class="badge badge-info" style="font-size: 0.8rem; margin-left: 8px;"></span>
+                        </h4>
+                        <div style="overflow-x: auto; max-height: 300px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px;">
+                            <table class="user-table" id="csvPreviewTable" style="margin: 0;">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Description</th>
+                                        <th>Credit</th>
+                                        <th>Debit</th>
+                                        <th>Note</th>
+                                        <th>Method</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="csvPreviewBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Import / Clear buttons -->
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <button class="btn-sm btn-success" id="csvImportBtn" onclick="importCsv()" disabled>
+                            <i class="fas fa-upload"></i> Import Transactions
+                        </button>
+                        <button class="btn-sm btn-secondary" id="csvClearBtn" onclick="clearCsvForm()" style="display: none;">
+                            <i class="fas fa-times"></i> Clear
+                        </button>
+                        <span id="csvImportStatus" style="color: var(--text-secondary); font-size: 0.9rem;"></span>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
 
-    <!-- CSV Import Section -->
-    <div class="section-card">
-        <div class="section-header">
-            <h2 style="margin: 0; font-size: 1.5rem; color: var(--text-primary);">
-                <i class="fas fa-file-csv"></i> Import Transactions from CSV
-            </h2>
-        </div>
-        <div class="section-body">
-            <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9rem;">
-                Upload a CSV file with columns: <strong>Description, Credit, Debit, Note, Method</strong>.
-                Amounts may include currency prefixes (e.g. Rs) and thousand-separators.
-            </p>
-
-            <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 15px;">
-                <!-- User selector -->
-                <div style="flex: 1; min-width: 180px;">
-                    <label style="display: block; font-weight: 600; margin-bottom: 5px; color: var(--text-primary); font-size: 0.9rem;">
-                        <i class="fas fa-user"></i> User
-                    </label>
-                    <select id="csvUserId"
-                            style="width: 100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.95rem;">
-                        <option value="">-- Select User --</option>
-                        {% for user in users %}
-                        {% if user.is_active %}
-                        <option value="{{ user.id }}">{{ user.username }}</option>
-                        {% endif %}
-                        {% endfor %}
-                    </select>
+        <!-- Delete Monthly Record Tab -->
+        <div class="tab-pane fade" id="records-pane" role="tabpanel" aria-labelledby="records-tab">
+            <div class="section-card">
+                <div class="section-header">
+                    <h2 style="margin: 0; font-size: 1.5rem; color: var(--text-primary);">
+                        <i class="fas fa-calendar-times"></i> Delete Monthly Record
+                    </h2>
                 </div>
+                <div class="section-body">
+                    <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9rem;">
+                        Delete a monthly record and <strong>all its transactions</strong> for a specific user. This action cannot be undone.
+                    </p>
 
-                <!-- Year -->
-                <div style="min-width: 110px;">
-                    <label style="display: block; font-weight: 600; margin-bottom: 5px; color: var(--text-primary); font-size: 0.9rem;">
-                        <i class="fas fa-calendar"></i> Year
-                    </label>
-                    <input type="number" id="csvYear" min="2000" max="2099"
-                           style="width: 100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.95rem;">
-                </div>
+                    <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 15px;">
+                        <!-- User selector -->
+                        <div style="flex: 1; min-width: 180px;">
+                            <label style="display: block; font-weight: 600; margin-bottom: 5px; color: var(--text-primary); font-size: 0.9rem;">
+                                <i class="fas fa-user"></i> User
+                            </label>
+                            <select id="delRecordUserId" onchange="loadMonthlyRecords()"
+                                    style="width: 100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.95rem;">
+                                <option value="">-- Select User --</option>
+                                {% for user in users %}
+                                {% if user.is_active %}
+                                <option value="{{ user.id }}">{{ user.username }}</option>
+                                {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
 
-                <!-- Month -->
-                <div style="min-width: 150px;">
-                    <label style="display: block; font-weight: 600; margin-bottom: 5px; color: var(--text-primary); font-size: 0.9rem;">
-                        <i class="fas fa-calendar-alt"></i> Month
-                    </label>
-                    <select id="csvMonth"
-                            style="width: 100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.95rem;">
-                        <option value="1">January</option>
-                        <option value="2">February</option>
-                        <option value="3">March</option>
-                        <option value="4">April</option>
-                        <option value="5">May</option>
-                        <option value="6">June</option>
-                        <option value="7">July</option>
-                        <option value="8">August</option>
-                        <option value="9">September</option>
-                        <option value="10">October</option>
-                        <option value="11">November</option>
-                        <option value="12">December</option>
-                    </select>
-                </div>
+                        <!-- Monthly record selector (populated dynamically) -->
+                        <div style="flex: 2; min-width: 260px;">
+                            <label style="display: block; font-weight: 600; margin-bottom: 5px; color: var(--text-primary); font-size: 0.9rem;">
+                                <i class="fas fa-calendar-alt"></i> Monthly Record
+                            </label>
+                            <select id="delRecordSelect" disabled
+                                    style="width: 100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.95rem;">
+                                <option value="">-- Select a user first --</option>
+                            </select>
+                        </div>
 
-                <!-- File picker -->
-                <div style="flex: 1; min-width: 220px;">
-                    <label style="display: block; font-weight: 600; margin-bottom: 5px; color: var(--text-primary); font-size: 0.9rem;">
-                        <i class="fas fa-file-upload"></i> CSV File
-                    </label>
-                    <input type="file" id="csvFileInput" accept=".csv"
-                           style="width: 100%; padding: 6px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.9rem;"
-                           onchange="previewCsv()">
+                        <!-- Delete button -->
+                        <div>
+                            <button class="btn-sm btn-danger" id="delRecordBtn" onclick="showDeleteRecordModal()" disabled>
+                                <i class="fas fa-trash"></i> Delete Record
+                            </button>
+                        </div>
+                    </div>
+                    <span id="delRecordStatus" style="color: var(--text-secondary); font-size: 0.9rem;"></span>
                 </div>
             </div>
+        </div>
 
-            <!-- Preview area -->
-            <div id="csvPreviewArea" style="display: none; margin-bottom: 15px;">
-                <h4 style="margin: 0 0 10px 0; color: var(--text-primary); font-size: 1rem;">
-                    <i class="fas fa-eye"></i> Preview
-                    <span id="csvPreviewCount" class="badge badge-info" style="font-size: 0.8rem; margin-left: 8px;"></span>
-                </h4>
-                <div style="overflow-x: auto; max-height: 300px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px;">
-                    <table class="user-table" id="csvPreviewTable" style="margin: 0;">
+        <!-- User Management Tab -->
+        <div class="tab-pane fade" id="users-pane" role="tabpanel" aria-labelledby="users-tab">
+            <div class="section-card">
+                <div class="section-header">
+                    <h2 style="margin: 0; font-size: 1.5rem; color: var(--text-primary);">
+                        <i class="fas fa-users"></i> User Management
+                    </h2>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <input type="text"
+                               id="userSearch"
+                               class="search-box"
+                               placeholder="Search by username, email, or ID..."
+                               onkeyup="filterUsers()">
+                        <button class="btn-sm btn-primary" onclick="refreshData()">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+                <div class="section-body" style="overflow-x: auto;">
+                    {% if users %}
+                    <table class="user-table" id="userTable">
                         <thead>
                             <tr>
-                                <th>#</th>
-                                <th>Description</th>
-                                <th>Credit</th>
-                                <th>Debit</th>
-                                <th>Note</th>
-                                <th>Method</th>
+                                <th>ID</th>
+                                <th>Username</th>
+                                <th>Email</th>
+                                <th>Status</th>
+                                <th>Role</th>
+                                <th>Last Login</th>
+                                <th>Created</th>
+                                <th>Records</th>
+                                <th>Transactions</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
-                        <tbody id="csvPreviewBody"></tbody>
+                        <tbody id="userTableBody">
+                            {% for user in users %}
+                            <tr class="user-row" data-user-id="{{ user.id }}" data-username="{{ user.username }}" data-email="{{ user.email }}">
+                                <td>{{ user.id }}</td>
+                                <td><strong>{{ user.username }}</strong></td>
+                                <td>{{ user.email }}</td>
+                                <td>
+                                    {% if user.is_active %}
+                                    <span class="badge badge-success">Active</span>
+                                    {% else %}
+                                    <span class="badge badge-danger">Inactive</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if user.is_admin %}
+                                    <span class="badge badge-primary">Admin</span>
+                                    {% else %}
+                                    <span class="badge badge-secondary">User</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else 'Never' }}</td>
+                                <td>{{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else 'N/A' }}</td>
+                                <td>{{ user.monthly_records_count or 0 }}</td>
+                                <td>{{ user.transactions_count or 0 }}</td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-sm {{ 'btn-warning' if user.is_active else 'btn-success' }}"
+                                                onclick="toggleUserActive({{ user.id }}, '{{ user.username }}')"
+                                                title="{{ 'Deactivate' if user.is_active else 'Activate' }} user"
+                                                {% if user.id == current_user_id %}disabled{% endif %}>
+                                            <i class="fas fa-{{ 'ban' if user.is_active else 'check' }}"></i>
+                                        </button>
+                                        <button class="btn-sm {{ 'btn-secondary' if user.is_admin else 'btn-primary' }}"
+                                                onclick="toggleUserAdmin({{ user.id }}, '{{ user.username }}')"
+                                                title="{{ 'Revoke' if user.is_admin else 'Grant' }} admin"
+                                                {% if user.id == current_user_id %}disabled{% endif %}>
+                                            <i class="fas fa-user-shield"></i>
+                                        </button>
+                                        <button class="btn-sm btn-danger"
+                                                onclick="showDeleteModal({{ user.id }}, '{{ user.username }}')"
+                                                title="Delete user"
+                                                {% if user.id == current_user_id %}disabled{% endif %}>
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
                     </table>
+                    {% else %}
+                    <p class="text-muted" style="text-align: center; padding: 40px;">No users found in the database.</p>
+                    {% endif %}
                 </div>
             </div>
-
-            <!-- Import / Clear buttons -->
-            <div style="display: flex; gap: 10px; align-items: center;">
-                <button class="btn-sm btn-success" id="csvImportBtn" onclick="importCsv()" disabled>
-                    <i class="fas fa-upload"></i> Import Transactions
-                </button>
-                <button class="btn-sm btn-secondary" id="csvClearBtn" onclick="clearCsvForm()" style="display: none;">
-                    <i class="fas fa-times"></i> Clear
-                </button>
-                <span id="csvImportStatus" style="color: var(--text-secondary); font-size: 0.9rem;"></span>
-            </div>
         </div>
-    </div>
 
-    <!-- Delete Monthly Record Section -->
-    <div class="section-card">
-        <div class="section-header">
-            <h2 style="margin: 0; font-size: 1.5rem; color: var(--text-primary);">
-                <i class="fas fa-calendar-times"></i> Delete Monthly Record
-            </h2>
-        </div>
-        <div class="section-body">
-            <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9rem;">
-                Delete a monthly record and <strong>all its transactions</strong> for a specific user. This action cannot be undone.
-            </p>
-
-            <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 15px;">
-                <!-- User selector -->
-                <div style="flex: 1; min-width: 180px;">
-                    <label style="display: block; font-weight: 600; margin-bottom: 5px; color: var(--text-primary); font-size: 0.9rem;">
-                        <i class="fas fa-user"></i> User
-                    </label>
-                    <select id="delRecordUserId" onchange="loadMonthlyRecords()"
-                            style="width: 100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.95rem;">
-                        <option value="">-- Select User --</option>
-                        {% for user in users %}
-                        {% if user.is_active %}
-                        <option value="{{ user.id }}">{{ user.username }}</option>
-                        {% endif %}
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <!-- Monthly record selector (populated dynamically) -->
-                <div style="flex: 2; min-width: 260px;">
-                    <label style="display: block; font-weight: 600; margin-bottom: 5px; color: var(--text-primary); font-size: 0.9rem;">
-                        <i class="fas fa-calendar-alt"></i> Monthly Record
-                    </label>
-                    <select id="delRecordSelect" disabled
-                            style="width: 100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.95rem;">
-                        <option value="">-- Select a user first --</option>
-                    </select>
-                </div>
-
-                <!-- Delete button -->
-                <div>
-                    <button class="btn-sm btn-danger" id="delRecordBtn" onclick="showDeleteRecordModal()" disabled>
-                        <i class="fas fa-trash"></i> Delete Record
+        <!-- Audit Logs Tab -->
+        <div class="tab-pane fade" id="audit-pane" role="tabpanel" aria-labelledby="audit-tab">
+            <div class="section-card">
+                <div class="section-header">
+                    <h2 style="margin: 0; font-size: 1.5rem; color: var(--text-primary);">
+                        <i class="fas fa-history"></i> Audit Logs
+                        <span class="badge badge-secondary" style="font-size: 0.75rem; margin-left: 10px;">Last 50</span>
+                    </h2>
+                    <button class="btn-sm btn-primary" onclick="refreshAuditLogs()">
+                        <i class="fas fa-sync-alt"></i> Refresh
                     </button>
                 </div>
+                <div class="section-body" style="overflow-x: auto;">
+                    {% if audit_logs %}
+                    <table class="audit-table" id="auditTable">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Admin</th>
+                                <th>Action</th>
+                                <th>Target User</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in audit_logs %}
+                            <tr>
+                                <td>{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') if log.created_at else 'N/A' }}</td>
+                                <td><strong>{{ log.admin_username }}</strong></td>
+                                <td><span class="badge badge-info">{{ log.action }}</span></td>
+                                <td>{{ log.target_username or 'N/A' }}</td>
+                                <td>{{ log.details or '' }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p class="text-muted" style="text-align: center; padding: 40px;">No audit logs available.</p>
+                    {% endif %}
+                </div>
             </div>
-            <span id="delRecordStatus" style="color: var(--text-secondary); font-size: 0.9rem;"></span>
         </div>
-    </div>
 
-    <!-- User Management Section -->
-    <div class="section-card">
-        <div class="section-header">
-            <h2 style="margin: 0; font-size: 1.5rem; color: var(--text-primary);">
-                <i class="fas fa-users"></i> User Management
-            </h2>
-            <div style="display: flex; gap: 10px; align-items: center;">
-                <input type="text"
-                       id="userSearch"
-                       class="search-box"
-                       placeholder="Search by username, email, or ID..."
-                       onkeyup="filterUsers()">
-                <button class="btn-sm btn-primary" onclick="refreshData()">
-                    <i class="fas fa-sync-alt"></i> Refresh
-                </button>
-            </div>
-        </div>
-        <div class="section-body" style="overflow-x: auto;">
-            {% if users %}
-            <table class="user-table" id="userTable">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Username</th>
-                        <th>Email</th>
-                        <th>Status</th>
-                        <th>Role</th>
-                        <th>Last Login</th>
-                        <th>Created</th>
-                        <th>Records</th>
-                        <th>Transactions</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="userTableBody">
-                    {% for user in users %}
-                    <tr class="user-row" data-user-id="{{ user.id }}" data-username="{{ user.username }}" data-email="{{ user.email }}">
-                        <td>{{ user.id }}</td>
-                        <td><strong>{{ user.username }}</strong></td>
-                        <td>{{ user.email }}</td>
-                        <td>
-                            {% if user.is_active %}
-                            <span class="badge badge-success">Active</span>
-                            {% else %}
-                            <span class="badge badge-danger">Inactive</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if user.is_admin %}
-                            <span class="badge badge-primary">Admin</span>
-                            {% else %}
-                            <span class="badge badge-secondary">User</span>
-                            {% endif %}
-                        </td>
-                        <td>{{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else 'Never' }}</td>
-                        <td>{{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else 'N/A' }}</td>
-                        <td>{{ user.monthly_records_count or 0 }}</td>
-                        <td>{{ user.transactions_count or 0 }}</td>
-                        <td>
-                            <div class="action-buttons">
-                                <button class="btn-sm {{ 'btn-warning' if user.is_active else 'btn-success' }}"
-                                        onclick="toggleUserActive({{ user.id }}, '{{ user.username }}')"
-                                        title="{{ 'Deactivate' if user.is_active else 'Activate' }} user"
-                                        {% if user.id == current_user_id %}disabled{% endif %}>
-                                    <i class="fas fa-{{ 'ban' if user.is_active else 'check' }}"></i>
-                                </button>
-                                <button class="btn-sm {{ 'btn-secondary' if user.is_admin else 'btn-primary' }}"
-                                        onclick="toggleUserAdmin({{ user.id }}, '{{ user.username }}')"
-                                        title="{{ 'Revoke' if user.is_admin else 'Grant' }} admin"
-                                        {% if user.id == current_user_id %}disabled{% endif %}>
-                                    <i class="fas fa-user-shield"></i>
-                                </button>
-                                <button class="btn-sm btn-danger"
-                                        onclick="showDeleteModal({{ user.id }}, '{{ user.username }}')"
-                                        title="Delete user"
-                                        {% if user.id == current_user_id %}disabled{% endif %}>
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% else %}
-            <p class="text-muted" style="text-align: center; padding: 40px;">No users found in the database.</p>
-            {% endif %}
-        </div>
-    </div>
-
-    <!-- Audit Logs Section -->
-    <div class="section-card">
-        <div class="section-header">
-            <h2 style="margin: 0; font-size: 1.5rem; color: var(--text-primary);">
-                <i class="fas fa-history"></i> Audit Logs
-                <span class="badge badge-secondary" style="font-size: 0.75rem; margin-left: 10px;">Last 50</span>
-            </h2>
-            <button class="btn-sm btn-primary" onclick="refreshAuditLogs()">
-                <i class="fas fa-sync-alt"></i> Refresh
-            </button>
-        </div>
-        <div class="section-body" style="overflow-x: auto;">
-            {% if audit_logs %}
-            <table class="audit-table" id="auditTable">
-                <thead>
-                    <tr>
-                        <th>Timestamp</th>
-                        <th>Admin</th>
-                        <th>Action</th>
-                        <th>Target User</th>
-                        <th>Details</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for log in audit_logs %}
-                    <tr>
-                        <td>{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') if log.created_at else 'N/A' }}</td>
-                        <td><strong>{{ log.admin_username }}</strong></td>
-                        <td><span class="badge badge-info">{{ log.action }}</span></td>
-                        <td>{{ log.target_username or 'N/A' }}</td>
-                        <td>{{ log.details or '' }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% else %}
-            <p class="text-muted" style="text-align: center; padding: 40px;">No audit logs available.</p>
-            {% endif %}
-        </div>
-    </div>
+    </div><!-- /tab-content -->
 </div>
 
 <!-- CSV Import Confirmation Modal -->
@@ -1558,5 +1661,48 @@
         confirmBtn.innerHTML = '<i class="fas fa-trash"></i> Delete';
         deleteRecordMeta = null;
     }
+
+    // ── Tab persistence via URL hash ────────────────────────────
+    (function() {
+        // Map hash values to tab IDs
+        const tabMap = {
+            '#settings': 'settings-tab',
+            '#csv-import': 'csv-tab',
+            '#delete-records': 'records-tab',
+            '#users': 'users-tab',
+            '#audit-logs': 'audit-tab'
+        };
+
+        // Reverse map: tab ID to hash
+        const hashMap = {
+            'settings-tab': '#settings',
+            'csv-tab': '#csv-import',
+            'records-tab': '#delete-records',
+            'users-tab': '#users',
+            'audit-tab': '#audit-logs'
+        };
+
+        // On page load, activate the tab from the URL hash
+        document.addEventListener('DOMContentLoaded', function() {
+            const hash = window.location.hash;
+            if (hash && tabMap[hash]) {
+                const tabEl = document.getElementById(tabMap[hash]);
+                if (tabEl) {
+                    const tab = new bootstrap.Tab(tabEl);
+                    tab.show();
+                }
+            }
+
+            // Update hash when a tab is clicked
+            document.querySelectorAll('#adminTabs button[data-bs-toggle="tab"]').forEach(function(btn) {
+                btn.addEventListener('shown.bs.tab', function(e) {
+                    const tabId = e.target.id;
+                    if (hashMap[tabId]) {
+                        history.replaceState(null, null, hashMap[tabId]);
+                    }
+                });
+            });
+        });
+    })();
 </script>
 {% endblock %}
