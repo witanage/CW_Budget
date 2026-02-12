@@ -200,6 +200,22 @@ def log_transaction_audit(cursor, transaction_id, user_id, action, field_name=No
 
 
 # Routes
+
+
+@app.before_request
+def make_session_permanent():
+    """Ensure authenticated sessions always use a persistent cookie.
+
+    Without this, non-'Remember Me' sessions use browser-session cookies
+    that are deleted when the tab or browser is closed. By always marking
+    authenticated sessions as permanent, the cookie is sent with a Max-Age
+    equal to PERMANENT_SESSION_LIFETIME (365 days) so the user stays
+    logged in across tab/browser restarts.
+    """
+    if 'user_id' in session:
+        session.permanent = True
+
+
 @app.route('/')
 def index():
     """Landing page - redirect to login or dashboard/mobile based on device."""
@@ -470,14 +486,15 @@ def login():
                     cursor.execute("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = %s", (user['id'],))
                     connection.commit()
 
-                    # Set session as permanent if remember_me is checked
-                    session.permanent = remember_me
+                    # Always set session as permanent so the cookie is sent
+                    # with Max-Age (persists across tab/browser restarts).
+                    session.permanent = True
                     session['user_id'] = user['id']
                     session['username'] = user['username']
                     session['is_admin'] = user.get('is_admin', False)
                     session.modified = True
                     logger.info(
-                        f"Login successful for user: {username} (ID: {user['id']}), permanent: {remember_me}, is_admin: {user.get('is_admin', False)}")
+                        f"Login successful for user: {username} (ID: {user['id']}), is_admin: {user.get('is_admin', False)}")
 
                     # Start background task to populate exchange rates (CBSL + HNB)
                     background_thread = threading.Thread(target=populate_all_exchange_rates_background, daemon=True)
