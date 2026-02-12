@@ -1120,6 +1120,286 @@ def update_admin_setting(key):
         connection.close()
 
 
+@app.route('/api/admin/db-backup', methods=['GET'])
+@admin_required
+def admin_db_backup():
+    """Generate a full MySQL database backup in MySQL Workbench compatible format.
+
+    Includes: table structures, data, views, stored procedures, functions,
+    triggers, and events.  The output mirrors the format produced by
+    mysqldump / MySQL Workbench so that it can be imported back seamlessly.
+    """
+    import subprocess
+    import shutil
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    # Log the backup action
+    log_audit(session['user_id'], 'DATABASE_BACKUP', details='Full database backup downloaded')
+
+    db_name = DB_CONFIG['database']
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = f"{db_name}_{timestamp}.sql"
+
+    # Try mysqldump first (produces the most compatible output)
+    mysqldump_path = shutil.which('mysqldump')
+    if mysqldump_path:
+        try:
+            cmd = [
+                mysqldump_path,
+                '--host', DB_CONFIG['host'],
+                '--port', str(DB_CONFIG['port']),
+                '--user', DB_CONFIG['user'],
+                f'--password={DB_CONFIG["password"]}',
+                '--routines',
+                '--events',
+                '--triggers',
+                '--single-transaction',
+                '--set-gtid-purged=OFF',
+                '--column-statistics=0',
+                '--skip-lock-tables',
+                '--default-character-set=utf8mb4',
+                db_name
+            ]
+            result = subprocess.run(cmd, capture_output=True, timeout=300)
+            if result.returncode == 0 and result.stdout:
+                response = make_response(result.stdout)
+                response.headers['Content-Type'] = 'application/sql'
+                response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+                return response
+            logger.warning(f"mysqldump failed (rc={result.returncode}): {result.stderr[:500]}")
+        except Exception as e:
+            logger.warning(f"mysqldump error: {e}")
+
+    # Fallback: pure-Python dump in MySQL Workbench format
+    cursor = connection.cursor()
+    try:
+        output = io.StringIO()
+
+        # ── Header ──────────────────────────────────────────────────
+        cursor.execute("SELECT VERSION()")
+        mysql_version = cursor.fetchone()[0]
+
+        output.write("-- MySQL dump\n")
+        output.write(f"-- Host: {DB_CONFIG['host']}    Database: {db_name}\n")
+        output.write("-- ------------------------------------------------------\n")
+        output.write(f"-- Server version\t{mysql_version}\n\n")
+
+        output.write("/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;\n")
+        output.write("/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;\n")
+        output.write("/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;\n")
+        output.write("/*!40101 SET NAMES utf8mb4 */;\n")
+        output.write("/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;\n")
+        output.write("/*!40103 SET TIME_ZONE='+00:00' */;\n")
+        output.write("/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;\n")
+        output.write("/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;\n")
+        output.write("/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;\n")
+        output.write("/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;\n\n")
+
+        # ── Collect object lists ────────────────────────────────────
+        cursor.execute("SHOW FULL TABLES WHERE Table_type = 'BASE TABLE'")
+        tables = [row[0] for row in cursor.fetchall()]
+
+        cursor.execute("SHOW FULL TABLES WHERE Table_type = 'VIEW'")
+        views = [row[0] for row in cursor.fetchall()]
+
+        # ── Helper: escape a Python value for a SQL INSERT ─────────
+        def sql_escape(val):
+            if val is None:
+                return 'NULL'
+            if isinstance(val, bool):
+                return '1' if val else '0'
+            if isinstance(val, (int, float, Decimal)):
+                return str(val)
+            if isinstance(val, (bytes, bytearray)):
+                hex_str = val.hex()
+                return f"X'{hex_str}'" if hex_str else "''"
+            if isinstance(val, datetime):
+                return f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'"
+            if isinstance(val, timedelta):
+                total = int(val.total_seconds())
+                h, rem = divmod(abs(total), 3600)
+                m, s = divmod(rem, 60)
+                sign = '-' if total < 0 else ''
+                return f"'{sign}{h:02d}:{m:02d}:{s:02d}'"
+            # String — escape special characters
+            s = str(val)
+            s = s.replace('\\', '\\\\')
+            s = s.replace("'", "\\'")
+            s = s.replace('\n', '\\n')
+            s = s.replace('\r', '\\r')
+            s = s.replace('\x00', '\\0')
+            s = s.replace('\x1a', '\\Z')
+            return f"'{s}'"
+
+        # ── Tables: structure + data ────────────────────────────────
+        for table in tables:
+            output.write(f"--\n-- Table structure for table `{table}`\n--\n\n")
+            output.write(f"DROP TABLE IF EXISTS `{table}`;\n")
+            output.write("/*!40101 SET @saved_cs_client     = @@character_set_client */;\n")
+            output.write("/*!40101 SET character_set_client = utf8 */;\n")
+
+            cursor.execute(f"SHOW CREATE TABLE `{table}`")
+            create_stmt = cursor.fetchone()[1]
+            output.write(f"{create_stmt};\n")
+            output.write("/*!40101 SET character_set_client = @saved_cs_client */;\n\n")
+
+            # Data
+            cursor.execute(f"SELECT * FROM `{table}`")
+            rows = cursor.fetchall()
+            if rows:
+                # Get column names
+                col_names = [desc[0] for desc in cursor.description]
+                col_list = ', '.join(f'`{c}`' for c in col_names)
+
+                output.write(f"--\n-- Dumping data for table `{table}`\n--\n\n")
+                output.write(f"LOCK TABLES `{table}` WRITE;\n")
+                output.write(f"/*!40000 ALTER TABLE `{table}` DISABLE KEYS */;\n")
+
+                # Write INSERT statements in batches (extended inserts)
+                batch_size = 100
+                for i in range(0, len(rows), batch_size):
+                    batch = rows[i:i + batch_size]
+                    output.write(f"INSERT INTO `{table}` ({col_list}) VALUES\n")
+                    value_lines = []
+                    for row in batch:
+                        vals = ', '.join(sql_escape(v) for v in row)
+                        value_lines.append(f"({vals})")
+                    output.write(',\n'.join(value_lines))
+                    output.write(';\n')
+
+                output.write(f"/*!40000 ALTER TABLE `{table}` ENABLE KEYS */;\n")
+                output.write("UNLOCK TABLES;\n\n")
+
+        # ── Views ───────────────────────────────────────────────────
+        for view in views:
+            output.write(f"--\n-- Structure for view `{view}`\n--\n\n")
+            output.write(f"DROP VIEW IF EXISTS `{view}`;\n")
+            try:
+                cursor.execute(f"SHOW CREATE VIEW `{view}`")
+                result = cursor.fetchone()
+                create_view = result[1]
+                output.write(f"{create_view};\n\n")
+            except Exception as e:
+                output.write(f"-- Error exporting view `{view}`: {e}\n\n")
+
+        # ── Stored Procedures ───────────────────────────────────────
+        cursor.execute(
+            "SELECT ROUTINE_NAME FROM INFORMATION_SCHEMA.ROUTINES "
+            "WHERE ROUTINE_SCHEMA = %s AND ROUTINE_TYPE = 'PROCEDURE'",
+            (db_name,)
+        )
+        procedures = [row[0] for row in cursor.fetchall()]
+
+        for proc in procedures:
+            output.write(f"--\n-- Dumping routine `{proc}`\n--\n\n")
+            output.write(f"DROP PROCEDURE IF EXISTS `{proc}`;\n")
+            output.write("DELIMITER ;;\n")
+            try:
+                cursor.execute(f"SHOW CREATE PROCEDURE `{proc}`")
+                result = cursor.fetchone()
+                create_proc = result[2]
+                output.write(f"{create_proc} ;;\n")
+            except Exception as e:
+                output.write(f"-- Error exporting procedure `{proc}`: {e}\n")
+            output.write("DELIMITER ;\n\n")
+
+        # ── Functions ───────────────────────────────────────────────
+        cursor.execute(
+            "SELECT ROUTINE_NAME FROM INFORMATION_SCHEMA.ROUTINES "
+            "WHERE ROUTINE_SCHEMA = %s AND ROUTINE_TYPE = 'FUNCTION'",
+            (db_name,)
+        )
+        functions = [row[0] for row in cursor.fetchall()]
+
+        for func in functions:
+            output.write(f"--\n-- Dumping function `{func}`\n--\n\n")
+            output.write(f"DROP FUNCTION IF EXISTS `{func}`;\n")
+            output.write("DELIMITER ;;\n")
+            try:
+                cursor.execute(f"SHOW CREATE FUNCTION `{func}`")
+                result = cursor.fetchone()
+                create_func = result[2]
+                output.write(f"{create_func} ;;\n")
+            except Exception as e:
+                output.write(f"-- Error exporting function `{func}`: {e}\n")
+            output.write("DELIMITER ;\n\n")
+
+        # ── Triggers ────────────────────────────────────────────────
+        cursor.execute(
+            "SELECT TRIGGER_NAME FROM INFORMATION_SCHEMA.TRIGGERS "
+            "WHERE TRIGGER_SCHEMA = %s",
+            (db_name,)
+        )
+        triggers = [row[0] for row in cursor.fetchall()]
+
+        for trigger in triggers:
+            output.write(f"--\n-- Dumping trigger `{trigger}`\n--\n\n")
+            output.write(f"DROP TRIGGER IF EXISTS `{trigger}`;\n")
+            output.write("DELIMITER ;;\n")
+            try:
+                cursor.execute(f"SHOW CREATE TRIGGER `{trigger}`")
+                result = cursor.fetchone()
+                create_trigger = result[2]
+                output.write(f"{create_trigger} ;;\n")
+            except Exception as e:
+                output.write(f"-- Error exporting trigger `{trigger}`: {e}\n")
+            output.write("DELIMITER ;\n\n")
+
+        # ── Events ──────────────────────────────────────────────────
+        cursor.execute(
+            "SELECT EVENT_NAME FROM INFORMATION_SCHEMA.EVENTS "
+            "WHERE EVENT_SCHEMA = %s",
+            (db_name,)
+        )
+        events = [row[0] for row in cursor.fetchall()]
+
+        for event in events:
+            output.write(f"--\n-- Dumping event `{event}`\n--\n\n")
+            output.write(f"DROP EVENT IF EXISTS `{event}`;\n")
+            output.write("DELIMITER ;;\n")
+            try:
+                cursor.execute(f"SHOW CREATE EVENT `{event}`")
+                result = cursor.fetchone()
+                create_event = result[3]
+                output.write(f"{create_event} ;;\n")
+            except Exception as e:
+                output.write(f"-- Error exporting event `{event}`: {e}\n")
+            output.write("DELIMITER ;\n\n")
+
+        # ── Footer ──────────────────────────────────────────────────
+        output.write("/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;\n")
+        output.write("/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;\n")
+        output.write("/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;\n")
+        output.write("/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;\n")
+        output.write("/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;\n")
+        output.write("/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;\n")
+        output.write("/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;\n")
+        output.write("/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;\n\n")
+        output.write(f"-- Dump completed on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+
+        # Build response
+        sql_content = output.getvalue()
+        output.close()
+
+        response = make_response(sql_content)
+        response.headers['Content-Type'] = 'application/sql; charset=utf-8'
+        response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+        return response
+
+    except Error as e:
+        logger.error(f"Error generating database backup: {str(e)}")
+        return jsonify({'error': f'Backup failed: {str(e)}'}), 500
+    except Exception as e:
+        logger.error(f"Unexpected error during database backup: {str(e)}", exc_info=True)
+        return jsonify({'error': f'Backup failed: {str(e)}'}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+
 @app.route('/api/admin/users/<int:user_id>/payment-methods', methods=['GET'])
 @admin_required
 def admin_get_user_payment_methods(user_id):

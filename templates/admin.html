@@ -444,6 +444,28 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Database Backup Section -->
+            <div class="section-card">
+                <div class="section-header">
+                    <h2 style="margin: 0; font-size: 1.5rem; color: var(--text-primary);">
+                        <i class="fas fa-database"></i> Database Backup
+                    </h2>
+                </div>
+                <div class="section-body">
+                    <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9rem;">
+                        Download a complete SQL backup of the entire database. The backup includes all tables,
+                        data, views, stored procedures, functions, triggers, and events in MySQL Workbench
+                        compatible format (<code>.sql</code>).
+                    </p>
+                    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                        <button class="btn-sm btn-primary" id="dbBackupBtn" onclick="downloadDbBackup()" style="padding: 8px 20px; font-size: 0.95rem;">
+                            <i class="fas fa-download"></i> Download Full Backup
+                        </button>
+                        <span id="dbBackupStatus" style="color: var(--text-secondary); font-size: 0.9rem;"></span>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- CSV Import Tab -->
@@ -1159,6 +1181,52 @@
         }
         btn.disabled = false;
         btn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh All Rates Now';
+    }
+
+    // ── Database Backup ────────────────────────────────────────
+    async function downloadDbBackup() {
+        const btn = document.getElementById('dbBackupBtn');
+        const status = document.getElementById('dbBackupStatus');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating backup\u2026';
+        status.textContent = 'This may take a moment for large databases.';
+
+        try {
+            const response = await fetch('/api/admin/db-backup');
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || 'Backup failed');
+            }
+
+            // Get filename from Content-Disposition header
+            const disposition = response.headers.get('Content-Disposition');
+            let fname = 'database_backup.sql';
+            if (disposition) {
+                const match = disposition.match(/filename=([^\s;]+)/);
+                if (match) fname = match[1];
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fname;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+
+            const sizeMB = (blob.size / (1024 * 1024)).toFixed(2);
+            status.textContent = `Backup downloaded (${sizeMB} MB)`;
+            showAlert('Database backup downloaded successfully', 'success');
+        } catch (error) {
+            console.error('Error:', error);
+            status.textContent = '';
+            showAlert('Backup failed: ' + error.message, 'danger');
+        }
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-download"></i> Download Full Backup';
     }
 
     // ── System Settings: refresh interval ──────────────────────
