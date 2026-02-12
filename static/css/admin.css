@@ -28,6 +28,11 @@ input:disabled, button:disabled, select:disabled, textarea:disabled {
     cursor: not-allowed;
 }
 
+/* Tab persistence via hash */
+.tab-pane {
+    animation: fadeIn 0.2s ease;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
     .admin-container {
@@ -67,6 +72,20 @@ input:disabled, button:disabled, select:disabled, textarea:disabled {
 
     .btn-sm {
         width: 100%;
+    }
+
+    /* Tabs responsive */
+    .admin-tabs .nav-link {
+        padding: 10px 14px !important;
+        font-size: 0.85rem !important;
+    }
+
+    .admin-tabs .nav-link .tab-label {
+        display: none;
+    }
+
+    .admin-tabs .nav-link i {
+        font-size: 1.1rem;
     }
 }
 
