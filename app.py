@@ -10,7 +10,6 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from functools import wraps
 
-import mysql.connector
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash, make_response
 from flask.json.provider import DefaultJSONProvider
@@ -81,74 +80,14 @@ app.config['SESSION_COOKIE_NAME'] = 'session'  # Explicit session cookie name
 CORS(app)
 
 
-# Database configuration with proper type conversion and defaults
-def get_db_config():
-    """Get database configuration from environment variables."""
-    host = os.environ.get('DB_HOST')
-    port = os.environ.get('DB_PORT', '3306')  # Default MySQL port
-    database = os.environ.get('DB_NAME')
-    user = os.environ.get('DB_USER')
-    password = os.environ.get('DB_PASSWORD')
-
-    # Validate required fields
-    if not all([host, database, user, password]):
-        logger.error("Missing required database configuration in environment variables")
-        logger.error(
-            f"DB_HOST: {host}, DB_NAME: {database}, DB_USER: {user}, DB_PASSWORD: {'***' if password else None}")
-        return None
-
-    # Convert port to integer
-    try:
-        port_int = int(port)
-    except (ValueError, TypeError):
-        logger.error(f"Invalid DB_PORT value: {port}, using default 3306")
-        port_int = 3306
-
-    return {
-        'host': host,
-        'port': port_int,
-        'database': database,
-        'user': user,
-        'password': password,
-        'charset': 'utf8mb4',
-        'use_unicode': True
-    }
-
-
-DB_CONFIG = get_db_config()
+# ---------------------------------------------------------------------------
+# Database connection pool (centralised in db.py)
+# ---------------------------------------------------------------------------
+from db import get_db_connection, DB_CONFIG  # noqa: E402
 
 # Scheduler instance — assigned in the __main__ block; referenced by the hourly job
 # so it can reschedule itself when the interval setting changes.
 scheduler = None
-
-# Log database configuration status
-if DB_CONFIG:
-    logger.info(f"Database configuration loaded successfully")
-    logger.info(f"DB Host: {DB_CONFIG['host']}, Port: {DB_CONFIG['port']}, Database: {DB_CONFIG['database']}")
-else:
-    logger.error("CRITICAL: Database configuration failed to load. Application may not function properly.")
-    logger.error("Please check your .env file and ensure all required variables are set:")
-    logger.error("Required: DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD")
-
-
-def get_db_connection():
-    """Create a database connection."""
-    if DB_CONFIG is None:
-        logger.error("Cannot connect to database: DB_CONFIG is not properly configured")
-        return None
-
-    try:
-        connection = mysql.connector.connect(**DB_CONFIG)
-        logger.info("Database connection established successfully")
-        return connection
-    except Error as e:
-        logger.error(f"Error connecting to MySQL: {e}")
-        logger.error(
-            f"DB_CONFIG: host={DB_CONFIG.get('host')}, port={DB_CONFIG.get('port')}, database={DB_CONFIG.get('database')}")
-        return None
-    except Exception as e:
-        logger.error(f"Unexpected error connecting to database: {e}", exc_info=True)
-        return None
 
 
 def get_setting(key, default=None):
@@ -596,25 +535,20 @@ def populate_all_exchange_rates_background():
             start_date = end_date - timedelta(days=10)
 
             # Get existing dates in the last 10 days
-            connection = mysql.connector.connect(
-                host=os.environ.get('DB_HOST', 'localhost'),
-                port=int(os.environ.get('DB_PORT', 3306)),
-                user=os.environ.get('DB_USER', 'root'),
-                password=os.environ.get('DB_PASSWORD', ''),
-                database=os.environ.get('DB_NAME', 'budget_app')
-            )
+            connection = get_db_connection()
             cursor = connection.cursor()
-            cursor.execute("""
-                           SELECT date
-                           FROM exchange_rates
-                           WHERE date BETWEEN %s
-                             AND %s
-                             AND source IN ('CBSL', 'CBSL_BULK')
-                           """, (start_date, end_date))
-
-            existing_dates = {row[0] for row in cursor.fetchall()}
-            cursor.close()
-            connection.close()
+            try:
+                cursor.execute("""
+                               SELECT date
+                               FROM exchange_rates
+                               WHERE date BETWEEN %s
+                                 AND %s
+                                 AND source IN ('CBSL', 'CBSL_BULK')
+                               """, (start_date, end_date))
+                existing_dates = {row[0] for row in cursor.fetchall()}
+            finally:
+                cursor.close()
+                connection.close()
 
             # Find missing dates in the last 10 days
             current_date = start_date
@@ -4488,25 +4422,19 @@ def bulk_cache_exchange_rates():
         service = get_exchange_rate_service()
 
         # Step 1: Get all dates that are already in the database (single query)
-        import mysql.connector
-        connection = mysql.connector.connect(
-            host=os.environ.get('DB_HOST', 'localhost'),
-            port=int(os.environ.get('DB_PORT', 3306)),
-            user=os.environ.get('DB_USER', 'root'),
-            password=os.environ.get('DB_PASSWORD', ''),
-            database=os.environ.get('DB_NAME', 'budget_app')
-        )
+        connection = get_db_connection()
         cursor = connection.cursor()
-        cursor.execute("""
-                       SELECT date
-                       FROM exchange_rates
-                       WHERE date BETWEEN %s
-                         AND %s
-                       """, (start_date, end_date))
-
-        existing_dates = {row[0] for row in cursor.fetchall()}
-        cursor.close()
-        connection.close()
+        try:
+            cursor.execute("""
+                           SELECT date
+                           FROM exchange_rates
+                           WHERE date BETWEEN %s
+                             AND %s
+                           """, (start_date, end_date))
+            existing_dates = {row[0] for row in cursor.fetchall()}
+        finally:
+            cursor.close()
+            connection.close()
 
         # Step 2: Determine which dates need to be fetched
         current_date = start_date
