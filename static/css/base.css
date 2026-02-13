@@ -1418,3 +1418,128 @@ color: #ffffff;
     border-top-left-radius: 0;
     border-bottom-left-radius: 0;
 }
+
+/* ============================================================
+   Sidebar Collapse/Expand Feature
+   ============================================================ */
+
+/* Sidebar header */
+.sidebar-header {
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 0.5rem;
+}
+
+.sidebar-title {
+    color: var(--text-primary);
+    font-size: 1.1rem;
+    transition: opacity 0.3s ease;
+}
+
+/* Toggle button inside sidebar */
+.sidebar-toggle-btn {
+    background-color: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 0.25rem 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.sidebar-toggle-btn:hover {
+    background-color: var(--sidebar-hover);
+    color: var(--text-primary);
+    transform: scale(1.1);
+}
+
+/* Vertical expand tab (shown when sidebar is collapsed) */
+.sidebar-expand-tab {
+    position: fixed;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 1000;
+    background: linear-gradient(135deg, var(--accent-color), var(--primary-color));
+    color: #ffffff;
+    padding: 1.5rem 0.5rem;
+    border-radius: 0 8px 8px 0;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    font-size: 1.25rem;
+    width: 30px;
+}
+
+.sidebar-expand-tab:hover {
+    padding-right: 0.75rem;
+    background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+    box-shadow: 4px 0 15px rgba(0, 0, 0, 0.3);
+}
+
+.sidebar-expand-tab i {
+    writing-mode: horizontal-tb;
+    display: inline-block;
+    animation: pulse-arrow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-arrow {
+    0%, 100% {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    50% {
+        opacity: 0.6;
+        transform: translateX(3px);
+    }
+}
+
+/* Sidebar transitions */
+.sidebar {
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+/* Collapsed sidebar state */
+.sidebar.collapsed {
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: 0 !important;
+    padding: 0;
+    overflow: hidden;
+    border-right: none;
+}
+
+/* Hide sidebar content when collapsed */
+.sidebar.collapsed .position-sticky {
+    opacity: 0;
+    visibility: hidden;
+}
+
+/* Main content adjustments when sidebar is collapsed */
+#mainContent {
+    transition: all 0.3s ease;
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+
+#mainContent.expanded {
+    margin-left: 0 !important;
+    max-width: 100% !important;
+    flex: 0 0 100% !important;
+    padding-left: 2rem !important;
+    padding-right: 2rem !important;
+}
+
+/* Adjust container row when sidebar is collapsed */
+.container-fluid > .row.sidebar-collapsed {
+    margin-left: 0;
+    margin-right: 0;
+}
+
+/* Responsive behavior - on mobile, sidebar is already collapsible via Bootstrap */
+@media (max-width: 767.98px) {
+    .sidebar-toggle-btn,
+    .sidebar-expand-btn {
+        display: none;
+    }
+}

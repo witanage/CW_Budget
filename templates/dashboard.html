@@ -10,8 +10,14 @@
 <div class="container-fluid">
     <div class="row">
         <!-- Sidebar -->
-        <nav class="col-md-3 col-lg-2 d-md-block sidebar">
+        <nav class="col-md-3 col-lg-2 d-md-block sidebar" id="sidebar">
             <div class="position-sticky">
+                <div class="sidebar-header d-flex align-items-center justify-content-between p-3">
+                    <span class="sidebar-title fw-bold">Menu</span>
+                    <button id="sidebarToggle" class="btn btn-sm sidebar-toggle-btn" title="Collapse sidebar">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                </div>
                 <ul class="nav flex-column">
                     <li class="nav-item">
                         <a class="nav-link active" href="#" data-page="transactions">
@@ -38,7 +44,11 @@
         </nav>
         
         <!-- Main Content -->
-        <main class="col-md-9 ms-sm-auto col-lg-10">
+        <main class="col-md-9 ms-sm-auto col-lg-10" id="mainContent">
+            <!-- Vertical expand tab (shown when sidebar is collapsed) -->
+            <div id="sidebarExpandTab" class="sidebar-expand-tab" title="Expand sidebar" style="display: none;">
+                <i class="fas fa-chevron-right"></i>
+            </div>
 
             <!-- Transactions Page -->
             <div id="transactionsPage" class="page-content" style="display:none;">
@@ -116,14 +126,14 @@
                                     <tr>
                                         <th style="width: 2%;"></th>
                                         <th style="width: 5%;">Method</th>
-                                        <th style="width: 21%;">Description</th>
+                                        <th style="width: 17%;">Description</th>
                                         <th style="width: 8%;">Category</th>
                                         <th style="width: 9%;">Debit</th>
                                         <th style="width: 9%;">Credit</th>
                                         <th style="width: 9%;">Balance</th>
                                         <th style="width: 10%;">Paid At</th>
-                                        <th style="width: 17%;">Notes</th>
-                                        <th style="width: 10%;">Actions</th>
+                                        <th style="width: 14%;">Notes</th>
+                                        <th style="width: 11%;">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
