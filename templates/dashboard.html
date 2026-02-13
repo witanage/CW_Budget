@@ -10,8 +10,14 @@
 <div class="container-fluid">
     <div class="row">
         <!-- Sidebar -->
-        <nav class="col-md-3 col-lg-2 d-md-block sidebar">
+        <nav class="col-md-3 col-lg-2 d-md-block sidebar" id="sidebar">
             <div class="position-sticky">
+                <div class="sidebar-header d-flex align-items-center justify-content-between p-3">
+                    <span class="sidebar-title fw-bold">Menu</span>
+                    <button id="sidebarToggle" class="btn btn-sm sidebar-toggle-btn" title="Collapse sidebar">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                </div>
                 <ul class="nav flex-column">
                     <li class="nav-item">
                         <a class="nav-link active" href="#" data-page="transactions">
@@ -38,7 +44,10 @@
         </nav>
         
         <!-- Main Content -->
-        <main class="col-md-9 ms-sm-auto col-lg-10">
+        <main class="col-md-9 ms-sm-auto col-lg-10" id="mainContent">
+            <button id="sidebarExpandBtn" class="btn btn-sm sidebar-expand-btn" title="Expand sidebar" style="display: none;">
+                <i class="fas fa-chevron-right"></i>
+            </button>
 
             <!-- Transactions Page -->
             <div id="transactionsPage" class="page-content" style="display:none;">

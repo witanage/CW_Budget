@@ -47,7 +47,10 @@ function initApp() {
         // 1. Setup navigation
         setupNavigation();
 
-        // 2. Setup form buttons
+        // 2. Setup sidebar toggle
+        setupSidebarToggle();
+
+        // 3. Setup form buttons
         setupFormButtons();
 
         // 3. Load initial data
@@ -89,6 +92,48 @@ function setupNavigation() {
     if (refreshBtn) {
         refreshBtn.addEventListener('click', recalculateAndRefresh);
     }
+}
+
+// ================================
+// SIDEBAR TOGGLE
+// ================================
+
+function setupSidebarToggle() {
+    const sidebar = document.getElementById('sidebar');
+    const mainContent = document.getElementById('mainContent');
+    const toggleBtn = document.getElementById('sidebarToggle');
+    const expandBtn = document.getElementById('sidebarExpandBtn');
+
+    if (!sidebar || !mainContent || !toggleBtn || !expandBtn) {
+        console.warn('Sidebar toggle elements not found');
+        return;
+    }
+
+    // Check localStorage for saved state
+    const sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+    if (sidebarCollapsed) {
+        sidebar.classList.add('collapsed');
+        mainContent.classList.add('expanded');
+        expandBtn.style.display = 'block';
+    }
+
+    // Toggle button click (collapse sidebar)
+    toggleBtn.addEventListener('click', function() {
+        sidebar.classList.add('collapsed');
+        mainContent.classList.add('expanded');
+        expandBtn.style.display = 'block';
+        localStorage.setItem('sidebarCollapsed', 'true');
+    });
+
+    // Expand button click (expand sidebar)
+    expandBtn.addEventListener('click', function() {
+        sidebar.classList.remove('collapsed');
+        mainContent.classList.remove('expanded');
+        expandBtn.style.display = 'none';
+        localStorage.setItem('sidebarCollapsed', 'false');
+    });
+
+    console.log('✓ Sidebar toggle initialized');
 }
 
 function navigateToPage(pageName) {

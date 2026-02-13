@@ -1418,3 +1418,96 @@ color: #ffffff;
     border-top-left-radius: 0;
     border-bottom-left-radius: 0;
 }
+
+/* ============================================================
+   Sidebar Collapse/Expand Feature
+   ============================================================ */
+
+/* Sidebar header */
+.sidebar-header {
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 0.5rem;
+}
+
+.sidebar-title {
+    color: var(--text-primary);
+    font-size: 1.1rem;
+    transition: opacity 0.3s ease;
+}
+
+/* Toggle button inside sidebar */
+.sidebar-toggle-btn {
+    background-color: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 0.25rem 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.sidebar-toggle-btn:hover {
+    background-color: var(--sidebar-hover);
+    color: var(--text-primary);
+    transform: scale(1.1);
+}
+
+/* Expand button in main content (shown when sidebar is collapsed) */
+.sidebar-expand-btn {
+    position: fixed;
+    left: 10px;
+    top: 70px;
+    z-index: 1000;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    transition: all 0.3s ease;
+}
+
+.sidebar-expand-btn:hover {
+    background-color: var(--sidebar-hover);
+    color: var(--text-primary);
+    transform: scale(1.1);
+}
+
+/* Sidebar transitions */
+.sidebar {
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+/* Collapsed sidebar state */
+.sidebar.collapsed {
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: 0 !important;
+    padding: 0;
+    overflow: hidden;
+    border-right: none;
+}
+
+/* Hide sidebar content when collapsed */
+.sidebar.collapsed .position-sticky {
+    opacity: 0;
+    visibility: hidden;
+}
+
+/* Main content adjustments when sidebar is collapsed */
+#mainContent {
+    transition: all 0.3s ease;
+}
+
+#mainContent.expanded {
+    margin-left: 0 !important;
+    max-width: 100% !important;
+    flex: 0 0 100% !important;
+}
+
+/* Responsive behavior - on mobile, sidebar is already collapsible via Bootstrap */
+@media (max-width: 767.98px) {
+    .sidebar-toggle-btn,
+    .sidebar-expand-btn {
+        display: none;
+    }
+}
