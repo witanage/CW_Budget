@@ -110,6 +110,11 @@
                                 </button>
                             </div>
                             <div class="col-auto">
+                                <button class="btn btn-primary btn-sm" id="bankComparisonBtn" data-bs-toggle="modal" data-bs-target="#bankComparisonModal">
+                                    <i class="fas fa-chart-line me-1"></i>Bank Rates
+                                </button>
+                            </div>
+                            <div class="col-auto">
                                 <button class="btn btn-outline-secondary btn-sm" id="clearFiltersPageBtn" style="display: none;">
                                     <i class="fas fa-times me-1"></i>Clear
                                 </button>
@@ -1463,6 +1468,111 @@
                 <button type="button" class="btn btn-primary btn-sm filter-action-btn" id="applyFiltersBtn">
                     <i class="fas fa-check me-1"></i>Apply Filters
                 </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bank Comparison Modal -->
+<div class="modal fade" id="bankComparisonModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-chart-line me-2"></i>Bank Rate Comparison</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Chart Controls -->
+                <div class="row mb-3 align-items-center">
+                    <div class="col-auto">
+                        <label class="form-label mb-0 me-2">History Period:</label>
+                    </div>
+                    <div class="col-auto">
+                        <select class="form-select form-select-sm" id="desktopBankComparisonMonths" style="width: auto;">
+                            <option value="1">1 Month</option>
+                            <option value="3" selected>3 Months</option>
+                            <option value="6">6 Months</option>
+                            <option value="12">1 Year</option>
+                        </select>
+                    </div>
+                    <div class="col-auto ms-auto">
+                        <button class="btn btn-sm btn-outline-primary" onclick="loadDesktopBankComparison()">
+                            <i class="fas fa-sync-alt me-1"></i>Refresh
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Summary Cards -->
+                <div class="row g-3 mb-3" id="desktopBankSummaryCards">
+                    <div class="col-md-3">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-body">
+                                <h6 class="text-muted mb-1 small">Best Buy Rate</h6>
+                                <h4 class="mb-0 text-success" id="desktopBestBuyRate">--</h4>
+                                <small class="text-muted" id="desktopBestBuyBank">--</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-body">
+                                <h6 class="text-muted mb-1 small">Current CBSL</h6>
+                                <h4 class="mb-0 text-primary" id="desktopCbslRate">--</h4>
+                                <small class="text-muted" id="desktopCbslDate">--</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-body">
+                                <h6 class="text-muted mb-1 small">HNB Rate</h6>
+                                <h4 class="mb-0 text-success" id="desktopHnbRate">--</h4>
+                                <small class="text-muted" id="desktopHnbDate">--</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-body">
+                                <h6 class="text-muted mb-1 small">Sampath Rate</h6>
+                                <h4 class="mb-0 text-danger" id="desktopSampathRate">--</h4>
+                                <small class="text-muted" id="desktopSampathDate">--</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Loading State -->
+                <div id="desktopBankComparisonLoading" class="text-center py-5">
+                    <i class="fas fa-spinner fa-spin fa-3x mb-3 text-primary"></i>
+                    <p class="text-muted">Loading bank rates...</p>
+                </div>
+
+                <!-- Error State -->
+                <div id="desktopBankComparisonError" class="text-center py-5" style="display: none;">
+                    <i class="fas fa-exclamation-triangle fa-3x mb-3 text-danger"></i>
+                    <p class="text-muted" id="desktopBankComparisonErrorMsg">Failed to load bank comparison data.</p>
+                    <button class="btn btn-sm btn-outline-primary" onclick="loadDesktopBankComparison()">
+                        <i class="fas fa-sync-alt me-1"></i>Retry
+                    </button>
+                </div>
+
+                <!-- Chart Container -->
+                <div id="desktopBankComparisonChartContainer" style="display: none;">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-body">
+                            <h6 class="card-title mb-3">
+                                <i class="fas fa-balance-scale me-1"></i>Buy Rate Comparison
+                            </h6>
+                            <div style="position: relative; height: 400px;">
+                                <canvas id="desktopBankComparisonChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
