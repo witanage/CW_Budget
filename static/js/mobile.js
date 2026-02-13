@@ -1338,3 +1338,222 @@ console.error('Error:', error);
 });
 }
 });
+
+// ============================================================
+// Bank Comparison for Mobile
+// ============================================================
+
+let mobileBankComparisonChart = null;
+
+// Bank colors (matching desktop version)
+const BANK_COLORS = {
+    'CBSL': '#0d6efd',
+    'HNB': '#198754',
+    'PB': '#fd7e14',
+    'SAMPATH': '#dc3545'
+};
+
+// Load and render bank comparison
+function loadMobileBankComparison() {
+    const months = document.getElementById('mobileBankComparisonMonths').value || 3;
+
+    // Show loading, hide error and chart
+    document.getElementById('mobileBankComparisonLoading').style.display = '';
+    document.getElementById('mobileBankComparisonError').style.display = 'none';
+    document.getElementById('mobileBankComparisonChartContainer').style.display = 'none';
+
+    // Fetch data
+    const params = new URLSearchParams({
+        period: 'daily',
+        months: months,
+        forecast_days: 0,
+        forecast_history: 0,
+        comparison_months: months
+    });
+
+    fetch('/api/exchange-rate/trends/all?' + params)
+        .then(response => {
+            if (!response.ok) {
+                return response.json().catch(() => ({})).then(data => {
+                    throw new Error(data.error || 'Server error ' + response.status);
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Hide loading
+            document.getElementById('mobileBankComparisonLoading').style.display = 'none';
+
+            // Show chart container
+            document.getElementById('mobileBankComparisonChartContainer').style.display = '';
+
+            // Render chart
+            renderMobileBankComparisonChart(data.source_comparison || {});
+        })
+        .catch(error => {
+            console.error('Error loading bank comparison:', error);
+
+            // Hide loading, show error
+            document.getElementById('mobileBankComparisonLoading').style.display = 'none';
+            document.getElementById('mobileBankComparisonError').style.display = '';
+            document.getElementById('mobileBankComparisonErrorMsg').textContent = error.message || 'Failed to load bank comparison data.';
+        });
+}
+// Render the bank comparison chart
+function renderMobileBankComparisonChart(sources) {
+    const canvas = document.getElementById('mobileBankComparisonChart');
+    if (!canvas) {
+        console.error('Canvas element not found');
+        return;
+    }
+
+    const ctx = canvas.getContext('2d');
+
+    // Destroy existing chart
+    if (mobileBankComparisonChart) {
+        mobileBankComparisonChart.destroy();
+        mobileBankComparisonChart = null;
+    }
+
+    // Check if we have data
+    const bankNames = Object.keys(sources);
+    if (bankNames.length === 0) {
+        // Show empty state
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.font = '14px sans-serif';
+        ctx.fillStyle = '#ccc';
+        ctx.textAlign = 'center';
+        ctx.fillText('No bank comparison data available', canvas.width / 2, canvas.height / 2);
+        return;
+    }
+
+    // Collect all unique dates
+    const dateSet = {};
+    bankNames.forEach(bankName => {
+        sources[bankName].forEach(item => {
+            dateSet[item.date] = true;
+        });
+    });
+    const labels = Object.keys(dateSet).sort();
+
+    // Create datasets for each bank
+    const datasets = bankNames.map(bankName => {
+        const bankData = sources[bankName];
+        const dataMap = {};
+
+        // Map dates to buy rates
+        bankData.forEach(item => {
+            dataMap[item.date] = item.buy_rate;
+        });
+
+        // Create data array aligned with labels
+        const data = labels.map(date => dataMap[date] !== undefined ? dataMap[date] : null);
+
+        return {
+            label: bankName,
+            data: data,
+            borderColor: BANK_COLORS[bankName] || '#6c757d',
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            pointRadius: labels.length > 60 ? 0 : 2,
+            pointHoverRadius: 4,
+            tension: 0.3,
+            spanGaps: true
+        };
+    });
+
+    // Create chart
+    mobileBankComparisonChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
+            plugins: {
+                legend: {
+                    display: false  // Hide legend since we have custom legend below
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                    titleColor: '#fff',
+                    bodyColor: '#ddd',
+                    borderColor: 'rgba(255, 255, 255, 0.1)',
+                    borderWidth: 1,
+                    padding: 10,
+                    displayColors: true,
+                    itemSort: (a, b) => {
+                        // Sort by value descending
+                        return (b.parsed.y || 0) - (a.parsed.y || 0);
+                    },
+                    callbacks: {
+                        label: function(context) {
+                            const value = context.parsed.y;
+                            if (value !== null && value !== undefined) {
+                                return context.dataset.label + ': ' + value.toFixed(4);
+                            }
+                            return '';
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: {
+                        color: '#ccc',
+                        font: { size: 9 },
+                        maxRotation: 45,
+                        autoSkip: true,
+                        maxTicksLimit: 10
+                    },
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.05)'
+                    }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: 'Buy Rate (LKR)',
+                        color: '#ccc',
+                        font: { size: 10 }
+                    },
+                    ticks: {
+                        color: '#ccc',
+                        font: { size: 9 },
+                        callback: function(value) {
+                            return value.toFixed(2);
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.05)'
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Event listener for month selector change
+document.addEventListener('DOMContentLoaded', function() {
+    const monthSelector = document.getElementById('mobileBankComparisonMonths');
+    if (monthSelector) {
+        monthSelector.addEventListener('change', function() {
+            loadMobileBankComparison();
+        });
+    }
+
+    // Load bank comparison when modal is shown
+    const modal = document.getElementById('bankComparisonModal');
+    if (modal) {
+        modal.addEventListener('shown.bs.modal', function() {
+            // Load data when modal opens
+            loadMobileBankComparison();
+        });
+    }
+});

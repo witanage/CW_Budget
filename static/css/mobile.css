@@ -782,3 +782,74 @@ opacity: 0;
 transform: translateX(-50%) translateY(20px);
 }
 }
+
+/* Mobile Bank Comparison Styles */
+#bankComparisonModal .modal-body {
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
+}
+
+#mobileBankComparisonChart {
+    width: 100% !important;
+    height: 300px !important;
+}
+
+/* Summary cards for bank comparison */
+#mobileBankSummaryCards .card {
+    transition: transform 0.2s;
+}
+
+#mobileBankSummaryCards .card:active {
+    transform: scale(0.98);
+}
+
+/* Ensure chart is visible on mobile */
+#mobileBankComparisonChartContainer canvas {
+    max-width: 100%;
+    height: auto !important;
+}
+
+/* Mobile legend styling */
+#mobileBankLegend {
+    font-size: 0.75rem;
+    line-height: 1.5;
+}
+
+#mobileBankLegend span {
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+}
+
+/* Loading and error states */
+#mobileBankComparisonLoading,
+#mobileBankComparisonError {
+    min-height: 200px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Responsive adjustments for very small screens */
+@media (max-width: 360px) {
+    #mobileBankComparisonChart {
+        height: 250px !important;
+    }
+
+    #mobileBankLegend {
+        font-size: 0.7rem;
+    }
+
+    #mobileBankSummaryCards .card-body {
+        padding: 8px !important;
+    }
+
+    #mobileBankSummaryCards h5 {
+        font-size: 1rem !important;
+    }
+
+    #mobileBankSummaryCards h6 {
+        font-size: 0.7rem !important;
+    }
+}
