@@ -1387,9 +1387,6 @@ function loadMobileBankComparison() {
             // Show chart container
             document.getElementById('mobileBankComparisonChartContainer').style.display = '';
 
-            // Update summary cards
-            updateMobileBankSummaryCards(data);
-
             // Render chart
             renderMobileBankComparisonChart(data.source_comparison || {});
         })
@@ -1402,49 +1399,6 @@ function loadMobileBankComparison() {
             document.getElementById('mobileBankComparisonErrorMsg').textContent = error.message || 'Failed to load bank comparison data.';
         });
 }
-
-// Update summary cards
-function updateMobileBankSummaryCards(data) {
-    const sources = data.source_comparison || {};
-    const trend = data.trend || [];
-
-    // Find the latest rates from each bank
-    let bestBuyRate = null;
-    let bestBuyBank = '--';
-    let cbslRate = '--';
-    let cbslDate = '--';
-
-    // Get latest CBSL rate from trend
-    if (trend.length > 0) {
-        const latest = trend[trend.length - 1];
-        if (latest.buy_rate) {
-            cbslRate = latest.buy_rate.toFixed(2);
-            cbslDate = latest.date || '';
-        }
-    }
-
-    // Find best buy rate across all banks
-    Object.keys(sources).forEach(bankName => {
-        const bankData = sources[bankName];
-        if (bankData && bankData.length > 0) {
-            // Get most recent rate
-            const latest = bankData[bankData.length - 1];
-            if (latest.buy_rate) {
-                if (bestBuyRate === null || latest.buy_rate < bestBuyRate) {
-                    bestBuyRate = latest.buy_rate;
-                    bestBuyBank = bankName;
-                }
-            }
-        }
-    });
-
-    // Update cards
-    document.getElementById('mobileBestBuyRate').textContent = bestBuyRate !== null ? bestBuyRate.toFixed(2) : '--';
-    document.getElementById('mobileBestBuyBank').textContent = bestBuyBank;
-    document.getElementById('mobileCbslRate').textContent = cbslRate;
-    document.getElementById('mobileCbslDate').textContent = cbslDate;
-}
-
 // Render the bank comparison chart
 function renderMobileBankComparisonChart(sources) {
     const canvas = document.getElementById('mobileBankComparisonChart');
