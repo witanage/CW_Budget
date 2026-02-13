@@ -1450,25 +1450,47 @@ color: #ffffff;
     transform: scale(1.1);
 }
 
-/* Expand button in main content (shown when sidebar is collapsed) */
-.sidebar-expand-btn {
+/* Vertical expand tab (shown when sidebar is collapsed) */
+.sidebar-expand-tab {
     position: fixed;
-    left: 10px;
-    top: 70px;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
     z-index: 1000;
-    background-color: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    color: var(--text-primary);
-    padding: 0.5rem 0.75rem;
-    border-radius: 8px;
-    box-shadow: var(--shadow);
+    background: linear-gradient(135deg, var(--accent-color), var(--primary-color));
+    color: #ffffff;
+    padding: 1.5rem 0.5rem;
+    border-radius: 0 8px 8px 0;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
     transition: all 0.3s ease;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    font-size: 1.25rem;
+    width: 30px;
 }
 
-.sidebar-expand-btn:hover {
-    background-color: var(--sidebar-hover);
-    color: var(--text-primary);
-    transform: scale(1.1);
+.sidebar-expand-tab:hover {
+    padding-right: 0.75rem;
+    background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+    box-shadow: 4px 0 15px rgba(0, 0, 0, 0.3);
+}
+
+.sidebar-expand-tab i {
+    writing-mode: horizontal-tb;
+    display: inline-block;
+    animation: pulse-arrow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-arrow {
+    0%, 100% {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    50% {
+        opacity: 0.6;
+        transform: translateX(3px);
+    }
 }
 
 /* Sidebar transitions */
@@ -1496,12 +1518,22 @@ color: #ffffff;
 /* Main content adjustments when sidebar is collapsed */
 #mainContent {
     transition: all 0.3s ease;
+    padding-left: 1rem;
+    padding-right: 1rem;
 }
 
 #mainContent.expanded {
     margin-left: 0 !important;
     max-width: 100% !important;
     flex: 0 0 100% !important;
+    padding-left: 2rem !important;
+    padding-right: 2rem !important;
+}
+
+/* Adjust container row when sidebar is collapsed */
+.container-fluid > .row.sidebar-collapsed {
+    margin-left: 0;
+    margin-right: 0;
 }
 
 /* Responsive behavior - on mobile, sidebar is already collapsible via Bootstrap */

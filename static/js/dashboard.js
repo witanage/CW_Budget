@@ -102,9 +102,10 @@ function setupSidebarToggle() {
     const sidebar = document.getElementById('sidebar');
     const mainContent = document.getElementById('mainContent');
     const toggleBtn = document.getElementById('sidebarToggle');
-    const expandBtn = document.getElementById('sidebarExpandBtn');
+    const expandTab = document.getElementById('sidebarExpandTab');
+    const containerRow = document.querySelector('.container-fluid > .row');
 
-    if (!sidebar || !mainContent || !toggleBtn || !expandBtn) {
+    if (!sidebar || !mainContent || !toggleBtn || !expandTab) {
         console.warn('Sidebar toggle elements not found');
         return;
     }
@@ -114,22 +115,25 @@ function setupSidebarToggle() {
     if (sidebarCollapsed) {
         sidebar.classList.add('collapsed');
         mainContent.classList.add('expanded');
-        expandBtn.style.display = 'block';
+        if (containerRow) containerRow.classList.add('sidebar-collapsed');
+        expandTab.style.display = 'block';
     }
 
     // Toggle button click (collapse sidebar)
     toggleBtn.addEventListener('click', function() {
         sidebar.classList.add('collapsed');
         mainContent.classList.add('expanded');
-        expandBtn.style.display = 'block';
+        if (containerRow) containerRow.classList.add('sidebar-collapsed');
+        expandTab.style.display = 'block';
         localStorage.setItem('sidebarCollapsed', 'true');
     });
 
-    // Expand button click (expand sidebar)
-    expandBtn.addEventListener('click', function() {
+    // Expand tab click (expand sidebar)
+    expandTab.addEventListener('click', function() {
         sidebar.classList.remove('collapsed');
         mainContent.classList.remove('expanded');
-        expandBtn.style.display = 'none';
+        if (containerRow) containerRow.classList.remove('sidebar-collapsed');
+        expandTab.style.display = 'none';
         localStorage.setItem('sidebarCollapsed', 'false');
     });
 
