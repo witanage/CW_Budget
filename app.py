@@ -4939,6 +4939,157 @@ def revoke_token():
 
 
 # ==================================================
+# TRANSACTION API ENDPOINT (TOKEN AUTHENTICATED)
+# ==================================================
+
+@app.route('/api/transactions/create', methods=['POST'])
+@token_required
+def create_transaction():
+    """
+    Create a new transaction with token authentication.
+
+    Request Body (JSON):
+        {
+            "description": "Grocery shopping",
+            "credit": 150.50,
+            "transaction_date": "2026-02-15"
+        }
+
+    Returns:
+        JSON with transaction ID and success message
+
+    Example Usage:
+        POST /api/transactions/create
+        Headers: Authorization: Bearer <token>
+        Body: {"description": "Coffee", "credit": 5.50, "transaction_date": "2026-02-15"}
+    """
+    try:
+        # Get user ID from the token (set by token_required decorator)
+        user_id = request.current_user['user_id']
+
+        # Get request data
+        data = request.get_json()
+
+        if not data:
+            return jsonify({'error': 'Request body is required'}), 400
+
+        # Validate required fields
+        description = data.get('description')
+        credit_value = data.get('credit')
+        transaction_date_str = data.get('transaction_date')
+
+        if not description:
+            return jsonify({'error': 'Description is required'}), 400
+
+        if credit_value is None or credit_value == '':
+            return jsonify({'error': 'Credit (expense) amount is required'}), 400
+
+        if not transaction_date_str:
+            return jsonify({'error': 'Transaction date is required'}), 400
+
+        # Parse transaction date
+        try:
+            transaction_date = datetime.strptime(transaction_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({'error': 'Invalid date format. Use YYYY-MM-DD (e.g., 2026-02-15)'}), 400
+
+        # Convert credit to Decimal
+        try:
+            credit = Decimal(str(credit_value))
+            if credit <= 0:
+                return jsonify({'error': 'Credit amount must be greater than 0'}), 400
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid credit amount'}), 400
+
+        # Get database connection
+        connection = get_db_connection()
+        if not connection:
+            return jsonify({'error': 'Database connection failed'}), 500
+
+        cursor = connection.cursor(dictionary=True)
+
+        try:
+            # Extract year and month from transaction date
+            year = transaction_date.year
+            month = transaction_date.month
+            month_name = calendar.month_name[month]
+
+            # Create or get monthly record for the transaction date
+            cursor.execute("""
+                INSERT INTO monthly_records (user_id, year, month, month_name)
+                VALUES (%s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP
+            """, (user_id, year, month, month_name))
+
+            # Get the monthly record ID
+            cursor.execute("""
+                SELECT id FROM monthly_records
+                WHERE user_id = %s AND year = %s AND month = %s
+            """, (user_id, year, month))
+
+            monthly_record = cursor.fetchone()
+
+            if not monthly_record:
+                return jsonify({'error': 'Failed to create or retrieve monthly record'}), 500
+
+            # Get the highest display_order for this month
+            cursor.execute("""
+                SELECT COALESCE(MAX(display_order), 0) as max_order
+                FROM transactions
+                WHERE monthly_record_id = %s
+            """, (monthly_record['id'],))
+
+            max_order_result = cursor.fetchone()
+            next_display_order = max_order_result['max_order'] + 1 if max_order_result else 1
+
+            # Insert the transaction
+            cursor.execute("""
+                INSERT INTO transactions
+                (monthly_record_id, description, debit, credit, transaction_date, display_order)
+                VALUES (%s, %s, NULL, %s, %s, %s)
+            """, (monthly_record['id'], description, credit, transaction_date, next_display_order))
+
+            transaction_id = cursor.lastrowid
+
+            # Log the transaction creation in audit logs
+            log_transaction_audit(
+                cursor,
+                transaction_id,
+                user_id,
+                'CREATE',
+                None,
+                None,
+                f"Created via API - Description: {description}, Credit: {credit}, Date: {transaction_date}"
+            )
+
+            connection.commit()
+
+            logger.info(f"Transaction created via API - User: {user_id}, ID: {transaction_id}, Description: {description}")
+
+            return jsonify({
+                'message': 'Transaction created successfully',
+                'transaction_id': transaction_id,
+                'description': description,
+                'credit': float(credit),
+                'transaction_date': transaction_date_str,
+                'year': year,
+                'month': month
+            }), 201
+
+        except Error as e:
+            connection.rollback()
+            logger.error(f"Database error creating transaction: {str(e)}")
+            return jsonify({'error': 'Failed to create transaction', 'details': str(e)}), 500
+        finally:
+            cursor.close()
+            connection.close()
+
+    except Exception as e:
+        logger.error(f"Error creating transaction: {str(e)}")
+        return jsonify({'error': 'Failed to create transaction', 'details': str(e)}), 500
+
+
+# ==================================================
 # BANK EXCHANGE RATE API ENDPOINTS
 # ==================================================
 
