@@ -73,29 +73,28 @@ curl -X POST http://localhost:5003/api/auth/token \
 ```json
 {
   "description": "Transaction description",
-  "credit": 150.50,
-  "transaction_date": "2026-02-15"
+  "credit": 150.50
 }
 ```
 
 **Required Fields:**
 - `description` (string): Description of the transaction (e.g., "Grocery shopping", "Coffee")
 - `credit` (number): Expense amount (must be greater than 0)
-- `transaction_date` (string): Transaction date in `YYYY-MM-DD` format
+
+**Note:** The transaction date is automatically set to today's date (current date)
 
 **Example using curl:**
 ```bash
 # First, save your token to a variable
 TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 
-# Create a transaction
+# Create a transaction (date will be set to today)
 curl -X POST http://localhost:5003/api/transactions/create \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "description": "Grocery shopping",
-    "credit": 150.50,
-    "transaction_date": "2026-02-15"
+    "credit": 150.50
   }'
 ```
 
@@ -146,14 +145,13 @@ TOKEN=$(echo $TOKEN_RESPONSE | jq -r '.token')
 
 echo "Token: $TOKEN"
 
-# Step 2: Create transaction
+# Step 2: Create transaction (date will be today)
 curl -X POST http://localhost:5003/api/transactions/create \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "description": "Coffee at Starbucks",
-    "credit": 5.50,
-    "transaction_date": "2026-02-15"
+    "credit": 5.50
   }'
 ```
 
@@ -173,14 +171,13 @@ response = requests.post(
 )
 token = response.json()['token']
 
-# Create transaction
+# Create transaction (date will be today)
 response = requests.post(
     "http://localhost:5003/api/transactions/create",
     headers={"Authorization": f"Bearer {token}"},
     json={
         "description": "Coffee",
-        "credit": 5.50,
-        "transaction_date": "2026-02-15"
+        "credit": 5.50
     }
 )
 print(response.json())
