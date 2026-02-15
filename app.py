@@ -5032,15 +5032,16 @@ def create_transaction():
             if not monthly_record:
                 return jsonify({'error': 'Failed to create or retrieve monthly record'}), 500
 
-            # Get the highest display_order for this month
+            # Push all existing transactions down by incrementing their display_order
+            # This makes room for the new transaction at position 1 (top)
             cursor.execute("""
-                SELECT COALESCE(MAX(display_order), 0) as max_order
-                FROM transactions
+                UPDATE transactions
+                SET display_order = display_order + 1
                 WHERE monthly_record_id = %s
             """, (monthly_record['id'],))
 
-            max_order_result = cursor.fetchone()
-            next_display_order = max_order_result['max_order'] + 1 if max_order_result else 1
+            # New transaction gets display_order = 1 (appears at top)
+            next_display_order = 1
 
             # Insert the transaction
             cursor.execute("""
