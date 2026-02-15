@@ -56,15 +56,15 @@ def get_token(username, password):
         return None
 
 
-def create_transaction(token, description, credit, transaction_date):
+def create_transaction(token, description, credit):
     """
     Create a new transaction using the authentication token.
+    The transaction date is automatically set to today's date.
 
     Args:
         token (str): JWT authentication token
         description (str): Transaction description
         credit (float): Expense amount
-        transaction_date (str): Date in YYYY-MM-DD format
 
     Returns:
         dict: Response data if successful, None otherwise
@@ -72,7 +72,7 @@ def create_transaction(token, description, credit, transaction_date):
     print(f"\nStep 2: Creating transaction...")
     print(f"  Description: {description}")
     print(f"  Credit (Expense): {credit}")
-    print(f"  Date: {transaction_date}")
+    print(f"  Date: Today (automatically set)")
 
     transaction_url = f"{BASE_URL}/api/transactions/create"
     headers = {
@@ -81,8 +81,7 @@ def create_transaction(token, description, credit, transaction_date):
     }
     payload = {
         "description": description,
-        "credit": credit,
-        "transaction_date": transaction_date
+        "credit": credit
     }
 
     try:
@@ -117,13 +116,11 @@ def main():
         print("\n✗ Cannot proceed without a valid token.")
         return
 
-    # Step 2: Create a transaction
-    today = datetime.now().strftime('%Y-%m-%d')
+    # Step 2: Create a transaction (date will be today)
     result = create_transaction(
         token=token,
         description="API Test - Coffee",
-        credit=5.50,
-        transaction_date=today
+        credit=5.50
     )
 
     if result:

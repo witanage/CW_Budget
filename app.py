@@ -4947,12 +4947,12 @@ def revoke_token():
 def create_transaction():
     """
     Create a new transaction with token authentication.
+    The transaction date is automatically set to today's date.
 
     Request Body (JSON):
         {
             "description": "Grocery shopping",
-            "credit": 150.50,
-            "transaction_date": "2026-02-15"
+            "credit": 150.50
         }
 
     Returns:
@@ -4961,7 +4961,7 @@ def create_transaction():
     Example Usage:
         POST /api/transactions/create
         Headers: Authorization: Bearer <token>
-        Body: {"description": "Coffee", "credit": 5.50, "transaction_date": "2026-02-15"}
+        Body: {"description": "Coffee", "credit": 5.50}
     """
     try:
         # Get user ID from the token (set by token_required decorator)
@@ -4976,7 +4976,6 @@ def create_transaction():
         # Validate required fields
         description = data.get('description')
         credit_value = data.get('credit')
-        transaction_date_str = data.get('transaction_date')
 
         if not description:
             return jsonify({'error': 'Description is required'}), 400
@@ -4984,14 +4983,8 @@ def create_transaction():
         if credit_value is None or credit_value == '':
             return jsonify({'error': 'Credit (expense) amount is required'}), 400
 
-        if not transaction_date_str:
-            return jsonify({'error': 'Transaction date is required'}), 400
-
-        # Parse transaction date
-        try:
-            transaction_date = datetime.strptime(transaction_date_str, '%Y-%m-%d').date()
-        except ValueError:
-            return jsonify({'error': 'Invalid date format. Use YYYY-MM-DD (e.g., 2026-02-15)'}), 400
+        # Use current date as transaction date
+        transaction_date = datetime.now().date()
 
         # Convert credit to Decimal
         try:
@@ -5072,7 +5065,7 @@ def create_transaction():
                 'transaction_id': transaction_id,
                 'description': description,
                 'credit': float(credit),
-                'transaction_date': transaction_date_str,
+                'transaction_date': transaction_date.isoformat(),
                 'year': year,
                 'month': month
             }), 201
