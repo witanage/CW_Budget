@@ -63,7 +63,7 @@ DB_CONFIG = _build_db_config()
 # ---------------------------------------------------------------------------
 # Connection-pool management
 # ---------------------------------------------------------------------------
-_DB_POOL_SIZE_DEFAULT = 5
+_DB_POOL_SIZE_DEFAULT = 10
 _DB_CONNECTION_TIMEOUT_DEFAULT = 10
 _connection_pool = None
 
@@ -133,10 +133,8 @@ _create_connection_pool()
 def get_db_connection():
     """Get a connection from the pool.
 
-    Falls back to a direct connection only when the pool was never created
-    (e.g. during first-time schema setup).  When the pool exists but is
-    exhausted, returns None immediately so callers receive a clear error
-    rather than a 6th direct connection that exceeds the provider limit.
+    Falls back to a direct connection if the pool is unavailable so the
+    application can still operate (e.g. during first-time schema setup).
     """
     if _connection_pool is not None:
         try:
@@ -144,12 +142,9 @@ def get_db_connection():
             logger.debug("Database connection acquired from pool")
             return connection
         except Error as e:
-            logger.error(
-                f"Could not acquire connection from pool: {e}. "
-                "All pool connections may be in use — consider reducing concurrency.")
-            return None
+            logger.warning(
+                f"Pool connection failed ({e}), falling back to direct connection")
 
-    # Pool was never created (e.g. first-time schema setup) — try a direct connection.
     if DB_CONFIG is None:
         logger.error(
             "Cannot connect to database: DB_CONFIG is not properly configured")
