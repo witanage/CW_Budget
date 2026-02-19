@@ -63,7 +63,7 @@ DB_CONFIG = _build_db_config()
 # ---------------------------------------------------------------------------
 # Connection-pool management
 # ---------------------------------------------------------------------------
-_DB_POOL_SIZE_DEFAULT = 10
+_DB_POOL_SIZE_DEFAULT = 4
 _DB_CONNECTION_TIMEOUT_DEFAULT = 10
 _connection_pool = None
 
