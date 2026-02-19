@@ -455,11 +455,7 @@ INSERT IGNORE INTO app_settings (setting_key, value, description) VALUES
 ('exchange_rate_refresh_interval_minutes', '60',
  'How often (in minutes) the background scheduler fetches fresh exchange rates from all banks'),
 ('exchange_rate_refresh_mode', 'background',
- 'How exchange rates are refreshed: background = automatic scheduler, manual = on-demand via admin only'),
-('db_pool_size', '4',
- 'Number of connections kept open in the MySQL connection pool (min 1, max 32)'),
-('db_connection_timeout', '10',
- 'Timeout in seconds when waiting for a database connection from the pool or from MySQL (min 1, max 60)');
+ 'How exchange rates are refreshed: background = automatic scheduler, manual = on-demand via admin only');
 
 -- ============================================================
 -- Exchange-Rate Refresh Logs Table
