@@ -2988,8 +2988,8 @@ function populateDateSelectors() {
     const currentMonthYear = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
 
     // Set min and max range (same as old dropdown: 2 years back to 1 year forward)
-    const minYear = currentYear - 2;
-    const maxYear = currentYear + 1;
+    const minYear = currentYear - 3;
+    const maxYear = currentYear + 3;
     const minDate = `${minYear}-01`;
     const maxDate = `${maxYear}-12`;
 
