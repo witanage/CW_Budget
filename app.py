@@ -5042,91 +5042,88 @@ def revoke_token():
 # AUTO-CATEGORIZATION HELPER
 # ==================================================
 
-# Keyword-to-category mapping for auto-categorization.
-# Keys are category IDs, values are lists of keywords/patterns to match against
-# transaction descriptions (case-insensitive). Only expense categories are included.
-CATEGORY_KEYWORDS = {
-    7:  ['grocery', 'groceries', 'supermarket', 'keells', 'cargills', 'arpico', 'food city',
-         'spar', 'glomark', 'laugfs', 'market'],
-    8:  ['rent', 'mortgage', 'housing', 'landlord', 'lease'],
-    9:  ['utility', 'utilities', 'electricity', 'water bill', 'gas bill', 'ceb', 'leco',
-         'water board', 'nwsdb'],
-    10: ['transport', 'bus', 'train', 'uber', 'pickme', 'grab', 'taxi', 'parking',
-         'toll', 'highway'],
-    11: ['healthcare', 'medical', 'hospital', 'doctor', 'clinic', 'pharmacy', 'medicine',
-         'channeling', 'lab test', 'dental', 'optician', 'health'],
-    12: ['insurance', 'premium', 'policy', 'life insurance', 'vehicle insurance',
-         'ceylinco', 'sri lanka insurance', 'aia', 'allianz'],
-    13: ['entertainment', 'movie', 'cinema', 'concert', 'netflix', 'spotify', 'game',
-         'gaming', 'hobby', 'recreation', 'theme park', 'zoo'],
-    14: ['shopping', 'clothing', 'clothes', 'shoes', 'electronics', 'fashion', 'mall',
-         'odel', 'nolimit', 'cool planet', 'softlogic', 'abans', 'singer',
-         'amazon', 'aliexpress', 'daraz'],
-    15: ['education', 'tuition', 'school', 'university', 'college', 'course', 'book',
-         'training', 'exam', 'tutorial', 'udemy', 'coursera', 'class fee'],
-    16: ['saving', 'savings', 'fd', 'fixed deposit', 'transfer to savings'],
-    17: ['loan', 'emi', 'repayment', 'installment', 'leasing', 'finance company'],
-    18: ['phone bill', 'mobile bill', 'internet bill', 'broadband', 'dialog', 'mobitel',
-         'airtel', 'hutch', 'slt', 'lanka bell', 'fiber', 'wifi'],
-    19: ['subscription', 'netflix', 'spotify', 'youtube premium', 'apple music',
-         'disney', 'hbo', 'prime video', 'icloud', 'google one', 'membership'],
-    20: ['household', 'home repair', 'maintenance', 'plumber', 'electrician', 'cleaning',
-         'furniture', 'appliance', 'hardware'],
-    21: ['personal care', 'salon', 'barber', 'haircut', 'grooming', 'spa', 'beauty',
-         'toiletries', 'cosmetics'],
-    22: ['gift', 'donation', 'charity', 'temple', 'church', 'mosque', 'alms',
-         'wedding gift', 'birthday gift'],
-    23: ['travel', 'vacation', 'holiday', 'hotel', 'flight', 'airline', 'airbnb',
-         'booking', 'trip', 'tour', 'resort', 'passport', 'visa fee', 'expressway'],
-    24: ['restaurant', 'dining', 'cafe', 'coffee', 'kfc', 'mcdonald', 'pizza hut',
-         'domino', 'burger king', 'starbucks', 'eat', 'lunch', 'dinner',
-         'breakfast', 'takeaway', 'food delivery', 'ubereats'],
-    25: ['miscellaneous', 'other', 'misc'],
-    28: ['hsbc cc fee', 'hsbc credit card fee', 'hsbc annual fee'],
-    29: ['fuel', 'petrol', 'diesel', 'ceypetco', 'ioc', 'gas station', 'filling station',
-         'lanka ioc'],
-    30: ['income tax', 'tax payment', 'ird', 'inland revenue'],
-    31: ['vehicle', 'car service', 'vehicle service', 'tyre', 'tire', 'mechanic',
-         'car wash', 'revenue license', 'registration'],
-    32: ['hsbc cc balanc', 'hsbv cc balanc', 'hsbc balancing'],
-    34: ['penalty', 'fine', 'late fee', 'overdue fee', 'penalty fee'],
-    35: ['hnb cc fee', 'hnb credit card fee', 'hnb annual fee'],
-    36: ['hnb fee', 'hnb bank fee', 'hnb charge'],
-    37: ['cash out', 'withdrawal', 'atm withdrawal', 'cash withdraw'],
-    41: ['ceft fee', 'ceft charge', 'transfer fee', 'ceft'],
-}
+# ---------------------------------------------------------------------------
+# Category-keyword cache (DB-backed, in-memory for performance)
+# ---------------------------------------------------------------------------
+# Keywords are stored in the `category_keywords` table so they can be edited
+# at runtime without redeployment.  An in-memory cache with a 5-minute TTL
+# keeps DB reads to a minimum while pre-compiled regex patterns ensure fast
+# matching on every transaction.
+# ---------------------------------------------------------------------------
 
-# Pre-compile patterns for faster matching
-_CATEGORY_PATTERNS = {
-    cat_id: [re.compile(re.escape(kw), re.IGNORECASE) for kw in keywords]
-    for cat_id, keywords in CATEGORY_KEYWORDS.items()
+_kw_cache_lock = threading.Lock()
+_kw_cache = {
+    'patterns': {},   # {category_id: [compiled_pattern, ...]}
+    'loaded_at': 0,   # epoch timestamp of last DB load
 }
+_KW_CACHE_TTL = 300   # seconds (5 minutes)
+
+
+def _load_category_patterns():
+    """Fetch keywords from DB, compile regex patterns, and update the cache."""
+    connection = get_db_connection()
+    if not connection:
+        return None
+
+    try:
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute(
+            "SELECT category_id, keyword FROM category_keywords ORDER BY category_id"
+        )
+        rows = cursor.fetchall()
+    finally:
+        connection.close()
+
+    patterns = {}
+    for row in rows:
+        cat_id = row['category_id']
+        compiled = re.compile(re.escape(row['keyword']), re.IGNORECASE)
+        patterns.setdefault(cat_id, []).append(compiled)
+
+    return patterns
+
+
+def _get_category_patterns():
+    """Return cached patterns, refreshing from DB when the TTL expires."""
+    now = time.time()
+
+    # Fast path: cache is still valid (read without lock)
+    if now - _kw_cache['loaded_at'] < _KW_CACHE_TTL and _kw_cache['patterns']:
+        return _kw_cache['patterns']
+
+    with _kw_cache_lock:
+        # Double-check after acquiring lock
+        if now - _kw_cache['loaded_at'] < _KW_CACHE_TTL and _kw_cache['patterns']:
+            return _kw_cache['patterns']
+
+        patterns = _load_category_patterns()
+        if patterns is not None:
+            _kw_cache['patterns'] = patterns
+            _kw_cache['loaded_at'] = time.time()
+        # If DB load failed but we have stale data, keep using it
+        return _kw_cache['patterns']
 
 
 def auto_categorize_transaction(description):
     """
     Attempt to match a transaction description to an expense category
-    using keyword-based matching.
+    using keyword-based matching against DB-stored keywords.
 
-    Args:
-        description: The transaction description string.
-
-    Returns:
-        The matching category ID (int) or None if no match is found.
+    Returns the matching category ID (int) or None if no match is found.
     """
     if not description:
         return None
 
     desc_lower = description.lower().strip()
+    patterns = _get_category_patterns()
 
     best_match = None
     best_match_length = 0
 
-    for cat_id, patterns in _CATEGORY_PATTERNS.items():
-        for pattern in patterns:
+    for cat_id, compiled_list in patterns.items():
+        for pattern in compiled_list:
             match = pattern.search(desc_lower)
             if match:
-                # Prefer the longest keyword match (more specific)
                 keyword_len = match.end() - match.start()
                 if keyword_len > best_match_length:
                     best_match = cat_id
