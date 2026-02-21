@@ -4,6 +4,7 @@ import io
 import json
 import logging
 import os
+import re
 import threading
 import time
 from datetime import datetime, timedelta
@@ -5038,6 +5039,103 @@ def revoke_token():
 
 
 # ==================================================
+# AUTO-CATEGORIZATION HELPER
+# ==================================================
+
+# Keyword-to-category mapping for auto-categorization.
+# Keys are category IDs, values are lists of keywords/patterns to match against
+# transaction descriptions (case-insensitive). Only expense categories are included.
+CATEGORY_KEYWORDS = {
+    7:  ['grocery', 'groceries', 'supermarket', 'keells', 'cargills', 'arpico', 'food city',
+         'spar', 'laugfs', 'market'],
+    8:  ['rent', 'mortgage', 'housing', 'landlord', 'lease'],
+    9:  ['utility', 'utilities', 'electricity', 'water bill', 'gas bill', 'ceb', 'leco',
+         'water board', 'nwsdb'],
+    10: ['transport', 'bus', 'train', 'uber', 'pickme', 'grab', 'taxi', 'parking',
+         'toll', 'highway'],
+    11: ['healthcare', 'medical', 'hospital', 'doctor', 'clinic', 'pharmacy', 'medicine',
+         'channeling', 'lab test', 'dental', 'optician', 'health'],
+    12: ['insurance', 'premium', 'policy', 'life insurance', 'vehicle insurance',
+         'ceylinco', 'sri lanka insurance', 'aia', 'allianz'],
+    13: ['entertainment', 'movie', 'cinema', 'concert', 'netflix', 'spotify', 'game',
+         'gaming', 'hobby', 'recreation', 'theme park', 'zoo'],
+    14: ['shopping', 'clothing', 'clothes', 'shoes', 'electronics', 'fashion', 'mall',
+         'odel', 'nolimit', 'cool planet', 'softlogic', 'abans', 'singer',
+         'amazon', 'aliexpress', 'daraz'],
+    15: ['education', 'tuition', 'school', 'university', 'college', 'course', 'book',
+         'training', 'exam', 'tutorial', 'udemy', 'coursera', 'class fee'],
+    16: ['saving', 'savings', 'fd', 'fixed deposit', 'transfer to savings'],
+    17: ['loan', 'emi', 'repayment', 'installment', 'leasing', 'finance company'],
+    18: ['phone bill', 'mobile bill', 'internet bill', 'broadband', 'dialog', 'mobitel',
+         'airtel', 'hutch', 'slt', 'lanka bell', 'fiber', 'wifi'],
+    19: ['subscription', 'netflix', 'spotify', 'youtube premium', 'apple music',
+         'disney', 'hbo', 'prime video', 'icloud', 'google one', 'membership'],
+    20: ['household', 'home repair', 'maintenance', 'plumber', 'electrician', 'cleaning',
+         'furniture', 'appliance', 'hardware'],
+    21: ['personal care', 'salon', 'barber', 'haircut', 'grooming', 'spa', 'beauty',
+         'toiletries', 'cosmetics'],
+    22: ['gift', 'donation', 'charity', 'temple', 'church', 'mosque', 'alms',
+         'wedding gift', 'birthday gift'],
+    23: ['travel', 'vacation', 'holiday', 'hotel', 'flight', 'airline', 'airbnb',
+         'booking', 'trip', 'tour', 'resort', 'passport', 'visa fee'],
+    24: ['restaurant', 'dining', 'cafe', 'coffee', 'kfc', 'mcdonald', 'pizza hut',
+         'domino', 'burger king', 'starbucks', 'eat', 'lunch', 'dinner',
+         'breakfast', 'takeaway', 'food delivery', 'ubereats'],
+    25: ['miscellaneous', 'other', 'misc'],
+    28: ['hsbc cc fee', 'hsbc credit card fee', 'hsbc annual fee'],
+    29: ['fuel', 'petrol', 'diesel', 'ceypetco', 'ioc', 'gas station', 'filling station',
+         'lanka ioc'],
+    30: ['income tax', 'tax payment', 'ird', 'inland revenue'],
+    31: ['vehicle', 'car service', 'vehicle service', 'tyre', 'tire', 'mechanic',
+         'car wash', 'revenue license', 'registration'],
+    32: ['hsbc cc balanc', 'hsbv cc balanc', 'hsbc balancing'],
+    34: ['penalty', 'fine', 'late fee', 'overdue fee', 'penalty fee'],
+    35: ['hnb cc fee', 'hnb credit card fee', 'hnb annual fee'],
+    36: ['hnb fee', 'hnb bank fee', 'hnb charge'],
+    37: ['cash out', 'withdrawal', 'atm withdrawal', 'cash withdraw'],
+    41: ['ceft fee', 'ceft charge', 'transfer fee', 'ceft'],
+}
+
+# Pre-compile patterns for faster matching
+_CATEGORY_PATTERNS = {
+    cat_id: [re.compile(re.escape(kw), re.IGNORECASE) for kw in keywords]
+    for cat_id, keywords in CATEGORY_KEYWORDS.items()
+}
+
+
+def auto_categorize_transaction(description):
+    """
+    Attempt to match a transaction description to an expense category
+    using keyword-based matching.
+
+    Args:
+        description: The transaction description string.
+
+    Returns:
+        The matching category ID (int) or None if no match is found.
+    """
+    if not description:
+        return None
+
+    desc_lower = description.lower().strip()
+
+    best_match = None
+    best_match_length = 0
+
+    for cat_id, patterns in _CATEGORY_PATTERNS.items():
+        for pattern in patterns:
+            match = pattern.search(desc_lower)
+            if match:
+                # Prefer the longest keyword match (more specific)
+                keyword_len = match.end() - match.start()
+                if keyword_len > best_match_length:
+                    best_match = cat_id
+                    best_match_length = keyword_len
+
+    return best_match
+
+
+# ==================================================
 # TRANSACTION API ENDPOINT (TOKEN AUTHENTICATED)
 # ==================================================
 
@@ -5047,20 +5145,22 @@ def create_transaction():
     """
     Create a new transaction with token authentication.
     The transaction date is automatically set to today's date.
+    The category is auto-detected from the description unless explicitly provided.
 
     Request Body (JSON):
         {
             "description": "Grocery shopping",
-            "credit": 150.50
+            "credit": 150.50,
+            "category_id": null  (optional - auto-detected if omitted)
         }
 
     Returns:
-        JSON with transaction ID and success message
+        JSON with transaction ID, matched category, and success message
 
     Example Usage:
         POST /api/transactions/create
         Headers: Authorization: Bearer <token>
-        Body: {"description": "Coffee", "credit": 5.50}
+        Body: {"description": "Coffee at Starbucks", "credit": 5.50}
     """
     try:
         # Get user ID from the token (set by token_required decorator)
@@ -5093,6 +5193,20 @@ def create_transaction():
         except (ValueError, TypeError):
             return jsonify({'error': 'Invalid credit amount'}), 400
 
+        # Auto-categorize from description, or use explicitly provided category_id
+        category_id = data.get('category_id')
+        category_name = None
+
+        if category_id is not None:
+            # Caller explicitly provided a category - validate it
+            try:
+                category_id = int(category_id)
+            except (ValueError, TypeError):
+                return jsonify({'error': 'Invalid category_id'}), 400
+        else:
+            # Auto-detect category from description
+            category_id = auto_categorize_transaction(description)
+
         # Get database connection
         connection = get_db_connection()
         if not connection:
@@ -5101,6 +5215,16 @@ def create_transaction():
         cursor = connection.cursor(dictionary=True)
 
         try:
+            # If we have a category_id (explicit or auto-detected), verify it exists
+            if category_id is not None:
+                cursor.execute("SELECT id, name FROM categories WHERE id = %s", (category_id,))
+                category_row = cursor.fetchone()
+                if category_row:
+                    category_name = category_row['name']
+                else:
+                    # Invalid category_id - clear it rather than failing
+                    category_id = None
+
             # Extract year and month from transaction date
             year = transaction_date.year
             month = transaction_date.month
@@ -5135,16 +5259,18 @@ def create_transaction():
             # New transaction gets display_order = 1 (appears at top)
             next_display_order = 1
 
-            # Insert the transaction
+            # Insert the transaction with auto-categorized category
             cursor.execute("""
                 INSERT INTO transactions
-                (monthly_record_id, description, debit, credit, transaction_date, display_order)
-                VALUES (%s, %s, NULL, %s, %s, %s)
-            """, (monthly_record['id'], description, credit, transaction_date, next_display_order))
+                (monthly_record_id, description, category_id, debit, credit, transaction_date, display_order)
+                VALUES (%s, %s, %s, NULL, %s, %s, %s)
+            """, (monthly_record['id'], description, category_id, credit, transaction_date, next_display_order))
 
             transaction_id = cursor.lastrowid
 
             # Log the transaction creation in audit logs
+            category_info = f", Category: {category_name} (auto)" if category_name and not data.get('category_id') else \
+                            f", Category: {category_name}" if category_name else ""
             log_transaction_audit(
                 cursor,
                 transaction_id,
@@ -5152,22 +5278,28 @@ def create_transaction():
                 'CREATE',
                 None,
                 None,
-                f"Created via API - Description: {description}, Credit: {credit}, Date: {transaction_date}"
+                f"Created via API - Description: {description}, Credit: {credit}, Date: {transaction_date}{category_info}"
             )
 
             connection.commit()
 
-            logger.info(f"Transaction created via API - User: {user_id}, ID: {transaction_id}, Description: {description}")
+            logger.info(f"Transaction created via API - User: {user_id}, ID: {transaction_id}, "
+                        f"Description: {description}, Category: {category_name or 'Uncategorized'}")
 
-            return jsonify({
+            response = {
                 'message': 'Transaction created successfully',
                 'transaction_id': transaction_id,
                 'description': description,
                 'credit': float(credit),
                 'transaction_date': transaction_date.isoformat(),
                 'year': year,
-                'month': month
-            }), 201
+                'month': month,
+                'category_id': category_id,
+                'category_name': category_name,
+                'auto_categorized': category_id is not None and data.get('category_id') is None
+            }
+
+            return jsonify(response), 201
 
         except Error as e:
             connection.rollback()
