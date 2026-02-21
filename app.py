@@ -5047,7 +5047,7 @@ def revoke_token():
 # transaction descriptions (case-insensitive). Only expense categories are included.
 CATEGORY_KEYWORDS = {
     7:  ['grocery', 'groceries', 'supermarket', 'keells', 'cargills', 'arpico', 'food city',
-         'spar', 'laugfs', 'market'],
+         'spar', 'glomark', 'laugfs', 'market'],
     8:  ['rent', 'mortgage', 'housing', 'landlord', 'lease'],
     9:  ['utility', 'utilities', 'electricity', 'water bill', 'gas bill', 'ceb', 'leco',
          'water board', 'nwsdb'],
@@ -5077,7 +5077,7 @@ CATEGORY_KEYWORDS = {
     22: ['gift', 'donation', 'charity', 'temple', 'church', 'mosque', 'alms',
          'wedding gift', 'birthday gift'],
     23: ['travel', 'vacation', 'holiday', 'hotel', 'flight', 'airline', 'airbnb',
-         'booking', 'trip', 'tour', 'resort', 'passport', 'visa fee'],
+         'booking', 'trip', 'tour', 'resort', 'passport', 'visa fee', 'expressway'],
     24: ['restaurant', 'dining', 'cafe', 'coffee', 'kfc', 'mcdonald', 'pizza hut',
          'domino', 'burger king', 'starbucks', 'eat', 'lunch', 'dinner',
          'breakfast', 'takeaway', 'food delivery', 'ubereats'],
