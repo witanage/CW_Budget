@@ -480,3 +480,114 @@ CREATE TABLE IF NOT EXISTS exchange_rate_refresh_logs (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 COMMENT='Logs every exchange-rate refresh attempt made by the background scheduler';
 
+-- ============================================================
+-- Category Keywords Table
+-- ============================================================
+-- Stores keyword-to-category mappings for auto-categorization.
+-- Each row is one keyword that maps to an expense category.
+-- Moving these out of code allows editing without redeployment.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS category_keywords (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    category_id INT          NOT NULL,
+    keyword     VARCHAR(100) NOT NULL,
+    created_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY  uk_keyword   (keyword),
+    INDEX       idx_category (category_id),
+    CONSTRAINT  fk_ck_category FOREIGN KEY (category_id) REFERENCES categories(id)
+        ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+COMMENT='Keyword-to-category mappings for auto-categorizing transactions';
+
+-- Seed category keywords
+INSERT IGNORE INTO category_keywords (category_id, keyword) VALUES
+-- Groceries (7)
+(7,'grocery'),(7,'groceries'),(7,'supermarket'),(7,'keells'),(7,'cargills'),
+(7,'arpico'),(7,'food city'),(7,'spar'),(7,'glomark'),(7,'laugfs'),(7,'market'),
+-- Housing (8)
+(8,'rent'),(8,'mortgage'),(8,'housing'),(8,'landlord'),(8,'lease'),
+-- Utilities (9)
+(9,'utility'),(9,'utilities'),(9,'electricity'),(9,'water bill'),(9,'gas bill'),
+(9,'ceb'),(9,'leco'),(9,'water board'),(9,'nwsdb'),
+-- Transport (10)
+(10,'transport'),(10,'bus'),(10,'train'),(10,'uber'),(10,'pickme'),
+(10,'grab'),(10,'taxi'),(10,'parking'),(10,'toll'),(10,'highway'),
+-- Healthcare (11)
+(11,'healthcare'),(11,'medical'),(11,'hospital'),(11,'doctor'),(11,'clinic'),
+(11,'pharmacy'),(11,'medicine'),(11,'channeling'),(11,'lab test'),(11,'dental'),
+(11,'optician'),(11,'health'),
+-- Insurance (12)
+(12,'insurance'),(12,'premium'),(12,'policy'),(12,'life insurance'),
+(12,'vehicle insurance'),(12,'ceylinco'),(12,'sri lanka insurance'),
+(12,'aia'),(12,'allianz'),
+-- Entertainment (13)
+(13,'entertainment'),(13,'movie'),(13,'cinema'),(13,'concert'),(13,'netflix'),
+(13,'spotify'),(13,'game'),(13,'gaming'),(13,'hobby'),(13,'recreation'),
+(13,'theme park'),(13,'zoo'),
+-- Shopping (14)
+(14,'shopping'),(14,'clothing'),(14,'clothes'),(14,'shoes'),(14,'electronics'),
+(14,'fashion'),(14,'mall'),(14,'odel'),(14,'nolimit'),(14,'cool planet'),
+(14,'softlogic'),(14,'abans'),(14,'singer'),(14,'amazon'),(14,'aliexpress'),
+(14,'daraz'),
+-- Education (15)
+(15,'education'),(15,'tuition'),(15,'school'),(15,'university'),(15,'college'),
+(15,'course'),(15,'book'),(15,'training'),(15,'exam'),(15,'tutorial'),
+(15,'udemy'),(15,'coursera'),(15,'class fee'),
+-- Savings (16)
+(16,'saving'),(16,'savings'),(16,'fd'),(16,'fixed deposit'),(16,'transfer to savings'),
+-- Loan (17)
+(17,'loan'),(17,'emi'),(17,'repayment'),(17,'installment'),(17,'leasing'),
+(17,'finance company'),
+-- Phone/Internet (18)
+(18,'phone bill'),(18,'mobile bill'),(18,'internet bill'),(18,'broadband'),
+(18,'dialog'),(18,'mobitel'),(18,'airtel'),(18,'hutch'),(18,'slt'),
+(18,'lanka bell'),(18,'fiber'),(18,'wifi'),
+-- Subscriptions (19)
+(19,'subscription'),(19,'netflix'),(19,'spotify'),(19,'youtube premium'),
+(19,'apple music'),(19,'disney'),(19,'hbo'),(19,'prime video'),(19,'icloud'),
+(19,'google one'),(19,'membership'),
+-- Household (20)
+(20,'household'),(20,'home repair'),(20,'maintenance'),(20,'plumber'),
+(20,'electrician'),(20,'cleaning'),(20,'furniture'),(20,'appliance'),(20,'hardware'),
+-- Personal Care (21)
+(21,'personal care'),(21,'salon'),(21,'barber'),(21,'haircut'),(21,'grooming'),
+(21,'spa'),(21,'beauty'),(21,'toiletries'),(21,'cosmetics'),
+-- Gift/Donation (22)
+(22,'gift'),(22,'donation'),(22,'charity'),(22,'temple'),(22,'church'),
+(22,'mosque'),(22,'alms'),(22,'wedding gift'),(22,'birthday gift'),
+-- Travel (23)
+(23,'travel'),(23,'vacation'),(23,'holiday'),(23,'hotel'),(23,'flight'),
+(23,'airline'),(23,'airbnb'),(23,'booking'),(23,'trip'),(23,'tour'),
+(23,'resort'),(23,'passport'),(23,'visa fee'),(23,'expressway'),
+-- Restaurant (24)
+(24,'restaurant'),(24,'dining'),(24,'cafe'),(24,'coffee'),(24,'kfc'),
+(24,'mcdonald'),(24,'pizza hut'),(24,'domino'),(24,'burger king'),
+(24,'starbucks'),(24,'eat'),(24,'lunch'),(24,'dinner'),(24,'breakfast'),
+(24,'takeaway'),(24,'food delivery'),(24,'ubereats'),
+-- Miscellaneous (25)
+(25,'miscellaneous'),(25,'other'),(25,'misc'),
+-- HSBC CC Fee (28)
+(28,'hsbc cc fee'),(28,'hsbc credit card fee'),(28,'hsbc annual fee'),
+-- Fuel (29)
+(29,'fuel'),(29,'petrol'),(29,'diesel'),(29,'ceypetco'),(29,'ioc'),
+(29,'gas station'),(29,'filling station'),(29,'lanka ioc'),
+-- Income Tax (30)
+(30,'income tax'),(30,'tax payment'),(30,'ird'),(30,'inland revenue'),
+-- Vehicle (31)
+(31,'vehicle'),(31,'car service'),(31,'vehicle service'),(31,'tyre'),
+(31,'tire'),(31,'mechanic'),(31,'car wash'),(31,'revenue license'),
+(31,'registration'),
+-- HSBC Balancing (32)
+(32,'hsbc cc balanc'),(32,'hsbv cc balanc'),(32,'hsbc balancing'),
+-- Penalty (34)
+(34,'penalty'),(34,'fine'),(34,'late fee'),(34,'overdue fee'),(34,'penalty fee'),
+-- HNB CC Fee (35)
+(35,'hnb cc fee'),(35,'hnb credit card fee'),(35,'hnb annual fee'),
+-- HNB Fee (36)
+(36,'hnb fee'),(36,'hnb bank fee'),(36,'hnb charge'),
+-- Cash Out (37)
+(37,'cash out'),(37,'withdrawal'),(37,'atm withdrawal'),(37,'cash withdraw'),
+-- CEFT Fee (41)
+(41,'ceft fee'),(41,'ceft charge'),(41,'transfer fee'),(41,'ceft');
+
