@@ -126,7 +126,11 @@ def login_required(f):
 
 
 def admin_required(f):
-    """Decorator to require admin privileges for routes."""
+    """Decorator to require admin privileges for routes.
+
+    Uses the ``is_admin`` flag cached in the session at login time so that
+    no extra database round-trip is needed on every admin request.
+    """
 
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -134,23 +138,8 @@ def admin_required(f):
             flash('Please login first.', 'warning')
             return redirect(url_for('login'))
 
-        # Check if user is admin
-        connection = get_db_connection()
-        if connection:
-            cursor = connection.cursor(dictionary=True)
-            try:
-                cursor.execute("SELECT is_admin FROM users WHERE id = %s", (session['user_id'],))
-                user = cursor.fetchone()
-
-                if not user or not user.get('is_admin'):
-                    flash('Access denied. Admin privileges required.', 'danger')
-                    return redirect(url_for('dashboard'))
-
-            finally:
-                cursor.close()
-                connection.close()
-        else:
-            flash('Database connection failed.', 'danger')
+        if not session.get('is_admin'):
+            flash('Access denied. Admin privileges required.', 'danger')
             return redirect(url_for('dashboard'))
 
         return f(*args, **kwargs)
@@ -1631,13 +1620,9 @@ def admin_import_csv():
         cursor.execute("""
                        INSERT INTO monthly_records (user_id, year, month, month_name)
                        VALUES (%s, %s, %s, %s) ON DUPLICATE KEY
-                       UPDATE updated_at = CURRENT_TIMESTAMP
+                       UPDATE id = LAST_INSERT_ID(id), updated_at = CURRENT_TIMESTAMP
                        """, (target_user_id, year, month, month_name))
-        cursor.execute("""
-                       SELECT id FROM monthly_records
-                       WHERE user_id = %s AND year = %s AND month = %s
-                       """, (target_user_id, year, month))
-        monthly_record = cursor.fetchone()
+        monthly_record = {'id': cursor.lastrowid}
 
         # Pre-load existing payment methods for the target user
         cursor.execute("""
@@ -1659,16 +1644,18 @@ def admin_import_csv():
         skipped_count = 0
         methods_created = []
 
-        for idx, row in enumerate(rows):
-            # Resolve payment method via explicit mapping first, then auto-match
+        # ── Phase 1: resolve payment methods for ALL rows first ──
+        # This avoids interleaving method-creation queries with
+        # transaction inserts and reduces round-trips.
+        resolved_pm_ids = []  # parallel list — one entry per row
+        for row in rows:
             payment_method_id = None
             if row['method']:
-                mapping_value = method_mapping.get(row['method'])  # exact key from CSV
+                mapping_value = method_mapping.get(row['method'])
 
                 if mapping_value == '__skip__':
                     payment_method_id = None
                 elif mapping_value == '__create__':
-                    # Create new payment method
                     method_key = row['method'].lower()
                     if method_key in existing_methods:
                         payment_method_id = existing_methods[method_key]
@@ -1681,13 +1668,11 @@ def admin_import_csv():
                         existing_methods[method_key] = payment_method_id
                         methods_created.append(row['method'])
                 elif mapping_value is not None:
-                    # Map to an existing payment method id
                     try:
                         payment_method_id = int(mapping_value)
                     except (ValueError, TypeError):
                         payment_method_id = None
                 else:
-                    # No explicit mapping — auto-match by name
                     method_key = row['method'].lower()
                     if method_key in existing_methods:
                         payment_method_id = existing_methods[method_key]
@@ -1699,17 +1684,15 @@ def admin_import_csv():
                         payment_method_id = cursor.lastrowid
                         existing_methods[method_key] = payment_method_id
                         methods_created.append(row['method'])
+            resolved_pm_ids.append(payment_method_id)
 
+        # ── Phase 2: batch-insert all transactions in one query ──
+        txn_values = []
+        txn_params = []
+        for idx, row in enumerate(rows):
             current_max_order += 1
-
-            cursor.execute("""
-                           INSERT INTO transactions
-                           (monthly_record_id, description, category_id, debit, credit,
-                            transaction_date, notes, payment_method_id, display_order,
-                            is_done, is_paid, marked_done_at, paid_at)
-                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s,
-                                   TRUE, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                           """, (
+            txn_values.append("(%s, %s, %s, %s, %s, %s, %s, %s, %s, TRUE, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)")
+            txn_params.extend([
                 monthly_record['id'],
                 row['description'],
                 None,
@@ -1717,15 +1700,50 @@ def admin_import_csv():
                 row['credit'],
                 transaction_date,
                 row['note'] if row['note'] else None,
-                payment_method_id,
+                resolved_pm_ids[idx],
                 current_max_order,
-            ))
+            ])
 
-            txn_id = cursor.lastrowid
-            log_transaction_audit(cursor, txn_id, admin_id, 'CREATE',
-                                  field_name='csv_import',
-                                  new_value=f"Imported for user {target_user['username']}")
-            imported_count += 1
+        if txn_values:
+            cursor.execute(
+                "INSERT INTO transactions "
+                "(monthly_record_id, description, category_id, debit, credit, "
+                "transaction_date, notes, payment_method_id, display_order, "
+                "is_done, is_paid, marked_done_at, paid_at) VALUES "
+                + ", ".join(txn_values),
+                txn_params,
+            )
+            first_txn_id = cursor.lastrowid
+            imported_count = len(txn_values)
+
+            # ── Phase 3: batch-insert audit logs in one query ──
+            ip_address = request.remote_addr if request else None
+            user_agent = request.headers.get('User-Agent') if request else None
+            audit_note = f"Imported for user {target_user['username']}"
+
+            audit_values = []
+            audit_params = []
+            for i in range(imported_count):
+                audit_values.append("(%s, %s, %s, %s, %s, %s, %s)")
+                audit_params.extend([
+                    first_txn_id + i,
+                    admin_id,
+                    'CREATE',
+                    'csv_import',
+                    audit_note,
+                    ip_address,
+                    user_agent,
+                ])
+
+            try:
+                cursor.execute(
+                    "INSERT INTO transaction_audit_logs "
+                    "(transaction_id, user_id, action, field_name, new_value, ip_address, user_agent) VALUES "
+                    + ", ".join(audit_values),
+                    audit_params,
+                )
+            except Exception as e:
+                logger.error(f"Failed to create batch audit logs: {e}")
 
         connection.commit()
 
@@ -1844,85 +1862,69 @@ def dashboard_stats():
             current_year = datetime.now().year
             current_month = datetime.now().month
 
-            # Get current month income and expenses
+            # Fetch current-month stats, YTD stats, and top categories
+            # in a single round-trip using UNION ALL.
             cursor.execute("""
-                           SELECT SUM(debit)  as total_income,
-                                  SUM(credit) as total_expenses
+                           SELECT 'current' AS _section,
+                                  SUM(debit) AS total_income,
+                                  SUM(credit) AS total_expenses,
+                                  NULL AS ytd_income,
+                                  NULL AS ytd_expenses,
+                                  NULL AS category,
+                                  NULL AS amount,
+                                  NULL AS cat_type
                            FROM transactions t
                                     JOIN monthly_records mr ON t.monthly_record_id = mr.id
-                           WHERE mr.user_id = %s
-                             AND mr.year = %s
-                             AND mr.month = %s
-                           """, (user_id, current_year, current_month))
+                           WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s
 
-            current_stats = cursor.fetchone() or {'total_income': 0, 'total_expenses': 0}
+                           UNION ALL
 
-            # Balance will be calculated on frontend
-            current_stats['current_balance'] = (current_stats.get('total_income', 0) or 0) - (
-                        current_stats.get('total_expenses', 0) or 0)
-
-            # Get year-to-date stats
-            cursor.execute("""
-                           SELECT SUM(debit)  as ytd_income,
-                                  SUM(credit) as ytd_expenses
+                           SELECT 'ytd', NULL, NULL,
+                                  SUM(debit), SUM(credit),
+                                  NULL, NULL, NULL
                            FROM transactions t
                                     JOIN monthly_records mr ON t.monthly_record_id = mr.id
-                           WHERE mr.user_id = %s
-                             AND mr.year = %s
-                           """, (user_id, current_year))
+                           WHERE mr.user_id = %s AND mr.year = %s
 
-            ytd_stats = cursor.fetchone()
+                           UNION ALL
 
-            # Get recent transactions (balance will be calculated on frontend)
-            cursor.execute("""
-                           SELECT t.description,
-                                  t.debit,
-                                  t.credit,
-                                  t.transaction_date,
-                                  c.name as category
+                           SELECT 'income_cat', NULL, NULL, NULL, NULL,
+                                  c.name, SUM(t.debit), NULL
                            FROM transactions t
                                     JOIN monthly_records mr ON t.monthly_record_id = mr.id
                                     LEFT JOIN categories c ON t.category_id = c.id
-                           WHERE mr.user_id = %s
-                           ORDER BY t.created_at DESC LIMIT 10
-                           """, (user_id,))
-
-            recent_transactions = cursor.fetchall()
-
-            # Get monthly trend (last 12 months)
-            cursor.execute("""
-                           SELECT mr.year,
-                                  mr.month,
-                                  mr.month_name,
-                                  SUM(t.debit)  as income,
-                                  SUM(t.credit) as expenses
-                           FROM monthly_records mr
-                                    LEFT JOIN transactions t ON mr.id = t.monthly_record_id
-                           WHERE mr.user_id = %s
-                           GROUP BY mr.year, mr.month, mr.month_name
-                           ORDER BY mr.year DESC, mr.month DESC LIMIT 12
-                           """, (user_id,))
-
-            monthly_trend = cursor.fetchall()
-
-            # Get current month income by category
-            cursor.execute("""
-                           SELECT c.name       as category,
-                                  SUM(t.debit) as amount
-                           FROM transactions t
-                                    JOIN monthly_records mr ON t.monthly_record_id = mr.id
-                                    LEFT JOIN categories c ON t.category_id = c.id
-                           WHERE mr.user_id = %s
-                             AND mr.year = %s
-                             AND mr.month = %s
-                             AND t.debit > 0
+                           WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s AND t.debit > 0
                            GROUP BY c.name
                            ORDER BY amount DESC LIMIT 5
-                           """, (user_id, current_year, current_month))
+                           """, (user_id, current_year, current_month,
+                                 user_id, current_year,
+                                 user_id, current_year, current_month))
 
-            income_categories = cursor.fetchall()
+            # Parse the UNION ALL result set
+            current_stats = {'total_income': 0, 'total_expenses': 0}
+            ytd_stats = {'ytd_income': 0, 'ytd_expenses': 0}
+            income_categories = []
 
-            # Get current month expenses by category
+            for row in cursor.fetchall():
+                section = row['_section']
+                if section == 'current':
+                    current_stats = {
+                        'total_income': row['total_income'] or 0,
+                        'total_expenses': row['total_expenses'] or 0,
+                    }
+                elif section == 'ytd':
+                    ytd_stats = {
+                        'ytd_income': row['ytd_income'] or 0,
+                        'ytd_expenses': row['ytd_expenses'] or 0,
+                    }
+                elif section == 'income_cat':
+                    income_categories.append({'category': row['category'], 'amount': row['amount']})
+
+            current_stats['current_balance'] = (current_stats['total_income'] or 0) - (
+                        current_stats['total_expenses'] or 0)
+
+            # Second query: expense categories, monthly trend, and recent
+            # transactions (these need independent ORDER BY / LIMIT clauses).
             cursor.execute("""
                            SELECT c.name        as category,
                                   SUM(t.credit) as amount
@@ -1936,8 +1938,35 @@ def dashboard_stats():
                            GROUP BY c.name
                            ORDER BY amount DESC LIMIT 5
                            """, (user_id, current_year, current_month))
-
             expense_categories = cursor.fetchall()
+
+            cursor.execute("""
+                           SELECT mr.year,
+                                  mr.month,
+                                  mr.month_name,
+                                  SUM(t.debit)  as income,
+                                  SUM(t.credit) as expenses
+                           FROM monthly_records mr
+                                    LEFT JOIN transactions t ON mr.id = t.monthly_record_id
+                           WHERE mr.user_id = %s
+                           GROUP BY mr.year, mr.month, mr.month_name
+                           ORDER BY mr.year DESC, mr.month DESC LIMIT 12
+                           """, (user_id,))
+            monthly_trend = cursor.fetchall()
+
+            cursor.execute("""
+                           SELECT t.description,
+                                  t.debit,
+                                  t.credit,
+                                  t.transaction_date,
+                                  c.name as category
+                           FROM transactions t
+                                    JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                                    LEFT JOIN categories c ON t.category_id = c.id
+                           WHERE mr.user_id = %s
+                           ORDER BY t.created_at DESC LIMIT 10
+                           """, (user_id,))
+            recent_transactions = cursor.fetchall()
 
             return jsonify({
                 'current_stats': current_stats,
@@ -1998,68 +2027,34 @@ def transactions():
             where_clauses = []
             params = []
 
-            # If searching all or filters are active, search across all user's transactions
-            # Otherwise, limit to specific month
+            # Use a JOIN on monthly_records instead of a separate
+            # query to fetch IDs first (eliminates one round-trip).
+            # The mr.user_id filter is always applied via the JOIN.
+            where_clauses.append("mr.user_id = %s")
+            params.append(user_id)
+
             if search_all or has_filters:
                 # Parse date range to extract year and month if provided
-                start_year, start_month = None, None
-                end_year, end_month = None, None
-
                 if start_date:
                     try:
                         start_dt = datetime.strptime(start_date, '%Y-%m-%d')
-                        start_year = start_dt.year
-                        start_month = start_dt.month
+                        where_clauses.append("(mr.year > %s OR (mr.year = %s AND mr.month >= %s))")
+                        params.extend([start_dt.year, start_dt.year, start_dt.month])
                     except ValueError:
                         pass
 
                 if end_date:
                     try:
                         end_dt = datetime.strptime(end_date, '%Y-%m-%d')
-                        end_year = end_dt.year
-                        end_month = end_dt.month
+                        where_clauses.append("(mr.year < %s OR (mr.year = %s AND mr.month <= %s))")
+                        params.extend([end_dt.year, end_dt.year, end_dt.month])
                     except ValueError:
                         pass
-
-                # Get all monthly records for this user, filtered by date range if provided
-                monthly_records_query = "SELECT id FROM monthly_records WHERE user_id = %s"
-                monthly_records_params = [user_id]
-
-                # Add date range filter on monthly_records year/month
-                if start_year and start_month:
-                    monthly_records_query += " AND (year > %s OR (year = %s AND month >= %s))"
-                    monthly_records_params.extend([start_year, start_year, start_month])
-
-                if end_year and end_month:
-                    monthly_records_query += " AND (year < %s OR (year = %s AND month <= %s))"
-                    monthly_records_params.extend([end_year, end_year, end_month])
-
-                cursor.execute(monthly_records_query, monthly_records_params)
-                monthly_records = cursor.fetchall()
-
-                if monthly_records:
-                    monthly_record_ids = [record['id'] for record in monthly_records]
-                    placeholders = ','.join(['%s'] * len(monthly_record_ids))
-                    where_clauses.append(f"t.monthly_record_id IN ({placeholders})")
-                    params.extend(monthly_record_ids)
-                else:
-                    # No records found, return empty
-                    return jsonify([])
             else:
-                # Normal behavior - get specific monthly record
-                cursor.execute("""
-                               SELECT id
-                               FROM monthly_records
-                               WHERE user_id = %s AND year = %s AND month = %s
-                               """, (user_id, year, month))
-
-                monthly_record = cursor.fetchone()
-
-                if not monthly_record:
-                    return jsonify([])
-
-                where_clauses.append("t.monthly_record_id = %s")
-                params.append(monthly_record['id'])
+                # Normal behavior - limit to specific month
+                where_clauses.append("mr.year = %s")
+                where_clauses.append("mr.month = %s")
+                params.extend([year, month])
 
             # Continue with filter building only if we have WHERE clauses
             if where_clauses:
@@ -2140,6 +2135,7 @@ def transactions():
                         pm.color as payment_method_color,
                         COALESCE(t.is_paid, FALSE) as is_paid
                     FROM transactions t
+                    INNER JOIN monthly_records mr ON t.monthly_record_id = mr.id
                     LEFT JOIN categories c ON t.category_id = c.id
                     LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id
                     WHERE {where_sql}
@@ -2164,16 +2160,10 @@ def transactions():
             cursor.execute("""
                            INSERT INTO monthly_records (user_id, year, month, month_name)
                            VALUES (%s, %s, %s, %s) ON DUPLICATE KEY
-                           UPDATE updated_at = CURRENT_TIMESTAMP
+                           UPDATE id = LAST_INSERT_ID(id), updated_at = CURRENT_TIMESTAMP
                            """, (user_id, year, month, month_name))
 
-            cursor.execute("""
-                           SELECT id
-                           FROM monthly_records
-                           WHERE user_id = %s AND year = %s AND month = %s
-                           """, (user_id, year, month))
-
-            monthly_record = cursor.fetchone()
+            monthly_record = {'id': cursor.lastrowid}
 
             # Convert to Decimal to avoid float/Decimal arithmetic errors
             debit_value = data.get('debit')
@@ -2634,16 +2624,10 @@ def move_transaction(transaction_id):
         cursor.execute("""
                        INSERT INTO monthly_records (user_id, year, month, month_name)
                        VALUES (%s, %s, %s, %s) ON DUPLICATE KEY
-                       UPDATE updated_at = CURRENT_TIMESTAMP
+                       UPDATE id = LAST_INSERT_ID(id), updated_at = CURRENT_TIMESTAMP
                        """, (user_id, target_year, target_month, month_name))
 
-        cursor.execute("""
-                       SELECT id
-                       FROM monthly_records
-                       WHERE user_id = %s AND year = %s AND month = %s
-                       """, (user_id, target_year, target_month))
-
-        target_record = cursor.fetchone()
+        target_record_id = cursor.lastrowid
 
         # Update transaction's monthly_record_id and date
         new_date = datetime(target_year, target_month, 1).date()
@@ -2652,7 +2636,7 @@ def move_transaction(transaction_id):
                        SET monthly_record_id = %s,
                            transaction_date  = %s
                        WHERE id = %s
-                       """, (target_record['id'], new_date, transaction_id))
+                       """, (target_record_id, new_date, transaction_id))
 
         # Log audit trail
         log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'moved_to_month',
@@ -2713,23 +2697,17 @@ def copy_transaction(transaction_id):
         cursor.execute("""
                        INSERT INTO monthly_records (user_id, year, month, month_name)
                        VALUES (%s, %s, %s, %s) ON DUPLICATE KEY
-                       UPDATE updated_at = CURRENT_TIMESTAMP
+                       UPDATE id = LAST_INSERT_ID(id), updated_at = CURRENT_TIMESTAMP
                        """, (user_id, target_year, target_month, month_name))
 
-        cursor.execute("""
-                       SELECT id
-                       FROM monthly_records
-                       WHERE user_id = %s AND year = %s AND month = %s
-                       """, (user_id, target_year, target_month))
-
-        target_record = cursor.fetchone()
+        target_record_id = cursor.lastrowid
 
         # Push all existing transactions down in the target month
         cursor.execute("""
                        UPDATE transactions
                        SET display_order = display_order + 1
                        WHERE monthly_record_id = %s
-                       """, (target_record['id'],))
+                       """, (target_record_id,))
 
         # Create a copy of the transaction in the target month at position 1 (top)
         new_date = datetime(target_year, target_month, 1).date()
@@ -2742,7 +2720,7 @@ def copy_transaction(transaction_id):
                         transaction_date, notes, payment_method_id, display_order)
                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                        """, (
-                           target_record['id'],
+                           target_record_id,
                            transaction['description'],
                            transaction['category_id'],
                            debit,
@@ -3061,28 +3039,24 @@ def reorder_transactions():
         try:
             user_id = session.get('user_id')
 
-            # Update display_order for each transaction in the new order
+            # Build a single UPDATE … CASE statement to set all
+            # display_order values in one round-trip instead of N queries.
+            case_clauses = []
+            params = []
             for index, transaction_id in enumerate(transaction_ids):
-                new_order = index + 1  # Start from 1
+                case_clauses.append("WHEN %s THEN %s")
+                params.extend([transaction_id, index + 1])
 
-                # Get old display_order for audit log
-                cursor.execute("""
-                               SELECT display_order
-                               FROM transactions
-                               WHERE id = %s
-                               """, (transaction_id,))
+            # Append the IN-list params
+            params.extend(transaction_ids)
+            placeholders = ','.join(['%s'] * len(transaction_ids))
 
-                result = cursor.fetchone()
-                if result:
-                    old_order = result['display_order']
-
-                    # Only update if order changed
-                    if old_order != new_order:
-                        cursor.execute("""
-                                       UPDATE transactions
-                                       SET display_order = %s
-                                       WHERE id = %s
-                                       """, (new_order, transaction_id))
+            cursor.execute(
+                f"UPDATE transactions SET display_order = CASE id "
+                f"{' '.join(case_clauses)} END "
+                f"WHERE id IN ({placeholders})",
+                params,
+            )
 
             connection.commit()
             return jsonify({
@@ -3955,16 +3929,10 @@ def clone_month_transactions():
         cursor.execute("""
                        INSERT INTO monthly_records (user_id, year, month, month_name)
                        VALUES (%s, %s, %s, %s) ON DUPLICATE KEY
-                       UPDATE updated_at = CURRENT_TIMESTAMP
+                       UPDATE id = LAST_INSERT_ID(id), updated_at = CURRENT_TIMESTAMP
                        """, (user_id, to_year, to_month, month_name))
 
-        cursor.execute("""
-                       SELECT id
-                       FROM monthly_records
-                       WHERE user_id = %s AND year = %s AND month = %s
-                       """, (user_id, to_year, to_month))
-
-        target_record = cursor.fetchone()
+        target_record = {'id': cursor.lastrowid}
 
         # Get all transactions from source month (preserve order)
         cursor.execute("""
@@ -3987,38 +3955,43 @@ def clone_month_transactions():
         if not source_transactions:
             return jsonify({'error': 'No transactions found in source month'}), 404
 
-        # Clone transactions (balance will be calculated on frontend)
-        cloned_count = 0
+        # Clone transactions using a single multi-row INSERT instead
+        # of one INSERT per transaction.
+        clone_date = datetime.now().date()
+        insert_values = []
+        insert_params = []
 
         for trans in source_transactions:
             debit = Decimal(str(trans['debit'])) if trans['debit'] else Decimal('0')
             credit = Decimal(str(trans['credit'])) if trans['credit'] else Decimal('0')
 
-            # Set payment fields based on checkbox
             payment_method_id = trans['payment_method_id'] if include_payments else None
             is_done = trans['is_done'] if include_payments else False
             is_paid = trans['is_paid'] if include_payments else False
 
-            cursor.execute("""
-                           INSERT INTO transactions
-                           (monthly_record_id, description, category_id, debit, credit,
-                            transaction_date, notes, payment_method_id, is_done, is_paid, display_order)
-                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                           """, (
-                               target_record['id'],
-                               trans['description'],
-                               trans['category_id'],
-                               debit if debit > 0 else None,
-                               credit if credit > 0 else None,
-                               datetime.now().date(),  # Use current date for cloned transactions
-                               trans['notes'],
-                               payment_method_id,
-                               is_done,
-                               is_paid,
-                               trans['display_order']  # Preserve order from source
-                           ))
+            insert_values.append("(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)")
+            insert_params.extend([
+                target_record['id'],
+                trans['description'],
+                trans['category_id'],
+                debit if debit > 0 else None,
+                credit if credit > 0 else None,
+                clone_date,
+                trans['notes'],
+                payment_method_id,
+                is_done,
+                is_paid,
+                trans['display_order'],
+            ])
 
-            cloned_count += 1
+        cursor.execute(
+            "INSERT INTO transactions "
+            "(monthly_record_id, description, category_id, debit, credit, "
+            "transaction_date, notes, payment_method_id, is_done, is_paid, display_order) VALUES "
+            + ", ".join(insert_values),
+            insert_params,
+        )
+        cloned_count = len(insert_values)
 
         connection.commit()
 
@@ -5253,18 +5226,12 @@ def create_transaction():
             cursor.execute("""
                 INSERT INTO monthly_records (user_id, year, month, month_name)
                 VALUES (%s, %s, %s, %s)
-                ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP
+                ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id), updated_at = CURRENT_TIMESTAMP
             """, (user_id, year, month, month_name))
 
-            # Get the monthly record ID
-            cursor.execute("""
-                SELECT id FROM monthly_records
-                WHERE user_id = %s AND year = %s AND month = %s
-            """, (user_id, year, month))
+            monthly_record = {'id': cursor.lastrowid}
 
-            monthly_record = cursor.fetchone()
-
-            if not monthly_record:
+            if not monthly_record['id']:
                 return jsonify({'error': 'Failed to create or retrieve monthly record'}), 500
 
             # Push all existing transactions down by incrementing their display_order
