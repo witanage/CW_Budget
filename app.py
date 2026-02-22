@@ -2190,11 +2190,16 @@ def transactions():
             # New transaction gets display_order = 1 (appears at top)
             next_display_order = 1
 
+            # Auto-categorize if no category provided (same logic as token endpoint)
+            category_id = data.get('category_id') or None
+            if not category_id:
+                category_id = auto_categorize_transaction(data.get('description'))
+
             # Insert transaction (balance will be calculated on frontend)
             insert_values = (
                 monthly_record['id'],
                 data.get('description'),
-                data.get('category_id'),
+                category_id,
                 debit if debit > 0 else None,
                 credit if credit > 0 else None,
                 transaction_date,
