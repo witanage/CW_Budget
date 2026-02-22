@@ -316,7 +316,10 @@ class ExchangeRateService:
 
     def get_rates_for_month(self, year: int, month: int) -> Dict[str, Dict[str, float]]:
         """
-        Get exchange rates for all days in a specific month
+        Get exchange rates for all days in a specific month.
+
+        Fetches all available rates for the month in a single query rather
+        than opening a connection per day.
 
         Args:
             year: Year
@@ -327,17 +330,42 @@ class ExchangeRateService:
         """
         import calendar
         rates = {}
-
-        # Get the last day of the month
         last_day = calendar.monthrange(year, month)[1]
 
-        # Fetch rates for each day
-        for day in range(1, last_day + 1):
-            date = datetime(year, month, day)
-            rate = self.get_exchange_rate(date)
-            if rate:
-                date_str = date.strftime('%Y-%m-%d')
-                rates[date_str] = rate
+        start_date = f"{year:04d}-{month:02d}-01"
+        end_date = f"{year:04d}-{month:02d}-{last_day:02d}"
+
+        connection = None
+        cursor = None
+        try:
+            connection = get_db_connection()
+            if not connection:
+                return rates
+            cursor = connection.cursor(dictionary=True)
+
+            cursor.execute("""
+                SELECT date, buy_rate, sell_rate, source
+                FROM exchange_rates
+                WHERE date BETWEEN %s AND %s
+                  AND source IN ('CBSL', 'CBSL_BULK')
+                ORDER BY date
+            """, (start_date, end_date))
+
+            for row in cursor.fetchall():
+                date_str = row['date'].strftime('%Y-%m-%d')
+                rates[date_str] = {
+                    'buy_rate': float(row['buy_rate']),
+                    'sell_rate': float(row['sell_rate']),
+                    'date': date_str,
+                    'source': row['source'],
+                }
+        except Error as e:
+            logger.error(f"Database error fetching monthly rates: {str(e)}")
+        finally:
+            if cursor:
+                cursor.close()
+            if connection:
+                connection.close()
 
         return rates
 
@@ -363,7 +391,10 @@ class ExchangeRateService:
     def _fetch_and_import_bulk_csv(self) -> bool:
         """
         Fetch bulk historical data from CBSL and import into database
-        Fetches last 2 years of data using HTML table parsing
+        Fetches last 2 years of data using HTML table parsing.
+
+        Uses a single database connection for all inserts to stay within
+        the server's connection limit.
 
         Returns:
             True if successful, False otherwise
@@ -423,29 +454,51 @@ class ExchangeRateService:
                 logger.error("No data rows found in CBSL table")
                 return False
 
-            # Import all rates to database
+            # Import all rates using a SINGLE connection
             success_count = 0
             error_count = 0
+            connection = None
+            cursor = None
 
-            for row in rows:
-                try:
-                    cells = row.find_all('td')
-                    if len(cells) >= 3:
-                        row_date_str = cells[0].text.strip()
-                        buy_rate = float(cells[1].text.strip())
-                        sell_rate = float(cells[2].text.strip())
+            try:
+                connection = get_db_connection()
+                if not connection:
+                    logger.error("Bulk import: could not get DB connection")
+                    return False
+                cursor = connection.cursor()
 
-                        date_obj = datetime.strptime(row_date_str, '%Y-%m-%d')
+                for row in rows:
+                    try:
+                        cells = row.find_all('td')
+                        if len(cells) >= 3:
+                            row_date_str = cells[0].text.strip()
+                            buy_rate = float(cells[1].text.strip())
+                            sell_rate = float(cells[2].text.strip())
 
-                        if self.save_exchange_rate(date_obj, buy_rate, sell_rate, source='CBSL_BULK'):
+                            cursor.execute("""
+                                INSERT INTO exchange_rates (date, buy_rate, sell_rate, source)
+                                VALUES (%s, %s, %s, %s)
+                                ON DUPLICATE KEY UPDATE
+                                    buy_rate = VALUES(buy_rate),
+                                    sell_rate = VALUES(sell_rate),
+                                    source = VALUES(source),
+                                    updated_at = CURRENT_TIMESTAMP
+                            """, (row_date_str, buy_rate, sell_rate, 'CBSL_BULK'))
+
                             success_count += 1
                             if success_count % 100 == 0:
+                                connection.commit()
                                 logger.info(f"Imported {success_count} rates...")
-                        else:
-                            error_count += 1
-                except Exception as e:
-                    logger.error(f"Error importing row: {str(e)}")
-                    error_count += 1
+                    except Exception as e:
+                        logger.error(f"Error importing row: {str(e)}")
+                        error_count += 1
+
+                connection.commit()
+            finally:
+                if cursor:
+                    cursor.close()
+                if connection:
+                    connection.close()
 
             logger.info(f"Bulk import complete: {success_count} successful, {error_count} errors")
             return success_count > 0

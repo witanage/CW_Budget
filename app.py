@@ -631,14 +631,29 @@ def login():
 # LOGIN BACKGROUND TASK - CBSL HISTORICAL RATES
 # ==================================================
 
+_bg_populate_lock = threading.Lock()
+_bg_populate_running = False
+
+
 def populate_all_exchange_rates_background():
     """
     Background task to populate missing CBSL historical exchange rates.
     Runs in a separate thread after user login.
 
+    Only one instance runs at a time (guarded by ``_bg_populate_lock``)
+    to avoid connection storms.
+
     HNB and People's Bank rates are handled by the hourly scheduler.
     """
+    global _bg_populate_running
+
+    # Skip if another background populate is already running.
+    if not _bg_populate_lock.acquire(blocking=False):
+        logger.info("Background task: another populate is already running — skipping")
+        return
+
     try:
+        _bg_populate_running = True
         logger.info("Background task: Starting CBSL exchange rate population...")
 
         # ===== PART 1: CBSL RATES (existing logic) =====
@@ -663,6 +678,9 @@ def populate_all_exchange_rates_background():
 
             # Get existing dates in the last 10 days
             connection = get_db_connection()
+            if not connection:
+                logger.error("Background task: could not get DB connection")
+                return
             cursor = connection.cursor()
             try:
                 cursor.execute("""
@@ -688,7 +706,8 @@ def populate_all_exchange_rates_background():
             if missing_dates:
                 logger.info(f"Background task: Found {len(missing_dates)} missing CBSL dates in last 10 days")
 
-                # Fetch each missing date
+                # Fetch each missing date — one at a time so we never hold
+                # more than one connection simultaneously in this thread.
                 fetched = 0
                 failed = 0
                 for date in missing_dates:
@@ -710,6 +729,9 @@ def populate_all_exchange_rates_background():
 
     except Exception as e:
         logger.error(f"Background task: Error populating exchange rates: {str(e)}", exc_info=True)
+    finally:
+        _bg_populate_running = False
+        _bg_populate_lock.release()
 
 
 @app.route('/logout')
