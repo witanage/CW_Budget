@@ -5,9 +5,10 @@ Every module that needs a MySQL connection should call::
 
     from db import get_db_connection
 
-Connections are served from a small ``MySQLConnectionPool`` (pool_size=3)
-so that the application stays within the server's 5-connection limit while
-still reusing connections efficiently.
+Connections are served from a ``MySQLConnectionPool`` whose size is
+controlled by the ``DB_POOL_SIZE`` environment variable (default **4**).
+TiDB Serverless free tier allows 5 concurrent connections per user, so
+the default of 4 leaves one slot as server-side safety margin.
 
 When a pool connection is not available (e.g. all slots busy), the caller
 retries with exponential back-off before giving up.
@@ -68,7 +69,15 @@ DB_CONFIG = _build_db_config()
 # ---------------------------------------------------------------------------
 _pool = None
 _pool_lock = threading.Lock()
-_POOL_SIZE = 3  # Keep well under the server's max_user_connections (5)
+
+# TiDB Serverless free tier: max_user_connections = 5.
+# Default to 4 (3 for web requests + 1 for background scheduler),
+# keeping 1 slot as server-side margin.  Override via DB_POOL_SIZE env var
+# if you upgrade to a paid plan with a higher connection limit.
+try:
+    _POOL_SIZE = int(os.environ.get('DB_POOL_SIZE', '4'))
+except (ValueError, TypeError):
+    _POOL_SIZE = 4
 
 
 def _get_pool():
