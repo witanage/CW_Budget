@@ -147,7 +147,8 @@ CREATE TABLE IF NOT EXISTS transactions (
     INDEX idx_transaction_date (transaction_date),
     INDEX idx_is_done (is_done),
     INDEX idx_is_paid (is_paid),
-    INDEX idx_display_order (display_order)
+    INDEX idx_display_order (display_order),
+    INDEX idx_monthly_record_order (monthly_record_id, display_order, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
