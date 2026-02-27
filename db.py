@@ -38,11 +38,16 @@ def _build_db_config():
     user = os.environ.get('DB_USER')
     password = os.environ.get('DB_PASSWORD')
 
-    if not all([host, database, user, password]):
-        logger.error("Missing required database configuration in environment variables")
+    required = {'DB_HOST': host, 'DB_NAME': database,
+                'DB_USER': user, 'DB_PASSWORD': password}
+    missing = [name for name, val in required.items() if not val]
+
+    if missing:
         logger.error(
-            f"DB_HOST: {host}, DB_NAME: {database}, DB_USER: {user}, "
-            f"DB_PASSWORD: {'***' if password else None}")
+            "Missing required database environment variable(s): %s. "
+            "Copy .env.example to .env and fill in your values: "
+            "cp .env.example .env",
+            ', '.join(missing))
         return None
 
     try:
@@ -118,7 +123,9 @@ def get_db_connection():
     if pool is None:
         if DB_CONFIG is None:
             logger.error(
-                "Cannot connect to database: DB_CONFIG is not properly configured")
+                "Cannot connect to database: DB_CONFIG is not configured. "
+                "Ensure DB_HOST, DB_NAME, DB_USER, and DB_PASSWORD are set "
+                "in your .env file (see .env.example).")
         return None
 
     last_err = None
