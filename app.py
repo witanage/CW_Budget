@@ -86,6 +86,12 @@ CORS(app)
 # ---------------------------------------------------------------------------
 from db import get_db_connection, DB_CONFIG  # noqa: E402
 
+if DB_CONFIG is None:
+    logger.warning(
+        "Database is NOT configured. The application will start but all "
+        "database operations will fail. Copy .env.example to .env and fill "
+        "in your database credentials, then restart the application.")
+
 # Scheduler instance — assigned in the __main__ block; referenced by the hourly job
 # so it can reschedule itself when the interval setting changes.
 scheduler = None
