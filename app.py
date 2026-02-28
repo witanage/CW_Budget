@@ -18,7 +18,6 @@ from flask_cors import CORS
 from mysql.connector import Error
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from apscheduler.schedulers.background import BackgroundScheduler
 from services.hnb_exchange_rate_service import get_hnb_exchange_rate_service
 from services.pb_exchange_rate_service import get_pb_exchange_rate_service
 from services.sampath_exchange_rate_service import get_sampath_exchange_rate_service
@@ -92,9 +91,6 @@ if DB_CONFIG is None:
         "database operations will fail. Copy .env.example to .env and fill "
         "in your database credentials, then restart the application.")
 
-# Scheduler instance — assigned in the __main__ block; referenced by the hourly job
-# so it can reschedule itself when the interval setting changes.
-scheduler = None
 
 
 def get_setting(key, default=None):
@@ -275,10 +271,9 @@ def register():
 def refresh_all_exchange_rates(force=False):
     """Fetch today's exchange rates from all banks and cache in the database.
 
-    Called by the background scheduler every *interval* minutes.  When the
-    admin switches the mode to ``manual`` the scheduler still fires but the
-    function returns immediately — unless *force* is ``True`` (used by the
-    admin "Refresh All" endpoint).
+    Called by the Vercel cron job every 15 minutes.  When the admin sets the
+    mode to ``manual`` the function returns ``None`` immediately — unless
+    *force* is ``True`` (used by the admin "Refresh All" endpoint).
     """
     if not force:
         mode = get_setting('exchange_rate_refresh_mode', 'background')
@@ -395,121 +390,8 @@ def refresh_all_exchange_rates(force=False):
                                  duration_ms=int((time.time() - cbsl_start) * 1000))
         results['CBSL'] = {'status': 'failure', 'error': str(e)}
 
-    # Check whether the admin changed the interval since the last run.
-    # reschedule_job() is a no-op-equivalent when the value hasn't changed.
-    if scheduler:
-        try:
-            new_minutes = int(get_setting('exchange_rate_refresh_interval_minutes', '60'))
-            job = scheduler.get_job('refresh_exchange_rates')
-            if job:
-                current_minutes = int(job.trigger.interval.total_seconds() // 60)
-                if new_minutes != current_minutes:
-                    scheduler.reschedule_job('refresh_exchange_rates', trigger='interval', minutes=new_minutes)
-                    logger.info(f"Scheduler: Interval changed {current_minutes} -> {new_minutes} min")
-        except Exception as e:
-            logger.error(f"Scheduler: Error checking interval setting: {str(e)}")
-
-    logger.info("Scheduler: Exchange rate refresh completed — results: %s", results)
+    logger.info("Exchange rate refresh completed — results: %s", results)
     return results
-
-
-# ---------------------------------------------------------------------------
-# Scheduler bootstrap & lazy-refresh fallback
-# ---------------------------------------------------------------------------
-
-_lazy_refresh_lock = threading.Lock()
-_lazy_refresh_running = False  # True while a lazy-refresh daemon thread is live
-
-
-def init_scheduler():
-    """Start the APScheduler background exchange-rate refresh job.
-
-    Safe to call multiple times — skips silently when a scheduler is already
-    running.  Calling this at *module level* (not just inside ``__main__``)
-    ensures the scheduler starts whether the app is launched via
-    ``python app.py`` or a WSGI entry-point (gunicorn, uWSGI, waitress …).
-    """
-    global scheduler
-    if scheduler is not None and scheduler.running:
-        return
-    try:
-        interval_minutes = int(get_setting('exchange_rate_refresh_interval_minutes', '60'))
-        scheduler = BackgroundScheduler()
-        scheduler.add_job(
-            func=refresh_all_exchange_rates,
-            trigger='interval',
-            minutes=interval_minutes,
-            next_run_time=datetime.now(),
-            id='refresh_exchange_rates'
-        )
-        scheduler.start()
-        logger.info(f"Exchange rate refresh scheduler started (interval: {interval_minutes} min)")
-    except Exception as e:
-        logger.error(f"Failed to start exchange rate scheduler: {e}")
-
-
-@app.before_request
-def lazy_exchange_rate_refresh():
-    """Fallback refresh for hosts where background threads are not reliable.
-
-    When APScheduler is running this is a no-op — the scheduler owns the
-    refresh cycle.  When the scheduler is *not* running (e.g. the WSGI
-    server killed the background thread or never started it), the first
-    request that arrives after rates become stale will spawn a short-lived
-    daemon thread to refresh them.  No cron job required.
-    """
-    global _lazy_refresh_running
-
-    # Skip static asset requests to avoid a DB round-trip on every file load.
-    if request.path.startswith('/static/'):
-        return
-
-    # Scheduler is healthy — nothing to do.
-    if scheduler is not None and scheduler.running:
-        return
-
-    with _lazy_refresh_lock:
-        if _lazy_refresh_running:
-            return  # a refresh is already in flight
-
-        try:
-            interval_minutes = int(get_setting('exchange_rate_refresh_interval_minutes', '60'))
-            connection = get_db_connection()
-            if connection is None:
-                return
-            try:
-                cursor = connection.cursor(dictionary=True)
-                cursor.execute(
-                    "SELECT MAX(created_at) AS last_refresh "
-                    "FROM exchange_rate_refresh_logs WHERE status = 'success'"
-                )
-                row = cursor.fetchone()
-            finally:
-                cursor.close()
-                connection.close()
-
-            last_refresh = row['last_refresh'] if row else None
-            stale = (
-                last_refresh is None
-                or (datetime.now() - last_refresh).total_seconds() > interval_minutes * 60
-            )
-            if not stale:
-                return
-
-            _lazy_refresh_running = True
-        except Exception:
-            return
-
-    def _do_refresh():
-        global _lazy_refresh_running
-        try:
-            refresh_all_exchange_rates(force=True)
-        finally:
-            _lazy_refresh_running = False
-
-    t = threading.Thread(target=_do_refresh, daemon=True, name='lazy-rate-refresh')
-    t.start()
-    logger.info("Lazy refresh: spawned background thread (scheduler not running).")
 
 
 def _resolve_rate(service, date):
@@ -5785,19 +5667,8 @@ def handle_exception(error):
     return render_template('error.html', error_code=500, error_message='An unexpected error occurred'), 500
 
 
-# ---------------------------------------------------------------------------
-# Start the scheduler at module load time so it runs under any WSGI server
-# (gunicorn, uWSGI, waitress …) and not only when the Flask dev-server is
-# used directly.
-# ---------------------------------------------------------------------------
-init_scheduler()
-
-
 if __name__ == '__main__':
     logger.info("Starting Personal Finance Budget application...")
     logger.info(f"Debug mode: False (Production)")
     logger.info(f"Host: 0.0.0.0, Port: 5003")
-    # Scheduler is already started at module level above (init_scheduler()).
-    # Use debug=False for production
-    # Set to True for development (detailed error messages)
     app.run(debug=False, host='0.0.0.0', port=5003)
