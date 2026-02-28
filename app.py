@@ -4810,6 +4810,41 @@ def refresh_all_rates_manually():
         return jsonify({'error': 'Refresh failed', 'details': str(e)}), 500
 
 
+@app.route('/api/cron', methods=['GET'])
+def cron_refresh_rates():
+    """Vercel cron endpoint — refreshes all exchange-rate sources.
+
+    Secured via the CRON_SECRET env var.  Vercel automatically sends
+    an ``Authorization: Bearer <CRON_SECRET>`` header on scheduled
+    invocations.  Any other caller must supply the same header.
+    """
+    cron_secret = os.environ.get('CRON_SECRET')
+    if not cron_secret:
+        logger.error("CRON_SECRET env var is not set")
+        return jsonify({'error': 'Server misconfiguration'}), 500
+
+    auth_header = request.headers.get('Authorization', '')
+    if auth_header != f'Bearer {cron_secret}':
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    try:
+        results = refresh_all_exchange_rates(force=True)
+
+        succeeded = [k for k, v in results.items() if v.get('status') == 'success']
+        failed    = [k for k, v in results.items() if v.get('status') != 'success']
+
+        status_code = 200 if succeeded else 500
+        return jsonify({
+            'message': f"{len(succeeded)} of {len(results)} source(s) refreshed successfully",
+            'sources': results,
+            'succeeded': succeeded,
+            'failed': failed
+        }), status_code
+    except Exception as e:
+        logger.error(f"Cron refresh-all error: {str(e)}")
+        return jsonify({'error': 'Refresh failed', 'details': str(e)}), 500
+
+
 def token_required(f):
     """
     Decorator to require token authentication for routes.
