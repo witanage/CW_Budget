@@ -438,9 +438,6 @@ COMMENT='Stores USD to LKR exchange rates (one row per bank per date)';
 -- App Settings Table
 -- ============================================================
 -- Runtime key-value store for tuneable application settings.
--- The background scheduler reads exchange_rate_refresh_interval_minutes
--- after every job run and reschedules itself if the value changed —
--- no application restart required.
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS app_settings (
@@ -453,8 +450,6 @@ COMMENT='Runtime application settings (key-value store)';
 
 -- Seed defaults (INSERT IGNORE preserves any previously customised value)
 INSERT IGNORE INTO app_settings (setting_key, value, description) VALUES
-('exchange_rate_refresh_interval_minutes', '60',
- 'How often (in minutes) the background scheduler fetches fresh exchange rates from all banks'),
 ('exchange_rate_refresh_mode', 'background',
  'How exchange rates are refreshed: background = automatic scheduler, manual = on-demand via admin only');
 
