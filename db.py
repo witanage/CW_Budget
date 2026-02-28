@@ -5,23 +5,25 @@ Every module that needs a MySQL connection should call::
 
     from db import get_db_connection
 
-Connections are served from a ``MySQLConnectionPool`` whose size is
-controlled by the ``DB_POOL_SIZE`` environment variable (default **4**).
-TiDB Serverless free tier allows 5 concurrent connections per user, so
-the default of 4 leaves one slot as server-side safety margin.
+Each call creates a fresh connection to the database.  This avoids holding
+persistent pooled connections open, which is important for TiDB Serverless
+(and similar services) that impose a low maximum-connection limit.
 
-When a pool connection is not available (e.g. all slots busy), the caller
-retries with exponential back-off before giving up.
+Connections are short-lived: callers open one, execute their queries, and
+close it promptly.  Because the connection only exists for the duration of
+the operation, concurrent connection usage stays well within server limits.
+
+Retry logic with exponential back-off is included to handle transient
+connection failures.
 """
 
 import logging
 import os
-import threading
 import time
 
 import mysql.connector
 from dotenv import load_dotenv
-from mysql.connector import Error, pooling
+from mysql.connector import Error
 
 load_dotenv()
 
@@ -70,80 +72,42 @@ def _build_db_config():
 DB_CONFIG = _build_db_config()
 
 # ---------------------------------------------------------------------------
-# Connection pool (lazy-initialised, thread-safe)
+# On-demand connection (no pool — friendly to low connection-limit servers)
 # ---------------------------------------------------------------------------
-_pool = None
-_pool_lock = threading.Lock()
-
-# TiDB Serverless free tier: max_user_connections = 5.
-# Default to 4 (3 for web requests + 1 for background scheduler),
-# keeping 1 slot as server-side margin.  Override via DB_POOL_SIZE env var
-# if you upgrade to a paid plan with a higher connection limit.
-try:
-    _POOL_SIZE = int(os.environ.get('DB_POOL_SIZE', '4'))
-except (ValueError, TypeError):
-    _POOL_SIZE = 4
-
-
-def _get_pool():
-    """Return the shared connection pool, creating it on first call."""
-    global _pool
-    if _pool is not None:
-        return _pool
-    with _pool_lock:
-        if _pool is not None:          # double-check after acquiring lock
-            return _pool
-        if DB_CONFIG is None:
-            return None
-        try:
-            _pool = pooling.MySQLConnectionPool(
-                pool_name="cw_budget_pool",
-                pool_size=_POOL_SIZE,
-                pool_reset_session=True,
-                **DB_CONFIG,
-            )
-            logger.info("Database connection pool created (pool_size=%d)", _POOL_SIZE)
-            return _pool
-        except Error as e:
-            logger.error("Failed to create connection pool: %s", e)
-            return None
 
 
 def get_db_connection():
-    """Return a pooled MySQL connection.
+    """Create and return a fresh MySQL connection.
 
-    Retries up to 3 times with short back-off when the pool is exhausted or
-    the server rejects the connection.  Returns ``None`` when all attempts
-    fail.
+    A new connection is opened on every call and closed by the caller when
+    done.  This keeps the number of concurrent server-side connections to a
+    minimum, which is essential for TiDB Serverless and other services that
+    cap the maximum number of connections.
 
-    The caller is still responsible for closing the connection (which returns
-    it to the pool).
+    Retries up to 3 times with exponential back-off when the server rejects
+    the connection.  Returns ``None`` when all attempts fail.
     """
-    pool = _get_pool()
-    if pool is None:
-        if DB_CONFIG is None:
-            logger.error(
-                "Cannot connect to database: DB_CONFIG is not configured. "
-                "Ensure DB_HOST, DB_NAME, DB_USER, and DB_PASSWORD are set "
-                "in your .env file (see .env.example).")
+    if DB_CONFIG is None:
+        logger.error(
+            "Cannot connect to database: DB_CONFIG is not configured. "
+            "Ensure DB_HOST, DB_NAME, DB_USER, and DB_PASSWORD are set "
+            "in your .env file (see .env.example).")
         return None
 
     last_err = None
     for attempt in range(4):           # 0, 1, 2, 3 → up to 4 attempts
         try:
-            connection = pool.get_connection()
-            # Ensure the connection is still alive after sitting in the pool.
-            connection.ping(reconnect=True, attempts=1, delay=0)
-            logger.debug("Database connection acquired from pool (attempt %d)", attempt)
+            connection = mysql.connector.connect(**DB_CONFIG)
+            logger.debug("Database connection created (attempt %d)", attempt)
             return connection
         except Error as e:
             last_err = e
             if attempt < 3:
                 wait = 0.5 * (2 ** attempt)   # 0.5s, 1s, 2s
                 logger.warning(
-                    "Pool connection attempt %d failed (%s), retrying in %.1fs …",
+                    "Connection attempt %d failed (%s), retrying in %.1fs …",
                     attempt, e, wait)
                 time.sleep(wait)
 
-    logger.error("All pool connection attempts failed: %s", last_err)
+    logger.error("All connection attempts failed: %s", last_err)
     return None
