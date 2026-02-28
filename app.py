@@ -4828,7 +4828,13 @@ def cron_refresh_rates():
         return jsonify({'error': 'Unauthorized'}), 401
 
     try:
-        results = refresh_all_exchange_rates(force=True)
+        results = refresh_all_exchange_rates(force=False)
+
+        if results is None:
+            # Mode is not 'background' — nothing to do
+            return jsonify({
+                'message': 'Skipped — refresh mode is not set to background'
+            }), 200
 
         succeeded = [k for k, v in results.items() if v.get('status') == 'success']
         failed    = [k for k, v in results.items() if v.get('status') != 'success']
