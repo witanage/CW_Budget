@@ -1040,15 +1040,6 @@ def update_admin_setting(key):
     new_value = str(data['value'])
 
     # Key-specific validation
-    if key == 'exchange_rate_refresh_interval_minutes':
-        try:
-            interval = int(new_value)
-            if interval < 1:
-                return jsonify({'error': 'Interval must be at least 1 minute'}), 400
-            new_value = str(interval)
-        except (ValueError, TypeError):
-            return jsonify({'error': 'Interval must be a positive integer'}), 400
-
     if key == 'exchange_rate_refresh_mode':
         if new_value not in ('background', 'manual'):
             return jsonify({'error': "Value must be 'background' or 'manual'"}), 400
