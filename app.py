@@ -9,7 +9,6 @@ import threading
 import time
 from datetime import datetime, timedelta
 from decimal import Decimal
-from zoneinfo import ZoneInfo
 from functools import wraps
 
 from dotenv import load_dotenv
@@ -4709,14 +4708,6 @@ def cron_refresh_rates():
     auth_header = request.headers.get('Authorization', '')
     if auth_header != f'Bearer {cron_secret}':
         return jsonify({'error': 'Unauthorized'}), 401
-
-    # Only run on weekdays between 8 AM and 8 PM Sri Lanka time.
-    now_sl = datetime.now(ZoneInfo('Asia/Colombo'))
-    if now_sl.weekday() >= 5 or not (8 <= now_sl.hour < 20):
-        return jsonify({
-            'message': 'Skipped — outside operating window (weekdays 8 AM–8 PM IST)',
-            'local_time': now_sl.strftime('%Y-%m-%d %H:%M %Z'),
-        }), 200
 
     try:
         results = refresh_all_exchange_rates(force=False)
