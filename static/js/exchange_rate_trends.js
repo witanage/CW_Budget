@@ -14,9 +14,9 @@
     var _s = {
         period: 'daily',
         months: 6,
-        forecastDays: 30,
+        forecastDays: 7,
         forecastHistory: 3,
-        compMonths: 3
+        compMonths: 1
     };
 
     // --------------- Colours ---------------
