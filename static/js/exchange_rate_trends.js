@@ -13,7 +13,7 @@
 
     var _s = {
         period: 'daily',
-        months: 6,
+        months: 1,
         forecastDays: 7,
         forecastHistory: 3,
         compMonths: 1
@@ -35,10 +35,36 @@
     window.loadRateTrends = function () {
         if (!_bound) {
             _bindControls();
+            _syncDropdownValues();
             _bound = true;
         }
         _fetchAll();
     };
+
+    // ===================================================================
+    // Sync dropdown values with state
+    // ===================================================================
+    function _syncDropdownValues() {
+        var monthsEl = document.getElementById('ertMonthsSelector');
+        if (monthsEl) {
+            monthsEl.value = _s.months;
+        }
+
+        var forecastDaysEl = document.getElementById('ertForecastDays');
+        if (forecastDaysEl) {
+            forecastDaysEl.value = _s.forecastDays;
+        }
+
+        var forecastHistoryEl = document.getElementById('ertForecastHistory');
+        if (forecastHistoryEl) {
+            forecastHistoryEl.value = _s.forecastHistory;
+        }
+
+        var compMonthsEl = document.getElementById('ertCompMonths');
+        if (compMonthsEl) {
+            compMonthsEl.value = _s.compMonths;
+        }
+    }
 
     // ===================================================================
     // Bind controls (once)
