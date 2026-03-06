@@ -974,7 +974,7 @@ function displayTransactions(transactions) {
             <td class="text-success">${t.debit ? parseFloat(t.debit).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,') : '-'}</td>
             <td class="text-danger">${t.credit ? parseFloat(t.credit).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,') : '-'}</td>
             <td class="fw-bold">${parseFloat(t.calculatedBalance).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}</td>
-            <td class="opacity-75 small">${paidAtDisplay}</td>
+            <td class="small">${paidAtDisplay}</td>
             <td>${t.notes || '-'}</td>
             <td class="p-1" style="white-space: nowrap;">
                 <button class="btn btn-sm btn-primary p-1 me-1" style="font-size: 0.7rem; line-height: 1; background-color: #0d6efd !important; border-color: #0d6efd !important; color: white !important;" onclick="editTransaction(${t.id})" title="Edit">
