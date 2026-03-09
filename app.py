@@ -21,6 +21,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from services.hnb_exchange_rate_service import get_hnb_exchange_rate_service
 from services.pb_exchange_rate_service import get_pb_exchange_rate_service
 from services.sampath_exchange_rate_service import get_sampath_exchange_rate_service
+from services.gemini_bill_scanner import get_gemini_bill_scanner
 
 # Load environment variables from .env file
 load_dotenv()
@@ -79,7 +80,6 @@ app.config['SESSION_COOKIE_NAME'] = 'session'  # Explicit session cookie name
 
 CORS(app)
 
-
 # ---------------------------------------------------------------------------
 # Database connection pool (centralised in db.py)
 # ---------------------------------------------------------------------------
@@ -90,7 +90,6 @@ if DB_CONFIG is None:
         "Database is NOT configured. The application will start but all "
         "database operations will fail. Copy .env.example to .env and fill "
         "in your database credentials, then restart the application.")
-
 
 
 def get_setting(key, default=None):
@@ -294,21 +293,21 @@ def refresh_all_exchange_rates(force=False):
         if hnb_rate:
             logger.info(f"Scheduler: HNB rate updated: Buy={hnb_rate['buy_rate']}, Sell={hnb_rate['sell_rate']}")
             log_exchange_rate_refresh('HNB', 'success',
-                                     buy_rate=hnb_rate['buy_rate'],
-                                     sell_rate=hnb_rate['sell_rate'],
-                                     duration_ms=hnb_ms)
+                                      buy_rate=hnb_rate['buy_rate'],
+                                      sell_rate=hnb_rate['sell_rate'],
+                                      duration_ms=hnb_ms)
             results['HNB'] = {'status': 'success', 'buy_rate': hnb_rate['buy_rate'], 'sell_rate': hnb_rate['sell_rate']}
         else:
             logger.warning("Scheduler: Failed to fetch HNB rate")
             log_exchange_rate_refresh('HNB', 'failure',
-                                     error_message='No rate returned by HNB API',
-                                     duration_ms=hnb_ms)
+                                      error_message='No rate returned by HNB API',
+                                      duration_ms=hnb_ms)
             results['HNB'] = {'status': 'failure', 'error': 'No rate returned by HNB API'}
     except Exception as e:
         logger.error(f"Scheduler: Error fetching HNB rate: {str(e)}")
         log_exchange_rate_refresh('HNB', 'failure',
-                                 error_message=str(e),
-                                 duration_ms=int((time.time() - hnb_start) * 1000))
+                                  error_message=str(e),
+                                  duration_ms=int((time.time() - hnb_start) * 1000))
         results['HNB'] = {'status': 'failure', 'error': str(e)}
 
     # People's Bank
@@ -320,21 +319,21 @@ def refresh_all_exchange_rates(force=False):
         if pb_rate:
             logger.info(f"Scheduler: PB rate updated: Buy={pb_rate['buy_rate']}, Sell={pb_rate['sell_rate']}")
             log_exchange_rate_refresh('PB', 'success',
-                                     buy_rate=pb_rate['buy_rate'],
-                                     sell_rate=pb_rate['sell_rate'],
-                                     duration_ms=pb_ms)
+                                      buy_rate=pb_rate['buy_rate'],
+                                      sell_rate=pb_rate['sell_rate'],
+                                      duration_ms=pb_ms)
             results['PB'] = {'status': 'success', 'buy_rate': pb_rate['buy_rate'], 'sell_rate': pb_rate['sell_rate']}
         else:
             logger.warning("Scheduler: Failed to fetch PB rate")
             log_exchange_rate_refresh('PB', 'failure',
-                                     error_message='No rate returned by PB scraper',
-                                     duration_ms=pb_ms)
+                                      error_message='No rate returned by PB scraper',
+                                      duration_ms=pb_ms)
             results['PB'] = {'status': 'failure', 'error': 'No rate returned by PB scraper'}
     except Exception as e:
         logger.error(f"Scheduler: Error fetching PB rate: {str(e)}")
         log_exchange_rate_refresh('PB', 'failure',
-                                 error_message=str(e),
-                                 duration_ms=int((time.time() - pb_start) * 1000))
+                                  error_message=str(e),
+                                  duration_ms=int((time.time() - pb_start) * 1000))
         results['PB'] = {'status': 'failure', 'error': str(e)}
 
     # Sampath Bank
@@ -344,23 +343,25 @@ def refresh_all_exchange_rates(force=False):
         sampath_rate = sampath_service.fetch_and_store_current_rate()
         sampath_ms = int((time.time() - sampath_start) * 1000)
         if sampath_rate:
-            logger.info(f"Scheduler: Sampath rate updated: Buy={sampath_rate['buy_rate']}, Sell={sampath_rate['sell_rate']}")
+            logger.info(
+                f"Scheduler: Sampath rate updated: Buy={sampath_rate['buy_rate']}, Sell={sampath_rate['sell_rate']}")
             log_exchange_rate_refresh('SAMPATH', 'success',
-                                     buy_rate=sampath_rate['buy_rate'],
-                                     sell_rate=sampath_rate['sell_rate'],
-                                     duration_ms=sampath_ms)
-            results['SAMPATH'] = {'status': 'success', 'buy_rate': sampath_rate['buy_rate'], 'sell_rate': sampath_rate['sell_rate']}
+                                      buy_rate=sampath_rate['buy_rate'],
+                                      sell_rate=sampath_rate['sell_rate'],
+                                      duration_ms=sampath_ms)
+            results['SAMPATH'] = {'status': 'success', 'buy_rate': sampath_rate['buy_rate'],
+                                  'sell_rate': sampath_rate['sell_rate']}
         else:
             logger.warning("Scheduler: Failed to fetch Sampath rate")
             log_exchange_rate_refresh('SAMPATH', 'failure',
-                                     error_message='No rate returned by Sampath API',
-                                     duration_ms=sampath_ms)
+                                      error_message='No rate returned by Sampath API',
+                                      duration_ms=sampath_ms)
             results['SAMPATH'] = {'status': 'failure', 'error': 'No rate returned by Sampath API'}
     except Exception as e:
         logger.error(f"Scheduler: Error fetching Sampath rate: {str(e)}")
         log_exchange_rate_refresh('SAMPATH', 'failure',
-                                 error_message=str(e),
-                                 duration_ms=int((time.time() - sampath_start) * 1000))
+                                  error_message=str(e),
+                                  duration_ms=int((time.time() - sampath_start) * 1000))
         results['SAMPATH'] = {'status': 'failure', 'error': str(e)}
 
     # CBSL (for today)
@@ -373,21 +374,22 @@ def refresh_all_exchange_rates(force=False):
         if cbsl_rate:
             logger.info(f"Scheduler: CBSL rate for today: Buy={cbsl_rate['buy_rate']}, Sell={cbsl_rate['sell_rate']}")
             log_exchange_rate_refresh('CBSL', 'success',
-                                     buy_rate=cbsl_rate['buy_rate'],
-                                     sell_rate=cbsl_rate['sell_rate'],
-                                     duration_ms=cbsl_ms)
-            results['CBSL'] = {'status': 'success', 'buy_rate': cbsl_rate['buy_rate'], 'sell_rate': cbsl_rate['sell_rate']}
+                                      buy_rate=cbsl_rate['buy_rate'],
+                                      sell_rate=cbsl_rate['sell_rate'],
+                                      duration_ms=cbsl_ms)
+            results['CBSL'] = {'status': 'success', 'buy_rate': cbsl_rate['buy_rate'],
+                               'sell_rate': cbsl_rate['sell_rate']}
         else:
             logger.warning("Scheduler: No CBSL rate available for today")
             log_exchange_rate_refresh('CBSL', 'failure',
-                                     error_message='No CBSL rate available for today',
-                                     duration_ms=cbsl_ms)
+                                      error_message='No CBSL rate available for today',
+                                      duration_ms=cbsl_ms)
             results['CBSL'] = {'status': 'failure', 'error': 'No CBSL rate available for today'}
     except Exception as e:
         logger.error(f"Scheduler: Error fetching CBSL rate: {str(e)}")
         log_exchange_rate_refresh('CBSL', 'failure',
-                                 error_message=str(e),
-                                 duration_ms=int((time.time() - cbsl_start) * 1000))
+                                  error_message=str(e),
+                                  duration_ms=int((time.time() - cbsl_start) * 1000))
         results['CBSL'] = {'status': 'failure', 'error': str(e)}
 
     logger.info("Exchange rate refresh completed — results: %s", results)
@@ -1800,7 +1802,7 @@ def dashboard_stats():
                     income_categories.append({'category': row['category'], 'amount': row['amount']})
 
             current_stats['current_balance'] = (current_stats['total_income'] or 0) - (
-                        current_stats['total_expenses'] or 0)
+                    current_stats['total_expenses'] or 0)
 
             # Second query: expense categories, monthly trend, and recent
             # transactions (these need independent ORDER BY / LIMIT clauses).
@@ -2326,14 +2328,14 @@ def manage_transaction(transaction_id):
                                notes            = %s
                            WHERE id = %s
                            """, (
-                               data.get('description'),
-                               data.get('category_id'),
-                               debit if debit > 0 else None,
-                               credit if credit > 0 else None,
-                               transaction_date,
-                               data.get('notes'),
-                               transaction_id
-                           ))
+                data.get('description'),
+                data.get('category_id'),
+                debit if debit > 0 else None,
+                credit if credit > 0 else None,
+                transaction_date,
+                data.get('notes'),
+                transaction_id
+            ))
 
             print(f"[DEBUG] Transaction {transaction_id} updated successfully")
 
@@ -2604,16 +2606,16 @@ def copy_transaction(transaction_id):
                         transaction_date, notes, payment_method_id, display_order)
                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                        """, (
-                           target_record_id,
-                           transaction['description'],
-                           transaction['category_id'],
-                           debit,
-                           credit,
-                           new_date,
-                           transaction['notes'],
-                           transaction['payment_method_id'],
-                           1  # Display at top
-                       ))
+            target_record_id,
+            transaction['description'],
+            transaction['category_id'],
+            debit,
+            credit,
+            new_date,
+            transaction['notes'],
+            transaction['payment_method_id'],
+            1  # Display at top
+        ))
 
         new_transaction_id = cursor.lastrowid
 
@@ -3456,7 +3458,7 @@ def forecast_report():
                     older_avg_expenses = sum(float(row['total_expenses']) for row in historical_data[-3:]) / min(3,
                                                                                                                  len(historical_data))
                     trend = ((
-                                         recent_avg_expenses - older_avg_expenses) / older_avg_expenses * 100) if older_avg_expenses > 0 else 0
+                                     recent_avg_expenses - older_avg_expenses) / older_avg_expenses * 100) if older_avg_expenses > 0 else 0
                 else:
                     trend = 0
 
@@ -3535,11 +3537,11 @@ def payment_methods():
                            INSERT INTO payment_methods (user_id, name, type, color)
                            VALUES (%s, %s, %s, %s)
                            """, (
-                               user_id,
-                               data.get('name'),
-                               data.get('type', 'credit_card'),
-                               data.get('color', '#007bff')
-                           ))
+                user_id,
+                data.get('name'),
+                data.get('type', 'credit_card'),
+                data.get('color', '#007bff')
+            ))
 
             connection.commit()
             return jsonify({'message': 'Payment method added successfully', 'id': cursor.lastrowid}), 201
@@ -3943,10 +3945,10 @@ def save_tax_calculation():
                         tax_rate, tax_free_threshold, start_month, monthly_data, is_active)
                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                        """, (
-                           user_id, calculation_name, assessment_year,
-                           tax_rate, tax_free_threshold, start_month,
-                           json.dumps(monthly_data), is_active
-                       ))
+            user_id, calculation_name, assessment_year,
+            tax_rate, tax_free_threshold, start_month,
+            json.dumps(monthly_data), is_active
+        ))
 
         tax_calculation_id = cursor.lastrowid
         connection.commit()
@@ -4669,7 +4671,7 @@ def refresh_all_rates_manually():
         log_audit(session['user_id'], 'MANUAL_EXCHANGE_RATE_REFRESH')
 
         succeeded = [k for k, v in results.items() if v.get('status') == 'success']
-        failed    = [k for k, v in results.items() if v.get('status') != 'success']
+        failed = [k for k, v in results.items() if v.get('status') != 'success']
 
         status_code = 200 if succeeded else 500
         return jsonify({
@@ -4710,7 +4712,7 @@ def cron_refresh_rates():
             }), 200
 
         succeeded = [k for k, v in results.items() if v.get('status') == 'success']
-        failed    = [k for k, v in results.items() if v.get('status') != 'success']
+        failed = [k for k, v in results.items() if v.get('status') != 'success']
 
         status_code = 200 if succeeded else 500
         return jsonify({
@@ -4973,10 +4975,10 @@ def revoke_token():
 
 _kw_cache_lock = threading.Lock()
 _kw_cache = {
-    'patterns': {},   # {category_id: [compiled_pattern, ...]}
-    'loaded_at': 0,   # epoch timestamp of last DB load
+    'patterns': {},  # {category_id: [compiled_pattern, ...]}
+    'loaded_at': 0,  # epoch timestamp of last DB load
 }
-_KW_CACHE_TTL = 300   # seconds (5 minutes)
+_KW_CACHE_TTL = 300  # seconds (5 minutes)
 
 
 def _load_category_patterns():
@@ -5181,7 +5183,7 @@ def create_transaction():
 
             # Log the transaction creation in audit logs
             category_info = f", Category: {category_name} (auto)" if category_name and not data.get('category_id') else \
-                            f", Category: {category_name}" if category_name else ""
+                f", Category: {category_name}" if category_name else ""
             log_transaction_audit(
                 cursor,
                 transaction_id,
@@ -5223,6 +5225,95 @@ def create_transaction():
     except Exception as e:
         logger.error(f"Error creating transaction: {str(e)}")
         return jsonify({'error': 'Failed to create transaction', 'details': str(e)}), 500
+
+
+@app.route('/api/scan-bill', methods=['POST'])
+@login_required
+def scan_bill():
+    """
+    Scan a bill image using Gemini AI to extract shop name and amount.
+
+    Request:
+        - Content-Type: multipart/form-data
+        - Field: 'bill_image' (image file)
+
+    Returns:
+        JSON with extracted shop_name and amount
+        {
+            "shop_name": "Store Name",
+            "amount": "15.50",
+            "success": true
+        }
+
+    Example Usage:
+        POST /api/scan-bill
+        Body: FormData with 'bill_image' file
+    """
+    try:
+        # Check if image file is present
+        if 'bill_image' not in request.files:
+            return jsonify({'error': 'No bill image provided'}), 400
+
+        bill_image = request.files['bill_image']
+
+        # Check if file is empty
+        if bill_image.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+
+        # Validate file type
+        allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+        file_ext = bill_image.filename.rsplit('.', 1)[-1].lower() if '.' in bill_image.filename else ''
+
+        if file_ext not in allowed_extensions:
+            return jsonify({'error': f'Invalid file type. Allowed: {", ".join(allowed_extensions)}'}), 400
+
+        # Read image data
+        image_data = bill_image.read()
+
+        if len(image_data) == 0:
+            return jsonify({'error': 'Empty image file'}), 400
+
+        # Get Gemini scanner instance
+        scanner = get_gemini_bill_scanner()
+
+        if not scanner:
+            return jsonify({
+                'error': 'Bill scanning service not configured. Please set GEMINI_API_KEY in .env file.'
+            }), 503
+
+        # Scan the bill
+        logger.info(f"Scanning bill image for user {session['user_id']}")
+        result = scanner.scan_bill(image_data)
+
+        # Check if there was an error
+        if 'error' in result:
+            logger.error(f"Bill scanning error: {result['error']}")
+            return jsonify({
+                'success': False,
+                'shop_name': result.get('shop_name', 'Unknown Store'),
+                'amount': result.get('amount', '0'),
+                'error': result['error'],
+                'raw_response': result.get('raw_response', '')
+            }), 200
+
+        # Return successful result
+        logger.info(f"Bill scanned successfully: {result['shop_name']} - {result['amount']}")
+
+        return jsonify({
+            'success': True,
+            'shop_name': result['shop_name'],
+            'amount': result['amount'],
+            'raw_response': result.get('raw_response', '')
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error scanning bill: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f'Failed to scan bill: {str(e)}',
+            'shop_name': 'Unknown Store',
+            'amount': '0'
+        }), 500
 
 
 # ==================================================
@@ -5327,7 +5418,7 @@ def get_bank_rate_for_date(bank_code):
 
         bank_code_lower = bank_code.lower()
         rate = None
-        
+
         if bank_code_lower == 'hnb':
             try:
                 service = get_hnb_exchange_rate_service()
@@ -5429,7 +5520,6 @@ def get_pb_rate_for_date():
         }), 500
 
 
-
 # ============================================================
 # Exchange Rate Trends Page & API
 # ============================================================
@@ -5464,11 +5554,11 @@ def get_exchange_rate_trends_all():
         JSON with keys: trend, forecast, source_comparison, monthly_volatility
     """
     try:
-        period           = request.args.get('period', 'daily')
-        months           = min(int(request.args.get('months', 6)), 36)
-        forecast_days    = min(int(request.args.get('forecast_days', 30)), 90)
+        period = request.args.get('period', 'daily')
+        months = min(int(request.args.get('months', 6)), 36)
+        forecast_days = min(int(request.args.get('forecast_days', 30)), 90)
         forecast_history = min(int(request.args.get('forecast_history', 3)), 12)
-        comp_months      = min(int(request.args.get('comparison_months', 3)), 12)
+        comp_months = min(int(request.args.get('comparison_months', 3)), 12)
 
         connection = get_db_connection()
         if not connection:
@@ -5537,25 +5627,25 @@ def get_exchange_rate_trends_all():
                 xs = [(datetime.strptime(r['date'], '%Y-%m-%d').date() - base_date).days for r in fc_history]
                 ys = [r['buy_rate'] for r in fc_history]
                 n = len(xs)
-                sum_x  = sum(xs)
-                sum_y  = sum(ys)
+                sum_x = sum(xs)
+                sum_y = sum(ys)
                 sum_xy = sum(x * y for x, y in zip(xs, ys))
                 sum_xx = sum(x * x for x in xs)
-                denom  = n * sum_xx - sum_x * sum_x
+                denom = n * sum_xx - sum_x * sum_x
                 if denom == 0:
                     slope, intercept = 0.0, sum_y / n
                 else:
-                    slope     = (n * sum_xy - sum_x * sum_y) / denom
+                    slope = (n * sum_xy - sum_x * sum_y) / denom
                     intercept = (sum_y - slope * sum_x) / n
 
-                y_mean    = sum_y / n
-                ss_tot    = sum((y - y_mean) ** 2 for y in ys)
-                ss_res    = sum((y - (slope * x + intercept)) ** 2 for x, y in zip(xs, ys))
+                y_mean = sum_y / n
+                ss_tot = sum((y - y_mean) ** 2 for y in ys)
+                ss_res = sum((y - (slope * x + intercept)) ** 2 for x, y in zip(xs, ys))
                 r_squared = 1 - (ss_res / ss_tot) if ss_tot != 0 else 0
-                res_std   = (sum((y - (slope * x + intercept)) ** 2 for x, y in zip(xs, ys)) / max(n - 2, 1)) ** 0.5
+                res_std = (sum((y - (slope * x + intercept)) ** 2 for x, y in zip(xs, ys)) / max(n - 2, 1)) ** 0.5
 
                 last_date = datetime.strptime(fc_history[-1]['date'], '%Y-%m-%d').date()
-                last_x    = xs[-1]
+                last_x = xs[-1]
                 fc_points = []
                 for i in range(1, forecast_days + 1):
                     fx = last_x + i
