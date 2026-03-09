@@ -1,5 +1,5 @@
 """
-Gemini AI Bill Scanner Service
+Gemini AI Bill Scanner Service free version
 This service uses Google's Gemini Flash 3 API to extract information from bill images.
 """
 
