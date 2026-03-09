@@ -133,6 +133,12 @@
         </table>
     </div>
 
+    <!-- Floating Scan Bill Button -->
+    <button class="scan-btn-float" id="scanBillBtnFloat" title="Scan Bill">
+        <i class="fas fa-camera"></i>
+    </button>
+    <input type="file" id="billImageInput" accept="image/*" capture="environment" style="display: none;">
+
     <!-- Floating Add Button -->
     <button class="add-btn-float" data-bs-toggle="modal" data-bs-target="#transactionModal">
         <i class="fas fa-plus"></i>
@@ -156,6 +162,11 @@
                 </div>
                 <div class="modal-body">
                     <form id="transactionForm">
+                        <!-- Scan Status Display -->
+                        <div id="scanStatus" class="mb-3 text-center" style="display: none; color: #ffc107;">
+                            <i class="fas fa-spinner fa-spin me-1"></i>
+                            <span id="scanStatusText">Scanning bill...</span>
+                        </div>
                         <div class="mb-3">
                             <label for="transDescription" class="form-label" style="color: #aaa;">Description</label>
                             <input type="text" class="form-control" id="transDescription" required style="background: #0d0d0d; border-color: #333; color: #fff;">

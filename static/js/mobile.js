@@ -1557,3 +1557,135 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// ==================================================
+// BILL SCANNING FEATURE
+// ==================================================
+
+// Bill scanning functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const scanBillBtnFloat = document.getElementById('scanBillBtnFloat');
+    const billImageInput = document.getElementById('billImageInput');
+    const scanStatus = document.getElementById('scanStatus');
+    const scanStatusText = document.getElementById('scanStatusText');
+    const transDescription = document.getElementById('transDescription');
+    const transCredit = document.getElementById('transCredit');
+
+    if (scanBillBtnFloat && billImageInput) {
+        // Handle scan bill button click
+        scanBillBtnFloat.addEventListener('click', function() {
+            console.log('Scan bill button clicked');
+            billImageInput.click();
+        });
+
+        // Handle file selection
+        billImageInput.addEventListener('change', async function(event) {
+            const file = event.target.files[0];
+
+            if (!file) {
+                console.log('No file selected');
+                return;
+            }
+
+            console.log('File selected:', file.name, file.type, file.size);
+
+            // Validate file type
+            const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
+            if (!allowedTypes.includes(file.type)) {
+                showToast('Please select a valid image file (PNG, JPEG, GIF, WebP)', 'danger');
+                billImageInput.value = '';
+                return;
+            }
+
+            // Validate file size (max 10MB)
+            const maxSize = 10 * 1024 * 1024; // 10MB
+            if (file.size > maxSize) {
+                showToast('Image file is too large. Please select an image under 10MB', 'danger');
+                billImageInput.value = '';
+                return;
+            }
+
+            // Show scanning status
+            scanStatus.style.display = 'block';
+            scanStatusText.textContent = 'Scanning bill...';
+            scanBillBtnFloat.disabled = true;
+            scanBillBtnFloat.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+            try {
+                // Create FormData to send the image
+                const formData = new FormData();
+                formData.append('bill_image', file);
+
+                // Send to API
+                console.log('Sending image to API...');
+                const response = await fetch('/api/scan-bill', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                console.log('API response:', result);
+
+                if (!response.ok) {
+                    throw new Error(result.error || 'Failed to scan bill');
+                }
+
+                if (result.success) {
+                    // Populate the form with extracted data
+                    if (result.shop_name && result.shop_name !== 'Unknown Store') {
+                        transDescription.value = result.shop_name;
+                    }
+
+                    if (result.amount && parseFloat(result.amount) > 0) {
+                        transCredit.value = result.amount;
+                    }
+
+                    // Show success message
+                    scanStatusText.textContent = '✓ Bill scanned successfully!';
+                    scanStatus.style.color = '#28a745';
+
+                    setTimeout(() => {
+                        scanStatus.style.display = 'none';
+                        scanStatus.style.color = '#ffc107';
+                    }, 3000);
+
+                    showToast(`Bill scanned: ${result.shop_name} - $${result.amount}`, 'success');
+
+                    // Open the transaction modal
+                    const transactionModal = new bootstrap.Modal(document.getElementById('transactionModal'));
+                    transactionModal.show();
+                } else {
+                    // Handle scanning error but still allow manual entry
+                    const errorMsg = result.error || 'Failed to extract bill information';
+                    scanStatusText.textContent = '✗ ' + errorMsg;
+                    scanStatus.style.color = '#dc3545';
+
+                    setTimeout(() => {
+                        scanStatus.style.display = 'none';
+                        scanStatus.style.color = '#ffc107';
+                    }, 5000);
+
+                    showToast('Could not scan bill automatically. Please enter details manually.', 'warning');
+                }
+
+            } catch (error) {
+                console.error('Error scanning bill:', error);
+
+                scanStatusText.textContent = '✗ Scan failed';
+                scanStatus.style.color = '#dc3545';
+
+                setTimeout(() => {
+                    scanStatus.style.display = 'none';
+                    scanStatus.style.color = '#ffc107';
+                }, 5000);
+
+                showToast(error.message || 'Failed to scan bill. Please enter details manually.', 'danger');
+            } finally {
+                // Reset button and input
+                scanBillBtnFloat.disabled = false;
+                scanBillBtnFloat.innerHTML = '<i class="fas fa-camera"></i>';
+                billImageInput.value = '';
+            }
+        });
+    }
+});
