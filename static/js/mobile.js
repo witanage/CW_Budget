@@ -1559,7 +1559,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ==================================================
-// BILL SCANNING FEATURES
+// BILL SCANNING FEATURESS
 // ==================================================
 
 // Bill scanning functionality
