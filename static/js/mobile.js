@@ -1559,8 +1559,53 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ==================================================
-// BILL SCANNING FEATURE GEMINATE FREE
+// BILL SCANNING FEATURE
 // ==================================================
+
+// Show scan button on first add button click, modal on second click
+document.addEventListener('DOMContentLoaded', function() {
+    const addBtnFloat = document.querySelector('.add-btn-float');
+    const scanBtnFloat = document.getElementById('scanBillBtnFloat');
+
+    // Check if scan button should be visible (user has clicked add button before)
+    const scanBtnVisible = localStorage.getItem('scanBtnVisible');
+    if (scanBtnVisible === 'true' && scanBtnFloat) {
+        scanBtnFloat.classList.add('visible');
+    }
+
+    // Handle add button click
+    if (addBtnFloat && scanBtnFloat) {
+        addBtnFloat.addEventListener('click', function(e) {
+            if (!scanBtnFloat.classList.contains('visible')) {
+                // First click: show scan button only, don't open modal
+                e.preventDefault();
+                e.stopPropagation();
+                scanBtnFloat.classList.add('visible');
+                localStorage.setItem('scanBtnVisible', 'true');
+            } else {
+                // Second click onwards: open modal
+                const modal = new bootstrap.Modal(document.getElementById('transactionModal'));
+                modal.show();
+            }
+        });
+    }
+
+    // Hide scan button when clicking outside (not on scan button or add button)
+    document.addEventListener('click', function(e) {
+        if (!scanBtnFloat || !scanBtnFloat.classList.contains('visible')) {
+            return;
+        }
+
+        // Check if click is outside both buttons
+        const clickedOnScanBtn = scanBtnFloat.contains(e.target);
+        const clickedOnAddBtn = addBtnFloat && addBtnFloat.contains(e.target);
+
+        if (!clickedOnScanBtn && !clickedOnAddBtn) {
+            scanBtnFloat.classList.remove('visible');
+            localStorage.setItem('scanBtnVisible', 'false');
+        }
+    });
+});
 
 // Bill scanning functionality
 document.addEventListener('DOMContentLoaded', function() {
