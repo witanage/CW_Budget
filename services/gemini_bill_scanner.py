@@ -1,5 +1,5 @@
 """
-Gemini AI Bill Scanner Service free version
+Gemini AI Bill Scanner Service
 This service uses Google's Gemini Flash 3 API to extract information from bill images.
 """
 
@@ -7,7 +7,7 @@ import os
 import json
 import logging
 from typing import Dict, Optional
-import google.generativeai as genai
+from google import genai
 from PIL import Image
 import io
 
@@ -28,11 +28,11 @@ class GeminiBillScanner:
         if not self.api_key:
             raise ValueError("Gemini API key not provided. Set GEMINI_API_KEY in .env file.")
 
-        # Configure Gemini
-        genai.configure(api_key=self.api_key)
+        # Configure Gemini client
+        self.client = genai.Client(api_key=self.api_key)
 
         # Use Gemini Flash 3 Preview model
-        self.model = genai.GenerativeModel('gemini-3-flash-preview')
+        self.model_name = 'gemini-3-flash-preview'
 
         logger.info("Gemini Bill Scanner initialized successfully")
 
@@ -80,7 +80,10 @@ Respond in this exact JSON format (no markdown, no code blocks, just raw JSON):
 """
 
             # Generate content with the image
-            response = self.model.generate_content([prompt, image])
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=[prompt, image]
+            )
 
             # Extract text from response
             response_text = response.text.strip()
