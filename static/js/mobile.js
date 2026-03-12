@@ -1650,7 +1650,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            // Show scanning status
+            // Open the transaction modal immediately
+            const transactionModal = new bootstrap.Modal(document.getElementById('transactionModal'));
+            transactionModal.show();
+
+            // Show scanning status inside the modal
             scanStatus.style.display = 'block';
             scanStatusText.textContent = 'Scanning bill...';
             scanBillBtnFloat.disabled = true;
@@ -1695,10 +1699,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     }, 3000);
 
                     showToast(`Bill scanned: ${result.shop_name} - $${result.amount}`, 'success');
-
-                    // Open the transaction modal
-                    const transactionModal = new bootstrap.Modal(document.getElementById('transactionModal'));
-                    transactionModal.show();
                 } else {
                     // Handle scanning error but still allow manual entry
                     const errorMsg = result.error || 'Failed to extract bill information';
