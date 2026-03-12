@@ -148,6 +148,85 @@ def admin_required(f):
     return decorated_function
 
 
+def token_required(f):
+    """Decorator to require token authentication for routes.
+    Extracts token from Authorization header: Bearer <token>
+
+    IMPORTANT: This must be defined BEFORE any endpoints that use it.
+    """
+
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        import jwt
+
+        token = None
+
+        # Get token from Authorization header
+        if 'Authorization' in request.headers:
+            auth_header = request.headers['Authorization']
+            try:
+                # Expected format: "Bearer <token>"
+                token = auth_header.split(' ')[1]
+            except IndexError:
+                return jsonify({'error': 'Invalid authorization header format. Use: Bearer <token>'}), 401
+
+        if not token:
+            return jsonify({'error': 'Token is missing. Please provide token in Authorization header.'}), 401
+
+        try:
+            # Decode token (also verifies signature and expiry)
+            payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        except jwt.ExpiredSignatureError:
+            return jsonify({'error': 'Token has expired. Please generate a new token.'}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({'error': 'Invalid token. Please provide a valid token.'}), 401
+        except Exception as e:
+            logger.error(f"Error validating token: {str(e)}")
+            return jsonify({'error': 'Token validation failed'}), 401
+
+        # Validate token against the tokens table
+        connection = get_db_connection()
+        if not connection:
+            return jsonify({'error': 'Token validation failed'}), 401
+        cursor = connection.cursor(dictionary=True)
+        try:
+            cursor.execute(
+                "SELECT id, is_revoked, expires_at < UTC_TIMESTAMP() AS is_expired FROM tokens WHERE token = %s AND user_id = %s",
+                (token, payload['user_id'])
+            )
+            token_record = cursor.fetchone()
+
+            if not token_record:
+                return jsonify({'error': 'Token not recognized. Please generate a new token.'}), 401
+            if token_record['is_revoked']:
+                return jsonify({'error': 'Token has been revoked. Please generate a new token.'}), 401
+            if token_record['is_expired']:
+                return jsonify({'error': 'Token has expired. Please generate a new token.'}), 401
+
+            cursor.execute(
+                "UPDATE tokens SET last_used_at = CURRENT_TIMESTAMP WHERE id = %s",
+                (token_record['id'],)
+            )
+            connection.commit()
+        except Exception as e:
+            logger.error(f"Error validating token in database: {str(e)}")
+            return jsonify({'error': 'Token validation failed'}), 401
+        finally:
+            cursor.close()
+            connection.close()
+
+        # Store user info in request context
+        request.current_user = {
+            'user_id': payload['user_id'],
+            'username': payload['username'],
+            'is_admin': payload.get('is_admin', False)
+        }
+
+        return f(*args, **kwargs)
+
+    return decorated_function
+
+
 # Utility function to serialize Decimal for JSON
 def decimal_default(obj):
     if isinstance(obj, Decimal):
@@ -397,40 +476,11 @@ def refresh_all_exchange_rates(force=False):
 
 
 def _resolve_rate(service, date):
-    """Return the rate from *service* for *date*, hitting the 3rd-party
-    source when appropriate.
+    """Return the cached rate from *service* for *date*.
 
-    background mode
-        The scheduler keeps the DB warm.  A plain cache read is enough.
-
-    manual mode + today
-        Nothing runs in the background, so we must fetch live ourselves.
-        ``fetch_and_store_current_rate()`` always contacts the external
-        source, writes via ``ON DUPLICATE KEY UPDATE`` (overwriting any
-        stale cached row), and returns the fresh value.  We fall back to
-        the cached row only when the live fetch itself fails (network
-        error, parse error, etc.).
-
-    manual mode + historical date
-        HNB and PB APIs only expose current rates; the DB is the only
-        source for past dates.
-
-    CBSL
-        ``ExchangeRateService`` has no ``fetch_and_store_current_rate``;
-        its ``get_exchange_rate`` already does cache-then-live-scrape
-        internally, so no special handling is needed.
+    This function simply reads from the database cache.
+    To refresh exchange rates, use the /api/exchange-rate/refresh-all endpoint.
     """
-    mode = get_setting('exchange_rate_refresh_mode', 'background')
-    if mode == 'manual' and hasattr(service, 'fetch_and_store_current_rate'):
-        today = datetime.now().date()
-        if date == today:
-            live = service.fetch_and_store_current_rate()
-            if live:
-                return live
-            # live fetch failed — return whatever is cached
-            return service.get_exchange_rate(date)
-        # historical date — cache is the only option
-        return service.get_exchange_rate(date)
     return service.get_exchange_rate(date)
 
 
@@ -475,11 +525,6 @@ def login():
                     logger.info(
                         f"Login successful for user: {username} (ID: {user['id']}), is_admin: {user.get('is_admin', False)}")
 
-                    # Start background task to populate exchange rates (CBSL + HNB)
-                    background_thread = threading.Thread(target=populate_all_exchange_rates_background, daemon=True)
-                    background_thread.start()
-                    logger.info("Background task started to populate CBSL and HNB exchange rates")
-
                     return jsonify({'message': 'Login successful'}), 200
                 else:
                     logger.warning(f"Login failed for username: {username} - Invalid credentials")
@@ -504,113 +549,6 @@ def login():
         return redirect(url_for('dashboard'))
 
     return render_template('login.html')
-
-
-# ==================================================
-# LOGIN BACKGROUND TASK - CBSL HISTORICAL RATES
-# ==================================================
-
-_bg_populate_lock = threading.Lock()
-_bg_populate_running = False
-
-
-def populate_all_exchange_rates_background():
-    """
-    Background task to populate missing CBSL historical exchange rates.
-    Runs in a separate thread after user login.
-
-    Only one instance runs at a time (guarded by ``_bg_populate_lock``)
-    to avoid connection storms.
-
-    HNB and People's Bank rates are handled by the hourly scheduler.
-    """
-    global _bg_populate_running
-
-    # Skip if another background populate is already running.
-    if not _bg_populate_lock.acquire(blocking=False):
-        logger.info("Background task: another populate is already running — skipping")
-        return
-
-    try:
-        _bg_populate_running = True
-        logger.info("Background task: Starting CBSL exchange rate population...")
-
-        # ===== PART 1: CBSL RATES (existing logic) =====
-        from services.exchange_rate_service import get_exchange_rate_service
-
-        cbsl_service = get_exchange_rate_service()
-
-        # Check if database is empty
-        if cbsl_service._is_database_empty():
-            logger.info("Background task: Database is empty, triggering CBSL bulk import...")
-            success = cbsl_service._fetch_and_import_bulk_csv()
-            if success:
-                logger.info("Background task: CBSL bulk import completed successfully")
-            else:
-                logger.warning("Background task: CBSL bulk import failed")
-        else:
-            # Database has data, check last 10 days for missing CBSL dates
-            logger.info("Background task: Checking last 10 days for missing CBSL exchange rates...")
-
-            end_date = datetime.now().date()
-            start_date = end_date - timedelta(days=10)
-
-            # Get existing dates in the last 10 days
-            connection = get_db_connection()
-            if not connection:
-                logger.error("Background task: could not get DB connection")
-                return
-            cursor = connection.cursor()
-            try:
-                cursor.execute("""
-                               SELECT date
-                               FROM exchange_rates
-                               WHERE date BETWEEN %s
-                                 AND %s
-                                 AND source IN ('CBSL', 'CBSL_BULK')
-                               """, (start_date, end_date))
-                existing_dates = {row[0] for row in cursor.fetchall()}
-            finally:
-                cursor.close()
-                connection.close()
-
-            # Find missing dates in the last 10 days
-            current_date = start_date
-            missing_dates = []
-            while current_date <= end_date:
-                if current_date not in existing_dates:
-                    missing_dates.append(current_date)
-                current_date += timedelta(days=1)
-
-            if missing_dates:
-                logger.info(f"Background task: Found {len(missing_dates)} missing CBSL dates in last 10 days")
-
-                # Fetch each missing date — one at a time so we never hold
-                # more than one connection simultaneously in this thread.
-                fetched = 0
-                failed = 0
-                for date in missing_dates:
-                    try:
-                        rate = cbsl_service.get_exchange_rate(datetime.combine(date, datetime.min.time()))
-                        if rate:
-                            fetched += 1
-                        else:
-                            failed += 1
-                    except Exception as e:
-                        logger.error(f"Background task: Error fetching CBSL rate for {date}: {str(e)}")
-                        failed += 1
-
-                logger.info(f"Background task: CBSL completed - {fetched} fetched, {failed} failed")
-            else:
-                logger.info("Background task: No missing CBSL dates in last 10 days")
-
-        logger.info("Background task: CBSL exchange rate population completed")
-
-    except Exception as e:
-        logger.error(f"Background task: Error populating exchange rates: {str(e)}", exc_info=True)
-    finally:
-        _bg_populate_running = False
-        _bg_populate_lock.release()
 
 
 @app.route('/logout')
@@ -4495,8 +4433,7 @@ def get_hnb_current_rate():
     """
     Get the latest cached USD to LKR exchange rate from HNB bank.
 
-    Rates are refreshed automatically every hour by the background scheduler.
-    Use POST /api/exchange-rate/hnb/refresh to force an immediate update.
+    To refresh all exchange rates, use GET /api/exchange-rate/refresh-all.
 
     Returns:
         JSON with buy_rate, sell_rate, date, source, and updated_at
@@ -4516,45 +4453,13 @@ def get_hnb_current_rate():
         return jsonify({'error': 'Failed to fetch exchange rate', 'details': str(e)}), 500
 
 
-@app.route('/api/exchange-rate/hnb/refresh', methods=['POST'])
-@login_required
-def refresh_hnb_rate():
-    """
-    Manually refresh today's exchange rate from HNB.
-
-    This forces a fresh fetch from the HNB API and updates the database.
-
-    Returns:
-        JSON with updated rate data
-    """
-    try:
-        from services.hnb_exchange_rate_service import get_hnb_exchange_rate_service
-
-        service = get_hnb_exchange_rate_service()
-        rate_data = service.fetch_and_store_current_rate()
-
-        if rate_data:
-            logger.info(f"HNB rate refreshed: {rate_data}")
-            return jsonify({
-                'message': 'Exchange rate refreshed successfully',
-                'rate': rate_data
-            }), 200
-        else:
-            return jsonify({'error': 'Failed to refresh rate from HNB'}), 500
-
-    except Exception as e:
-        logger.error(f"Error refreshing HNB rate: {str(e)}")
-        return jsonify({'error': 'Failed to refresh exchange rate', 'details': str(e)}), 500
-
-
 @app.route('/api/exchange-rate/pb/current', methods=['GET'])
 @login_required
 def get_pb_current_rate():
     """
     Get the latest cached USD to LKR exchange rate from People's Bank.
 
-    Rates are refreshed automatically every hour by the background scheduler.
-    Use POST /api/exchange-rate/pb/refresh to force an immediate update.
+    To refresh all exchange rates, use GET /api/exchange-rate/refresh-all.
 
     Returns:
         JSON with buy_rate, sell_rate, date, source, and updated_at
@@ -4574,44 +4479,13 @@ def get_pb_current_rate():
         return jsonify({'error': 'Failed to fetch exchange rate', 'details': str(e)}), 500
 
 
-@app.route('/api/exchange-rate/pb/refresh', methods=['POST'])
-@login_required
-def refresh_pb_rate():
-    """
-    Manually refresh today's exchange rate from People's Bank.
-
-    This forces a fresh scrape from the People's Bank website and
-    updates the database.
-
-    Returns:
-        JSON with updated rate data
-    """
-    try:
-        service = get_pb_exchange_rate_service()
-        rate_data = service.fetch_and_store_current_rate()
-
-        if rate_data:
-            logger.info(f"PB rate refreshed: {rate_data}")
-            return jsonify({
-                'message': 'Exchange rate refreshed successfully',
-                'rate': rate_data
-            }), 200
-        else:
-            return jsonify({'error': 'Failed to refresh rate from People\'s Bank'}), 500
-
-    except Exception as e:
-        logger.error(f"Error refreshing PB rate: {str(e)}")
-        return jsonify({'error': 'Failed to refresh exchange rate', 'details': str(e)}), 500
-
-
 @app.route('/api/exchange-rate/sampath/current', methods=['GET'])
 @login_required
 def get_sampath_current_rate():
     """
     Get the latest cached USD to LKR exchange rate from Sampath Bank.
 
-    Rates are refreshed automatically every hour by the background scheduler.
-    Use POST /api/exchange-rate/sampath/refresh to force an immediate update.
+    To refresh all exchange rates, use GET /api/exchange-rate/refresh-all.
 
     Returns:
         JSON with buy_rate, sell_rate, date, source, and updated_at
@@ -4631,44 +4505,15 @@ def get_sampath_current_rate():
         return jsonify({'error': 'Failed to fetch exchange rate', 'details': str(e)}), 500
 
 
-@app.route('/api/exchange-rate/sampath/refresh', methods=['POST'])
-@login_required
-def refresh_sampath_rate():
-    """
-    Manually refresh today's exchange rate from Sampath Bank.
-
-    This forces a fresh fetch from the Sampath Bank API and updates the database.
-
-    Returns:
-        JSON with updated rate data
-    """
-    try:
-        service = get_sampath_exchange_rate_service()
-        rate_data = service.fetch_and_store_current_rate()
-
-        if rate_data:
-            logger.info(f"Sampath rate refreshed: {rate_data}")
-            return jsonify({
-                'message': 'Exchange rate refreshed successfully',
-                'rate': rate_data
-            }), 200
-        else:
-            return jsonify({'error': 'Failed to refresh rate from Sampath Bank'}), 500
-
-    except Exception as e:
-        logger.error(f"Error refreshing Sampath rate: {str(e)}")
-        return jsonify({'error': 'Failed to refresh exchange rate', 'details': str(e)}), 500
-
-
 @app.route('/api/exchange-rate/refresh-all', methods=['GET'])
-@admin_required
+@token_required
 def refresh_all_rates_manually():
-    """Admin-only: trigger an immediate refresh of all exchange-rate sources
-    regardless of the current refresh-mode setting.  Returns per-source
-    results so the caller can see exactly which banks succeeded or failed."""
+    """Trigger an immediate refresh of all exchange-rate sources.
+    This is the single endpoint to manually refresh all bank exchange rates.
+    Returns per-source results so the caller can see exactly which banks succeeded or failed."""
     try:
         results = refresh_all_exchange_rates(force=True)
-        log_audit(session['user_id'], 'MANUAL_EXCHANGE_RATE_REFRESH')
+        log_audit(request.current_user['user_id'], 'MANUAL_EXCHANGE_RATE_REFRESH')
 
         succeeded = [k for k, v in results.items() if v.get('status') == 'success']
         failed = [k for k, v in results.items() if v.get('status') != 'success']
@@ -4685,129 +4530,8 @@ def refresh_all_rates_manually():
         return jsonify({'error': 'Refresh failed', 'details': str(e)}), 500
 
 
-@app.route('/api/cron', methods=['GET'])
-def cron_refresh_rates():
-    """Vercel cron endpoint — refreshes all exchange-rate sources.
-
-    Secured via the CRON_SECRET env var.  Vercel automatically sends
-    an ``Authorization: Bearer <CRON_SECRET>`` header on scheduled
-    invocations.  Any other caller must supply the same header.
-    """
-    cron_secret = os.environ.get('CRON_SECRET')
-    if not cron_secret:
-        logger.error("CRON_SECRET env var is not set")
-        return jsonify({'error': 'Server misconfiguration'}), 500
-
-    auth_header = request.headers.get('Authorization', '')
-    if auth_header != f'Bearer {cron_secret}':
-        return jsonify({'error': 'Unauthorized'}), 401
-
-    try:
-        results = refresh_all_exchange_rates(force=False)
-
-        if results is None:
-            # Mode is not 'background' — nothing to do
-            return jsonify({
-                'message': 'Skipped — refresh mode is not set to background'
-            }), 200
-
-        succeeded = [k for k, v in results.items() if v.get('status') == 'success']
-        failed = [k for k, v in results.items() if v.get('status') != 'success']
-
-        status_code = 200 if succeeded else 500
-        return jsonify({
-            'message': f"{len(succeeded)} of {len(results)} source(s) refreshed successfully",
-            'sources': results,
-            'succeeded': succeeded,
-            'failed': failed
-        }), status_code
-    except Exception as e:
-        logger.error(f"Cron refresh-all error: {str(e)}")
-        return jsonify({'error': 'Refresh failed', 'details': str(e)}), 500
-
-
-def token_required(f):
-    """
-    Decorator to require token authentication for routes.
-    Extracts token from Authorization header: Bearer <token>
-
-    IMPORTANT: This must be defined BEFORE any endpoints that use it.
-    """
-
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        import jwt
-
-        token = None
-
-        # Get token from Authorization header
-        if 'Authorization' in request.headers:
-            auth_header = request.headers['Authorization']
-            try:
-                # Expected format: "Bearer <token>"
-                token = auth_header.split(' ')[1]
-            except IndexError:
-                return jsonify({'error': 'Invalid authorization header format. Use: Bearer <token>'}), 401
-
-        if not token:
-            return jsonify({'error': 'Token is missing. Please provide token in Authorization header.'}), 401
-
-        try:
-            # Decode token (also verifies signature and expiry)
-            payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
-        except jwt.ExpiredSignatureError:
-            return jsonify({'error': 'Token has expired. Please generate a new token.'}), 401
-        except jwt.InvalidTokenError:
-            return jsonify({'error': 'Invalid token. Please provide a valid token.'}), 401
-        except Exception as e:
-            logger.error(f"Error validating token: {str(e)}")
-            return jsonify({'error': 'Token validation failed'}), 401
-
-        # Validate token against the tokens table
-        connection = get_db_connection()
-        if not connection:
-            return jsonify({'error': 'Token validation failed'}), 401
-        cursor = connection.cursor(dictionary=True)
-        try:
-            cursor.execute(
-                "SELECT id, is_revoked, expires_at < UTC_TIMESTAMP() AS is_expired FROM tokens WHERE token = %s AND user_id = %s",
-                (token, payload['user_id'])
-            )
-            token_record = cursor.fetchone()
-
-            if not token_record:
-                return jsonify({'error': 'Token not recognized. Please generate a new token.'}), 401
-            if token_record['is_revoked']:
-                return jsonify({'error': 'Token has been revoked. Please generate a new token.'}), 401
-            if token_record['is_expired']:
-                return jsonify({'error': 'Token has expired. Please generate a new token.'}), 401
-
-            cursor.execute(
-                "UPDATE tokens SET last_used_at = CURRENT_TIMESTAMP WHERE id = %s",
-                (token_record['id'],)
-            )
-            connection.commit()
-        except Exception as e:
-            logger.error(f"Error validating token in database: {str(e)}")
-            return jsonify({'error': 'Token validation failed'}), 401
-        finally:
-            cursor.close()
-            connection.close()
-
-        # Store user info in request context
-        request.current_user = {
-            'user_id': payload['user_id'],
-            'username': payload['username'],
-            'is_admin': payload.get('is_admin', False)
-        }
-
-        return f(*args, **kwargs)
-
-    return decorated_function
-
-
 # ==================================================
-# TOKEN GENERATION ENDPOINT (ADD THIS SECOND)
+# TOKEN GENERATION ENDPOINT
 # ==================================================
 
 @app.route('/api/auth/token', methods=['POST'])
@@ -5325,14 +5049,14 @@ def scan_bill():
 def get_all_bank_rates_for_date():
     """
     Get all bank exchange rates for a specific date.
+    Returns HNB, People's Bank, Sampath Bank, and CBSL rates from database cache only.
+
     Query Parameters:
         date: Date in YYYY-MM-DD format (required)
     Returns:
         JSON list of rates for all banks on that date
     """
     try:
-        from services.exchange_rate_service import get_exchange_rate_service
-
         date_str = request.args.get('date')
         if not date_str:
             return jsonify({'error': 'Date is required (YYYY-MM-DD)'}), 400
@@ -5343,7 +5067,7 @@ def get_all_bank_rates_for_date():
 
         rates = []
 
-        # Get HNB rate (live-fetch in manual mode when today is missing)
+        # Get HNB rate
         try:
             hnb_service = get_hnb_exchange_rate_service()
             hnb_rate = _resolve_rate(hnb_service, date)
@@ -5353,7 +5077,7 @@ def get_all_bank_rates_for_date():
         except Exception as e:
             logger.warning(f"Failed to get HNB rate for {date_str}: {str(e)}")
 
-        # Get People's Bank rate (live-fetch in manual mode when today is missing)
+        # Get People's Bank rate
         try:
             pb_service = get_pb_exchange_rate_service()
             pb_rate = _resolve_rate(pb_service, date)
@@ -5363,7 +5087,7 @@ def get_all_bank_rates_for_date():
         except Exception as e:
             logger.warning(f"Failed to get PB rate for {date_str}: {str(e)}")
 
-        # Get Sampath Bank rate (live-fetch in manual mode when today is missing)
+        # Get Sampath Bank rate
         try:
             sampath_service = get_sampath_exchange_rate_service()
             sampath_rate = _resolve_rate(sampath_service, date)
@@ -5373,16 +5097,38 @@ def get_all_bank_rates_for_date():
         except Exception as e:
             logger.warning(f"Failed to get Sampath rate for {date_str}: {str(e)}")
 
-        # Get CBSL rate
+        # Get CBSL rate from database only (no scraping)
         try:
-            cbsl_service = get_exchange_rate_service()
-            cbsl_rate = cbsl_service.get_exchange_rate(date)
-            if cbsl_rate and isinstance(cbsl_rate, dict):
-                # Guard: only label as CBSL if source is actually CBSL (or absent = live scrape)
-                source = cbsl_rate.get('source')
-                if source is None or source in ('CBSL', 'CBSL_BULK'):
-                    cbsl_rate['bank'] = 'CBSL'
-                    rates.append(cbsl_rate)
+            connection = get_db_connection()
+            if connection:
+                cursor = connection.cursor(dictionary=True)
+                try:
+                    cursor.execute("""
+                        SELECT buy_rate, sell_rate, date, source, updated_at
+                        FROM exchange_rates
+                        WHERE date = %s AND source IN ('CBSL', 'CBSL_BULK')
+                        ORDER BY updated_at DESC
+                        LIMIT 1
+                    """, (date,))
+                    cbsl_row = cursor.fetchone()
+                    if cbsl_row:
+                        cbsl_rate = {
+                            'bank': 'CBSL',
+                            'buy_rate': float(cbsl_row['buy_rate']) if isinstance(cbsl_row['buy_rate'], Decimal) else
+                            cbsl_row['buy_rate'],
+                            'sell_rate': float(cbsl_row['sell_rate']) if isinstance(cbsl_row['sell_rate'], Decimal) else
+                            cbsl_row['sell_rate'],
+                            'date': cbsl_row['date'].isoformat() if hasattr(cbsl_row['date'], 'isoformat') else str(
+                                cbsl_row['date']),
+                            'source': cbsl_row['source'],
+                            'updated_at': cbsl_row['updated_at'].isoformat() if cbsl_row['updated_at'] and hasattr(
+                                cbsl_row['updated_at'], 'isoformat') else str(cbsl_row['updated_at']) if cbsl_row[
+                                'updated_at'] else None
+                        }
+                        rates.append(cbsl_rate)
+                finally:
+                    cursor.close()
+                    connection.close()
         except Exception as e:
             logger.warning(f"Failed to get CBSL rate for {date_str}: {str(e)}")
 
