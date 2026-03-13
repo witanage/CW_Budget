@@ -1,0 +1,38 @@
+name: Generate Daily Token
+
+on:
+  schedule:
+    # Generate token at 5:00 AM SLT (11:30 PM UTC previous day)
+    - cron: '30 23 * * 0-4'  # Sun-Thu nights for Mon-Fri mornings in SLT
+  workflow_dispatch:
+
+jobs:
+  generate-token:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Generate and Store Daily API Token
+        run: |
+          echo "🔑 Generating daily authentication token..."
+          
+          response=$(curl -s -w "\n%{http_code}" -X POST "${{ secrets.APP_URL }}/api/auth/token" \
+            -H "Content-Type: application/json" \
+            -d "{\"username\":\"${{ secrets.API_USERNAME }}\",\"password\":\"${{ secrets.API_PASSWORD }}\"}")
+          
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+          
+          if [ "$http_code" -eq 200 ]; then
+            token=$(echo "$body" | jq -r '.token')
+            
+            echo "Storing token as GitHub secret..."
+            echo "$token" | gh secret set EXCHANGE_RATE_TOKEN --repo ${{ github.repository }}
+            
+            echo "✅ Daily token generated and stored successfully"
+          else
+            echo "❌ Failed to generate token"
+            echo "Response: $body"
+            exit 1
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}

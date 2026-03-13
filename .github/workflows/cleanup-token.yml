@@ -1,0 +1,22 @@
+name: Cleanup Daily Token
+
+on:
+  schedule:
+    # Remove token at 6:30 PM SLT (1:00 PM UTC)
+    - cron: '0 13 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  cleanup-token:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Remove Daily API Token
+        run: |
+          echo "🧹 Removing daily API token..."
+          
+          gh secret delete EXCHANGE_RATE_TOKEN --repo ${{ github.repository }} || true
+          
+          echo "✅ Token removed successfully"
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
