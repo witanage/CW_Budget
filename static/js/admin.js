@@ -122,62 +122,70 @@ function renderUsers(users) {
 
 // Toggle user active status
 async function toggleUserActive(userId, username) {
-    if (!confirm(`Are you sure you want to toggle ${username}'s account status?`)) {
-        return;
-    }
+    showConfirmModal(
+        'Toggle Account Status',
+        `Are you sure you want to toggle ${username}'s account status?`,
+        async () => {
+            try {
+                const response = await fetch(`/api/admin/users/${userId}/toggle-active`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
 
-    try {
-        const response = await fetch(`/api/admin/users/${userId}/toggle-active`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to update user');
+                }
+
+                showAlert(data.message, 'success');
+                await loadUsers();
+                await loadAuditLogs();
+
+            } catch (error) {
+                console.error('Error toggling user active status:', error);
+                showAlert('Error: ' + error.message, 'danger');
             }
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.error || 'Failed to update user');
-        }
-
-        showAlert(data.message, 'success');
-        await loadUsers();
-        await loadAuditLogs();
-
-    } catch (error) {
-        console.error('Error toggling user active status:', error);
-        showAlert('Error: ' + error.message, 'danger');
-    }
+        },
+        'Toggle Status',
+        'btn-warning'
+    );
 }
 
 // Toggle user admin status
 async function toggleUserAdmin(userId, username) {
-    if (!confirm(`Are you sure you want to modify ${username}'s admin privileges?`)) {
-        return;
-    }
+    showConfirmModal(
+        'Modify Admin Privileges',
+        `Are you sure you want to modify ${username}'s admin privileges?`,
+        async () => {
+            try {
+                const response = await fetch(`/api/admin/users/${userId}/toggle-admin`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
 
-    try {
-        const response = await fetch(`/api/admin/users/${userId}/toggle-admin`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to update user');
+                }
+
+                showAlert(data.message, 'success');
+                await loadUsers();
+                await loadAuditLogs();
+
+            } catch (error) {
+                console.error('Error toggling user admin status:', error);
+                showAlert('Error: ' + error.message, 'danger');
             }
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.error || 'Failed to update user');
-        }
-
-        showAlert(data.message, 'success');
-        await loadUsers();
-        await loadAuditLogs();
-
-    } catch (error) {
-        console.error('Error toggling user admin status:', error);
-        showAlert('Error: ' + error.message, 'danger');
-    }
+        },
+        'Modify Privileges',
+        'btn-warning'
+    );
 }
 
 // Show delete confirmation modal

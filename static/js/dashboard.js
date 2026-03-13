@@ -4249,46 +4249,50 @@ function showAllCalculations() {
 }
 
 function setActiveCalculation(calculationId) {
-    if (!confirm('Set this calculation as active for its assessment year?')) {
-        return;
-    }
+    showConfirmModal(
+        'Set Active Calculation',
+        'Set this calculation as active for its assessment year?',
+        () => {
+            showLoading();
 
-    showLoading();
+            fetch(`/api/tax-calculations/${calculationId}/set-active`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                // Check if feature is not implemented (501)
+                if (response.status === 501) {
+                    return response.json().then(data => {
+                        hideLoading();
+                        showToast(data.error || 'This feature requires a database migration.', 'warning');
+                        return null;
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (!data) return; // Already handled 501 case
 
-    fetch(`/api/tax-calculations/${calculationId}/set-active`, {
-        method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json'
-        }
-    })
-    .then(response => {
-        // Check if feature is not implemented (501)
-        if (response.status === 501) {
-            return response.json().then(data => {
                 hideLoading();
-                showToast(data.error || 'This feature requires a database migration.', 'warning');
-                return null;
+                if (data.error) {
+                    showToast(data.error, 'danger');
+                } else {
+                    showToast(`Calculation set as active for ${data.assessment_year}!`, 'success');
+                    // Reload the calculations list to reflect the change
+                    loadSavedCalculations();
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                console.error('Error setting active calculation:', error);
+                showToast('Failed to set active calculation', 'danger');
             });
-        }
-        return response.json();
-    })
-    .then(data => {
-        if (!data) return; // Already handled 501 case
-
-        hideLoading();
-        if (data.error) {
-            showToast(data.error, 'danger');
-        } else {
-            showToast(`Calculation set as active for ${data.assessment_year}!`, 'success');
-            // Reload the calculations list to reflect the change
-            loadSavedCalculations();
-        }
-    })
-    .catch(error => {
-        hideLoading();
-        console.error('Error setting active calculation:', error);
-        showToast('Failed to set active calculation', 'danger');
-    });
+        },
+        'Set Active',
+        'btn-primary'
+    );
 }
 
 function loadCalculation(calculationId) {
@@ -4425,30 +4429,34 @@ function loadCalculation(calculationId) {
 }
 
 function deleteCalculation(calculationId) {
-    if (!confirm('Are you sure you want to delete this calculation? This action cannot be undone.')) {
-        return;
-    }
+    showConfirmModal(
+        'Delete Calculation',
+        'Are you sure you want to delete this calculation? This action cannot be undone.',
+        () => {
+            showLoading();
 
-    showLoading();
-
-    fetch(`/api/tax-calculations/${calculationId}`, {
-        method: 'DELETE'
-    })
-    .then(response => response.json())
-    .then(data => {
-        hideLoading();
-        if (data.error) {
-            showToast(data.error, 'danger');
-        } else {
-            showToast('Calculation deleted successfully', 'success');
-            loadSavedCalculations();
-        }
-    })
-    .catch(error => {
-        hideLoading();
-        console.error('Error deleting calculation:', error);
-        showToast('Failed to delete calculation', 'danger');
-    });
+            fetch(`/api/tax-calculations/${calculationId}`, {
+                method: 'DELETE'
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                if (data.error) {
+                    showToast(data.error, 'danger');
+                } else {
+                    showToast('Calculation deleted successfully', 'success');
+                    loadSavedCalculations();
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                console.error('Error deleting calculation:', error);
+                showToast('Failed to delete calculation', 'danger');
+            });
+        },
+        'Delete',
+        'btn-danger'
+    );
 }
 
 // Note: formatCurrency, formatDate, showLoading, hideLoading, showToast
