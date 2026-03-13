@@ -1,19 +1,21 @@
-name: Generate Daily Token
+name: Rotate API Token
 
 on:
   schedule:
     # Generate token at 5:00 AM SLT (11:30 PM UTC previous day)
-    - cron: '30 23 * * 0-6'  # Sun-Thu nights for Mon-Fri mornings in SLT
+    - cron: '30 23 * * 0-6'
+    # Rotate token at 6:30 PM SLT (1:00 PM UTC)
+    - cron: '0 13 * * 0-6'
   workflow_dispatch:
 
 jobs:
-  generate-token:
+  rotate-token:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Generate and Store Daily API Token
+      - name: Rotate API Token
         run: |
-          echo "🔑 Generating daily authentication token..."
+          echo "🔑 Rotating authentication token..."
           
           response=$(curl -s -w "\n%{http_code}" -X POST "${{ secrets.APP_URL }}/api/auth/token" \
             -H "Content-Type: application/json" \
@@ -28,7 +30,7 @@ jobs:
             echo "Storing token as GitHub secret..."
             echo "$token" | gh secret set EXCHANGE_RATE_TOKEN --repo ${{ github.repository }}
             
-            echo "✅ Daily token generated and stored successfully"
+            echo "✅ Token rotated and stored successfully"
           else
             echo "❌ Failed to generate token"
             echo "Response: $body"
