@@ -3,7 +3,7 @@ name: Generate Daily Token
 on:
   schedule:
     # Generate token at 5:00 AM SLT (11:30 PM UTC previous day)
-    - cron: '30 23 * * 0-4'  # Sun-Thu nights for Mon-Fri mornings in SLT
+    - cron: '30 23 * * 0-6'  # Sun-Thu nights for Mon-Fri mornings in SLT
   workflow_dispatch:
 
 jobs:
