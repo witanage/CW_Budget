@@ -502,22 +502,75 @@ font-size: 0.8rem;
 font-weight: normal;
 }
 
-/* Fixed table layout for consistent column widths */
+/* Responsive table layout - columns adjust to screen size */
 #transactionsTable {
-table-layout: fixed;
+table-layout: auto;
 width: 100%;
+min-width: 100%;
 }
 
-/* Fixed column widths */
-#transactionsTable thead th:nth-child(1) { width: 50px; }   /* Method checkbox */
-#transactionsTable thead th:nth-child(2) { width: 60px; }   /* ID */
-#transactionsTable thead th:nth-child(3) { width: 250px; }  /* Description */
-#transactionsTable thead th:nth-child(4) { width: 120px; }  /* Category */
-#transactionsTable thead th:nth-child(5) { width: 100px; }  /* Debit */
-#transactionsTable thead th:nth-child(6) { width: 100px; }  /* Credit */
-#transactionsTable thead th:nth-child(7) { width: 110px; }  /* Balance */
-#transactionsTable thead th:nth-child(8) { width: 150px; }  /* Notes */
-#transactionsTable thead th:nth-child(9) { width: 120px; }  /* Actions */
+/* Responsive column widths using percentages with minimum widths */
+#transactionsTable thead th:nth-child(1) {
+    width: 3%;
+    min-width: 35px;
+}   /* Method checkbox */
+
+#transactionsTable thead th:nth-child(2) {
+    width: 5%;
+    min-width: 60px;
+}   /* ID */
+
+#transactionsTable thead th:nth-child(3) {
+    width: 23%;
+    min-width: 200px;
+}  /* Description */
+
+#transactionsTable thead th:nth-child(4) {
+    width: 10%;
+    min-width: 100px;
+}  /* Category */
+
+#transactionsTable thead th:nth-child(5) {
+    width: 10%;
+    min-width: 90px;
+}  /* Debit */
+
+#transactionsTable thead th:nth-child(6) {
+    width: 10%;
+    min-width: 90px;
+}  /* Credit */
+
+#transactionsTable thead th:nth-child(7) {
+    width: 10%;
+    min-width: 100px;
+}  /* Balance */
+
+#transactionsTable thead th:nth-child(8) {
+    width: 13%;
+    min-width: 120px;
+}  /* Paid At */
+
+#transactionsTable thead th:nth-child(9) {
+    width: 13%;
+    min-width: 130px;
+}  /* Notes */
+
+#transactionsTable thead th:nth-child(10) {
+    width: 13%;
+    min-width: 120px;
+}  /* Actions */
+
+/* Apply width to tbody cells as well for consistent sizing */
+#transactionsTable tbody td:nth-child(1) { width: 3%; min-width: 35px; }
+#transactionsTable tbody td:nth-child(2) { width: 5%; min-width: 60px; }
+#transactionsTable tbody td:nth-child(3) { width: 23%; min-width: 200px; }
+#transactionsTable tbody td:nth-child(4) { width: 10%; min-width: 100px; }
+#transactionsTable tbody td:nth-child(5) { width: 10%; min-width: 90px; }
+#transactionsTable tbody td:nth-child(6) { width: 10%; min-width: 90px; }
+#transactionsTable tbody td:nth-child(7) { width: 10%; min-width: 100px; }
+#transactionsTable tbody td:nth-child(8) { width: 13%; min-width: 120px; }
+#transactionsTable tbody td:nth-child(9) { width: 13%; min-width: 130px; }
+#transactionsTable tbody td:nth-child(10) { width: 13%; min-width: 120px; }
 
 /* Compact transaction table rows with fixed height */
 #transactionsTable tbody tr {
@@ -582,6 +635,18 @@ transform: scale(1.1);
 font-size: 0.9rem;
 }
 
+/* Disabled buttons in transaction table */
+#transactionsTable .btn-sm:disabled {
+opacity: 0.5;
+cursor: not-allowed;
+pointer-events: none;
+}
+
+#transactionsTable .btn-sm:disabled:hover {
+transform: none !important;
+background-color: transparent !important;
+}
+
 /* Smaller badges in transaction table */
 #transactionsTable .badge {
 padding: 1px 6px;
@@ -601,6 +666,32 @@ flex: 1;
 overflow-y: auto;
 overflow-x: auto;
 min-height: 0;
+}
+
+/* Ensure table fits screen and allows horizontal scroll on smaller screens */
+#transactionsPage .table-responsive {
+    -webkit-overflow-scrolling: touch;
+}
+
+/* On larger screens, allow table to use full width */
+@media (min-width: 1400px) {
+    #transactionsTable thead th:nth-child(3) {
+        width: 25%;
+    }  /* Give description more space on large screens */
+}
+
+/* On medium screens, adjust proportions */
+@media (min-width: 992px) and (max-width: 1399px) {
+    #transactionsTable thead th:nth-child(3) {
+        width: 20%;
+    }
+}
+
+/* On smaller screens, enable horizontal scrolling */
+@media (max-width: 991px) {
+    #transactionsTable {
+        min-width: 1000px; /* Force horizontal scroll on small screens */
+    }
 }
 
 /* Other pages table responsive */
