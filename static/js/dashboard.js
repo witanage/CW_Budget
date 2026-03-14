@@ -104,13 +104,15 @@ function setupSidebarToggle() {
     const toggleBtn = document.getElementById('sidebarToggle');
     const expandTab = document.getElementById('sidebarExpandTab');
     const containerRow = document.querySelector('.container-fluid > .row');
+    const mobileSidebarToggle = document.getElementById('mobileSidebarToggle');
+    const sidebarOverlay = document.getElementById('sidebarOverlay');
 
     if (!sidebar || !mainContent || !toggleBtn || !expandTab) {
         console.warn('Sidebar toggle elements not found');
         return;
     }
 
-    // Check localStorage for saved state
+    // Check localStorage for saved state (desktop only)
     const sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
     if (sidebarCollapsed) {
         sidebar.classList.add('collapsed');
@@ -119,7 +121,7 @@ function setupSidebarToggle() {
         expandTab.style.display = 'block';
     }
 
-    // Toggle button click (collapse sidebar)
+    // Toggle button click (collapse sidebar - desktop)
     toggleBtn.addEventListener('click', function() {
         sidebar.classList.add('collapsed');
         mainContent.classList.add('expanded');
@@ -128,7 +130,7 @@ function setupSidebarToggle() {
         localStorage.setItem('sidebarCollapsed', 'true');
     });
 
-    // Expand tab click (expand sidebar)
+    // Expand tab click (expand sidebar - desktop)
     expandTab.addEventListener('click', function() {
         sidebar.classList.remove('collapsed');
         mainContent.classList.remove('expanded');
@@ -136,6 +138,44 @@ function setupSidebarToggle() {
         expandTab.style.display = 'none';
         localStorage.setItem('sidebarCollapsed', 'false');
     });
+
+    // Mobile menu toggle
+    if (mobileSidebarToggle && sidebarOverlay) {
+        // Toggle button click (mobile)
+        mobileSidebarToggle.addEventListener('click', function() {
+            sidebar.classList.toggle('show');
+            sidebarOverlay.classList.toggle('show');
+
+            // Change button text
+            const icon = this.querySelector('i');
+            if (sidebar.classList.contains('show')) {
+                icon.className = 'fas fa-times';
+            } else {
+                icon.className = 'fas fa-bars';
+            }
+        });
+
+        // Overlay click (close sidebar on mobile)
+        sidebarOverlay.addEventListener('click', function() {
+            sidebar.classList.remove('show');
+            sidebarOverlay.classList.remove('show');
+            const icon = mobileSidebarToggle.querySelector('i');
+            icon.className = 'fas fa-bars';
+        });
+
+        // Close sidebar when clicking a nav link on mobile
+        const navLinks = sidebar.querySelectorAll('.nav-link');
+        navLinks.forEach(link => {
+            link.addEventListener('click', function() {
+                if (window.innerWidth < 768) {
+                    sidebar.classList.remove('show');
+                    sidebarOverlay.classList.remove('show');
+                    const icon = mobileSidebarToggle.querySelector('i');
+                    icon.className = 'fas fa-bars';
+                }
+            });
+        });
+    }
 
     console.log('✓ Sidebar toggle initialized');
 }

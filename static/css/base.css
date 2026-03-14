@@ -260,6 +260,102 @@ padding: 1rem 0;
 border-right: 1px solid var(--border-color);
 overflow-y: auto;
 overflow-x: hidden;
+position: relative;
+z-index: 10;
+}
+
+/* Ensure sidebar content is clickable */
+.sidebar .position-sticky {
+position: relative;
+z-index: 11;
+}
+
+/* Ensure sidebar links are clickable */
+.sidebar .nav-link {
+position: relative;
+z-index: 12;
+pointer-events: auto;
+}
+
+/* Mobile: Hide sidebar by default */
+@media (max-width: 767.98px) {
+    .sidebar {
+        display: none !important;
+        position: fixed;
+        top: 50px;
+        left: 0;
+        width: 80%;
+        max-width: 300px;
+        z-index: 1100;
+        height: calc(100vh - 50px);
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+    }
+
+    .sidebar.show {
+        display: block !important;
+        transform: translateX(0);
+    }
+
+    /* Make main content full width on mobile */
+    main.col-md-9 {
+        width: 100% !important;
+        max-width: 100% !important;
+        flex: 0 0 100% !important;
+        padding-left: 1rem;
+        padding-right: 1rem;
+        padding-top: 4rem !important; /* Space for mobile menu button */
+    }
+
+    /* Show mobile menu toggle */
+    .mobile-menu-toggle {
+        display: block !important;
+        position: fixed;
+        top: 60px;
+        left: 10px;
+        z-index: 1150;
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        background-color: var(--accent-color) !important;
+        border-color: var(--accent-color) !important;
+        color: white !important;
+        font-weight: 600;
+    }
+
+    /* Overlay when sidebar is open on mobile */
+    .sidebar-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1050;
+        transition: opacity 0.3s ease;
+    }
+
+    .sidebar-overlay.show {
+        display: block;
+    }
+
+    /* Hide desktop sidebar controls on mobile */
+    .sidebar-toggle-btn,
+    .sidebar-expand-tab {
+        display: none !important;
+    }
+}
+
+/* Tablet and up: Show sidebar normally */
+@media (min-width: 768px) {
+    .sidebar {
+        display: block !important;
+    }
+
+    .mobile-menu-toggle {
+        display: none !important;
+    }
 }
 
 .sidebar .nav-link {
@@ -269,6 +365,7 @@ margin: 0 12px 4px 12px;
 border-radius: 8px;
 transition: all 0.3s ease;
 font-weight: 500;
+cursor: pointer;
 }
 
 .sidebar .nav-link:first-child {
@@ -279,6 +376,7 @@ margin-top: 0;
 background-color: var(--sidebar-hover);
 color: #ffffff;
 transform: translateX(4px);
+cursor: pointer;
 }
 
 .sidebar .nav-link.active {
@@ -666,31 +764,19 @@ flex: 1;
 overflow-y: auto;
 overflow-x: auto;
 min-height: 0;
+-webkit-overflow-scrolling: touch;
 }
 
-/* Ensure table fits screen and allows horizontal scroll on smaller screens */
+/* Enable smooth scrolling on touch devices */
 #transactionsPage .table-responsive {
-    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
 }
 
-/* On larger screens, allow table to use full width */
-@media (min-width: 1400px) {
-    #transactionsTable thead th:nth-child(3) {
-        width: 25%;
-    }  /* Give description more space on large screens */
-}
-
-/* On medium screens, adjust proportions */
-@media (min-width: 992px) and (max-width: 1399px) {
-    #transactionsTable thead th:nth-child(3) {
-        width: 20%;
-    }
-}
-
-/* On smaller screens, enable horizontal scrolling */
-@media (max-width: 991px) {
-    #transactionsTable {
-        min-width: 1000px; /* Force horizontal scroll on small screens */
+/* Table wrapper responsiveness */
+@media (max-width: 1199px) {
+    #transactionsPage .table-responsive {
+        /* Ensure horizontal scrollbar is visible */
+        overflow-x: scroll;
     }
 }
 
@@ -705,10 +791,6 @@ border-color: var(--border-color);
 }
 
 /* Transaction highlighting - Keep original colors in both themes */
-.transaction-highlighted td {
-/* No filter - keep payment method colors vibrant and unchanged */
-}
-
 [data-theme="light"] .transaction-highlighted td {
 filter: brightness(0.95) !important;
 }
@@ -829,6 +911,8 @@ overflow: hidden;
 height: 100%;
 display: flex;
 flex-direction: column;
+position: relative;
+z-index: 5;
 }
 
 /* Prevent content overlap with navbar */
@@ -893,6 +977,55 @@ main.col-md-9 {
 padding-left: 1rem;
 padding-right: 1rem;
 }
+
+/* Responsive control buttons */
+#transactionsPage .card-body > .row:first-child {
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+#transactionsPage .card-body > .row:first-child .col-auto {
+    width: 100%;
+}
+
+/* Better spacing for mobile */
+#transactionsPage .btn {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+}
+
+/* Month picker full width on mobile */
+#monthYearPicker {
+    width: 100% !important;
+    min-width: 100% !important;
+}
+}
+
+/* Responsive adjustments for medium screens */
+@media (min-width: 769px) and (max-width: 1199px) {
+    /* Wrap control buttons more efficiently */
+    #transactionsPage .card-body > .row:first-child {
+        row-gap: 0.5rem;
+    }
+
+    #transactionsPage .btn {
+        padding: 0.3rem 0.7rem;
+        font-size: 0.85rem;
+    }
+
+    /* Reduce icon spacing */
+    #transactionsPage .btn i {
+        margin-right: 0.25rem !important;
+    }
+}
+
+/* Prevent button text wrapping on smaller screens */
+@media (max-width: 1399px) {
+    #transactionsPage .btn-sm {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
 }
 
 .chart-container {
@@ -1518,6 +1651,8 @@ color: #ffffff;
 .sidebar-header {
     border-bottom: 1px solid var(--border-color);
     margin-bottom: 0.5rem;
+    position: relative;
+    z-index: 12;
 }
 
 .sidebar-title {
@@ -1533,6 +1668,9 @@ color: #ffffff;
     color: var(--text-primary);
     padding: 0.25rem 0.5rem;
     transition: all 0.3s ease;
+    cursor: pointer;
+    position: relative;
+    z-index: 13;
 }
 
 .sidebar-toggle-btn:hover {

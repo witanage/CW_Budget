@@ -7,6 +7,14 @@
 {% endblock %}
 
 {% block content %}
+<!-- Mobile Sidebar Overlay -->
+<div id="sidebarOverlay" class="sidebar-overlay"></div>
+
+<!-- Mobile Menu Toggle Button (visible only on mobile) -->
+<button id="mobileSidebarToggle" class="mobile-menu-toggle btn btn-primary" style="display: none;">
+    <i class="fas fa-bars"></i> Menu
+</button>
+
 <div class="container-fluid">
     <div class="row">
         <!-- Sidebar -->
@@ -42,7 +50,7 @@
                 </ul>
             </div>
         </nav>
-        
+
         <!-- Main Content -->
         <main class="col-md-9 ms-sm-auto col-lg-10" id="mainContent">
             <!-- Vertical expand tab (shown when sidebar is collapsed) -->
@@ -118,7 +126,7 @@
                                 <span id="activeFiltersText" class="text-muted" style="display: none;"></span>
                             </div>
                         </div>
-                        
+
                         <!-- Transactions Table -->
                         <div class="table-responsive">
                             <table class="table table-hover table-sm" id="transactionsTable" style="font-size: 0.875rem;">
@@ -1702,6 +1710,215 @@ tr[draggable="true"] {
     #newCategoryForm .btn-sm {
         font-size: 0.8rem;
         padding: 0.4rem 0.6rem;
+    }
+}
+
+/* ===================================
+   RESPONSIVE DESKTOP VIEW
+   =================================== */
+
+/* Extra large screens (1920px and up) - Full desktop */
+@media (min-width: 1920px) {
+    #transactionsTable thead th:nth-child(3) {
+        width: 28%;
+    }  /* Extra space for description */
+
+    #transactionsTable tbody td {
+        font-size: 0.85rem !important;
+    }
+
+    #transactionsTable thead th {
+        font-size: 0.85rem !important;
+    }
+}
+
+/* Large screens (1400px - 1919px) - Standard desktop */
+@media (min-width: 1400px) and (max-width: 1919px) {
+    #transactionsTable thead th:nth-child(3) {
+        width: 25%;
+    }
+}
+
+/* Medium-large screens (1200px - 1399px) - Smaller desktop */
+@media (min-width: 1200px) and (max-width: 1399px) {
+    #transactionsTable thead th:nth-child(3) {
+        width: 22%;
+    }
+
+    /* Slightly smaller action buttons */
+    #transactionsTable .btn-sm {
+        padding: 3px 5px !important;
+    }
+}
+
+/* Medium screens (992px - 1199px) - Tablet landscape / small desktop */
+@media (min-width: 992px) and (max-width: 1199px) {
+    #transactionsTable {
+        font-size: 0.75rem !important;
+    }
+
+    #transactionsTable thead th:nth-child(3) {
+        width: 20%;
+        min-width: 150px;
+    }
+
+    #transactionsTable thead th:nth-child(8) {
+        width: 11%;
+        min-width: 100px;
+    }
+
+    #transactionsTable thead th:nth-child(9) {
+        width: 11%;
+        min-width: 110px;
+    }
+
+    /* Smaller action buttons */
+    #transactionsTable .btn-sm {
+        padding: 2px 4px !important;
+        font-size: 0.65rem !important;
+    }
+
+    #transactionsTable .btn-sm i {
+        font-size: 0.8rem !important;
+    }
+
+    /* Compact control row buttons */
+    .row.mb-3.align-items-center .btn-sm {
+        padding: 0.2rem 0.6rem;
+        font-size: 0.8rem;
+        min-height: 28px;
+    }
+
+    .row.mb-3.align-items-center .form-control-sm {
+        font-size: 0.8rem;
+        min-height: 28px;
+    }
+}
+
+/* Small screens (768px - 991px) - Tablet portrait */
+@media (min-width: 768px) and (max-width: 991px) {
+    #transactionsTable {
+        min-width: 900px;
+        font-size: 0.7rem !important;
+    }
+
+    #transactionsTable thead th {
+        padding: 0.4rem 0.3rem !important;
+        font-size: 0.7rem !important;
+    }
+
+    #transactionsTable tbody td {
+        padding: 0.2rem 0.3rem !important;
+        font-size: 0.7rem !important;
+    }
+
+    /* Very compact action buttons */
+    #transactionsTable .btn-sm {
+        padding: 1px 3px !important;
+        font-size: 0.6rem !important;
+    }
+
+    #transactionsTable .btn-sm i {
+        font-size: 0.75rem !important;
+    }
+
+    /* Stack control buttons on multiple rows */
+    .row.mb-3.align-items-center {
+        row-gap: 0.3rem;
+    }
+
+    .row.mb-3.align-items-center .col-auto {
+        margin-bottom: 0.2rem;
+    }
+
+    .row.mb-3.align-items-center .btn-sm {
+        padding: 0.2rem 0.5rem;
+        font-size: 0.75rem;
+        min-height: 26px;
+    }
+
+    /* Reduce card header padding */
+    #transactionsPage .card-header {
+        padding: 8px 12px;
+    }
+
+    #transactionsPage .card-header h5 {
+        font-size: 0.9rem;
+    }
+}
+
+/* Extra small screens (below 768px) - Mobile */
+@media (max-width: 767px) {
+    #transactionsTable {
+        min-width: 800px;
+        font-size: 0.65rem !important;
+    }
+
+    #transactionsTable thead th {
+        padding: 0.3rem 0.2rem !important;
+        font-size: 0.65rem !important;
+    }
+
+    #transactionsTable tbody td {
+        padding: 0.15rem 0.2rem !important;
+        font-size: 0.65rem !important;
+        max-height: 24px;
+    }
+
+    #transactionsTable tbody tr {
+        height: 24px;
+        max-height: 24px;
+    }
+
+    /* Minimal action buttons */
+    #transactionsTable .btn-sm {
+        padding: 1px 2px !important;
+        font-size: 0.55rem !important;
+        margin-right: 0.1rem !important;
+    }
+
+    #transactionsTable .btn-sm i {
+        font-size: 0.7rem !important;
+    }
+
+    /* Stack all controls vertically */
+    .row.mb-3.align-items-center .col-auto {
+        width: 100%;
+        margin-bottom: 0.3rem;
+    }
+
+    .row.mb-3.align-items-center .btn-sm,
+    .row.mb-3.align-items-center .form-control-sm {
+        width: 100%;
+        min-height: 32px;
+    }
+
+    /* Hide less important columns on very small screens */
+    #transactionsTable .drag-handle {
+        display: none;
+    }
+
+    #transactionsTable thead th:nth-child(1),
+    #transactionsTable tbody td:nth-child(1) {
+        display: none;
+    }
+}
+
+/* Print styles */
+@media print {
+    .sidebar,
+    .row.mb-3.align-items-center,
+    #transactionsTable .btn-sm {
+        display: none !important;
+    }
+
+    #transactionsTable {
+        font-size: 0.7rem !important;
+    }
+
+    main.col-md-9 {
+        width: 100% !important;
+        max-width: 100% !important;
     }
 }
 
