@@ -137,6 +137,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     marked_done_at TIMESTAMP NULL,
     paid_at TIMESTAMP NULL,
     display_order INT NOT NULL DEFAULT 0 COMMENT 'Order for displaying transactions (lower numbers first)',
+    bill_content JSON NULL COMMENT 'Scanned bill content with line items in JSON format',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (monthly_record_id) REFERENCES monthly_records(id) ON DELETE CASCADE,
     FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL,

@@ -126,14 +126,14 @@
                                     <tr>
                                         <th style="width: 2%;"></th>
                                         <th style="width: 5%;">Method</th>
-                                        <th style="width: 17%;">Description</th>
+                                        <th style="width: 15%;">Description</th>
                                         <th style="width: 8%;">Category</th>
                                         <th style="width: 9%;">Debit</th>
                                         <th style="width: 9%;">Credit</th>
                                         <th style="width: 9%;">Balance</th>
                                         <th style="width: 10%;">Paid At</th>
                                         <th style="width: 14%;">Notes</th>
-                                        <th style="width: 11%;">Actions</th>
+                                        <th style="width: 16%;">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1127,6 +1127,31 @@
                             <span class="visually-hidden">Loading...</span>
                         </div>
                         <p class="mt-2">Loading audit logs...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bill Content Modal -->
+<div class="modal fade" id="billContentModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-receipt me-2"></i>Bill Details
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="billContentDisplay">
+                    <div class="text-center py-4">
+                        <i class="fas fa-receipt fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">No bill content available</p>
                     </div>
                 </div>
             </div>
