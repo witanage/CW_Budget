@@ -989,9 +989,9 @@ function displayTransactions(transactions) {
                 <button class="btn btn-sm btn-success p-1 me-1" style="font-size: 0.7rem; line-height: 1; background-color: #198754 !important; border-color: #198754 !important; color: white !important;" onclick="showMoveCopyModal(${t.id}, 'copy')" title="Copy to Month">
                     <i class="fas fa-copy"></i>
                 </button>
-                ${t.bill_content ? `<button class="btn btn-sm btn-secondary p-1 me-1" style="font-size: 0.7rem; line-height: 1; background-color: #6c757d !important; border-color: #6c757d !important; color: white !important;" onclick="showBillContent(${t.id})" title="View Bill">
+                <button class="btn btn-sm btn-secondary p-1 me-1" style="font-size: 0.7rem; line-height: 1; background-color: #6c757d !important; border-color: #6c757d !important; color: white !important;" onclick="showBillContent(${t.id})" title="${t.bill_content ? 'View Bill' : 'No Bill Available'}" ${t.bill_content ? '' : 'disabled'}>
                     <i class="fas fa-receipt"></i>
-                </button>` : ''}
+                </button>
                 <button class="btn btn-sm btn-info p-1" style="font-size: 0.7rem; line-height: 1; background-color: #0dcaf0 !important; border-color: #0dcaf0 !important; color: #000 !important;" onclick="showAuditModal(${t.id})" title="Audit Log">
                     <i class="fas fa-history"></i>
                 </button>
