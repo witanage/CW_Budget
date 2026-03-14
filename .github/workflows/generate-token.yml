@@ -2,8 +2,8 @@ name: Generate Daily Token
 
 on:
   schedule:
-    # Generate token at 5:30 AM SLT every day (midnight UTC)
-    - cron: '0 0 * * 0-6'
+    # Generate token at 2:00 AM SLT every day (8:30 PM UTC previous day)
+    - cron: '30 20 * * *'
   workflow_dispatch:
 
 jobs:
