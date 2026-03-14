@@ -1690,25 +1690,39 @@ document.addEventListener('DOMContentLoaded', function() {
 // BILL SCANNING FEATURE
 // ==================================================
 
-// Show scan button on first add button click, modal on second click
+// Show scan and upload buttons on first add button click, modal on second click
 document.addEventListener('DOMContentLoaded', function() {
     const addBtnFloat = document.querySelector('.add-btn-float');
     const scanBtnFloat = document.getElementById('scanBillBtnFloat');
+    const uploadBtnFloat = document.getElementById('uploadBillBtnFloat');
 
-    // Check if scan button should be visible (user has clicked add button before)
+    // Check if buttons should be visible (user has clicked add button before)
     const scanBtnVisible = localStorage.getItem('scanBtnVisible');
-    if (scanBtnVisible === 'true' && scanBtnFloat) {
-        scanBtnFloat.classList.add('visible');
+    if (scanBtnVisible === 'true') {
+        if (scanBtnFloat) {
+            scanBtnFloat.classList.add('visible');
+        }
+        if (uploadBtnFloat) {
+            uploadBtnFloat.classList.add('visible');
+        }
     }
 
     // Handle add button click
-    if (addBtnFloat && scanBtnFloat) {
+    if (addBtnFloat) {
         addBtnFloat.addEventListener('click', function(e) {
-            if (!scanBtnFloat.classList.contains('visible')) {
-                // First click: show scan button only, don't open modal
+            const buttonsVisible = (scanBtnFloat && scanBtnFloat.classList.contains('visible')) ||
+                                  (uploadBtnFloat && uploadBtnFloat.classList.contains('visible'));
+
+            if (!buttonsVisible) {
+                // First click: show both buttons only, don't open modal
                 e.preventDefault();
                 e.stopPropagation();
-                scanBtnFloat.classList.add('visible');
+                if (scanBtnFloat) {
+                    scanBtnFloat.classList.add('visible');
+                }
+                if (uploadBtnFloat) {
+                    uploadBtnFloat.classList.add('visible');
+                }
                 localStorage.setItem('scanBtnVisible', 'true');
             } else {
                 // Second click onwards: open modal
@@ -1718,18 +1732,27 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Hide scan button when clicking outside (not on scan button or add button)
+    // Hide both buttons when clicking outside (not on scan/upload/add buttons)
     document.addEventListener('click', function(e) {
-        if (!scanBtnFloat || !scanBtnFloat.classList.contains('visible')) {
+        const buttonsVisible = (scanBtnFloat && scanBtnFloat.classList.contains('visible')) ||
+                              (uploadBtnFloat && uploadBtnFloat.classList.contains('visible'));
+
+        if (!buttonsVisible) {
             return;
         }
 
-        // Check if click is outside both buttons
-        const clickedOnScanBtn = scanBtnFloat.contains(e.target);
+        // Check if click is outside all buttons
+        const clickedOnScanBtn = scanBtnFloat && scanBtnFloat.contains(e.target);
+        const clickedOnUploadBtn = uploadBtnFloat && uploadBtnFloat.contains(e.target);
         const clickedOnAddBtn = addBtnFloat && addBtnFloat.contains(e.target);
 
-        if (!clickedOnScanBtn && !clickedOnAddBtn) {
-            scanBtnFloat.classList.remove('visible');
+        if (!clickedOnScanBtn && !clickedOnUploadBtn && !clickedOnAddBtn) {
+            if (scanBtnFloat) {
+                scanBtnFloat.classList.remove('visible');
+            }
+            if (uploadBtnFloat) {
+                uploadBtnFloat.classList.remove('visible');
+            }
             localStorage.setItem('scanBtnVisible', 'false');
         }
     });
@@ -1738,122 +1761,140 @@ document.addEventListener('DOMContentLoaded', function() {
 // Bill scanning functionality
 document.addEventListener('DOMContentLoaded', function() {
     const scanBillBtnFloat = document.getElementById('scanBillBtnFloat');
+    const uploadBillBtnFloat = document.getElementById('uploadBillBtnFloat');
     const billImageInput = document.getElementById('billImageInput');
+    const uploadImageInput = document.getElementById('uploadImageInput');
     const scanStatus = document.getElementById('scanStatus');
     const scanStatusText = document.getElementById('scanStatusText');
     const transDescription = document.getElementById('transDescription');
     const transCredit = document.getElementById('transCredit');
 
     if (scanBillBtnFloat && billImageInput) {
-        // Handle scan bill button click
+        // Handle scan bill button click (opens camera)
         scanBillBtnFloat.addEventListener('click', function() {
             console.log('Scan bill button clicked');
             billImageInput.click();
         });
+    }
 
-        // Handle file selection
+    if (uploadBillBtnFloat && uploadImageInput) {
+        // Handle upload bill button click (opens file picker)
+        uploadBillBtnFloat.addEventListener('click', function() {
+            console.log('Upload bill button clicked');
+            uploadImageInput.click();
+        });
+    }
+
+    // Handle camera scan input
+    if (billImageInput) {
+
+        // Handle camera scan file selection
         billImageInput.addEventListener('change', async function(event) {
-            const file = event.target.files[0];
+            await processImageScan(event.target.files[0], billImageInput);
+        });
+    }
 
-            if (!file) {
-                console.log('No file selected');
-                return;
-            }
+    // Handle upload input
+    if (uploadImageInput) {
+        // Handle upload file selection
+        uploadImageInput.addEventListener('change', async function(event) {
+            await processImageScan(event.target.files[0], uploadImageInput);
+        });
+    }
 
-            console.log('File selected:', file.name, file.type, file.size);
+    // Shared function to process image scanning
+    async function processImageScan(file, inputElement) {
+        if (!file) {
+            console.log('No file selected');
+            return;
+        }
 
-            // Validate file type
-            const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
-            if (!allowedTypes.includes(file.type)) {
-                showToast('Please select a valid image file (PNG, JPEG, GIF, WebP)', 'danger');
-                billImageInput.value = '';
-                return;
-            }
+        console.log('File selected:', file.name, file.type, file.size);
 
-            // Validate file size (max 10MB)
-            const maxSize = 10 * 1024 * 1024; // 10MB
-            if (file.size > maxSize) {
-                showToast('Image file is too large. Please select an image under 10MB', 'danger');
-                billImageInput.value = '';
-                return;
-            }
+        // Validate file type
+        const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
+        if (!allowedTypes.includes(file.type)) {
+            showToast('Please select a valid image file (PNG, JPEG, GIF, WebP)', 'danger');
+            inputElement.value = '';
+            return;
+        }
 
-            // Open the transaction modal immediately
-            const transactionModal = new bootstrap.Modal(document.getElementById('transactionModal'));
-            transactionModal.show();
+        // Validate file size (max 10MB)
+        const maxSize = 10 * 1024 * 1024; // 10MB
+        if (file.size > maxSize) {
+            showToast('Image file is too large. Please select an image under 10MB', 'danger');
+            inputElement.value = '';
+            return;
+        }
 
-            // Show scanning status inside the modal
-            scanStatus.style.display = 'block';
-            scanStatusText.textContent = 'Scanning bill...';
+        // Open the transaction modal immediately
+        const transactionModal = new bootstrap.Modal(document.getElementById('transactionModal'));
+        transactionModal.show();
+
+        // Show scanning status inside the modal
+        scanStatus.style.display = 'block';
+        scanStatusText.textContent = 'Scanning bill...';
+        if (scanBillBtnFloat) {
             scanBillBtnFloat.disabled = true;
             scanBillBtnFloat.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        }
+        if (uploadBillBtnFloat) {
+            uploadBillBtnFloat.disabled = true;
+            uploadBillBtnFloat.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        }
 
-            try {
-                // Create FormData to send the image
-                const formData = new FormData();
-                formData.append('bill_image', file);
+        try {
+            // Create FormData to send the image
+            const formData = new FormData();
+            formData.append('bill_image', file);
 
-                // Send to API
-                console.log('Sending image to API...');
-                const response = await fetch('/api/scan-bill', {
-                    method: 'POST',
-                    body: formData
-                });
+            // Send to API
+            console.log('Sending image to API...');
+            const response = await fetch('/api/scan-bill', {
+                method: 'POST',
+                body: formData
+            });
 
-                const result = await response.json();
-                console.log('API response:', result);
+            const result = await response.json();
+            console.log('API response:', result);
 
-                if (!response.ok) {
-                    throw new Error(result.error || 'Failed to scan bill');
+            if (!response.ok) {
+                throw new Error(result.error || 'Failed to scan bill');
+            }
+
+            if (result.success) {
+                // Store the scanned bill content including items
+                scannedBillContent = {
+                    shop_name: result.shop_name,
+                    amount: result.amount,
+                    items: result.items || []
+                };
+
+                // Populate the form with extracted data
+                if (result.shop_name && result.shop_name !== 'Unknown Store') {
+                    transDescription.value = result.shop_name;
                 }
 
-                if (result.success) {
-                    // Store the scanned bill content including items
-                    scannedBillContent = {
-                        shop_name: result.shop_name,
-                        amount: result.amount,
-                        items: result.items || []
-                    };
-
-                    // Populate the form with extracted data
-                    if (result.shop_name && result.shop_name !== 'Unknown Store') {
-                        transDescription.value = result.shop_name;
-                    }
-
-                    if (result.amount && parseFloat(result.amount) > 0) {
-                        transCredit.value = result.amount;
-                    }
-
-                    // Show success message with item count
-                    const itemCount = result.items ? result.items.length : 0;
-                    const itemText = itemCount > 0 ? ` (${itemCount} items)` : '';
-                    scanStatusText.textContent = `✓ Bill scanned successfully!${itemText}`;
-                    scanStatus.style.color = '#28a745';
-
-                    setTimeout(() => {
-                        scanStatus.style.display = 'none';
-                        scanStatus.style.color = '#ffc107';
-                    }, 3000);
-
-                    showToast(`Bill scanned: ${result.shop_name} - $${result.amount}${itemText}`, 'success');
-                } else {
-                    // Handle scanning error but still allow manual entry
-                    const errorMsg = result.error || 'Failed to extract bill information';
-                    scanStatusText.textContent = '✗ ' + errorMsg;
-                    scanStatus.style.color = '#dc3545';
-
-                    setTimeout(() => {
-                        scanStatus.style.display = 'none';
-                        scanStatus.style.color = '#ffc107';
-                    }, 5000);
-
-                    showToast('Could not scan bill automatically. Please enter details manually.', 'warning');
+                if (result.amount && parseFloat(result.amount) > 0) {
+                    transCredit.value = result.amount;
                 }
 
-            } catch (error) {
-                console.error('Error scanning bill:', error);
+                // Show success message with item count
+                const itemCount = result.items ? result.items.length : 0;
+                const itemText = itemCount > 0 ? ` (${itemCount} items)` : '';
+                scanStatusText.textContent = `✓ Bill scanned successfully!${itemText}`;
+                scanStatus.style.color = '#28a745';
 
-                scanStatusText.textContent = '✗ Scan failed';
+                setTimeout(() => {
+                    scanStatus.style.display = 'none';
+                    scanStatus.style.color = '#ffc107';
+                }, 3000);
+
+                showToast(`Bill scanned: ${result.shop_name} - $${result.amount}${itemText}`, 'success');
+            } else {
+                // Handle scanning error but still allow manual entry
+                const errorMsg = result.error || 'Failed to extract bill information';
+                scanStatusText.textContent = '✗ ' + errorMsg;
                 scanStatus.style.color = '#dc3545';
 
                 setTimeout(() => {
@@ -1861,13 +1902,32 @@ document.addEventListener('DOMContentLoaded', function() {
                     scanStatus.style.color = '#ffc107';
                 }, 5000);
 
-                showToast(error.message || 'Failed to scan bill. Please enter details manually.', 'danger');
-            } finally {
-                // Reset button and input
+                showToast('Could not scan bill automatically. Please enter details manually.', 'warning');
+            }
+
+        } catch (error) {
+            console.error('Error scanning bill:', error);
+
+            scanStatusText.textContent = '✗ Scan failed';
+            scanStatus.style.color = '#dc3545';
+
+            setTimeout(() => {
+                scanStatus.style.display = 'none';
+                scanStatus.style.color = '#ffc107';
+            }, 5000);
+
+            showToast(error.message || 'Failed to scan bill. Please enter details manually.', 'danger');
+        } finally {
+            // Reset buttons and input
+            if (scanBillBtnFloat) {
                 scanBillBtnFloat.disabled = false;
                 scanBillBtnFloat.innerHTML = '<i class="fas fa-camera"></i>';
-                billImageInput.value = '';
             }
-        });
+            if (uploadBillBtnFloat) {
+                uploadBillBtnFloat.disabled = false;
+                uploadBillBtnFloat.innerHTML = '<i class="fas fa-file-upload"></i>';
+            }
+            inputElement.value = '';
+        }
     }
 });

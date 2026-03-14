@@ -1,1063 +1,2292 @@
-* {
-box-sizing: border-box;
-}
-
-body {
-margin: 0;
-padding: 0;
-font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-background-color: #1a1a1a;
-overflow: hidden;
-}
-
-.mobile-header {
-background: linear-gradient(135deg, #3d3d3d 0%, #2d2d2d 100%);
-padding: 8px 10px;
-position: fixed;
-top: 0;
-left: 0;
-right: 0;
-z-index: 100;
-box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-}
-
-.header-top {
-display: flex;
-justify-content: space-between;
-align-items: center;
-margin-bottom: 8px;
-}
-
-.mobile-header h1 {
-font-size: 1rem;
-margin: 0;
-font-weight: 600;
-color: #ffffff;
-}
-
-.header-buttons {
-display: flex;
-gap: 6px;
-align-items: center;
-}
-
-.btn-back {
-background: rgba(255,255,255,0.1);
-border: none;
-color: #ffffff;
-padding: 4px 10px;
-border-radius: 6px;
-font-size: 0.75rem;
-text-decoration: none;
-display: inline-flex;
-align-items: center;
-gap: 4px;
-}
-
-/* User dropdown for mobile */
-.mobile-user-dropdown {
-position: relative;
-}
-
-.mobile-user-btn {
-background: rgba(255,255,255,0.1);
-border: none;
-color: #ffffff;
-padding: 6px 10px;
-border-radius: 50px;
-font-size: 0.75rem;
-cursor: pointer;
-display: inline-flex;
-align-items: center;
-gap: 4px;
-transition: all 0.3s ease;
-}
-
-.mobile-user-btn:active {
-background: rgba(255,255,255,0.2);
-transform: scale(0.95);
-}
-
-/* Mobile User Avatar */
-.mobile-user-avatar {
-width: 28px;
-height: 28px;
-border-radius: 50%;
-background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-display: flex;
-align-items: center;
-justify-content: center;
-box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-}
-
-.mobile-user-initials {
-color: #ffffff;
-font-weight: 600;
-font-size: 12px;
-text-transform: uppercase;
-}
-
-.mobile-dropdown-menu {
-position: absolute;
-top: 100%;
-right: 0;
-background: #2d2d2d;
-border: 1px solid #555555;
-border-radius: 12px;
-min-width: 240px;
-margin-top: 6px;
-display: none;
-z-index: 1000;
-box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-overflow: hidden;
-animation: mobileDropdownSlideIn 0.2s ease-out;
-}
-
-@keyframes mobileDropdownSlideIn {
-from {
-opacity: 0;
-transform: translateY(-10px);
-}
-to {
-opacity: 1;
-transform: translateY(0);
-}
-}
-
-.mobile-dropdown-menu.show {
-display: block;
-}
-
-/* Mobile User Header */
-.mobile-user-header {
-padding: 16px 12px;
-background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-display: flex;
-align-items: center;
-gap: 10px;
-}
-
-.mobile-user-avatar-large {
-width: 42px;
-height: 42px;
-border-radius: 50%;
-background: rgba(255, 255, 255, 0.2);
-display: flex;
-align-items: center;
-justify-content: center;
-border: 2px solid rgba(255, 255, 255, 0.3);
-flex-shrink: 0;
-}
-
-.mobile-user-initials-large {
-color: #ffffff;
-font-weight: 700;
-font-size: 18px;
-text-transform: uppercase;
-}
-
-.mobile-user-info {
-flex: 1;
-overflow: hidden;
-}
-
-.mobile-user-name {
-color: #ffffff;
-font-weight: 600;
-font-size: 14px;
-margin-bottom: 4px;
-white-space: nowrap;
-overflow: hidden;
-text-overflow: ellipsis;
-}
-
-.mobile-user-role {
-color: rgba(255, 255, 255, 0.9);
-font-size: 11px;
-font-weight: 500;
-display: inline-flex;
-align-items: center;
-background: rgba(255, 255, 255, 0.2);
-padding: 2px 6px;
-border-radius: 8px;
-}
-
-/* Mobile Dropdown Label */
-.mobile-dropdown-label {
-padding: 8px 12px 4px 12px;
-font-size: 10px;
-font-weight: 600;
-text-transform: uppercase;
-letter-spacing: 0.5px;
-color: #aaaaaa;
-opacity: 0.8;
-}
-
-.mobile-dropdown-item {
-padding: 10px 12px;
-color: #ffffff;
-text-decoration: none;
-display: flex;
-align-items: center;
-gap: 10px;
-font-size: 0.85rem;
-cursor: pointer;
-transition: all 0.2s ease;
-}
-
-.mobile-dropdown-item:last-child {
-border-bottom: none;
-}
-
-.mobile-dropdown-item:active {
-background: #3d3d3d;
-padding-left: 16px;
-}
-
-.mobile-dropdown-item i {
-width: 18px;
-text-align: center;
-opacity: 0.7;
-}
-
-.mobile-dropdown-item:active i {
-opacity: 1;
-}
-
-/* Mobile Logout Item */
-.mobile-dropdown-item-logout {
-color: #dc3545 !important;
-font-weight: 500;
-}
-
-.mobile-dropdown-item-logout:active {
-background: rgba(220, 53, 69, 0.15) !important;
-}
-
-.mobile-dropdown-item-logout i {
-color: #dc3545;
-opacity: 1 !important;
-}
-
-.mobile-dropdown-divider {
-height: 1px;
-background: #3d3d3d;
-margin: 6px 0;
-opacity: 0.5;
-}
-
-.month-nav {
-display: flex;
-align-items: center;
-gap: 6px;
-justify-content: center;
-}
-
-.month-nav button, .action-btn {
-background: #3d3d3d;
-border: 1px solid #555555;
-color: #ffffff;
-padding: 4px 8px;
-border-radius: 6px;
-font-size: 0.7rem;
-cursor: pointer;
-}
-
-.month-nav button:active, .action-btn:active {
-background: #4d4d4d;
-}
-
-.month-display {
-color: #ffffff;
-font-size: 0.8rem;
-font-weight: 600;
-min-width: 100px;
-text-align: center;
-}
-
-.action-buttons {
-display: flex;
-gap: 4px;
-}
-
-/* Table header row in mobile header */
-.table-header-row {
-display: flex;
-width: 100%;
-background: #3d3d3d;
-border-top: 1px solid #555555;
-margin-top: 8px;
-}
-
-.table-header-cell {
-padding: 6px 4px;
-font-weight: 600;
-text-align: left;
-color: #007acc;
-white-space: nowrap;
-font-size: 0.7rem;
-border-right: 1px solid #555555;
-}
-
-.table-header-cell:last-child {
-border-right: none;
-}
-
-/* Match table column widths */
-.table-header-cell.col-desc {
-width: 40%;
-}
-
-.table-header-cell.col-debit,
-.table-header-cell.col-credit,
-.table-header-cell.col-balance {
-width: 20%;
-text-align: right;
-}
-
-.mobile-content {
-position: fixed;
-top: 130px; /* Position below the fixed header */
-left: 0;
-right: 0;
-bottom: 0;
-overflow: auto;
--webkit-overflow-scrolling: touch;
-padding-bottom: 100px; /* Extra padding to prevent last records from being hidden by browser toolbar */
-}
-
-/* Excel-like table - Dark theme (matching desktop) */
-.excel-table {
-width: 100%;
-border-collapse: collapse;
-font-size: 0.75rem;
-background: #2d2d2d;
-table-layout: fixed;
-}
-
-.excel-table td {
-padding: 4px 4px;
-border: 1px solid #555555;
-vertical-align: middle;
-font-size: 0.7rem;
-white-space: nowrap;
-overflow: hidden;
-text-overflow: ellipsis;
-max-width: 150px;
-color: #ffffff;
-}
-
-.excel-table tbody tr:nth-child(even) {
-background-color: #2d2d2d;
-}
-
-.excel-table tbody tr:nth-child(odd) {
-background-color: #3d3d3d;
-}
-
-.excel-table tbody tr:hover {
-background-color: #4d4d4d;
-}
-
-/* Column widths - Use percentages to fit viewport */
-.col-desc {
-width: 40%;
-white-space: normal;
-word-wrap: break-word;
-cursor: pointer;
-font-weight: normal;
-}
-
-.col-debit, .col-credit {
-width: 20%;
-text-align: right;
-}
-
-.col-balance {
-width: 20%;
-text-align: right;
-}
-
-/* Swipe-to-reveal container */
-.swipe-container {
-/* TR element - no positioning needed here */
-}
-
-/* Remove spacing on the outer TD that contains swipe-wrapper */
-.swipe-container > td {
-padding: 0 !important;
-border: none !important;
-vertical-align: top;
-}
-
-.swipe-wrapper {
-position: relative;
-overflow: hidden;
-display: block;
-width: 100%;
-isolation: isolate; /* Create new stacking context */
-margin: 0;
-padding: 0;
-}
-
-.swipe-content {
-position: relative;
-background: #2d2d2d;
-transition: transform 0.3s ease;
-z-index: 2;
-width: 100%;
-pointer-events: auto; /* Ensure content is clickable */
-}
-
-/* Inner table cells - keep the Excel styling */
-.swipe-content td {
-padding: 4px 4px;
-border: 1px solid #555555;
-vertical-align: middle;
-font-size: 0.7rem;
-white-space: nowrap;
-overflow: hidden;
-text-overflow: ellipsis;
-max-width: 150px;
-color: #ffffff;
-}
-
-.swipe-actions {
-position: absolute;
-right: 0;
-top: 0;
-height: 100%;
-display: flex;
-align-items: stretch;
-z-index: 1;
-pointer-events: auto; /* Ensure buttons are clickable */
-}
-
-.swipe-action-btn {
-width: 70px;
-border: none;
-color: white;
-font-size: 0.9rem;
-cursor: pointer;
-display: flex;
-align-items: center;
-justify-content: center;
-transition: all 0.2s;
-padding: 0;
-}
-
-.swipe-action-btn i {
-font-size: 1rem;
-}
-
-.swipe-action-edit {
-background: #0d6efd;
-}
-
-.swipe-action-edit:active {
-background: #0a58ca;
-}
-
-.swipe-action-delete {
-background: #dc3545;
-}
-
-.swipe-action-delete:active {
-background: #bb2d3b;
-}
-
-.swipe-action-done {
-background: #198754;
-}
-
-.swipe-action-done:active {
-background: #146c43;
-}
-
-.swipe-action-undone {
-background: #6c757d;
-}
-
-.swipe-action-undone:active {
-background: #5a6268;
-}
-
-/* Info button on left side (for right swipe) */
-.swipe-info-actions {
-position: absolute;
-left: 0;
-top: 0;
-height: 100%;
-display: flex;
-align-items: stretch;
-z-index: 1;
-pointer-events: auto;
-}
-
-.swipe-action-info {
-width: 70px;
-background: #17a2b8;
-border: none;
-color: white;
-font-size: 0.9rem;
-cursor: pointer;
-display: flex;
-align-items: center;
-justify-content: center;
-transition: all 0.2s;
-padding: 0;
-}
-
-.swipe-action-info i {
-font-size: 1rem;
-}
-
-.swipe-action-info:active {
-background: #138496;
-}
-
-/* Touch feedback */
-.swipe-container.swiping .swipe-content {
-transition: none;
-}
-
-/* Override text colors for table on dark background */
-.excel-table .text-success,
-.excel-table .text-danger,
-.excel-table .fw-bold {
-color: #ffffff !important;
-font-weight: normal !important;
-}
-
-.scan-btn-float {
-position: fixed;
-bottom: 90px;
-right: 20px;
-width: 56px;
-height: 56px;
-border-radius: 50%;
-background: rgba(40, 167, 69, 0.7);
-color: white;
-border: none;
-box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
-z-index: 1000;
-display: none;
-align-items: center;
-justify-content: center;
-font-size: 1.3rem;
-backdrop-filter: blur(10px);
-transition: all 0.3s ease;
-opacity: 0;
-transform: scale(0.8);
-}
-
-.scan-btn-float.visible {
-display: flex;
-animation: scanBtnAppear 0.4s ease-out forwards;
-}
-
-@keyframes scanBtnAppear {
-from {
-opacity: 0;
-transform: scale(0.8) translateY(20px);
-}
-to {
-opacity: 1;
-transform: scale(1) translateY(0);
-}
-}
-
-.scan-btn-float:active {
-transform: scale(0.95);
-background: rgba(40, 167, 69, 0.9);
-}
-
-.scan-btn-float:disabled {
-opacity: 0.5;
-pointer-events: none;
-}
-
-.add-btn-float {
-position: fixed;
-bottom: 20px;
-right: 20px;
-width: 56px;
-height: 56px;
-border-radius: 50%;
-background: rgba(31, 111, 235, 0.7);
-color: white;
-border: none;
-box-shadow: 0 4px 12px rgba(31, 111, 235, 0.3);
-z-index: 1000;
-display: flex;
-align-items: center;
-justify-content: center;
-font-size: 1.5rem;
-backdrop-filter: blur(10px);
-}
-
-.add-btn-float:active {
-transform: scale(0.95);
-background: rgba(31, 111, 235, 0.9);
-}
-
-/* Payment method highlighting */
-.transaction-highlighted {
-/* Payment method color will be set inline */
-}
-
-.transaction-highlighted td {
-color: #000000 !important;
-}
-
-.transaction-highlighted .text-success,
-.transaction-highlighted .text-danger,
-.transaction-highlighted .fw-bold {
-color: #000000 !important;
-}
-
-.no-transactions {
-text-align: center;
-padding: 60px 20px;
-color: #cccccc;
-}
-
-/* Modal styles - Dark theme */
-.modal-content {
-background-color: #2d2d2d;
-color: #ffffff;
-border: 1px solid #555555;
-border-radius: 12px;
-}
-
-.modal-header {
-background: linear-gradient(135deg, #3d3d3d 0%, #2d2d2d 100%);
-color: white;
-border-bottom: 1px solid #555555;
-border-radius: 12px 12px 0 0;
-}
-
-.modal-footer {
-border-top: 1px solid #555555;
-}
-
-.modal-header .btn-close {
-filter: brightness(0) invert(1);
-}
-
-.form-label {
-color: #ffffff;
-}
-
-.form-control, .form-select {
-background-color: #3d3d3d;
-border: 1px solid #555555;
-color: #ffffff;
-}
-
-/* Reduce font size for dropdowns to prevent text clipping */
-.form-select {
-font-size: 0.875rem;
-line-height: 1.5;
-}
-
-.form-control:focus, .form-select:focus {
-background-color: #3d3d3d;
-border-color: #007acc;
-color: #ffffff;
-box-shadow: 0 0 0 3px rgba(0, 122, 204, 0.2);
-}
-
-.btn-secondary {
-background-color: #3d3d3d;
-border-color: #555555;
-}
-
-.btn-primary {
-background-color: #007acc;
-border-color: #007acc;
-}
-
-/* Payment totals modal specific styles */
-.payment-totals-table {
-width: 100%;
-font-size: 0.8rem;
-}
-
-.payment-totals-table td {
-padding: 8px 4px;
-border-bottom: 1px solid #555555;
-}
-
-.payment-method-color-indicator {
-width: 16px;
-height: 16px;
-border-radius: 50%;
-display: inline-block;
-margin-right: 8px;
-}
-
-.payment-method-name {
-color: #ffffff;
-}
-
-.payment-amount {
-text-align: right;
-font-weight: 600;
-color: #007acc;
-}
-
-/* Loading overlay */
-.loading-overlay {
-position: fixed;
-top: 0;
-left: 0;
-right: 0;
-bottom: 0;
-background: rgba(0, 0, 0, 0.7);
-display: none;
-justify-content: center;
-align-items: center;
-z-index: 9999;
-}
-
-.loading-overlay.show {
-display: flex;
-}
-
-.loading-spinner {
-text-align: center;
-color: #ffffff;
-}
-
-.loading-spinner i {
-font-size: 3rem;
-margin-bottom: 10px;
-}
-
-/* Payment method list in modal */
-.list-group-item {
-background-color: #3d3d3d;
-border-color: #555555;
-color: #ffffff;
-cursor: pointer;
-transition: all 0.2s;
-}
-
-.list-group-item:hover {
-background-color: #4d4d4d;
-transform: translateX(5px);
-}
-
-.payment-method-list-item {
-display: flex;
-align-items: center;
-gap: 10px;
-background: #0d0d0d !important;
-border-color: #333 !important;
-color: #fff !important;
-cursor: pointer;
-transition: background 0.2s;
-}
-
-.payment-method-list-item:hover {
-background: #1a1a1a !important;
-}
-
-.payment-method-list-item .badge {
-margin-left: auto;
-}
-
-/* Android-style toast notifications */
-.android-toast {
-position: fixed;
-bottom: 80px;
-left: 50%;
-transform: translateX(-50%);
-background-color: rgba(50, 50, 50, 0.95);
-color: #ffffff;
-padding: 10px 20px;
-border-radius: 20px;
-font-size: 0.85rem;
-z-index: 10000;
-max-width: 90%;
-text-align: center;
-box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-opacity: 0;
-animation: toast-fade-in 0.3s ease forwards;
-pointer-events: none;
-}
-
-.android-toast.toast-success {
-background-color: rgba(25, 135, 84, 0.95);
-}
-
-.android-toast.toast-danger {
-background-color: rgba(220, 53, 69, 0.95);
-}
-
-.android-toast.toast-warning {
-background-color: rgba(255, 193, 7, 0.95);
-color: #000000;
-}
-
-.android-toast.toast-info {
-background-color: rgba(13, 110, 253, 0.95);
-}
-
-.android-toast.toast-fade-out {
-animation: toast-fade-out 0.3s ease forwards;
-}
-
-@keyframes toast-fade-in {
-from {
-opacity: 0;
-transform: translateX(-50%) translateY(20px);
-}
-to {
-opacity: 1;
-transform: translateX(-50%) translateY(0);
-}
-}
-
-@keyframes toast-fade-out {
-from {
-opacity: 1;
-transform: translateX(-50%) translateY(0);
-}
-to {
-opacity: 0;
-transform: translateX(-50%) translateY(20px);
-}
-}
-
-/* Mobile Bank Comparison Styles */
-#bankComparisonModal .modal-body {
-    max-height: calc(100vh - 120px);
-    overflow-y: auto;
-}
-
-#mobileBankComparisonChart {
-    width: 100% !important;
-    height: 300px !important;
-}
-
-/* Summary cards for bank comparison */
-#mobileBankSummaryCards .card {
-    transition: transform 0.2s;
-}
-
-#mobileBankSummaryCards .card:active {
-    transform: scale(0.98);
-}
-
-/* Ensure chart is visible on mobile */
-#mobileBankComparisonChartContainer canvas {
-    max-width: 100%;
-    height: auto !important;
-}
-
-/* Mobile legend styling */
-#mobileBankLegend {
-    font-size: 0.75rem;
-    line-height: 1.5;
-}
-
-#mobileBankLegend span {
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Personal Finance Manager{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/exchange_rate_trends.css') }}">
+{% endblock %}
+
+{% block content %}
+<!-- Mobile Sidebar Overlay -->
+<div id="sidebarOverlay" class="sidebar-overlay"></div>
+
+<!-- Mobile Menu Toggle Button (visible only on mobile) -->
+<button id="mobileSidebarToggle" class="mobile-menu-toggle btn btn-primary" style="display: none;">
+    <i class="fas fa-bars"></i> Menu
+</button>
+
+<div class="container-fluid">
+    <div class="row">
+        <!-- Sidebar -->
+        <nav class="col-md-3 col-lg-2 d-md-block sidebar" id="sidebar">
+            <div class="position-sticky">
+                <div class="sidebar-header d-flex align-items-center justify-content-between p-3">
+                    <span class="sidebar-title fw-bold">Menu</span>
+                    <button id="sidebarToggle" class="btn btn-sm sidebar-toggle-btn" title="Collapse sidebar">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                </div>
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#" data-page="transactions">
+                            <i class="fas fa-exchange-alt me-2"></i>Transactions
+                        </a>
+                    </li>
+<li class="nav-item">
+                        <a class="nav-link" href="#" data-page="tax">
+                            <i class="fas fa-calculator me-2"></i>Tax
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-page="reports">
+                            <i class="fas fa-chart-bar me-2"></i>Reports
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-page="rateTrends">
+                            <i class="fas fa-chart-line me-2"></i>Rate Trends
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="col-md-9 ms-sm-auto col-lg-10" id="mainContent">
+            <!-- Vertical expand tab (shown when sidebar is collapsed) -->
+            <div id="sidebarExpandTab" class="sidebar-expand-tab" title="Expand sidebar" style="display: none;">
+                <i class="fas fa-chevron-right"></i>
+            </div>
+
+            <!-- Transactions Page -->
+            <div id="transactionsPage" class="page-content" style="display:none;">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="row align-items-center">
+                            <div class="col">
+                                <h5 class="card-title mb-0">Manage Transactions</h5>
+                            </div>
+                            <div class="col-auto">
+                                <button class="btn btn-gradient btn-sm" data-bs-toggle="modal" data-bs-target="#transactionModal">
+                                    <i class="fas fa-plus me-1"></i>Add Transaction
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- Month/Year Selector and Control Buttons -->
+                        <div class="row mb-3 align-items-center">
+                            <div class="col-auto">
+                                <input type="month" class="form-control form-control-sm" id="monthYearPicker" style="min-width: 160px;" min="2021-02" max="2036-02">
+                            </div>
+                            <div class="col-auto">
+                                <button class="btn btn-secondary btn-sm" id="prevMonthBtn" title="Previous Month">
+                                    <i class="fas fa-chevron-left"></i>
+                                </button>
+                            </div>
+                            <div class="col-auto">
+                                <button class="btn btn-secondary btn-sm" id="nextMonthBtn" title="Next Month">
+                                    <i class="fas fa-chevron-right"></i>
+                                </button>
+                            </div>
+                            <div class="col-auto">
+                                <button class="btn btn-primary btn-sm position-relative" id="filterBtn" data-bs-toggle="modal" data-bs-target="#filterModal">
+                                    <i class="fas fa-filter me-1"></i>Filters
+                                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="filterBadge" style="display: none;">
+                                        0
+                                    </span>
+                                </button>
+                            </div>
+                            <div class="col-auto">
+                                <button class="btn btn-success btn-sm" id="refreshBtn">
+                                    <i class="fas fa-sync-alt me-1"></i>Refresh
+                                </button>
+                            </div>
+                            <div class="col-auto">
+                                <button class="btn btn-gradient btn-sm" id="viewPaymentTotalsBtn" data-bs-toggle="modal" data-bs-target="#paymentTotalsModal">
+                                    <i class="fas fa-wallet me-1"></i>Totals
+                                </button>
+                            </div>
+                            <div class="col-auto">
+                                <button class="btn btn-success btn-sm" id="downloadTransactionsBtn" data-bs-toggle="modal" data-bs-target="#downloadModal">
+                                    <i class="fas fa-download me-1"></i>Download
+                                </button>
+                            </div>
+                            <div class="col-auto">
+                                <button class="btn btn-info btn-sm" id="cloneMonthBtn" data-bs-toggle="modal" data-bs-target="#cloneMonthModal">
+                                    <i class="fas fa-clone me-1"></i>Clone
+                                </button>
+                            </div>
+                            <div class="col-auto">
+                                <button class="btn btn-outline-secondary btn-sm" id="clearFiltersPageBtn" style="display: none;">
+                                    <i class="fas fa-times me-1"></i>Clear
+                                </button>
+                            </div>
+                            <div class="col-auto">
+                                <span id="activeFiltersText" class="text-muted" style="display: none;"></span>
+                            </div>
+                        </div>
+
+                        <!-- Transactions Table -->
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm" id="transactionsTable" style="font-size: 0.875rem;">
+                                <thead>
+                                    <tr>
+                                        <th></th>
+                                        <th>Method</th>
+                                        <th>Description</th>
+                                        <th>Category</th>
+                                        <th>Debit</th>
+                                        <th>Credit</th>
+                                        <th>Balance</th>
+                                        <th>Paid At</th>
+                                        <th>Notes</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Transactions will be loaded here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reports Page -->
+            <div id="reportsPage" class="page-content" style="display:none;">
+                <div class="row">
+                    <div class="col-lg-12 mb-3">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Financial Reports</h5>
+                            </div>
+                            <div class="card-body">
+                                <!-- Date Range Filter -->
+                                <div class="row mb-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label">Date Range</label>
+                                        <select id="reportRangeType" class="form-select">
+                                            <option value="monthly" selected>Monthly</option>
+                                            <option value="weekly">Weekly</option>
+                                            <option value="yearly">Yearly</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Year</label>
+                                        <select id="reportYear" class="form-select">
+                                            <!-- Years populated by JS -->
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4" id="reportMonthContainer">
+                                        <label class="form-label">Month</label>
+                                        <select id="reportMonth" class="form-select">
+                                            <option value="1">January</option>
+                                            <option value="2">February</option>
+                                            <option value="3">March</option>
+                                            <option value="4">April</option>
+                                            <option value="5">May</option>
+                                            <option value="6">June</option>
+                                            <option value="7">July</option>
+                                            <option value="8">August</option>
+                                            <option value="9">September</option>
+                                            <option value="10">October</option>
+                                            <option value="11">November</option>
+                                            <option value="12">December</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <ul class="nav nav-tabs" id="reportTabs">
+                                    <li class="nav-item">
+                                        <a class="nav-link active" data-bs-toggle="tab" href="#monthlyReport">Monthly Summary</a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link" data-bs-toggle="tab" href="#categoryReport">Category Analysis</a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link" data-bs-toggle="tab" href="#cashFlowReport">Cash Flow</a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link" data-bs-toggle="tab" href="#topSpendingReport">Top Spending</a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link" data-bs-toggle="tab" href="#forecastReport">Forecast</a>
+                                    </li>
+                                </ul>
+
+                                <div class="tab-content mt-3">
+                                    <div class="tab-pane fade show active" id="monthlyReport">
+                                        <div style="height: 500px; position: relative;">
+                                            <canvas id="monthlyReportChart"></canvas>
+                                        </div>
+                                    </div>
+                                    <div class="tab-pane fade" id="categoryReport">
+                                        <!-- Income and Expense Charts Side by Side -->
+                                        <div class="row mb-4">
+                                            <div class="col-md-6">
+                                                <div class="card border-success">
+                                                    <div class="card-header bg-success text-white">
+                                                        <h6 class="mb-0"><i class="fas fa-arrow-up me-2"></i>Income by Category</h6>
+                                                    </div>
+                                                    <div class="card-body">
+                                                        <div style="height: 300px; position: relative;">
+                                                            <canvas id="categoryIncomeChart"></canvas>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="card border-danger">
+                                                    <div class="card-header bg-danger text-white">
+                                                        <h6 class="mb-0"><i class="fas fa-arrow-down me-2"></i>Expenses by Category</h6>
+                                                    </div>
+                                                    <div class="card-body">
+                                                        <div style="height: 300px; position: relative;">
+                                                            <canvas id="categoryExpenseChart"></canvas>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Summary Tables -->
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <h6 class="text-success"><i class="fas fa-table me-2"></i>Income Summary</h6>
+                                                <div class="table-responsive">
+                                                    <table class="table table-sm table-striped">
+                                                        <thead class="table-success">
+                                                            <tr>
+                                                                <th>Category</th>
+                                                                <th class="text-end">Amount</th>
+                                                                <th class="text-end">%</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="incomeTableBody">
+                                                            <!-- Populated by JS -->
+                                                        </tbody>
+                                                        <tfoot class="fw-bold">
+                                                            <tr>
+                                                                <td>Total Income</td>
+                                                                <td class="text-end" id="totalIncome">LKR 0.00</td>
+                                                                <td class="text-end">100%</td>
+                                                            </tr>
+                                                        </tfoot>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <h6 class="text-danger"><i class="fas fa-table me-2"></i>Expense Summary</h6>
+                                                <div class="table-responsive">
+                                                    <table class="table table-sm table-striped">
+                                                        <thead class="table-danger">
+                                                            <tr>
+                                                                <th>Category</th>
+                                                                <th class="text-end">Amount</th>
+                                                                <th class="text-end">%</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="expenseTableBody">
+                                                            <!-- Populated by JS -->
+                                                        </tbody>
+                                                        <tfoot class="fw-bold">
+                                                            <tr>
+                                                                <td>Total Expenses</td>
+                                                                <td class="text-end" id="totalExpenses">LKR 0.00</td>
+                                                                <td class="text-end">100%</td>
+                                                            </tr>
+                                                        </tfoot>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Net Savings Card -->
+                                        <div class="row mt-3">
+                                            <div class="col-md-12">
+                                                <div class="card" id="netSavingsCard">
+                                                    <div class="card-body text-center">
+                                                        <h5 class="mb-2">Net Savings</h5>
+                                                        <h3 class="mb-0" id="netSavings">LKR 0.00</h3>
+                                                        <small class="text-muted" id="savingsPercentage">0% savings rate</small>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="tab-pane fade" id="cashFlowReport">
+                                        <div style="height: 500px; position: relative;">
+                                            <canvas id="cashFlowReportChart"></canvas>
+                                        </div>
+                                    </div>
+                                    <div class="tab-pane fade" id="topSpendingReport">
+                                        <div style="height: 500px; position: relative;">
+                                            <canvas id="topSpendingReportChart"></canvas>
+                                        </div>
+                                    </div>
+                                    <div class="tab-pane fade" id="forecastReport">
+                                        <div class="row">
+                                            <div class="col-md-12">
+                                                <div class="alert alert-info" id="forecastSummary">
+                                                    <!-- Forecast summary populated by JS -->
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div style="height: 400px; position: relative;">
+                                            <canvas id="forecastReportChart"></canvas>
+                                        </div>
+                                        <div class="row mt-3">
+                                            <div class="col-md-12">
+                                                <h6>Category Forecast</h6>
+                                                <div class="table-responsive">
+                                                    <table class="table table-sm" id="forecastTable">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>Category</th>
+                                                                <th>Avg Monthly</th>
+                                                                <th>Min</th>
+                                                                <th>Max</th>
+                                                                <th>Std Dev</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="forecastTableBody">
+                                                            <!-- Populated by JS -->
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tax Calculator Page - Completely Redesigned -->
+            <div id="taxPage" class="page-content" style="display:none;">
+                <!-- Page Header -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h4 class="mb-1"><i class="fas fa-calculator me-2"></i>Tax Calculator</h4>
+                        <p class="text-muted mb-0">Foreign Employment Income Tax (Sri Lanka)</p>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="refreshSavedCalculationsBtn">
+                            <i class="fas fa-sync-alt me-1"></i>Refresh
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Quick Summary Stats -->
+                <div class="row g-3 mb-4" id="taxSummaryCards" style="display: none;">
+                    <div class="col-md-3">
+                        <div class="tax-stat-card">
+                            <div class="tax-stat-icon bg-primary-soft">
+                                <i class="fas fa-dollar-sign"></i>
+                            </div>
+                            <div class="tax-stat-content">
+                                <small class="tax-stat-label">Annual Income</small>
+                                <h5 class="tax-stat-value mb-0" id="annualIncomeSummary">LKR 0</h5>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="tax-stat-card">
+                            <div class="tax-stat-icon bg-warning-soft">
+                                <i class="fas fa-shield-alt"></i>
+                            </div>
+                            <div class="tax-stat-content">
+                                <small class="tax-stat-label">Tax-Free Amount</small>
+                                <h5 class="tax-stat-value mb-0" id="taxFreeAmountSummary">LKR 360,000</h5>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="tax-stat-card">
+                            <div class="tax-stat-icon bg-danger-soft">
+                                <i class="fas fa-file-invoice-dollar"></i>
+                            </div>
+                            <div class="tax-stat-content">
+                                <small class="tax-stat-label">Total Tax Liability</small>
+                                <h5 class="tax-stat-value mb-0" id="totalTaxSummary">LKR 0</h5>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="tax-stat-card">
+                            <div class="tax-stat-icon bg-info-soft">
+                                <i class="fas fa-percentage"></i>
+                            </div>
+                            <div class="tax-stat-content">
+                                <small class="tax-stat-label">Effective Tax Rate</small>
+                                <h5 class="tax-stat-value mb-0" id="effectiveTaxRateSummary">0%</h5>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3">
+                    <!-- Left Column - Input Form -->
+                    <div class="col-lg-5">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0"><i class="fas fa-edit me-2"></i>Income Details</h6>
+                            </div>
+                            <div class="card-body">
+                                <form id="taxCalculatorForm">
+                                    <!-- Form Fields Row -->
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="assessmentYear" class="form-label">Assessment Year</label>
+                                            <select id="assessmentYear" class="form-select">
+                                                <option value="2025/2026">2025/2026</option>
+                                                <option value="2024/2025" selected>2024/2025</option>
+                                                <option value="2023/2024">2023/2024</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="startMonth" class="form-label">Start Month</label>
+                                            <select id="startMonth" class="form-select">
+                                                <option value="0" selected>April</option>
+                                                <option value="1">May</option>
+                                                <option value="2">June</option>
+                                                <option value="3">July</option>
+                                                <option value="4">August</option>
+                                                <option value="5">September</option>
+                                                <option value="6">October</option>
+                                                <option value="7">November</option>
+                                                <option value="8">December</option>
+                                                <option value="9">January</option>
+                                                <option value="10">February</option>
+                                                <option value="11">March</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <!-- Tax-Free Threshold -->
+                                    <div class="mb-3">
+                                        <label for="taxFreeThreshold" class="form-label">Tax-Free Threshold (Annual)</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">LKR</span>
+                                            <input type="number" class="form-control" id="taxFreeThreshold" value="1800000" step="1000" min="0">
+                                        </div>
+                                    </div>
+
+                                    <!-- Monthly Data Section (Always Expanded) -->
+                                    <div class="accordion mb-3" id="monthlyDataAccordion">
+                                        <div class="accordion-item">
+                                            <h2 class="accordion-header">
+                                                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#monthlyDataCollapse">
+                                                    <i class="fas fa-calendar-alt me-2"></i>Monthly Salary & Bonus
+                                                </button>
+                                            </h2>
+                                            <div id="monthlyDataCollapse" class="accordion-collapse collapse show">
+                                                <div class="accordion-body p-2">
+                                                    <div class="table-responsive">
+                                                        <table class="table table-sm mb-0" id="monthlyDataTable">
+                                                            <tbody id="monthlyDataBody"></tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Action Buttons -->
+                                    <div class="d-grid gap-2">
+                                        <button type="button" class="btn btn-primary btn-lg" id="calculateTaxBtn">
+                                            <i class="fas fa-calculator me-2"></i>Calculate Tax
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary" id="resetTaxBtn">
+                                            <i class="fas fa-redo me-2"></i>Reset Form
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column - Results & Saved Calculations -->
+                    <div class="col-lg-7">
+                        <!-- Tax Schedule Results -->
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h6 class="mb-0"><i class="fas fa-table me-2"></i>Tax Schedule <span class="badge bg-secondary" id="yaDisplay">2024/2025</span></h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover mb-0" id="taxScheduleTable">
+                                        <thead>
+                                            <tr>
+                                                <th>Month</th>
+                                                <th class="text-end">Receipts</th>
+                                                <th class="text-end">LKR</th>
+                                                <th class="text-end">Cumulative</th>
+                                                <th class="text-end">Tax Due</th>
+                                                <th class="text-end">Payment</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="taxScheduleBody">
+                                            <tr>
+                                                <td colspan="6" class="text-center text-muted py-5">
+                                                    <i class="fas fa-calculator fa-2x mb-2 d-block"></i>
+                                                    Click "Calculate Tax" to generate schedule
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                        <tfoot style="display: none;">
+                                            <tr class="fw-bold">
+                                                <td>Total</td>
+                                                <td class="text-end" id="totalUSD">$0</td>
+                                                <td class="text-end" id="totalConverted">LKR 0</td>
+                                                <td class="text-end">-</td>
+                                                <td class="text-end" id="totalTaxLiability">LKR 0</td>
+                                                <td class="text-end" id="totalMonthlyPayments">LKR 0</td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Save Modal (appears after calculation) -->
+                        <div id="saveCalculationSection" style="display: none;">
+                            <div class="card border-success mb-3">
+                                <div class="card-body">
+                                    <div class="row align-items-end">
+                                        <div class="col-md-8">
+                                            <label for="calculationName" class="form-label small mb-1">Save this calculation</label>
+                                            <input type="text" class="form-control" id="calculationName" placeholder="e.g., My 2024/2025 Tax Plan">
+                                            <div class="form-check mt-2">
+                                                <input class="form-check-input" type="checkbox" id="setAsActive" checked>
+                                                <label class="form-check-label small" for="setAsActive">
+                                                    Set as active calculation for this year
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <button type="button" class="btn btn-success w-100" id="saveCalculationBtnAlt">
+                                                <i class="fas fa-save me-1"></i>Save
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Saved Calculations List -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0"><i class="fas fa-history me-2"></i>Saved Calculations</h6>
+                            </div>
+                            <div class="card-body">
+                                <div id="savedCalculationsList">
+                                    <div class="text-center text-muted py-4">
+                                        <i class="fas fa-folder-open fa-2x mb-2 d-block"></i>
+                                        <small>No saved calculations</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rate Trends Page -->
+            <div id="rateTrendsPage" class="page-content" style="display:none;">
+                <div class="ert-container">
+                    <!-- Header -->
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                        <div>
+                            <h4 class="mb-1"><i class="fas fa-chart-line me-2"></i>Exchange Rate Trends</h4>
+                            <p class="text-muted mb-0 small">USD to LKR &mdash; Past, Present &amp; Forecast</p>
+                        </div>
+                        <button class="btn btn-sm btn-outline-primary" id="ertRefreshBtn">
+                            <i class="fas fa-sync-alt me-1"></i>Refresh
+                        </button>
+                    </div>
+
+                    <!-- Loading -->
+                    <div id="ertLoading" class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2 text-muted">Loading exchange rate data...</p>
+                    </div>
+
+                    <!-- Error -->
+                    <div id="ertError" class="alert alert-warning" style="display:none;">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <span id="ertErrorMsg">Failed to load exchange rate data.</span>
+                    </div>
+
+                    <!-- Content (shown after successful load) -->
+                    <div id="ertContent" style="display:none;">
+                        <!-- Summary Cards -->
+                        <div class="row mb-3">
+                            <div class="col-6 col-md-3 mb-2">
+                                <div class="card ert-stat-card">
+                                    <div class="card-body p-2">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <h6 class="text-muted mb-1 small text-uppercase">Buy Rate</h6>
+                                                <h4 class="mb-0 ert-rate-value" id="ertTodayRate">--</h4>
+                                            </div>
+                                            <div class="ert-stat-icon bg-primary"><i class="fas fa-dollar-sign"></i></div>
+                                        </div>
+                                        <small class="text-muted" id="ertTodayDate">--</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3 mb-2">
+                                <div class="card ert-stat-card">
+                                    <div class="card-body p-2">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <h6 class="text-muted mb-1 small text-uppercase">30-Day Change</h6>
+                                                <h4 class="mb-0" id="ert30DayChange">--</h4>
+                                            </div>
+                                            <div class="ert-stat-icon" id="ertChangeIcon"><i class="fas fa-arrows-alt-v"></i></div>
+                                        </div>
+                                        <small class="text-muted" id="ert30DayPct">--</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3 mb-2">
+                                <div class="card ert-stat-card">
+                                    <div class="card-body p-2">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <h6 class="text-muted mb-1 small text-uppercase">Min / Max</h6>
+                                                <h4 class="mb-0 ert-rate-value" id="ertMinMax">--</h4>
+                                            </div>
+                                            <div class="ert-stat-icon bg-warning"><i class="fas fa-arrows-alt-v"></i></div>
+                                        </div>
+                                        <small class="text-muted">Buy rate range</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3 mb-2">
+                                <div class="card ert-stat-card">
+                                    <div class="card-body p-2">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <h6 class="text-muted mb-1 small text-uppercase">Volatility</h6>
+                                                <h4 class="mb-0" id="ertVolatility">--</h4>
+                                            </div>
+                                            <div class="ert-stat-icon bg-info"><i class="fas fa-wave-square"></i></div>
+                                        </div>
+                                        <small class="text-muted">Std dev (monthly)</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Controls -->
+                        <div class="card mb-3">
+                            <div class="card-body p-2">
+                                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                    <div class="btn-group btn-group-sm" role="group" id="ertPeriodSelector">
+                                        <button type="button" class="btn btn-outline-primary active" data-period="daily">Daily</button>
+                                        <button type="button" class="btn btn-outline-primary" data-period="weekly">Weekly</button>
+                                        <button type="button" class="btn btn-outline-primary" data-period="monthly">Monthly</button>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <label class="form-label mb-0 small">History:</label>
+                                        <select class="form-select form-select-sm" id="ertMonthsSelector" style="width:auto;">
+                                            <option value="1">1 Month</option>
+                                            <option value="3">3 Months</option>
+                                            <option value="6" selected>6 Months</option>
+                                            <option value="12">1 Year</option>
+                                            <option value="24">2 Years</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Bank Comparison (first) -->
+                        <div class="card mb-3">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h6 class="card-title mb-0"><i class="fas fa-balance-scale me-2"></i>Bank Comparison</h6>
+                                <select class="form-select form-select-sm" id="ertCompMonths" style="width:auto;">
+                                    <option value="1">1M</option>
+                                    <option value="3" selected>3M</option>
+                                    <option value="6">6M</option>
+                                </select>
+                            </div>
+                            <div class="card-body">
+                                <div class="ert-chart-container"><canvas id="ertSourceChart"></canvas></div>
+                            </div>
+                        </div>
+
+                        <!-- Exchange Rate History -->
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h6 class="card-title mb-0"><i class="fas fa-chart-area me-2"></i>Exchange Rate History</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="ert-chart-container"><canvas id="ertTrendChart"></canvas></div>
+                            </div>
+                        </div>
+
+                        <!-- Forecast + Volatility -->
+                        <div class="row mb-3">
+                            <div class="col-12 col-lg-7 mb-3 mb-lg-0">
+                                <div class="card h-100">
+                                    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                        <h6 class="card-title mb-0"><i class="fas fa-magic me-2"></i>Forecast (Linear Trend)</h6>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <label class="form-label mb-0 small">Days:</label>
+                                            <select class="form-select form-select-sm" id="ertForecastDays" style="width:auto;">
+                                                <option value="7">7</option>
+                                                <option value="14">14</option>
+                                                <option value="30" selected>30</option>
+                                                <option value="60">60</option>
+                                                <option value="90">90</option>
+                                            </select>
+                                            <label class="form-label mb-0 small">Based on:</label>
+                                            <select class="form-select form-select-sm" id="ertForecastHistory" style="width:auto;">
+                                                <option value="1">1M</option>
+                                                <option value="3" selected>3M</option>
+                                                <option value="6">6M</option>
+                                                <option value="12">1Y</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="ert-chart-container"><canvas id="ertForecastChart"></canvas></div>
+                                        <div id="ertModelInfo" class="mt-2 small text-muted" style="display:none;">
+                                            <span><strong>Slope:</strong> <span id="ertSlope">--</span> LKR/day</span> &middot;
+                                            <span><strong>R&sup2;:</strong> <span id="ertR2">--</span></span> &middot;
+                                            <span><strong>Data:</strong> <span id="ertDataPts">--</span> points</span> &middot;
+                                            <span>95% Confidence Band</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-lg-5">
+                                <div class="card h-100">
+                                    <div class="card-header">
+                                        <h6 class="card-title mb-0"><i class="fas fa-chart-bar me-2"></i>Monthly Volatility</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="ert-chart-container"><canvas id="ertVolChart"></canvas></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<!-- Transaction Modal -->
+<div class="modal fade" id="transactionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Transaction</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="transactionForm" novalidate>
+                    <div class="mb-3">
+                        <label for="transDescription" class="form-label">Description</label>
+                        <input type="text" class="form-control" id="transDescription" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="transCategory" class="form-label">Category</label>
+                        <div class="d-flex gap-2 align-items-start">
+                            <select class="form-select" id="transCategory">
+                                <!-- Categories will be loaded here -->
+                            </select>
+                            <button type="button" class="btn btn-outline-primary btn-sm" id="toggleNewCategoryBtn" style="white-space: nowrap;">
+                                <i class="fas fa-plus"></i> New
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#manageCategoriesModal" style="white-space: nowrap;">
+                                <i class="fas fa-cog"></i> Manage
+                            </button>
+                        </div>
+
+                        <!-- Inline category creation form (initially hidden) -->
+                        <div id="newCategoryForm" class="mt-2" style="display: none;">
+                            <div class="card border-primary">
+                                <div class="card-body p-2">
+                                    <h6 class="card-title mb-2" style="font-size: 0.875rem;">
+                                        <i class="fas fa-plus-circle me-1"></i>Add New Category
+                                    </h6>
+                                    <div class="mb-2">
+                                        <input type="text" class="form-control form-control-sm" id="newCategoryName" placeholder="Category name" maxlength="255">
+                                    </div>
+                                    <div class="mb-2">
+                                        <select class="form-select form-select-sm" id="newCategoryType">
+                                            <option value="">Select type...</option>
+                                            <option value="income">Income</option>
+                                            <option value="expense">Expense</option>
+                                        </select>
+                                    </div>
+                                    <div class="d-flex gap-2">
+                                        <button type="button" class="btn btn-primary btn-sm flex-fill" id="saveNewCategoryBtn">
+                                            <i class="fas fa-check me-1"></i>Save
+                                        </button>
+                                        <button type="button" class="btn btn-secondary btn-sm flex-fill" id="cancelNewCategoryBtn">
+                                            <i class="fas fa-times me-1"></i>Cancel
+                                        </button>
+                                    </div>
+                                    <div id="newCategoryMessage" class="mt-2" style="display: none;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="transDebit" class="form-label">Debit (Income)</label>
+                            <input type="text" class="form-control" id="transDebit" placeholder="0.00" inputmode="decimal">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="transCredit" class="form-label">Credit (Expense)</label>
+                            <input type="text" class="form-control" id="transCredit" placeholder="0.00" inputmode="decimal">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="transDate" class="form-label">Date</label>
+                        <input type="date" class="form-control" id="transDate">
+                    </div>
+                    <div class="mb-3">
+                        <label for="transNotes" class="form-label">Notes</label>
+                        <textarea class="form-control" id="transNotes" rows="2"></textarea>
+                    </div>
+                    <input type="hidden" id="editTransactionId" value="">
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveTransactionBtn">Save Transaction</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Payment Method Selection Modal -->
+<div class="modal fade" id="paymentMethodModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Select Payment Method</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>How did you pay for this transaction?</p>
+                <div id="paymentMethodList" class="list-group">
+                    <!-- Payment methods will be loaded here -->
+                </div>
+                <hr>
+                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#manageCreditCardsModal">
+                    <i class="fas fa-credit-card me-1"></i>Manage Credit Cards
+                </button>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Manage Credit Cards Modal -->
+<div class="modal fade" id="manageCreditCardsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Manage Credit Cards</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row mb-3">
+                    <div class="col">
+                        <h6>Your Credit Cards</h6>
+                    </div>
+                    <div class="col-auto">
+                        <button type="button" class="btn btn-sm btn-primary" id="addCreditCardBtn">
+                            <i class="fas fa-plus me-1"></i>Add Credit Card
+                        </button>
+                    </div>
+                </div>
+
+                <div id="creditCardsList" class="list-group mb-3">
+                    <!-- Credit cards will be loaded here -->
+                </div>
+
+                <!-- Add Credit Card Form (initially hidden) -->
+                <div id="addCreditCardForm" style="display:none;">
+                    <hr>
+                    <h6>Add New Credit Card</h6>
+                    <form id="creditCardForm">
+                        <div class="mb-3">
+                            <label for="cardName" class="form-label">Card Name</label>
+                            <input type="text" class="form-control" id="cardName" placeholder="e.g., Visa Gold, Master Card" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="cardColor" class="form-label">Highlight Color</label>
+                            <input type="color" class="form-control form-control-color" id="cardColor" value="#007bff">
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-save me-1"></i>Save Card
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="cancelAddCardBtn">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Manage Categories Modal -->
+<div class="modal fade" id="manageCategoriesModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Manage Categories</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" style="padding: 1rem; max-height: calc(100vh - 200px); overflow-y: auto;">
+                <div class="alert alert-info mb-2 py-2">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <small>Categories being used in transactions cannot be deleted.</small>
+                </div>
+
+                <!-- Edit Category Form (initially hidden) -->
+                <div id="editCategoryForm" class="mb-2" style="display: none;">
+                    <div class="card border-warning">
+                        <div class="card-body p-2">
+                            <h6 class="card-title mb-2" style="font-size: 0.9rem;">
+                                <i class="fas fa-edit me-2"></i>Edit Category
+                            </h6>
+                            <form id="categoryEditForm">
+                                <input type="hidden" id="editCategoryId">
+                                <div class="row g-2">
+                                    <div class="col-md-6">
+                                        <label for="editCategoryName" class="form-label" style="font-size: 0.85rem; margin-bottom: 0.25rem;">Category Name</label>
+                                        <input type="text" class="form-control form-control-sm" id="editCategoryName" maxlength="255" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="editCategoryType" class="form-label" style="font-size: 0.85rem; margin-bottom: 0.25rem;">Type</label>
+                                        <select class="form-select form-select-sm" id="editCategoryType" required>
+                                            <option value="income">Income</option>
+                                            <option value="expense">Expense</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-2 mt-2">
+                                    <button type="button" class="btn btn-success btn-sm" id="saveEditCategoryBtn">
+                                        <i class="fas fa-save me-1"></i>Save
+                                    </button>
+                                    <button type="button" class="btn btn-secondary btn-sm" id="cancelEditCategoryBtn">
+                                        <i class="fas fa-times me-1"></i>Cancel
+                                    </button>
+                                </div>
+                                <div id="editCategoryMessage" class="mt-2" style="display: none;"></div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-2">
+                    <!-- Income Categories -->
+                    <div class="col-md-6">
+                        <h6 class="text-success mb-2" style="font-size: 0.9rem;"><i class="fas fa-arrow-down me-2"></i>Income Categories</h6>
+                        <div id="incomeCategoriesList" class="list-group" style="max-height: 300px; overflow-y: auto;">
+                            <!-- Income categories will be loaded here -->
+                        </div>
+                    </div>
+
+                    <!-- Expense Categories -->
+                    <div class="col-md-6">
+                        <h6 class="text-danger mb-2" style="font-size: 0.9rem;"><i class="fas fa-arrow-up me-2"></i>Expense Categories</h6>
+                        <div id="expenseCategoriesList" class="list-group" style="max-height: 300px; overflow-y: auto;">
+                            <!-- Expense categories will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 0.5rem 1rem;">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Category Confirmation Modal -->
+<div class="modal fade" id="deleteCategoryConfirmModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-exclamation-triangle text-warning me-2"></i>Confirm Delete
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="deleteCategoryConfirmMessage"></p>
+                <div class="alert alert-warning mb-0">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Note:</strong> Categories that are being used in transactions cannot be deleted.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteCategoryBtn">
+                    <i class="fas fa-trash me-1"></i>Delete Category
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Payment Totals Modal -->
+<div class="modal fade" id="paymentTotalsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Payment Method Totals</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Showing totals for marked transactions only (paid/done)
+                </div>
+
+                <div id="paymentTotalsContent">
+                    <!-- Totals will be loaded here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Clone Month Modal -->
+<div class="modal fade" id="cloneMonthModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Clone Month Transactions</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    This will copy all transactions from the source month to the target month.
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label">Copy From:</label>
+                    <input type="month" class="form-control" id="cloneFromMonthYear">
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label">Copy To:</label>
+                    <input type="month" class="form-control" id="cloneToMonthYear">
+                </div>
+
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="cloneWithPayments" checked>
+                    <label class="form-check-label" for="cloneWithPayments">
+                        Include payment method assignments
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="executeCloneBtn">
+                    <i class="fas fa-clone me-1"></i>Clone Transactions
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Transaction Audit Log Modal -->
+<div class="modal fade" id="auditLogModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-history me-2"></i>Transaction Audit Log
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="auditLogContent">
+                    <div class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Loading audit logs...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bill Content Modal -->
+<div class="modal fade" id="billContentModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-receipt me-2"></i>Bill Details
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="billContentDisplay">
+                    <div class="text-center py-4">
+                        <i class="fas fa-receipt fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">No bill content available</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Move/Copy Transaction Modal -->
+<div class="modal fade" id="moveCopyTransactionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-exchange-alt me-2"></i><span id="moveCopyTitle">Move Transaction</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <span id="moveCopyInfoText">This will move the transaction to the selected month.</span>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Transaction:</label>
+                    <div id="moveCopyTransactionInfo" class="p-2 rounded" style="background-color: var(--bg-tertiary);"></div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="targetMonthYear" class="form-label fw-bold">Target Month:</label>
+                    <input type="month" class="form-control" id="targetMonthYear" required>
+                </div>
+
+                <input type="hidden" id="moveCopyTransactionId">
+                <input type="hidden" id="moveCopyAction">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="executeMoveCopyBtn">
+                    <i class="fas fa-check me-1"></i>Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Download Transactions Modal -->
+<div class="modal fade" id="downloadModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-download me-2"></i>Download Transactions
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Download transactions for the currently selected month and filters.
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Select Format:</label>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-success" onclick="downloadTransactions('csv')">
+                            <i class="fas fa-file-csv me-2"></i>CSV (Comma Separated Values)
+                        </button>
+                        <button class="btn btn-outline-danger" onclick="downloadTransactions('pdf')">
+                            <i class="fas fa-file-pdf me-2"></i>PDF (Portable Document)
+                        </button>
+                        <button class="btn btn-outline-primary" onclick="downloadTransactions('excel')">
+                            <i class="fas fa-file-excel me-2"></i>Excel (XLSX Spreadsheet)
+                        </button>
+                    </div>
+                </div>
+
+                <div class="small opacity-75">
+                    <i class="fas fa-lightbulb me-1"></i>
+                    <strong>Tip:</strong> CSV files can be opened in Excel, Google Sheets, or any text editor.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filter Modal - Revamped Design -->
+<div class="modal fade" id="filterModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title">
+                    <i class="fas fa-filter me-2"></i>Advanced Filters
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" style="padding: 0.75rem;">
+                <!-- Quick Filter Presets -->
+                <div class="mb-2">
+                    <h6 class="text-muted mb-2" style="font-size: 0.875rem;"><i class="fas fa-bolt me-2"></i>Quick Filters</h6>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-primary filter-quick-btn" onclick="applyQuickFilter('today')">
+                            <i class="fas fa-calendar-day me-1"></i>Today
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-primary filter-quick-btn" onclick="applyQuickFilter('last7days')">
+                            <i class="fas fa-calendar-week me-1"></i>Last 7 Days
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-primary filter-quick-btn" onclick="applyQuickFilter('thisMonth')">
+                            <i class="fas fa-calendar-alt me-1"></i>This Month
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-success filter-quick-btn" onclick="applyQuickFilter('income')">
+                            <i class="fas fa-arrow-down me-1"></i>Income Only
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-danger filter-quick-btn" onclick="applyQuickFilter('expense')">
+                            <i class="fas fa-arrow-up me-1"></i>Expenses Only
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-warning filter-quick-btn" onclick="applyQuickFilter('unpaid')">
+                            <i class="fas fa-exclamation-triangle me-1"></i>Unpaid
+                        </button>
+                    </div>
+                </div>
+
+                <hr>
+
+                <div class="row g-2">
+                    <!-- Search Filters -->
+                    <div class="col-12">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-body" style="padding: 0.5rem;">
+                                <h6 class="card-title mb-2" style="font-size: 0.875rem;">
+                                    <i class="fas fa-search me-2"></i>Search
+                                </h6>
+                                <div class="row g-2">
+                                    <div class="col-md-6">
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text"><i class="fas fa-file-alt"></i></span>
+                                            <input type="text" class="form-control" id="filterDescription" placeholder="Search description...">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text"><i class="fas fa-sticky-note"></i></span>
+                                            <input type="text" class="form-control" id="filterNotes" placeholder="Search notes...">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Categories & Payment Methods -->
+                    <div class="col-md-6">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body" style="padding: 0.5rem;">
+                                <h6 class="card-title mb-2" style="font-size: 0.875rem;">
+                                    <i class="fas fa-tags me-2"></i>Categories
+                                </h6>
+                                <div class="mb-2">
+                                    <button type="button" class="btn btn-sm btn-link text-decoration-none filter-toggle-btn" onclick="selectAllCategories()">
+                                        Select All
+                                    </button>
+                                    <span class="text-muted mx-1">|</span>
+                                    <button type="button" class="btn btn-sm btn-link text-decoration-none filter-toggle-btn" onclick="deselectAllCategories()">
+                                        Clear
+                                    </button>
+                                </div>
+                                <div id="filterCategoryCheckboxes" class="filter-checkbox-container">
+                                    <!-- Categories will be populated here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body" style="padding: 0.5rem;">
+                                <h6 class="card-title mb-2" style="font-size: 0.875rem;">
+                                    <i class="fas fa-credit-card me-2"></i>Payment Methods
+                                </h6>
+                                <div class="mb-2">
+                                    <button type="button" class="btn btn-sm btn-link text-decoration-none filter-toggle-btn" onclick="selectAllPaymentMethods()">
+                                        Select All
+                                    </button>
+                                    <span class="text-muted mx-1">|</span>
+                                    <button type="button" class="btn btn-sm btn-link text-decoration-none filter-toggle-btn" onclick="deselectAllPaymentMethods()">
+                                        Clear
+                                    </button>
+                                </div>
+                                <div id="filterPaymentMethodCheckboxes" class="filter-checkbox-container">
+                                    <!-- Payment methods will be populated here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Transaction Type & Status -->
+                    <div class="col-md-6">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-body" style="padding: 0.5rem;">
+                                <h6 class="card-title mb-2" style="font-size: 0.875rem;">
+                                    <i class="fas fa-exchange-alt me-2"></i>Transaction Type
+                                </h6>
+                                <div class="form-check mb-1" style="font-size: 0.85rem;">
+                                    <input class="form-check-input filter-type-checkbox" type="checkbox" value="income" id="filterTypeIncome">
+                                    <label class="form-check-label" for="filterTypeIncome">
+                                        <i class="fas fa-arrow-down text-success me-1"></i>Income (Debit)
+                                    </label>
+                                </div>
+                                <div class="form-check" style="font-size: 0.85rem;">
+                                    <input class="form-check-input filter-type-checkbox" type="checkbox" value="expense" id="filterTypeExpense">
+                                    <label class="form-check-label" for="filterTypeExpense">
+                                        <i class="fas fa-arrow-up text-danger me-1"></i>Expense (Credit)
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-body" style="padding: 0.5rem;">
+                                <h6 class="card-title mb-2" style="font-size: 0.875rem;">
+                                    <i class="fas fa-check-circle me-2"></i>Status
+                                </h6>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <div class="form-check mb-1" style="font-size: 0.85rem;">
+                                            <input class="form-check-input filter-status-checkbox" type="checkbox" value="done" id="filterStatusDone">
+                                            <label class="form-check-label" for="filterStatusDone">
+                                                <i class="fas fa-check text-success me-1"></i>Done
+                                            </label>
+                                        </div>
+                                        <div class="form-check" style="font-size: 0.85rem;">
+                                            <input class="form-check-input filter-status-checkbox" type="checkbox" value="not_done" id="filterStatusNotDone">
+                                            <label class="form-check-label" for="filterStatusNotDone">
+                                                <i class="fas fa-times text-muted me-1"></i>Not Done
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="form-check mb-1" style="font-size: 0.85rem;">
+                                            <input class="form-check-input filter-status-checkbox" type="checkbox" value="paid" id="filterStatusPaid">
+                                            <label class="form-check-label" for="filterStatusPaid">
+                                                <i class="fas fa-dollar-sign text-success me-1"></i>Paid
+                                            </label>
+                                        </div>
+                                        <div class="form-check" style="font-size: 0.85rem;">
+                                            <input class="form-check-input filter-status-checkbox" type="checkbox" value="unpaid" id="filterStatusUnpaid">
+                                            <label class="form-check-label" for="filterStatusUnpaid">
+                                                <i class="fas fa-exclamation text-warning me-1"></i>Unpaid
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Amount Range -->
+                    <div class="col-12">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-body" style="padding: 0.5rem;">
+                                <h6 class="card-title mb-2" style="font-size: 0.875rem;">
+                                    <i class="fas fa-dollar-sign me-2"></i>Amount Range
+                                </h6>
+                                <div class="row g-2">
+                                    <div class="col-md-6">
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text">Min</span>
+                                            <input type="number" class="form-control" id="filterMinAmount" placeholder="0.00" step="0.01" min="0">
+                                            <span class="input-group-text"><i class="fas fa-dollar-sign"></i></span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text">Max</span>
+                                            <input type="number" class="form-control" id="filterMaxAmount" placeholder="No limit" step="0.01" min="0">
+                                            <span class="input-group-text"><i class="fas fa-dollar-sign"></i></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Date Range -->
+                    <div class="col-12">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-body" style="padding: 0.5rem;">
+                                <h6 class="card-title mb-2" style="font-size: 0.875rem;">
+                                    <i class="fas fa-calendar me-2"></i>Date Range (Monthly Records)
+                                </h6>
+                                <div class="row g-2">
+                                    <div class="col-md-6">
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text">From</span>
+                                            <input type="date" class="form-control" id="filterStartDate" placeholder="Start month">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text">To</span>
+                                            <input type="date" class="form-control" id="filterEndDate" placeholder="End month">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Active Filters Display -->
+                <div id="activeFiltersDisplay" class="mt-2" style="display: none;">
+                    <div class="alert alert-info mb-0">
+                        <h6 class="alert-heading">
+                            <i class="fas fa-filter me-2"></i>Active Filters:
+                        </h6>
+                        <div id="activeFiltersList" class="d-flex flex-wrap gap-2 mt-2">
+                            <!-- Active filter badges will be displayed here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary btn-sm filter-action-btn" id="clearFiltersBtn">
+                    <i class="fas fa-eraser me-1"></i>Clear All
+                </button>
+                <button type="button" class="btn btn-primary btn-sm filter-action-btn" id="applyFiltersBtn">
+                    <i class="fas fa-check me-1"></i>Apply Filters
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Transaction Controls Row - Ensure all buttons are same size */
+.row.mb-3.align-items-center {
+    row-gap: 0.5rem;
+}
+
+.row.mb-3.align-items-center .btn-sm {
+    min-height: 31px;
+    padding: 0.25rem 0.75rem;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     white-space: nowrap;
 }
 
-/* Loading and error states */
-#mobileBankComparisonLoading,
-#mobileBankComparisonError {
-    min-height: 200px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+.row.mb-3.align-items-center .form-control-sm {
+    min-height: 31px;
 }
 
-/* Responsive adjustments for very small screens */
-@media (max-width: 360px) {
-    #mobileBankComparisonChart {
-        height: 250px !important;
-    }
-
-    #mobileBankLegend {
-        font-size: 0.7rem;
-    }
-
-    #mobileBankSummaryCards .card-body {
-        padding: 8px !important;
-    }
-
-    #mobileBankSummaryCards h5 {
-        font-size: 1rem !important;
-    }
-
-    #mobileBankSummaryCards h6 {
-        font-size: 0.7rem !important;
-    }
+/* Compact Transaction Table Rows */
+#transactionsTable tbody td {
+    padding: 0.25rem 0.5rem !important;
+    vertical-align: middle;
 }
 
-/* Bill Items Modal - Theme Support */
-.bill-items-modal .modal-content {
-    background: #1a1a1a;
-    color: #ffffff;
+#transactionsTable thead th {
+    padding: 0.5rem !important;
 }
 
-html[data-theme="light"] .bill-items-modal .modal-content {
-    background: #ffffff;
-    color: #000000;
+/* Drag Handle Styling */
+.drag-handle {
+    cursor: grab;
+    user-select: none;
+    opacity: 0.4;
+    transition: opacity 0.2s;
 }
 
-.bill-items-modal .modal-header {
-    border-bottom: 1px solid #333;
-    background: linear-gradient(135deg, #3d3d3d 0%, #2d2d2d 100%);
-    color: white;
-    padding: 10px 16px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+.drag-handle:hover {
+    opacity: 0.8;
 }
 
-html[data-theme="light"] .bill-items-modal .modal-header {
-    border-bottom: 1px solid #dee2e6;
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-    color: #000;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+.drag-handle:active {
+    cursor: grabbing;
+    opacity: 1;
 }
 
-.bill-items-modal .btn-close {
-    filter: brightness(0) invert(1);
+tr.dragging {
+    opacity: 0.5;
 }
 
-html[data-theme="light"] .bill-items-modal .btn-close {
-    filter: none;
+tr[draggable="true"] {
+    cursor: move;
 }
 
-.bill-items-modal .modal-body {
-    padding: 0;
+/* Filter Modal Styling - Using Base Template Colors */
+#filterModal .modal-content {
+    background-color: var(--modal-bg);
+    color: var(--text-primary);
 }
 
-.bill-items-modal .modal-footer {
-    border-top: 1px solid #333;
-    padding: 8px 16px;
+/* Ensure ALL modals are on top of navbar */
+.modal {
+    z-index: 1200 !important;
 }
 
-html[data-theme="light"] .bill-items-modal .modal-footer {
-    border-top: 1px solid #dee2e6;
+.modal-backdrop {
+    z-index: 1199 !important;
 }
 
-.bill-header-info {
-    background: linear-gradient(135deg, #3d3d3d 0%, #2d2d2d 100%);
-    color: white;
-    padding: 10px 16px;
-    border-bottom: 1px solid #333;
+/* Prevent cards in filter modal from moving on hover */
+#filterModal .card:hover {
+    transform: none !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
 }
 
-html[data-theme="light"] .bill-header-info {
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-    color: #000;
-    border-bottom: 1px solid #dee2e6;
+[data-theme="light"] #filterModal .card:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
 }
 
-.bill-header-info h6 {
-    font-size: 0.95rem;
-    margin-bottom: 2px;
+#filterModal .modal-header {
+    background: var(--card-header-bg);
+    border-bottom: 1px solid var(--border-color);
 }
 
-.bill-header-info small {
-    font-size: 0.75rem;
+#filterModal .modal-footer {
+    background: var(--card-header-bg);
+    border-top: 1px solid var(--border-color);
 }
 
-.bill-items-table {
-    color: #fff;
-    margin-bottom: 0;
+#filterModal .card {
+    background-color: var(--card-bg);
+    border-color: var(--border-color);
+}
+
+#filterModal .card-title {
+    color: var(--text-primary);
+}
+
+#filterModal .input-group-text {
+    background-color: var(--bg-tertiary);
+    border-color: var(--input-border);
+    color: var(--text-primary);
+}
+
+.filter-checkbox-container {
+    max-height: 140px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    padding: 0.5rem;
+    background-color: var(--bg-secondary);
+}
+
+.filter-checkbox-container .form-check {
+    margin-bottom: 0.25rem;
     font-size: 0.85rem;
 }
 
-html[data-theme="light"] .bill-items-table {
-    color: #000;
+.filter-checkbox-container .form-check:last-child {
+    margin-bottom: 0;
 }
 
-.bill-items-table thead {
-    background: #2a2a2a;
+.filter-checkbox-container .form-check-label {
+    color: var(--text-primary);
+    font-weight: normal;
 }
 
-html[data-theme="light"] .bill-items-table thead {
-    background: #e9ecef;
+.filter-checkbox-container::-webkit-scrollbar {
+    width: 8px;
 }
 
-.bill-items-table th,
-.bill-items-table td {
-    border-color: #444;
-    padding: 8px;
+.filter-checkbox-container::-webkit-scrollbar-track {
+    background: var(--bg-tertiary);
+    border-radius: 4px;
 }
 
-html[data-theme="light"] .bill-items-table th,
-html[data-theme="light"] .bill-items-table td {
-    border-color: #dee2e6;
+.filter-checkbox-container::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
 }
 
-.bill-items-table tbody tr:nth-child(even) {
-    background: #1a1a1a;
+.filter-checkbox-container::-webkit-scrollbar-thumb:hover {
+    background: var(--text-secondary);
 }
 
-.bill-items-table tbody tr:nth-child(odd) {
-    background: #222222;
+/* Make all filter labels use theme colors */
+#filterModal .form-check-label {
+    color: var(--text-primary);
 }
 
-html[data-theme="light"] .bill-items-table tbody tr:nth-child(even) {
-    background: #ffffff;
+#filterModal .text-muted {
+    color: var(--text-secondary) !important;
 }
 
-html[data-theme="light"] .bill-items-table tbody tr:nth-child(odd) {
-    background: #f8f9fa;
+#filterModal hr {
+    border-color: var(--border-color);
+    opacity: 1;
 }
 
-.bill-items-table tfoot {
-    background: linear-gradient(135deg, #3d3d3d 0%, #2d2d2d 100%);
-    color: white;
-    font-weight: bold;
+/* Filter modal button styling */
+.filter-quick-btn {
+    font-size: 0.8rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 6px;
+    font-weight: 500;
+    transition: all 0.2s ease;
 }
 
-html[data-theme="light"] .bill-items-table tfoot {
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-    color: #000;
+.filter-quick-btn:hover {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.bill-items-table tfoot td {
-    border-color: #333;
-    padding: 10px 8px;
+.filter-action-btn {
+    font-size: 0.875rem;
+    padding: 0.5rem 1.25rem;
+    border-radius: 6px;
+    font-weight: 500;
+    min-width: 120px;
 }
 
-html[data-theme="light"] .bill-items-table tfoot td {
-    border-color: #dee2e6;
+.filter-toggle-btn {
+    font-size: 0.75rem;
+    padding: 0.125rem 0.5rem;
+    white-space: nowrap;
 }
 
-.bill-empty-state {
-    color: #aaa;
-    padding: 40px 20px;
-    text-align: center;
+/* Mobile view: Optimize Add Category section width */
+@media (max-width: 768px) {
+    #newCategoryForm {
+        max-width: 100%;
+    }
+
+    #newCategoryForm .card {
+        margin-left: 0;
+        margin-right: 0;
+    }
+
+    #newCategoryForm .card-body {
+        padding: 0.75rem !important;
+    }
+
+    #newCategoryForm .form-control-sm,
+    #newCategoryForm .form-select-sm {
+        font-size: 0.875rem;
+    }
+
+    #newCategoryForm .btn-sm {
+        font-size: 0.8rem;
+        padding: 0.4rem 0.6rem;
+    }
 }
 
-html[data-theme="light"] .bill-empty-state {
-    color: #6c757d;
+/* ===================================
+   RESPONSIVE DESKTOP VIEW
+   =================================== */
+
+/* Extra large screens (1920px and up) - Full desktop */
+@media (min-width: 1920px) {
+    #transactionsTable thead th:nth-child(3) {
+        width: 28%;
+    }  /* Extra space for description */
+
+    #transactionsTable tbody td {
+        font-size: 0.85rem !important;
+    }
+
+    #transactionsTable thead th {
+        font-size: 0.85rem !important;
+    }
 }
 
-.bill-empty-state i {
-    color: #555;
-    font-size: 2rem;
-    margin-bottom: 10px;
+/* Large screens (1400px - 1919px) - Standard desktop */
+@media (min-width: 1400px) and (max-width: 1919px) {
+    #transactionsTable thead th:nth-child(3) {
+        width: 25%;
+    }
+}
+
+/* Medium-large screens (1200px - 1399px) - Smaller desktop */
+@media (min-width: 1200px) and (max-width: 1399px) {
+    #transactionsTable thead th:nth-child(3) {
+        width: 22%;
+    }
+
+    /* Slightly smaller action buttons */
+    #transactionsTable .btn-sm {
+        padding: 3px 5px !important;
+    }
+}
+
+/* Medium screens (992px - 1199px) - Tablet landscape / small desktop */
+@media (min-width: 992px) and (max-width: 1199px) {
+    #transactionsTable {
+        font-size: 0.75rem !important;
+    }
+
+    #transactionsTable thead th:nth-child(3) {
+        width: 20%;
+        min-width: 150px;
+    }
+
+    #transactionsTable thead th:nth-child(8) {
+        width: 11%;
+        min-width: 100px;
+    }
+
+    #transactionsTable thead th:nth-child(9) {
+        width: 11%;
+        min-width: 110px;
+    }
+
+    /* Smaller action buttons */
+    #transactionsTable .btn-sm {
+        padding: 2px 4px !important;
+        font-size: 0.65rem !important;
+    }
+
+    #transactionsTable .btn-sm i {
+        font-size: 0.8rem !important;
+    }
+
+    /* Compact control row buttons */
+    .row.mb-3.align-items-center .btn-sm {
+        padding: 0.2rem 0.6rem;
+        font-size: 0.8rem;
+        min-height: 28px;
+    }
+
+    .row.mb-3.align-items-center .form-control-sm {
+        font-size: 0.8rem;
+        min-height: 28px;
+    }
+}
+
+/* Small screens (768px - 991px) - Tablet portrait */
+@media (min-width: 768px) and (max-width: 991px) {
+    #transactionsTable {
+        min-width: 900px;
+        font-size: 0.7rem !important;
+    }
+
+    #transactionsTable thead th {
+        padding: 0.4rem 0.3rem !important;
+        font-size: 0.7rem !important;
+    }
+
+    #transactionsTable tbody td {
+        padding: 0.2rem 0.3rem !important;
+        font-size: 0.7rem !important;
+    }
+
+    /* Very compact action buttons */
+    #transactionsTable .btn-sm {
+        padding: 1px 3px !important;
+        font-size: 0.6rem !important;
+    }
+
+    #transactionsTable .btn-sm i {
+        font-size: 0.75rem !important;
+    }
+
+    /* Stack control buttons on multiple rows */
+    .row.mb-3.align-items-center {
+        row-gap: 0.3rem;
+    }
+
+    .row.mb-3.align-items-center .col-auto {
+        margin-bottom: 0.2rem;
+    }
+
+    .row.mb-3.align-items-center .btn-sm {
+        padding: 0.2rem 0.5rem;
+        font-size: 0.75rem;
+        min-height: 26px;
+    }
+
+    /* Reduce card header padding */
+    #transactionsPage .card-header {
+        padding: 8px 12px;
+    }
+
+    #transactionsPage .card-header h5 {
+        font-size: 0.9rem;
+    }
+}
+
+/* Extra small screens (below 768px) - Mobile */
+@media (max-width: 767px) {
+    #transactionsTable {
+        min-width: 800px;
+        font-size: 0.65rem !important;
+    }
+
+    #transactionsTable thead th {
+        padding: 0.3rem 0.2rem !important;
+        font-size: 0.65rem !important;
+    }
+
+    #transactionsTable tbody td {
+        padding: 0.15rem 0.2rem !important;
+        font-size: 0.65rem !important;
+        max-height: 24px;
+    }
+
+    #transactionsTable tbody tr {
+        height: 24px;
+        max-height: 24px;
+    }
+
+    /* Minimal action buttons */
+    #transactionsTable .btn-sm {
+        padding: 1px 2px !important;
+        font-size: 0.55rem !important;
+        margin-right: 0.1rem !important;
+    }
+
+    #transactionsTable .btn-sm i {
+        font-size: 0.7rem !important;
+    }
+
+    /* Stack all controls vertically */
+    .row.mb-3.align-items-center .col-auto {
+        width: 100%;
+        margin-bottom: 0.3rem;
+    }
+
+    .row.mb-3.align-items-center .btn-sm,
+    .row.mb-3.align-items-center .form-control-sm {
+        width: 100%;
+        min-height: 32px;
+    }
+
+    /* Hide less important columns on very small screens */
+    #transactionsTable .drag-handle {
+        display: none;
+    }
+
+    #transactionsTable thead th:nth-child(1),
+    #transactionsTable tbody td:nth-child(1) {
+        display: none;
+    }
+}
+
+/* Print styles */
+@media print {
+    .sidebar,
+    .row.mb-3.align-items-center,
+    #transactionsTable .btn-sm {
+        display: none !important;
+    }
+
+    #transactionsTable {
+        font-size: 0.7rem !important;
+    }
+
+    main.col-md-9 {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+}
+
+/* Tax Calculator Page - Prevent card hover animations */
+#taxPage .card:hover {
+    transform: none !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+}
+
+[data-theme="light"] #taxPage .card:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Tax Summary Card - Improve label visibility in dark mode */
+#taxPage .text-muted.small {
+    color: var(--text-secondary) !important;
+    font-weight: 500;
+}
+
+[data-theme="dark"] #taxPage .text-muted.small {
+    color: #b0b0b0 !important;
+}
+
+/* Tax Calculator - Modern Redesign */
+
+/* Tax Stat Cards */
+.tax-stat-card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: all 0.2s ease;
+}
+
+.tax-stat-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+[data-theme="dark"] .tax-stat-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.tax-stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.bg-primary-soft {
+    background-color: rgba(8, 102, 255, 0.1);
+    color: var(--accent-color);
+}
+
+.bg-warning-soft {
+    background-color: rgba(255, 193, 7, 0.1);
+    color: #ffc107;
+}
+
+.bg-danger-soft {
+    background-color: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+}
+
+.bg-info-soft {
+    background-color: rgba(13, 202, 240, 0.1);
+    color: #0dcaf0;
+}
+
+.tax-stat-content {
+    flex: 1;
+}
+
+.tax-stat-label {
     display: block;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.25rem;
+    font-weight: 600;
 }
 
-html[data-theme="light"] .bill-empty-state i {
-    color: #adb5bd;
+.tax-stat-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary);
 }
 
-.bill-empty-state p {
-    margin: 0;
-    font-size: 0.9rem;
+/* Tax Page General Styles */
+#taxPage .card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
+
+#taxPage .card-header {
+    background-color: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    padding: 1rem 1.25rem;
+}
+
+#taxPage .card-header h6 {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+#taxPage .form-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+#taxPage .form-control,
+#taxPage .form-select {
+    background-color: var(--input-bg);
+    color: var(--text-primary);
+    border: 1px solid var(--input-border);
+    border-radius: 6px;
+    font-size: 0.9375rem;
+    padding: 0.625rem 0.75rem;
+    min-height: 44px;
+}
+
+#taxPage .form-select {
+    padding-right: 2.5rem;
+}
+
+#taxPage .form-control:focus,
+#taxPage .form-select:focus {
+    background-color: var(--input-bg);
+    color: var(--text-primary);
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(8, 102, 255, 0.1);
+}
+
+#taxPage .input-group-text {
+    background-color: var(--bg-tertiary);
+    border-color: var(--input-border);
+    color: var(--text-primary);
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+/* Accordion Styles */
+#taxPage .accordion-item {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+}
+
+#taxPage .accordion-button {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    font-weight: 600;
+    font-size: 0.875rem;
+    padding: 0.75rem 1rem;
+}
+
+#taxPage .accordion-button:not(.collapsed) {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+#taxPage .accordion-button:focus {
+    box-shadow: none;
+    border-color: var(--border-color);
+}
+
+#taxPage .accordion-body {
+    background-color: var(--card-bg);
+}
+
+/* Table Styles */
+#taxPage table {
+    color: var(--text-primary);
+}
+
+#taxPage table thead {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+#taxPage table tbody tr {
+    background-color: var(--table-bg);
+    border-bottom: 1px solid var(--border-color);
+}
+
+#taxPage table tbody tr:hover {
+    background-color: var(--table-hover);
+}
+
+#taxPage table tfoot {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    font-weight: 600;
+    border-top: 2px solid var(--border-color);
+}
+
+#taxPage #monthlyDataTable input {
+    font-size: 0.8125rem;
+    padding: 0.25rem 0.5rem;
+    background-color: var(--input-bg);
+    color: var(--text-primary);
+    border: 1px solid var(--input-border);
+}
+
+/* Alert Styles */
+#taxPage .alert-sm {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+}
+
+#taxPage .alert-info {
+    background-color: rgba(8, 102, 255, 0.1);
+    border-color: var(--accent-color);
+    color: var(--text-primary);
+}
+
+/* Saved Calculations */
+#taxPage .calculation-item {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-left: 3px solid var(--accent-color);
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    transition: all 0.2s ease;
+}
+
+#taxPage .calculation-item:hover {
+    background-color: var(--sidebar-hover);
+    border-left-width: 4px;
+    transform: translateX(2px);
+}
+
+/* Buttons */
+#taxPage .btn {
+    font-weight: 600;
+    border-radius: 6px;
+}
+
+#taxPage .btn-lg {
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+}
+
+/* Remove card hover transform */
+#taxPage .card:hover {
+    transform: none !important;
+}
+
+/* Reduce font size for specific tables */
+.table.table-sm.table-hover.mb-0 {
+    font-size: 0.75rem;
+}
+
+.table.table-sm.table-hover.mb-0 thead th {
+    font-size: 0.7rem;
+    padding: 0.4rem 0.5rem;
+}
+
+.table.table-sm.table-hover.mb-0 tbody td {
+    font-size: 0.75rem;
+    padding: 0.4rem 0.5rem;
+}
+
+.table.table-sm.table-hover.mb-0 tfoot td {
+    font-size: 0.75rem;
+    padding: 0.4rem 0.5rem;
+}
+
+/* Month Expandable Rows */
+.month-header-row {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.month-header-row:hover {
+    background-color: var(--table-hover);
+}
+
+.month-header {
+    padding: 0.75rem 1rem !important;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.month-chevron {
+    transition: transform 0.2s ease;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+}
+
+.month-detail-row {
+    border: none !important;
+}
+
+.month-detail-content {
+    background-color: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.month-summary {
+    font-size: 0.875rem;
+}
+
+/* Bonus Entry Styles */
+.bonuses-container {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.bonus-entry {
+    padding: 0.5rem;
+    background-color: var(--input-bg);
+    border: 1px solid var(--input-border);
+    border-radius: 6px;
+}
+
+.bonus-entry:hover {
+    background-color: var(--table-hover);
+}
+
+.add-bonus-btn {
+    font-size: 0.875rem;
+    padding: 0.25rem 0.5rem;
+}
+
+.remove-bonus-btn {
+    padding: 0.375rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 991px) {
+    .tax-stat-card {
+        padding: 1rem;
+    }
+
+    .tax-stat-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 1rem;
+    }
+
+    .tax-stat-value {
+        font-size: 1.1rem;
+    }
+}
+
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+<script src="{{ url_for('static', filename='js/exchange_rate_trends.js') }}"></script>
+{% endblock %}
