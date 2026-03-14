@@ -2014,6 +2014,9 @@ def transactions():
             if not category_id:
                 category_id = auto_categorize_transaction(data.get('description'))
 
+            # Get bill content if provided (from scanned bills)
+            bill_content = data.get('bill_content')
+
             # Insert transaction (balance will be calculated on frontend)
             insert_values = (
                 monthly_record['id'],
@@ -2023,15 +2026,16 @@ def transactions():
                 credit if credit > 0 else None,
                 transaction_date,
                 data.get('notes'),
-                next_display_order
+                next_display_order,
+                bill_content
             )
             print(f"[DEBUG] Inserting transaction with values: {insert_values}")
 
             cursor.execute("""
                            INSERT INTO transactions
                            (monthly_record_id, description, category_id, debit, credit, transaction_date, notes,
-                            display_order)
-                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                            display_order, bill_content)
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                            """, insert_values)
 
             transaction_id = cursor.lastrowid
@@ -4955,17 +4959,21 @@ def create_transaction():
 @login_required
 def scan_bill():
     """
-    Scan a bill image using Gemini AI to extract shop name and amount.
+    Scan a bill image using Gemini AI to extract shop name, amount, and line items.
 
     Request:
         - Content-Type: multipart/form-data
         - Field: 'bill_image' (image file)
 
     Returns:
-        JSON with extracted shop_name and amount
+        JSON with extracted shop_name, amount, and items
         {
             "shop_name": "Store Name",
             "amount": "15.50",
+            "items": [
+                {"name": "Item 1", "quantity": "1", "price": "5.50"},
+                {"name": "Item 2", "quantity": "2", "price": "10.00"}
+            ],
             "success": true
         }
 
@@ -5016,17 +5024,19 @@ def scan_bill():
                 'success': False,
                 'shop_name': result.get('shop_name', 'Unknown Store'),
                 'amount': result.get('amount', '0'),
+                'items': result.get('items', []),
                 'error': result['error'],
                 'raw_response': result.get('raw_response', '')
             }), 200
 
         # Return successful result
-        logger.info(f"Bill scanned successfully: {result['shop_name']} - {result['amount']}")
+        logger.info(f"Bill scanned successfully: {result['shop_name']} - {result['amount']} - {len(result.get('items', []))} items")
 
         return jsonify({
             'success': True,
             'shop_name': result['shop_name'],
             'amount': result['amount'],
+            'items': result.get('items', []),
             'raw_response': result.get('raw_response', '')
         }), 200
 
@@ -5036,7 +5046,8 @@ def scan_bill():
             'success': False,
             'error': f'Failed to scan bill: {str(e)}',
             'shop_name': 'Unknown Store',
-            'amount': '0'
+            'amount': '0',
+            'items': []
         }), 500
 
 

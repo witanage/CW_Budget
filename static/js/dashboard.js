@@ -989,6 +989,9 @@ function displayTransactions(transactions) {
                 <button class="btn btn-sm btn-success p-1 me-1" style="font-size: 0.7rem; line-height: 1; background-color: #198754 !important; border-color: #198754 !important; color: white !important;" onclick="showMoveCopyModal(${t.id}, 'copy')" title="Copy to Month">
                     <i class="fas fa-copy"></i>
                 </button>
+                ${t.bill_content ? `<button class="btn btn-sm btn-secondary p-1 me-1" style="font-size: 0.7rem; line-height: 1; background-color: #6c757d !important; border-color: #6c757d !important; color: white !important;" onclick="showBillContent(${t.id})" title="View Bill">
+                    <i class="fas fa-receipt"></i>
+                </button>` : ''}
                 <button class="btn btn-sm btn-info p-1" style="font-size: 0.7rem; line-height: 1; background-color: #0dcaf0 !important; border-color: #0dcaf0 !important; color: #000 !important;" onclick="showAuditModal(${t.id})" title="Audit Log">
                     <i class="fas fa-history"></i>
                 </button>
@@ -1547,6 +1550,115 @@ function displayAuditLogs(auditLogs) {
     html += '</div>';
 
     auditLogContent.innerHTML = html;
+}
+
+// ================================
+// BILL CONTENT VIEWER
+// ================================
+
+function showBillContent(transactionId) {
+    // Find the transaction data
+    const tbody = document.querySelector('#transactionsTable tbody');
+    const rows = tbody.querySelectorAll('tr[data-transaction]');
+
+    let transaction = null;
+    for (const row of rows) {
+        try {
+            const data = JSON.parse(row.dataset.transaction);
+            if (data.id === transactionId) {
+                transaction = data;
+                break;
+            }
+        } catch (e) {
+            continue;
+        }
+    }
+
+    if (!transaction) {
+        console.error('Transaction not found:', transactionId);
+        showToast('Transaction not found', 'danger');
+        return;
+    }
+
+    // Parse bill content
+    let billContent = null;
+    try {
+        if (typeof transaction.bill_content === 'string') {
+            billContent = JSON.parse(transaction.bill_content);
+        } else if (typeof transaction.bill_content === 'object') {
+            billContent = transaction.bill_content;
+        }
+    } catch (e) {
+        console.error('Error parsing bill content:', e);
+    }
+
+    // Display bill content
+    const billContentDisplay = document.getElementById('billContentDisplay');
+
+    if (!billContent || !billContent.items || billContent.items.length === 0) {
+        billContentDisplay.innerHTML = `
+            <div class="text-center py-4">
+                <i class="fas fa-receipt fa-3x text-muted mb-3"></i>
+                <p class="text-muted">No bill items available</p>
+            </div>
+        `;
+    } else {
+        // Create a nice bill display
+        let html = `
+            <div class="bill-content-wrapper">
+                <div class="text-center mb-4 pb-3 border-bottom">
+                    <h4 class="mb-0">${billContent.shop_name || transaction.description}</h4>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Item</th>
+                                <th class="text-center">Qty</th>
+                                <th class="text-end">Price</th>
+                                <th class="text-end">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        `;
+
+        let subtotal = 0;
+        billContent.items.forEach(item => {
+            const qty = parseFloat(item.quantity || 1);
+            const price = parseFloat(item.price || 0);
+            const total = qty * price;
+            subtotal += total;
+
+            html += `
+                <tr>
+                    <td><strong>${item.name}</strong></td>
+                    <td class="text-center">${qty}</td>
+                    <td class="text-end">${price.toFixed(2)}</td>
+                    <td class="text-end">${total.toFixed(2)}</td>
+                </tr>
+            `;
+        });
+
+        html += `
+                        </tbody>
+                        <tfoot class="table-light">
+                            <tr>
+                                <td colspan="3" class="text-end"><strong>Total:</strong></td>
+                                <td class="text-end"><strong>${billContent.amount || subtotal.toFixed(2)}</strong></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        `;
+
+        billContentDisplay.innerHTML = html;
+    }
+
+    // Show the modal
+    const modal = new bootstrap.Modal(document.getElementById('billContentModal'));
+    modal.show();
 }
 
 // ================================

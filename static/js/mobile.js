@@ -53,6 +53,7 @@ bootstrapModal.show();
 // Global variables
 let paymentMethods = [];
 let selectedTransactionIdForPayment = null;
+let scannedBillContent = null; // Store scanned bill content temporarily
 
 // Load payment methods
 function loadPaymentMethods() {
@@ -164,12 +165,19 @@ listContainer.appendChild(item);
 }
 }
 
+// Store current transaction for bill items viewing
+let currentTransactionForBillItems = null;
+
 // Show transaction info modal
 function showTransactionInfo(transaction) {
+// Store transaction for bill items viewing
+currentTransactionForBillItems = transaction;
+
 // Populate modal with transaction details
 const descElement = document.getElementById('infoDescription');
 const notesElement = document.getElementById('infoNotes');
 const paidAtElement = document.getElementById('infoPaidAt');
+const viewBillItemsBtn = document.getElementById('viewBillItemsBtn');
 
 // Set description
 if (descElement) {
@@ -199,9 +207,121 @@ paidAtElement.textContent = '-';
 }
 }
 
+// Show/hide View Bill Items button based on bill_content
+if (viewBillItemsBtn) {
+let hasBillItems = false;
+try {
+if (transaction.bill_content) {
+const billContent = typeof transaction.bill_content === 'string'
+? JSON.parse(transaction.bill_content)
+: transaction.bill_content;
+hasBillItems = billContent && billContent.items && billContent.items.length > 0;
+}
+} catch (e) {
+console.error('Error parsing bill content:', e);
+}
+viewBillItemsBtn.style.display = hasBillItems ? 'inline-block' : 'none';
+}
+
 // Show the modal
 const modal = new bootstrap.Modal(document.getElementById('transactionInfoModal'));
 modal.show();
+}
+
+// Show bill items modal
+function showMobileBillItems() {
+if (!currentTransactionForBillItems) {
+showToast('No transaction selected', 'danger');
+return;
+}
+
+const transaction = currentTransactionForBillItems;
+const billItemsContent = document.getElementById('billItemsContent');
+
+if (!billItemsContent) {
+showToast('Bill items view not available', 'danger');
+return;
+}
+
+// Parse bill content
+let billContent = null;
+try {
+if (typeof transaction.bill_content === 'string') {
+billContent = JSON.parse(transaction.bill_content);
+} else if (typeof transaction.bill_content === 'object') {
+billContent = transaction.bill_content;
+}
+} catch (e) {
+console.error('Error parsing bill content:', e);
+}
+
+if (!billContent || !billContent.items || billContent.items.length === 0) {
+billItemsContent.innerHTML = `
+<div class="bill-empty-state">
+<i class="fas fa-receipt"></i>
+<p>No bill items available</p>
+</div>
+`;
+} else {
+// Create compact bill items display
+let html = `
+<div class="bill-header-info">
+<h6 class="mb-0">${billContent.shop_name || transaction.description}</h6>
+</div>
+<div class="table-responsive">
+<table class="table table-sm bill-items-table">
+<thead>
+<tr>
+<th>Item</th>
+<th class="text-center">Qty</th>
+<th class="text-end">Price</th>
+<th class="text-end">Total</th>
+</tr>
+</thead>
+<tbody>
+`;
+
+let subtotal = 0;
+billContent.items.forEach((item) => {
+const qty = parseFloat(item.quantity || 1);
+const price = parseFloat(item.price || 0);
+const total = qty * price;
+subtotal += total;
+
+html += `
+<tr>
+<td><strong>${item.name}</strong></td>
+<td class="text-center">${qty}</td>
+<td class="text-end">${price.toFixed(2)}</td>
+<td class="text-end">${total.toFixed(2)}</td>
+</tr>
+`;
+});
+
+html += `
+</tbody>
+<tfoot>
+<tr>
+<td colspan="3" class="text-end">Total:</td>
+<td class="text-end">${billContent.amount || subtotal.toFixed(2)}</td>
+</tr>
+</tfoot>
+</table>
+</div>
+`;
+
+billItemsContent.innerHTML = html;
+}
+
+// Close the transaction info modal first
+const infoModal = bootstrap.Modal.getInstance(document.getElementById('transactionInfoModal'));
+if (infoModal) {
+infoModal.hide();
+}
+
+// Show the bill items modal
+const billModal = new bootstrap.Modal(document.getElementById('billItemsModal'));
+billModal.show();
 }
 
 // Mark transaction with payment method (marks as done)
@@ -982,52 +1102,60 @@ year: parseInt(currentYear),
 month: parseInt(currentMonth)
 };
 
-const url = isEdit ? `/api/transactions/${editId}` : '/api/transactions';
-const method = isEdit ? 'PUT' : 'POST';
+    // Include scanned bill content if available
+    if (scannedBillContent && !isEdit) {
+        data.bill_content = JSON.stringify(scannedBillContent);
+    }
 
-showLoading();
+    const url = isEdit ? `/api/transactions/${editId}` : '/api/transactions';
+    const method = isEdit ? 'PUT' : 'POST';
 
-fetch(url, {
-method: method,
-headers: { 'Content-Type': 'application/json' },
-body: JSON.stringify(data)
-})
-.then(response => response.json())
-.then(result => {
-hideLoading();
-if (result.error) {
-showToast(result.error, 'danger');
-} else {
-showToast(isEdit ? 'Transaction updated successfully' : 'Transaction saved successfully', 'success');
+    showLoading();
 
-// Close modal
-const modal = bootstrap.Modal.getInstance(document.getElementById('transactionModal'));
-const modalElement = document.getElementById('transactionModal');
+    fetch(url, {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(result => {
+        hideLoading();
+        if (result.error) {
+            showToast(result.error, 'danger');
+        } else {
+            showToast(isEdit ? 'Transaction updated successfully' : 'Transaction saved successfully', 'success');
 
-// Wait for modal to fully close before reloading transactions
-// This prevents the modal closing animation from interfering with scroll-to-top
-modalElement.addEventListener('hidden.bs.modal', function onModalHidden() {
-// Remove this listener after it fires once
-modalElement.removeEventListener('hidden.bs.modal', onModalHidden);
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('transactionModal'));
+            const modalElement = document.getElementById('transactionModal');
 
-// Now reload transactions after modal is fully closed
-loadTransactions();
-});
+            // Wait for modal to fully close before reloading transactions
+            // This prevents the modal closing animation from interfering with scroll-to-top
+            modalElement.addEventListener('hidden.bs.modal', function onModalHidden() {
+                // Remove this listener after it fires once
+                modalElement.removeEventListener('hidden.bs.modal', onModalHidden);
 
-modal.hide();
+                // Now reload transactions after modal is fully closed
+                loadTransactions();
+            });
 
-// Reset form
-document.getElementById('transactionForm').reset();
-document.getElementById('transactionForm').dataset.editId = '';
-document.querySelector('#transactionModal .modal-title').textContent = 'Add Transaction';
-document.getElementById('transDate').value = new Date().toISOString().split('T')[0];
-}
-})
-.catch(error => {
-hideLoading();
-console.error('Error saving transaction:', error);
-showToast('Error saving transaction', 'danger');
-});
+            modal.hide();
+
+            // Reset form
+            document.getElementById('transactionForm').reset();
+            document.getElementById('transactionForm').dataset.editId = '';
+            document.querySelector('#transactionModal .modal-title').textContent = 'Add Transaction';
+            document.getElementById('transDate').value = new Date().toISOString().split('T')[0];
+
+            // Clear scanned bill content after saving
+            scannedBillContent = null;
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Error saving transaction:', error);
+        showToast('Error saving transaction', 'danger');
+    });
 }
 
 // Edit transaction
@@ -1680,6 +1808,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 if (result.success) {
+                    // Store the scanned bill content including items
+                    scannedBillContent = {
+                        shop_name: result.shop_name,
+                        amount: result.amount,
+                        items: result.items || []
+                    };
+
                     // Populate the form with extracted data
                     if (result.shop_name && result.shop_name !== 'Unknown Store') {
                         transDescription.value = result.shop_name;
@@ -1689,8 +1824,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         transCredit.value = result.amount;
                     }
 
-                    // Show success message
-                    scanStatusText.textContent = '✓ Bill scanned successfully!';
+                    // Show success message with item count
+                    const itemCount = result.items ? result.items.length : 0;
+                    const itemText = itemCount > 0 ? ` (${itemCount} items)` : '';
+                    scanStatusText.textContent = `✓ Bill scanned successfully!${itemText}`;
                     scanStatus.style.color = '#28a745';
 
                     setTimeout(() => {
@@ -1698,7 +1835,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         scanStatus.style.color = '#ffc107';
                     }, 3000);
 
-                    showToast(`Bill scanned: ${result.shop_name} - $${result.amount}`, 'success');
+                    showToast(`Bill scanned: ${result.shop_name} - $${result.amount}${itemText}`, 'success');
                 } else {
                     // Handle scanning error but still allow manual entry
                     const errorMsg = result.error || 'Failed to extract bill information';

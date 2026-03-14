@@ -38,19 +38,23 @@ class GeminiBillScanner:
 
     def scan_bill(self, image_data: bytes) -> Dict[str, Optional[str]]:
         """
-        Scan a bill image and extract shop name and amount.
+        Scan a bill image and extract shop name, amount, and line items.
 
         Args:
             image_data: Raw image bytes (JPEG, PNG, etc.)
 
         Returns:
-            Dictionary with 'shop_name' and 'amount' keys.
+            Dictionary with 'shop_name', 'amount', and 'items' keys.
             Returns None for values that couldn't be extracted.
 
         Example:
             {
                 'shop_name': 'Starbucks Coffee',
                 'amount': '15.50',
+                'items': [
+                    {'name': 'Latte', 'quantity': '1', 'price': '5.50'},
+                    {'name': 'Croissant', 'quantity': '2', 'price': '10.00'}
+                ],
                 'raw_response': '...'
             }
         """
@@ -64,18 +68,28 @@ You are a bill/receipt analyzer. Extract the following information from this bil
 
 1. Shop/Store Name: The name of the business or store (merchant name)
 2. Total Amount: The final total amount to be paid (look for "Total", "Amount Due", "Grand Total", etc.)
+3. Line Items: Extract each item purchased with its details
 
 IMPORTANT INSTRUCTIONS:
 - For shop name: Extract only the business name, without any location, branch, or address details
 - For amount: Extract only the numeric value without currency symbols
+- For items: Extract item name, quantity, and individual item price (not total for that line)
 - If you cannot find the shop name, return "Unknown Store"
 - If you cannot find the total amount, return "0"
+- If you cannot extract items, return an empty array
 - Be accurate and extract exactly what you see
 
 Respond in this exact JSON format (no markdown, no code blocks, just raw JSON):
 {
     "shop_name": "extracted shop name or 'Unknown Store'",
-    "amount": "numeric amount or '0'"
+    "amount": "numeric amount or '0'",
+    "items": [
+        {
+            "name": "item name",
+            "quantity": "quantity or '1'",
+            "price": "unit price"
+        }
+    ]
 }
 """
 
@@ -104,6 +118,7 @@ Respond in this exact JSON format (no markdown, no code blocks, just raw JSON):
             # Validate and clean the results
             shop_name = result.get('shop_name', 'Unknown Store').strip()
             amount = result.get('amount', '0').strip()
+            items = result.get('items', [])
 
             # Clean amount - remove any non-numeric characters except decimal point
             cleaned_amount = ''.join(c for c in amount if c.isdigit() or c == '.')
@@ -111,6 +126,7 @@ Respond in this exact JSON format (no markdown, no code blocks, just raw JSON):
             return {
                 'shop_name': shop_name if shop_name else 'Unknown Store',
                 'amount': cleaned_amount if cleaned_amount else '0',
+                'items': items if isinstance(items, list) else [],
                 'raw_response': result.get('raw_response', '')
             }
 
@@ -120,6 +136,7 @@ Respond in this exact JSON format (no markdown, no code blocks, just raw JSON):
             return {
                 'shop_name': 'Unknown Store',
                 'amount': '0',
+                'items': [],
                 'error': f'Failed to parse response: {str(e)}',
                 'raw_response': response_text if 'response_text' in locals() else ''
             }
@@ -128,6 +145,7 @@ Respond in this exact JSON format (no markdown, no code blocks, just raw JSON):
             return {
                 'shop_name': 'Unknown Store',
                 'amount': '0',
+                'items': [],
                 'error': str(e)
             }
 
