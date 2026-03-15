@@ -627,7 +627,7 @@
                     <div id="ertContent" style="display:none;">
                         <!-- Summary Cards -->
                         <div class="row mb-3">
-                            <div class="col-6 col-md-3 mb-2">
+                            <div class="col-6 col-md-4 mb-2">
                                 <div class="card ert-stat-card">
                                     <div class="card-body p-2">
                                         <div class="d-flex justify-content-between align-items-start">
@@ -641,7 +641,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-6 col-md-3 mb-2">
+                            <div class="col-6 col-md-4 mb-2">
                                 <div class="card ert-stat-card">
                                     <div class="card-body p-2">
                                         <div class="d-flex justify-content-between align-items-start">
@@ -655,7 +655,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-6 col-md-3 mb-2">
+                            <div class="col-6 col-md-4 mb-2">
                                 <div class="card ert-stat-card">
                                     <div class="card-body p-2">
                                         <div class="d-flex justify-content-between align-items-start">
@@ -666,20 +666,6 @@
                                             <div class="ert-stat-icon bg-warning"><i class="fas fa-arrows-alt-v"></i></div>
                                         </div>
                                         <small class="text-muted">Buy rate range</small>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-6 col-md-3 mb-2">
-                                <div class="card ert-stat-card">
-                                    <div class="card-body p-2">
-                                        <div class="d-flex justify-content-between align-items-start">
-                                            <div>
-                                                <h6 class="text-muted mb-1 small text-uppercase">Volatility</h6>
-                                                <h4 class="mb-0" id="ertVolatility">--</h4>
-                                            </div>
-                                            <div class="ert-stat-icon bg-info"><i class="fas fa-wave-square"></i></div>
-                                        </div>
-                                        <small class="text-muted">Std dev (monthly)</small>
                                     </div>
                                 </div>
                             </div>
@@ -1172,15 +1158,15 @@
 
 <!-- Bill Content Modal -->
 <div class="modal fade" id="billContentModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content" style="max-height: 90vh; display: flex; flex-direction: column;">
+            <div class="modal-header bg-primary text-white" style="flex-shrink: 0;">
                 <h5 class="modal-title">
                     <i class="fas fa-receipt me-2"></i>Bill Details
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body" style="overflow-y: auto; flex: 1 1 auto;">
                 <div id="billContentDisplay">
                     <div class="text-center py-4">
                         <i class="fas fa-receipt fa-3x text-muted mb-3"></i>
@@ -1188,7 +1174,7 @@
                     </div>
                 </div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer" style="flex-shrink: 0;">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
@@ -2304,6 +2290,130 @@ tr[draggable="true"] {
 
     .tax-stat-value {
         font-size: 1.1rem;
+    }
+}
+
+/* Bill Content Modal Styles */
+#billContentModal .modal-content {
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+}
+
+#billContentModal .modal-header {
+    flex-shrink: 0;
+}
+
+#billContentModal .modal-body {
+    overflow-y: auto !important;
+    overflow-x: hidden;
+    flex: 1 1 auto;
+    max-height: calc(90vh - 120px);
+    padding: 1rem;
+}
+
+#billContentModal .modal-footer {
+    flex-shrink: 0;
+}
+
+/* Visible scrollbar styling for modal body */
+#billContentModal .modal-body::-webkit-scrollbar {
+    width: 14px;
+}
+
+#billContentModal .modal-body::-webkit-scrollbar-track {
+    background: var(--bg-tertiary);
+    border-radius: 7px;
+}
+
+#billContentModal .modal-body::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 7px;
+    border: 3px solid var(--bg-tertiary);
+}
+
+[data-theme="dark"] #billContentModal .modal-body::-webkit-scrollbar-thumb {
+    background: #666;
+}
+
+#billContentModal .modal-body::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+[data-theme="dark"] #billContentModal .modal-body::-webkit-scrollbar-thumb:hover {
+    background: #999;
+}
+
+/* Firefox scrollbar */
+#billContentModal .modal-body {
+    scrollbar-width: auto;
+    scrollbar-color: #888 var(--bg-tertiary);
+}
+
+/* Bill content display */
+#billContentDisplay {
+    min-height: 100%;
+}
+
+/* Sticky header support if content uses these classes */
+#billContentDisplay > .bill-header,
+#billContentDisplay > .bill-summary,
+#billContentDisplay > .bill-info {
+    position: sticky;
+    top: -1rem;
+    background-color: var(--modal-bg);
+    z-index: 10;
+    padding-bottom: 1rem;
+    margin: -1rem -1rem 1rem -1rem;
+    padding: 1rem;
+    border-bottom: 2px solid var(--border-color);
+}
+
+/* Table header sticky support - Keep header fixed while scrolling */
+#billContentDisplay table thead,
+#billContentDisplay .table thead,
+#billContentDisplay .table-light {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+#billContentDisplay table thead th,
+#billContentDisplay .table thead th {
+    background-color: var(--table-header-bg, var(--bg-secondary)) !important;
+    border-bottom: 2px solid var(--border-color);
+    position: sticky;
+    top: 0;
+}
+
+/* For table-light specifically */
+#billContentDisplay .table-light,
+#billContentDisplay thead.table-light,
+#billContentDisplay thead.table-light th {
+    background-color: #f8f9fa !important;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+[data-theme="dark"] #billContentDisplay .table-light,
+[data-theme="dark"] #billContentDisplay thead.table-light,
+[data-theme="dark"] #billContentDisplay thead.table-light th {
+    background-color: var(--bg-secondary) !important;
+}
+
+@media (max-width: 768px) {
+    #billContentModal .modal-content {
+        max-height: 95vh;
+    }
+
+    #billContentModal .modal-body {
+        max-height: calc(95vh - 100px);
+        padding: 0.75rem;
+    }
+
+    #billContentModal .modal-body::-webkit-scrollbar {
+        width: 10px;
     }
 }
 
