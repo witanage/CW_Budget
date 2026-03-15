@@ -112,6 +112,71 @@
             </div>
         </div>
 
+        <!-- Source Comparison & Volatility Charts -->
+        <div class="row mb-3">
+            <div class="col-12 col-lg-7 mb-3 mb-lg-0">
+                <div class="card h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="card-title mb-0"><i class="fas fa-balance-scale me-2"></i>Bank Rate Comparison</h6>
+                        <select class="form-select form-select-sm" id="ertCompMonths" style="width: auto;">
+                            <option value="1" selected>1 Month</option>
+                            <option value="3">3 Months</option>
+                            <option value="6">6 Months</option>
+                        </select>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="ertSourceChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-lg-5">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h6 class="card-title mb-0"><i class="fas fa-chart-bar me-2"></i>Monthly Volatility</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="ertVolChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Intraday Bank Comparison Chart -->
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <h6 class="card-title mb-0"><i class="fas fa-clock me-2"></i>Bank Comparison per Day</h6>
+                        <div class="d-flex align-items-center gap-2">
+                            <label class="form-label mb-0 small">Date:</label>
+                            <input type="date" class="form-control form-control-sm" id="ertIntradayDate"
+                                   style="width: auto;">
+                            <label class="form-label mb-0 small">Runs:</label>
+                            <select class="form-select form-select-sm" id="ertIntradayLimit" style="width: auto;">
+                                <option value="10">10</option>
+                                <option value="20" selected>20</option>
+                                <option value="30">30</option>
+                                <option value="50">50</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="ertIntradayChart"></canvas>
+                        </div>
+                        <div id="ertIntradayInfo" class="mt-2 small text-muted">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Shows exchange rate refresh attempts throughout the day. Each refresh cycle (run) fetches rates from multiple banks.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Main Trend Chart -->
         <div class="row mb-3">
             <div class="col-12">
@@ -161,39 +226,6 @@
                             <strong>Slope:</strong> <span id="ertSlope">--</span> |
                             <strong>R²:</strong> <span id="ertR2">--</span> |
                             <strong>Data Points:</strong> <span id="ertDataPts">--</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Source Comparison & Volatility Charts -->
-        <div class="row mb-3">
-            <div class="col-12 col-lg-7 mb-3 mb-lg-0">
-                <div class="card h-100">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h6 class="card-title mb-0"><i class="fas fa-balance-scale me-2"></i>Bank Rate Comparison</h6>
-                        <select class="form-select form-select-sm" id="ertCompMonths" style="width: auto;">
-                            <option value="1" selected>1 Month</option>
-                            <option value="3">3 Months</option>
-                            <option value="6">6 Months</option>
-                        </select>
-                    </div>
-                    <div class="card-body">
-                        <div class="chart-container">
-                            <canvas id="ertSourceChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-12 col-lg-5">
-                <div class="card h-100">
-                    <div class="card-header">
-                        <h6 class="card-title mb-0"><i class="fas fa-chart-bar me-2"></i>Monthly Volatility</h6>
-                    </div>
-                    <div class="card-body">
-                        <div class="chart-container">
-                            <canvas id="ertVolChart"></canvas>
                         </div>
                     </div>
                 </div>

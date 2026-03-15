@@ -16,7 +16,9 @@
         months: 1,
         forecastDays: 7,
         forecastHistory: 3,
-        compMonths: 1
+        compMonths: 1,
+        intradayDate: null,
+        intradayLimit: 20
     };
 
     // --------------- Colours ---------------
@@ -34,12 +36,32 @@
     // ===================================================================
     window.loadRateTrends = function () {
         if (!_bound) {
+            _initIntradayDate();
             _bindControls();
             _syncDropdownValues();
             _bound = true;
         }
         _fetchAll();
+        _fetchIntraday();
     };
+
+    // ===================================================================
+    // Initialize intraday date to today
+    // ===================================================================
+    function _initIntradayDate() {
+        var today = new Date();
+        var yyyy = today.getFullYear();
+        var mm = String(today.getMonth() + 1).padStart(2, '0');
+        var dd = String(today.getDate()).padStart(2, '0');
+        var todayStr = yyyy + '-' + mm + '-' + dd;
+        _s.intradayDate = todayStr;
+
+        var dateEl = document.getElementById('ertIntradayDate');
+        if (dateEl) {
+            dateEl.value = todayStr;
+            dateEl.max = todayStr;
+        }
+    }
 
     // ===================================================================
     // Sync dropdown values with state
@@ -64,6 +86,11 @@
         if (compMonthsEl) {
             compMonthsEl.value = _s.compMonths;
         }
+
+        var intradayLimitEl = document.getElementById('ertIntradayLimit');
+        if (intradayLimitEl) {
+            intradayLimitEl.value = _s.intradayLimit;
+        }
     }
 
     // ===================================================================
@@ -84,7 +111,9 @@
         _on('ertForecastDays',    'change', function () { _s.forecastDays    = +this.value; _fetchAll(); });
         _on('ertForecastHistory', 'change', function () { _s.forecastHistory = +this.value; _fetchAll(); });
         _on('ertCompMonths',      'change', function () { _s.compMonths      = +this.value; _fetchAll(); });
-        _on('ertRefreshBtn',      'click',  function () { _cache = null; _fetchAll(); });
+        _on('ertRefreshBtn',      'click',  function () { _cache = null; _fetchAll(); _fetchIntraday(); });
+        _on('ertIntradayDate',    'change', function () { _s.intradayDate    = this.value; _fetchIntraday(); });
+        _on('ertIntradayLimit',   'change', function () { _s.intradayLimit   = +this.value; _fetchIntraday(); });
     }
 
     function _on(id, evt, fn) {
@@ -481,6 +510,80 @@
         ctx.fillStyle = t.text;
         ctx.textAlign = 'center';
         ctx.fillText(msg || 'No data available', el.width / 2, el.height / 2);
+    }
+
+    // ===================================================================
+    // Fetch intraday refresh logs
+    // ===================================================================
+    function _fetchIntraday() {
+        if (!_s.intradayDate) return;
+
+        var params = new URLSearchParams({
+            date: _s.intradayDate,
+            limit_runs: _s.intradayLimit
+        });
+
+        fetch('/api/exchange-rate/intraday-logs?' + params)
+            .then(function (res) {
+                if (!res.ok) {
+                    return res.json().catch(function () { return {}; }).then(function (j) {
+                        throw new Error(j.error || 'Server error ' + res.status);
+                    });
+                }
+                return res.json();
+            })
+            .then(function (data) {
+                _renderIntraday(data.runs || []);
+            })
+            .catch(function (err) {
+                console.error('Intraday fetch error:', err);
+                _emptyCanvas('ertIntradayChart', 'Failed to load intraday data: ' + err.message);
+            });
+    }
+
+    // ===================================================================
+    // Render intraday chart (buy rate per bank per run)
+    // ===================================================================
+    function _renderIntraday(runs) {
+        if (!runs.length) {
+            _emptyCanvas('ertIntradayChart', 'No intraday refresh data available for this date');
+            return;
+        }
+
+        // Reverse to show oldest first (chronological order)
+        runs = runs.slice().reverse();
+
+        // Extract labels (timestamps) and prepare datasets per bank
+        var labels = runs.map(function (run) {
+            var dt = new Date(run.timestamp);
+            return dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+        });
+
+        var bankNames = ['CBSL', 'HNB', 'PB', 'SAMPATH'];
+        var datasets = bankNames.map(function (bank) {
+            var data = runs.map(function (run) {
+                var bankData = run.banks[bank];
+                if (!bankData || bankData.status !== 'success' || !bankData.buy_rate) {
+                    return null; // Missing or failed data
+                }
+                return bankData.buy_rate;
+            });
+
+            return {
+                label: bank,
+                data: data,
+                borderColor: SRC_CLR[bank] || '#6c757d',
+                backgroundColor: 'transparent',
+                borderWidth: 2,
+                fill: false,
+                tension: 0.3,
+                pointRadius: 3,
+                pointHoverRadius: 5,
+                spanGaps: true // Connect lines even when data is missing
+            };
+        });
+
+        _lineChart('ertIntradayChart', 'intraday', labels, datasets, 'Buy Rate (LKR)');
     }
 
 })();

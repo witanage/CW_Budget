@@ -7,6 +7,7 @@ import os
 import re
 import threading
 import time
+import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
 from functools import wraps
@@ -361,6 +362,10 @@ def refresh_all_exchange_rates(force=False):
 
     logger.info("Scheduler: Starting exchange rate refresh (force=%s)...", force)
 
+    # Generate a unique run key for this refresh batch
+    run_key = str(uuid.uuid4())
+    logger.info(f"Scheduler: Exchange rate refresh run_key: {run_key}")
+
     results = {}
 
     # HNB
@@ -374,19 +379,22 @@ def refresh_all_exchange_rates(force=False):
             log_exchange_rate_refresh('HNB', 'success',
                                       buy_rate=hnb_rate['buy_rate'],
                                       sell_rate=hnb_rate['sell_rate'],
-                                      duration_ms=hnb_ms)
+                                      duration_ms=hnb_ms,
+                                      run_key=run_key)
             results['HNB'] = {'status': 'success', 'buy_rate': hnb_rate['buy_rate'], 'sell_rate': hnb_rate['sell_rate']}
         else:
             logger.warning("Scheduler: Failed to fetch HNB rate")
             log_exchange_rate_refresh('HNB', 'failure',
                                       error_message='No rate returned by HNB API',
-                                      duration_ms=hnb_ms)
+                                      duration_ms=hnb_ms,
+                                      run_key=run_key)
             results['HNB'] = {'status': 'failure', 'error': 'No rate returned by HNB API'}
     except Exception as e:
         logger.error(f"Scheduler: Error fetching HNB rate: {str(e)}")
         log_exchange_rate_refresh('HNB', 'failure',
                                   error_message=str(e),
-                                  duration_ms=int((time.time() - hnb_start) * 1000))
+                                  duration_ms=int((time.time() - hnb_start) * 1000),
+                                  run_key=run_key)
         results['HNB'] = {'status': 'failure', 'error': str(e)}
 
     # People's Bank
@@ -400,19 +408,22 @@ def refresh_all_exchange_rates(force=False):
             log_exchange_rate_refresh('PB', 'success',
                                       buy_rate=pb_rate['buy_rate'],
                                       sell_rate=pb_rate['sell_rate'],
-                                      duration_ms=pb_ms)
+                                      duration_ms=pb_ms,
+                                      run_key=run_key)
             results['PB'] = {'status': 'success', 'buy_rate': pb_rate['buy_rate'], 'sell_rate': pb_rate['sell_rate']}
         else:
             logger.warning("Scheduler: Failed to fetch PB rate")
             log_exchange_rate_refresh('PB', 'failure',
                                       error_message='No rate returned by PB scraper',
-                                      duration_ms=pb_ms)
+                                      duration_ms=pb_ms,
+                                      run_key=run_key)
             results['PB'] = {'status': 'failure', 'error': 'No rate returned by PB scraper'}
     except Exception as e:
         logger.error(f"Scheduler: Error fetching PB rate: {str(e)}")
         log_exchange_rate_refresh('PB', 'failure',
                                   error_message=str(e),
-                                  duration_ms=int((time.time() - pb_start) * 1000))
+                                  duration_ms=int((time.time() - pb_start) * 1000),
+                                  run_key=run_key)
         results['PB'] = {'status': 'failure', 'error': str(e)}
 
     # Sampath Bank
@@ -427,20 +438,23 @@ def refresh_all_exchange_rates(force=False):
             log_exchange_rate_refresh('SAMPATH', 'success',
                                       buy_rate=sampath_rate['buy_rate'],
                                       sell_rate=sampath_rate['sell_rate'],
-                                      duration_ms=sampath_ms)
+                                      duration_ms=sampath_ms,
+                                      run_key=run_key)
             results['SAMPATH'] = {'status': 'success', 'buy_rate': sampath_rate['buy_rate'],
                                   'sell_rate': sampath_rate['sell_rate']}
         else:
             logger.warning("Scheduler: Failed to fetch Sampath rate")
             log_exchange_rate_refresh('SAMPATH', 'failure',
                                       error_message='No rate returned by Sampath API',
-                                      duration_ms=sampath_ms)
+                                      duration_ms=sampath_ms,
+                                      run_key=run_key)
             results['SAMPATH'] = {'status': 'failure', 'error': 'No rate returned by Sampath API'}
     except Exception as e:
         logger.error(f"Scheduler: Error fetching Sampath rate: {str(e)}")
         log_exchange_rate_refresh('SAMPATH', 'failure',
                                   error_message=str(e),
-                                  duration_ms=int((time.time() - sampath_start) * 1000))
+                                  duration_ms=int((time.time() - sampath_start) * 1000),
+                                  run_key=run_key)
         results['SAMPATH'] = {'status': 'failure', 'error': str(e)}
 
     # CBSL (for today)
@@ -455,20 +469,23 @@ def refresh_all_exchange_rates(force=False):
             log_exchange_rate_refresh('CBSL', 'success',
                                       buy_rate=cbsl_rate['buy_rate'],
                                       sell_rate=cbsl_rate['sell_rate'],
-                                      duration_ms=cbsl_ms)
+                                      duration_ms=cbsl_ms,
+                                      run_key=run_key)
             results['CBSL'] = {'status': 'success', 'buy_rate': cbsl_rate['buy_rate'],
                                'sell_rate': cbsl_rate['sell_rate']}
         else:
             logger.warning("Scheduler: No CBSL rate available for today")
             log_exchange_rate_refresh('CBSL', 'failure',
                                       error_message='No CBSL rate available for today',
-                                      duration_ms=cbsl_ms)
+                                      duration_ms=cbsl_ms,
+                                      run_key=run_key)
             results['CBSL'] = {'status': 'failure', 'error': 'No CBSL rate available for today'}
     except Exception as e:
         logger.error(f"Scheduler: Error fetching CBSL rate: {str(e)}")
         log_exchange_rate_refresh('CBSL', 'failure',
                                   error_message=str(e),
-                                  duration_ms=int((time.time() - cbsl_start) * 1000))
+                                  duration_ms=int((time.time() - cbsl_start) * 1000),
+                                  run_key=run_key)
         results['CBSL'] = {'status': 'failure', 'error': str(e)}
 
     logger.info("Exchange rate refresh completed — results: %s", results)
@@ -749,7 +766,7 @@ def log_audit(admin_user_id, action, target_user_id=None, details=None):
             connection.close()
 
 
-def log_exchange_rate_refresh(source, status, buy_rate=None, sell_rate=None, error_message=None, duration_ms=None):
+def log_exchange_rate_refresh(source, status, buy_rate=None, sell_rate=None, error_message=None, duration_ms=None, run_key=None):
     """Write one row to exchange_rate_refresh_logs for a single source attempt."""
     connection = get_db_connection()
     if connection:
@@ -757,9 +774,9 @@ def log_exchange_rate_refresh(source, status, buy_rate=None, sell_rate=None, err
         try:
             cursor.execute("""
                 INSERT INTO exchange_rate_refresh_logs
-                    (source, status, buy_rate, sell_rate, error_message, duration_ms)
-                VALUES (%s, %s, %s, %s, %s, %s)
-            """, (source, status, buy_rate, sell_rate, error_message, duration_ms))
+                    (run_key, source, status, buy_rate, sell_rate, error_message, duration_ms)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (run_key, source, status, buy_rate, sell_rate, error_message, duration_ms))
             connection.commit()
         except Error as e:
             logger.error(f"Error writing exchange_rate_refresh_logs: {str(e)}")
@@ -5582,6 +5599,90 @@ def get_exchange_rate_trends_all():
     except Exception as e:
         logger.error(f"Error fetching exchange rate trends: {str(e)}")
         return jsonify({'error': 'Failed to fetch trend data', 'details': str(e)}), 500
+
+
+@app.route('/api/exchange-rate/intraday-logs', methods=['GET'])
+@login_required
+def get_intraday_refresh_logs():
+    """
+    Fetch intraday exchange rate refresh logs from exchange_rate_refresh_logs table.
+    Groups logs by run_key to show trends within the day from multiple refresh cycles.
+
+    Query Parameters:
+        date: YYYY-MM-DD format (default: today)
+        limit_runs: Maximum number of runs to return (default: 20, max: 50)
+
+    Returns:
+        JSON with array of runs, each containing timestamp and bank rates
+    """
+    try:
+        target_date = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
+        limit_runs = min(int(request.args.get('limit_runs', 20)), 50)
+
+        connection = get_db_connection()
+        if not connection:
+            return jsonify({'error': 'Database connection failed'}), 500
+
+        cursor = connection.cursor(dictionary=True)
+
+        try:
+            # Fetch all logs for the target date, grouped by run_key
+            cursor.execute("""
+                SELECT 
+                    run_key,
+                    source,
+                    status,
+                    buy_rate,
+                    sell_rate,
+                    error_message,
+                    created_at
+                FROM exchange_rate_refresh_logs
+                WHERE DATE(created_at) = %s
+                  AND run_key IS NOT NULL
+                ORDER BY created_at DESC, run_key, source
+                LIMIT %s
+            """, (target_date, limit_runs * 10))  # Fetch more rows to account for multiple sources per run
+
+            rows = cursor.fetchall()
+
+            if not rows:
+                return jsonify({'date': target_date, 'runs': []}), 200
+
+            # Group logs by run_key
+            runs_dict = {}
+            for row in rows:
+                run_key = row['run_key']
+                if run_key not in runs_dict:
+                    runs_dict[run_key] = {
+                        'run_key': run_key,
+                        'timestamp': row['created_at'].isoformat() if hasattr(row['created_at'], 'isoformat') else str(row['created_at']),
+                        'banks': {}
+                    }
+
+                source = row['source']
+                runs_dict[run_key]['banks'][source] = {
+                    'status': row['status'],
+                    'buy_rate': float(row['buy_rate']) if row['buy_rate'] else None,
+                    'sell_rate': float(row['sell_rate']) if row['sell_rate'] else None,
+                    'error_message': row['error_message']
+                }
+
+            # Convert to sorted list (most recent first) and limit
+            runs_list = sorted(runs_dict.values(), key=lambda x: x['timestamp'], reverse=True)[:limit_runs]
+
+            return jsonify({
+                'date': target_date,
+                'runs': runs_list,
+                'total_runs': len(runs_list)
+            }), 200
+
+        finally:
+            cursor.close()
+            connection.close()
+
+    except Exception as e:
+        logger.error(f"Error fetching intraday refresh logs: {str(e)}")
+        return jsonify({'error': 'Failed to fetch intraday logs', 'details': str(e)}), 500
 
 
 # Global error handlers (must be outside if __name__ block)

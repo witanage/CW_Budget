@@ -723,6 +723,31 @@
                             </div>
                         </div>
 
+                        <!-- Bank Comparison per Day (Intraday) -->
+                        <div class="card mb-3">
+                            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <h6 class="card-title mb-0"><i class="fas fa-clock me-2"></i>Bank Comparison per Day</h6>
+                                <div class="d-flex align-items-center gap-2">
+                                    <label class="form-label mb-0 small">Date:</label>
+                                    <input type="date" class="form-control form-control-sm" id="ertIntradayDate" style="width:auto;">
+                                    <label class="form-label mb-0 small">Runs:</label>
+                                    <select class="form-select form-select-sm" id="ertIntradayLimit" style="width:auto;">
+                                        <option value="10">10</option>
+                                        <option value="20" selected>20</option>
+                                        <option value="30">30</option>
+                                        <option value="50">50</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="ert-chart-container"><canvas id="ertIntradayChart"></canvas></div>
+                                <div id="ertIntradayInfo" class="mt-2 small text-muted">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    Shows exchange rate refresh attempts throughout the day. Each refresh cycle (run) fetches rates from multiple banks.
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Exchange Rate History -->
                         <div class="card mb-3">
                             <div class="card-header">

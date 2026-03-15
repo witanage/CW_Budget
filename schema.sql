@@ -464,6 +464,7 @@ INSERT IGNORE INTO app_settings (setting_key, value, description) VALUES
 
 CREATE TABLE IF NOT EXISTS exchange_rate_refresh_logs (
     id            INT AUTO_INCREMENT PRIMARY KEY,
+    run_key       VARCHAR(36)  NULL COMMENT 'UUID to group all logs from a single refresh-all call',
     source        VARCHAR(50)  NOT NULL COMMENT 'Bank / API source (HNB, PB, CBSL)',
     status        ENUM('success','failure') NOT NULL COMMENT 'Outcome of the fetch attempt',
     buy_rate      DECIMAL(10,4) NULL COMMENT 'Buy rate that was stored (NULL on failure)',
@@ -471,6 +472,7 @@ CREATE TABLE IF NOT EXISTS exchange_rate_refresh_logs (
     error_message TEXT          NULL COMMENT 'Error detail when status = failure',
     duration_ms   INT UNSIGNED  NULL COMMENT 'Wall-clock time of the fetch in milliseconds',
     created_at    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_run_key    (run_key),
     INDEX idx_source     (source),
     INDEX idx_status     (status),
     INDEX idx_created_at (created_at)
