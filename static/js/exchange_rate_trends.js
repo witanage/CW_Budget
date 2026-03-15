@@ -419,11 +419,6 @@
             }
         }
 
-        // Volatility
-        if (last.buy_rate_volatility != null) {
-            _txt('ertVolatility', last.buy_rate_volatility.toFixed(4));
-        }
-
         // Min/Max
         var minRate = null, maxRate = null;
         data.forEach(function (d) {

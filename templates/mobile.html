@@ -354,19 +354,19 @@
     <!-- Bill Items Modal -->
     <div class="modal fade bill-items-modal" id="billItemsModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
+            <div class="modal-content" style="max-height: 90vh; display: flex; flex-direction: column;">
+                <div class="modal-header" style="flex-shrink: 0;">
                     <h6 class="modal-title mb-0">
                         <i class="fas fa-receipt me-2"></i>Bill Items
                     </h6>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
+                <div class="modal-body" style="overflow-y: auto; overflow-x: hidden; flex: 1 1 auto; max-height: calc(90vh - 120px);">
                     <div id="billItemsContent">
                         <!-- Bill items will be loaded here -->
                     </div>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer" style="flex-shrink: 0;">
                     <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
@@ -471,5 +471,164 @@
 
     <!-- Mobile JS -->
     <script src="{{ url_for('static', filename='js/mobile.js') }}"></script>
+
+    <style>
+        /* Bill Items Modal - Responsive Scrolling */
+        #billItemsModal .modal-body::-webkit-scrollbar {
+            width: 14px;
+        }
+
+        #billItemsModal .modal-body::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 7px;
+        }
+
+        #billItemsModal .modal-body::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 7px;
+            border: 3px solid rgba(0, 0, 0, 0.1);
+        }
+
+        #billItemsModal .modal-body::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        /* Firefox scrollbar */
+        #billItemsModal .modal-body {
+            scrollbar-width: auto;
+            scrollbar-color: #888 rgba(0, 0, 0, 0.1);
+        }
+
+        /* Sticky table header inside bill items */
+        #billItemsContent table thead,
+        #billItemsContent .table thead,
+        #billItemsContent .table-light {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        #billItemsContent table thead th,
+        #billItemsContent .table thead th {
+            background-color: var(--table-header-bg, #f8f9fa) !important;
+            border-bottom: 2px solid var(--border-color, #dee2e6);
+            position: sticky;
+            top: 0;
+        }
+
+        #billItemsContent .table-light,
+        #billItemsContent thead.table-light,
+        #billItemsContent thead.table-light th {
+            background-color: #f8f9fa !important;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        /* Responsive Table - Prevent horizontal scrolling */
+        #billItemsContent {
+            overflow-x: hidden;
+            width: 100%;
+        }
+
+        #billItemsContent table {
+            width: 100%;
+            table-layout: fixed;
+        }
+
+        #billItemsContent table th,
+        #billItemsContent table td {
+            word-wrap: break-word;
+            word-break: break-word;
+            white-space: normal;
+            overflow-wrap: break-word;
+            padding: 8px 6px;
+        }
+
+        /* Item name column - allow more space */
+        #billItemsContent table th:first-child,
+        #billItemsContent table td:first-child {
+            width: 50%;
+            min-width: 0;
+        }
+
+        /* Quantity column */
+        #billItemsContent table th:nth-child(2),
+        #billItemsContent table td:nth-child(2) {
+            width: 15%;
+            text-align: center;
+        }
+
+        /* Price column */
+        #billItemsContent table th:nth-child(3),
+        #billItemsContent table td:nth-child(3) {
+            width: 17.5%;
+            text-align: right;
+        }
+
+        /* Total column */
+        #billItemsContent table th:nth-child(4),
+        #billItemsContent table td:nth-child(4) {
+            width: 17.5%;
+            text-align: right;
+        }
+
+        /* Mobile responsive adjustments */
+        @media (max-width: 768px) {
+            #billItemsModal .modal-content {
+                max-height: 95vh;
+            }
+
+            #billItemsModal .modal-body {
+                max-height: calc(95vh - 100px);
+                padding: 0.5rem;
+            }
+
+            #billItemsModal .modal-body::-webkit-scrollbar {
+                width: 10px;
+            }
+
+            #billItemsContent table {
+                font-size: 0.875rem;
+            }
+
+            #billItemsContent table th,
+            #billItemsContent table td {
+                padding: 6px 4px;
+            }
+
+            /* Adjust column widths for mobile */
+            #billItemsContent table th:first-child,
+            #billItemsContent table td:first-child {
+                width: 45%;
+            }
+
+            #billItemsContent table th:nth-child(2),
+            #billItemsContent table td:nth-child(2) {
+                width: 18%;
+            }
+
+            #billItemsContent table th:nth-child(3),
+            #billItemsContent table td:nth-child(3) {
+                width: 18.5%;
+            }
+
+            #billItemsContent table th:nth-child(4),
+            #billItemsContent table td:nth-child(4) {
+                width: 18.5%;
+            }
+        }
+
+        @media (max-width: 480px) {
+            #billItemsContent table {
+                font-size: 0.8rem;
+            }
+
+            #billItemsContent table th,
+            #billItemsContent table td {
+                padding: 5px 3px;
+            }
+        }
+    </style>
 </body>
 </html>
