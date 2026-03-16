@@ -54,6 +54,7 @@ bootstrapModal.show();
 let paymentMethods = [];
 let selectedTransactionIdForPayment = null;
 let scannedBillContent = null; // Store scanned bill content temporarily
+let capturedBillImage = null; // Store the actual image file for upload
 
 // Load payment methods
 function loadPaymentMethods() {
@@ -313,6 +314,23 @@ html += `
 billItemsContent.innerHTML = html;
 }
 
+// Handle attachment button visibility
+const mobileViewAttachmentBtn = document.getElementById('mobileViewAttachmentBtn');
+const mobileBillAttachmentContainer = document.getElementById('mobileBillAttachmentContainer');
+
+// Reset attachment container
+mobileBillAttachmentContainer.style.display = 'none';
+
+if (transaction.attachments) {
+    // Show the "View Attachment" button
+    mobileViewAttachmentBtn.style.display = 'inline-block';
+    mobileViewAttachmentBtn.dataset.transactionId = transaction.id;
+    mobileViewAttachmentBtn.dataset.attachmentGuid = transaction.attachments;
+} else {
+    // Hide the "View Attachment" button
+    mobileViewAttachmentBtn.style.display = 'none';
+}
+
 // Close the transaction info modal first
 const infoModal = bootstrap.Modal.getInstance(document.getElementById('transactionInfoModal'));
 if (infoModal) {
@@ -322,6 +340,77 @@ infoModal.hide();
 // Show the bill items modal
 const billModal = new bootstrap.Modal(document.getElementById('billItemsModal'));
 billModal.show();
+}
+
+// Load and display attachment for mobile bill items modal
+async function loadMobileBillAttachment() {
+const mobileViewAttachmentBtn = document.getElementById('mobileViewAttachmentBtn');
+const mobileBillAttachmentContainer = document.getElementById('mobileBillAttachmentContainer');
+
+const transactionId = mobileViewAttachmentBtn.dataset.transactionId;
+const attachmentGuid = mobileViewAttachmentBtn.dataset.attachmentGuid;
+
+if (!transactionId || !attachmentGuid) {
+    showToast('Attachment information not available', 'danger');
+    return;
+}
+
+// Show loading state
+mobileBillAttachmentContainer.innerHTML = `
+    <div class="text-center py-3">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="text-muted mt-2">Loading attachment...</p>
+    </div>
+`;
+mobileBillAttachmentContainer.style.display = 'block';
+
+// Disable button while loading
+mobileViewAttachmentBtn.disabled = true;
+
+try {
+    const response = await fetch(`/api/transactions/${transactionId}/attachment`);
+
+    if (!response.ok) {
+        throw new Error(`Failed to load attachment: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    if (data.file_url) {
+        // Display the image
+        mobileBillAttachmentContainer.innerHTML = `
+            <div class="attachment-display">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0">Bill Attachment</h6>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="hideMobileBillAttachment()">
+                        <i class="fas fa-times"></i> Hide
+                    </button>
+                </div>
+                <img src="${data.file_url}" alt="Bill Attachment" class="img-fluid rounded shadow-sm"/>
+            </div>
+        `;
+    } else {
+        throw new Error('No file URL returned from server');
+    }
+} catch (error) {
+    console.error('Error loading attachment:', error);
+    mobileBillAttachmentContainer.innerHTML = `
+        <div class="alert alert-danger">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            Failed to load attachment: ${error.message}
+        </div>
+    `;
+} finally {
+    // Re-enable button
+    mobileViewAttachmentBtn.disabled = false;
+}
+}
+
+function hideMobileBillAttachment() {
+const mobileBillAttachmentContainer = document.getElementById('mobileBillAttachmentContainer');
+mobileBillAttachmentContainer.style.display = 'none';
 }
 
 // Mark transaction with payment method (marks as done)
@@ -1112,10 +1201,34 @@ month: parseInt(currentMonth)
 
     showLoading();
 
+    // Check if we have a captured bill image to upload
+    let requestBody, requestHeaders;
+    if (capturedBillImage && !isEdit) {
+        // Send as multipart/form-data with image
+        const formData = new FormData();
+
+        // Add all form fields
+        for (const key in data) {
+            if (data[key] !== null && data[key] !== undefined) {
+                formData.append(key, data[key]);
+            }
+        }
+
+        // Add the bill image
+        formData.append('bill_image', capturedBillImage);
+
+        requestBody = formData;
+        requestHeaders = {}; // Let browser set Content-Type with boundary
+    } else {
+        // Send as JSON (existing behavior for updates and non-scan transactions)
+        requestBody = JSON.stringify(data);
+        requestHeaders = { 'Content-Type': 'application/json' };
+    }
+
     fetch(url, {
         method: method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
+        headers: requestHeaders,
+        body: requestBody
     })
     .then(response => response.json())
     .then(result => {
@@ -1147,8 +1260,9 @@ month: parseInt(currentMonth)
             document.querySelector('#transactionModal .modal-title').textContent = 'Add Transaction';
             document.getElementById('transDate').value = new Date().toISOString().split('T')[0];
 
-            // Clear scanned bill content after saving
+            // Clear scanned bill content and captured image after saving
             scannedBillContent = null;
+            capturedBillImage = null;
         }
     })
     .catch(error => {
@@ -1328,6 +1442,12 @@ loadTransactions();
 
 // Save button
 document.getElementById('saveTransactionBtn').addEventListener('click', saveTransaction);
+
+// Mobile view attachment button
+const mobileViewAttachmentBtn = document.getElementById('mobileViewAttachmentBtn');
+if (mobileViewAttachmentBtn) {
+    mobileViewAttachmentBtn.addEventListener('click', loadMobileBillAttachment);
+}
 
 // New category inline creation
 const toggleNewCategoryBtn = document.getElementById('toggleNewCategoryBtn');
@@ -1869,6 +1989,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     amount: result.amount,
                     items: result.items || []
                 };
+
+                // Store the captured image file for upload when transaction is saved
+                capturedBillImage = file;
 
                 // Populate the form with extracted data
                 if (result.shop_name && result.shop_name !== 'Unknown Store') {

@@ -56,7 +56,23 @@ except ImportError:
     PDF_AVAILABLE = False
     logger.warning("reportlab not installed. PDF export will use text format.")
 
+try:
+    from appwrite.client import Client
+    from appwrite.services.storage import Storage
+    from appwrite.input_file import InputFile
+    from appwrite.id import ID
+
+    APPWRITE_AVAILABLE = True
+except ImportError:
+    APPWRITE_AVAILABLE = False
+    logger.warning("appwrite not installed. Bill image upload will be disabled.")
+
 logger.info("Environment variables loaded")
+
+# Initialize Appwrite client (will be set up after helper functions are defined)
+appwrite_client = None
+appwrite_storage = None
+APPWRITE_BUCKET_ID = None
 
 
 # Custom JSON provider to handle Decimal objects
@@ -112,6 +128,121 @@ def get_setting(key, default=None):
         if cursor:
             cursor.close()
         connection.close()
+
+
+def get_integration_settings(integration_name, fallback_to_env=True):
+    """
+    Read integration settings from the database.
+
+    Args:
+        integration_name: Name of the integration (e.g., 'appwrite', 'gemini')
+        fallback_to_env: If True, fall back to environment variables if DB fails or is empty
+
+    Returns:
+        dict: Integration settings as a dictionary, or None if not found
+    """
+    connection = get_db_connection()
+    if not connection:
+        if fallback_to_env:
+            logger.info(f"DB unavailable, falling back to .env for {integration_name}")
+            return _get_integration_from_env(integration_name)
+        return None
+
+    cursor = None
+    try:
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute(
+            "SELECT settings, is_active FROM integration_settings WHERE integration_name = %s",
+            (integration_name,)
+        )
+        row = cursor.fetchone()
+
+        if row and row['is_active']:
+            settings = row['settings']
+            # Check if settings are populated (not just empty placeholders)
+            if isinstance(settings, dict) and any(settings.values()):
+                logger.info(f"Loaded {integration_name} settings from database")
+                return settings
+            elif fallback_to_env:
+                logger.info(f"DB settings for {integration_name} are empty, falling back to .env")
+                return _get_integration_from_env(integration_name)
+
+        if fallback_to_env:
+            logger.info(f"No active DB settings for {integration_name}, falling back to .env")
+            return _get_integration_from_env(integration_name)
+
+        return None
+
+    except Exception as e:
+        logger.warning(f"get_integration_settings('{integration_name}'): {e}")
+        if fallback_to_env:
+            return _get_integration_from_env(integration_name)
+        return None
+    finally:
+        if cursor:
+            cursor.close()
+        connection.close()
+
+
+def _get_integration_from_env(integration_name):
+    """
+    Fallback function to read integration settings from environment variables.
+
+    Args:
+        integration_name: Name of the integration
+
+    Returns:
+        dict: Integration settings from .env file, or None if not configured
+    """
+    if integration_name == 'appwrite':
+        endpoint = os.environ.get('APPWRITE_ENDPOINT')
+        project_id = os.environ.get('APPWRITE_PROJECT_ID')
+        api_key = os.environ.get('APPWRITE_API_KEY')
+        bucket_id = os.environ.get('APPWRITE_BUCKET_ID')
+
+        if all([endpoint, project_id, api_key, bucket_id]):
+            return {
+                'endpoint': endpoint,
+                'project_id': project_id,
+                'api_key': api_key,
+                'bucket_id': bucket_id
+            }
+
+    elif integration_name == 'gemini':
+        api_key = os.environ.get('GEMINI_API_KEY')
+        if api_key:
+            return {'api_key': api_key}
+
+    return None
+
+
+# Initialize Appwrite client now that helper functions are defined
+if APPWRITE_AVAILABLE:
+    try:
+        # Try loading from database first, fallback to .env
+        appwrite_settings = get_integration_settings('appwrite', fallback_to_env=True)
+
+        if appwrite_settings:
+            appwrite_endpoint = appwrite_settings.get('endpoint')
+            appwrite_project_id = appwrite_settings.get('project_id')
+            appwrite_api_key = appwrite_settings.get('api_key')
+            APPWRITE_BUCKET_ID = appwrite_settings.get('bucket_id')
+
+            if all([appwrite_endpoint, appwrite_project_id, appwrite_api_key, APPWRITE_BUCKET_ID]):
+                appwrite_client = Client()
+                appwrite_client.set_endpoint(appwrite_endpoint)
+                appwrite_client.set_project(appwrite_project_id)
+                appwrite_client.set_key(appwrite_api_key)
+
+                appwrite_storage = Storage(appwrite_client)
+                logger.info(f"✅ Appwrite storage initialized from database (endpoint: {appwrite_endpoint})")
+            else:
+                logger.warning("Appwrite credentials incomplete. Set them in database or .env file.")
+        else:
+            logger.warning("Appwrite credentials not configured. Set them in database or through admin panel.")
+    except Exception as e:
+        logger.error(f"Failed to initialize Appwrite client: {e}")
+        appwrite_storage = None
 
 
 def login_required(f):
@@ -1023,6 +1154,262 @@ def update_admin_setting(key):
         return jsonify({'message': 'Setting updated', 'key': key, 'value': new_value}), 200
     except Error as e:
         logger.error(f"Error updating setting '{key}': {str(e)}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@app.route('/api/admin/integrations', methods=['GET'])
+@admin_required
+def get_all_integrations():
+    """Get all integration settings."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute("""
+            SELECT id, integration_name, settings, is_active, description, updated_at 
+            FROM integration_settings 
+            ORDER BY integration_name
+        """)
+        integrations = cursor.fetchall()
+
+        # Mask sensitive fields in the response
+        for integration in integrations:
+            if isinstance(integration['settings'], dict):
+                # Mask API keys and sensitive data
+                for key in integration['settings']:
+                    if 'key' in key.lower() or 'password' in key.lower() or 'secret' in key.lower():
+                        if integration['settings'][key]:
+                            integration['settings'][key] = '***masked***'
+
+        return jsonify(integrations), 200
+    except Error as e:
+        logger.error(f"Error fetching integrations: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@app.route('/api/admin/integrations/<string:integration_name>', methods=['GET'])
+@admin_required
+def get_integration(integration_name):
+    """Get a specific integration's settings (with masked sensitive fields)."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute("""
+            SELECT id, integration_name, settings, is_active, description, updated_at 
+            FROM integration_settings 
+            WHERE integration_name = %s
+        """, (integration_name,))
+
+        integration = cursor.fetchone()
+        if not integration:
+            return jsonify({'error': 'Integration not found'}), 404
+
+        # Mask sensitive fields
+        if isinstance(integration['settings'], dict):
+            for key in integration['settings']:
+                if 'key' in key.lower() or 'password' in key.lower() or 'secret' in key.lower():
+                    if integration['settings'][key]:
+                        integration['settings'][key] = '***masked***'
+
+        return jsonify(integration), 200
+    except Error as e:
+        logger.error(f"Error fetching integration: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@app.route('/api/admin/integrations/<string:integration_name>', methods=['PUT'])
+@admin_required
+def update_integration(integration_name):
+    """
+    Update integration settings.
+
+    Request Body:
+        {
+            "settings": {
+                "endpoint": "https://nyc.cloud.appwrite.io/v1",
+                "project_id": "xxx",
+                "api_key": "xxx",
+                "bucket_id": "xxx"
+            },
+            "is_active": true,
+            "description": "Updated description"
+        }
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor(dictionary=True)
+    admin_id = session['user_id']
+
+    try:
+        # Check if integration exists
+        cursor.execute("SELECT id, settings FROM integration_settings WHERE integration_name = %s",
+                       (integration_name,))
+        existing = cursor.fetchone()
+
+        if not existing:
+            return jsonify({'error': 'Integration not found'}), 404
+
+        # Merge new settings with existing ones
+        # If a field is '***masked***', keep the original value
+        new_settings = data.get('settings', {})
+        current_settings = existing['settings'] if isinstance(existing['settings'], dict) else {}
+
+        merged_settings = current_settings.copy()
+        for key, value in new_settings.items():
+            if value != '***masked***':
+                merged_settings[key] = value
+
+        is_active = data.get('is_active', True)
+        description = data.get('description')
+
+        # Update the integration
+        update_fields = []
+        update_values = []
+
+        if merged_settings:
+            update_fields.append("settings = %s")
+            update_values.append(json.dumps(merged_settings))
+
+        if 'is_active' in data:
+            update_fields.append("is_active = %s")
+            update_values.append(is_active)
+
+        if description is not None:
+            update_fields.append("description = %s")
+            update_values.append(description)
+
+        if not update_fields:
+            return jsonify({'error': 'No fields to update'}), 400
+
+        update_values.append(integration_name)
+
+        cursor.execute(
+            f"UPDATE integration_settings SET {', '.join(update_fields)} WHERE integration_name = %s",
+            tuple(update_values)
+        )
+        connection.commit()
+
+        # Log the action
+        log_audit(admin_id, 'UPDATE_INTEGRATION',
+                  details=f"Updated {integration_name} integration settings")
+
+        logger.info(f"Admin {admin_id} updated {integration_name} integration")
+
+        # Reinitialize integrations if needed
+        if integration_name == 'appwrite' and is_active:
+            _reinitialize_appwrite()
+
+        return jsonify({
+            'message': 'Integration updated successfully',
+            'integration_name': integration_name,
+            'is_active': is_active
+        }), 200
+
+    except Error as e:
+        logger.error(f"Error updating integration: {str(e)}")
+        connection.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def _reinitialize_appwrite():
+    """Reinitialize Appwrite client with updated settings from database."""
+    global appwrite_client, appwrite_storage, APPWRITE_BUCKET_ID
+
+    if not APPWRITE_AVAILABLE:
+        logger.warning("Appwrite SDK not available")
+        return False
+
+    try:
+        appwrite_settings = get_integration_settings('appwrite', fallback_to_env=False)
+
+        if appwrite_settings:
+            appwrite_endpoint = appwrite_settings.get('endpoint')
+            appwrite_project_id = appwrite_settings.get('project_id')
+            appwrite_api_key = appwrite_settings.get('api_key')
+            APPWRITE_BUCKET_ID = appwrite_settings.get('bucket_id')
+
+            if all([appwrite_endpoint, appwrite_project_id, appwrite_api_key, APPWRITE_BUCKET_ID]):
+                appwrite_client = Client()
+                appwrite_client.set_endpoint(appwrite_endpoint)
+                appwrite_client.set_project(appwrite_project_id)
+                appwrite_client.set_key(appwrite_api_key)
+
+                appwrite_storage = Storage(appwrite_client)
+                logger.info(f"Appwrite storage reinitialized successfully (endpoint: {appwrite_endpoint})")
+                return True
+
+        logger.warning("Failed to reinitialize Appwrite: incomplete settings")
+        return False
+
+    except Exception as e:
+        logger.error(f"Failed to reinitialize Appwrite: {e}")
+        return False
+
+
+@app.route('/api/admin/integrations/<string:integration_name>/toggle', methods=['POST'])
+@admin_required
+def toggle_integration(integration_name):
+    """Toggle integration active status."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor(dictionary=True)
+    admin_id = session['user_id']
+
+    try:
+        cursor.execute("SELECT is_active FROM integration_settings WHERE integration_name = %s",
+                       (integration_name,))
+        integration = cursor.fetchone()
+
+        if not integration:
+            return jsonify({'error': 'Integration not found'}), 404
+
+        new_status = not integration['is_active']
+        cursor.execute("UPDATE integration_settings SET is_active = %s WHERE integration_name = %s",
+                       (new_status, integration_name))
+        connection.commit()
+
+        # Log the action
+        action = 'ENABLE_INTEGRATION' if new_status else 'DISABLE_INTEGRATION'
+        log_audit(admin_id, action, details=f"{integration_name} integration")
+
+        logger.info(f"Admin {admin_id} {'enabled' if new_status else 'disabled'} {integration_name}")
+
+        # Reinitialize if activating Appwrite
+        if integration_name == 'appwrite' and new_status:
+            _reinitialize_appwrite()
+
+        return jsonify({
+            'message': f"Integration {'enabled' if new_status else 'disabled'}",
+            'is_active': new_status
+        }), 200
+
+    except Error as e:
+        logger.error(f"Error toggling integration: {str(e)}")
         return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()
@@ -2097,8 +2484,64 @@ def transactions():
                 return jsonify([])
 
         else:  # POST - Create new transaction
-            data = request.get_json()
+            # Check if request is multipart/form-data (with image) or JSON (without image)
+            is_multipart = request.content_type and 'multipart/form-data' in request.content_type
+
+            if is_multipart:
+                # Get form data
+                data = request.form.to_dict()
+                # Convert string numbers to proper types
+                for key in ['debit', 'credit', 'category_id', 'year', 'month', 'payment_method_id']:
+                    if key in data and data[key]:
+                        try:
+                            if key in ['debit', 'credit']:
+                                data[key] = float(data[key]) if data[key] else None
+                            else:
+                                data[key] = int(data[key]) if data[key] else None
+                        except (ValueError, TypeError):
+                            data[key] = None
+            else:
+                data = request.get_json()
+
             print(f"[DEBUG] Received transaction data: {data}")
+
+            # Handle bill image upload to Appwrite (if provided)
+            attachment_guid = None
+            if is_multipart and 'bill_image' in request.files:
+                bill_image = request.files['bill_image']
+
+                if bill_image and bill_image.filename:
+                    # Validate file type
+                    allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+                    file_ext = bill_image.filename.rsplit('.', 1)[-1].lower() if '.' in bill_image.filename else ''
+
+                    if file_ext in allowed_extensions:
+                        # Read image data
+                        image_data = bill_image.read()
+
+                        if len(image_data) > 0 and appwrite_storage and APPWRITE_BUCKET_ID:
+                            try:
+                                # Generate pure GUID for filename
+                                attachment_guid = str(uuid.uuid4())
+                                filename = f"{attachment_guid}.{file_ext}"
+
+                                logger.info(f"Uploading bill image to Appwrite: {filename}")
+
+                                # Upload to Appwrite with GUID as file ID
+                                result = appwrite_storage.create_file(
+                                    bucket_id=APPWRITE_BUCKET_ID,
+                                    file_id=attachment_guid,  # Use GUID as file ID
+                                    file=InputFile.from_bytes(image_data, filename=filename)
+                                )
+
+                                logger.info(f"Bill image uploaded successfully: {attachment_guid}")
+
+                            except Exception as e:
+                                logger.error(f"Failed to upload bill image to Appwrite: {str(e)}")
+                                # Continue with transaction creation even if upload fails
+                                attachment_guid = None
+                        else:
+                            logger.warning("Appwrite storage not configured or image is empty")
 
             # Get or create monthly record
             year = data.get('year', datetime.now().year)
@@ -2146,7 +2589,7 @@ def transactions():
             # Get bill content if provided (from scanned bills)
             bill_content = data.get('bill_content')
 
-            # Insert transaction (balance will be calculated on frontend)
+            # Insert transaction with attachments field
             insert_values = (
                 monthly_record['id'],
                 data.get('description'),
@@ -2156,15 +2599,16 @@ def transactions():
                 transaction_date,
                 data.get('notes'),
                 next_display_order,
-                bill_content
+                bill_content,
+                attachment_guid  # Store GUID in attachments column
             )
             print(f"[DEBUG] Inserting transaction with values: {insert_values}")
 
             cursor.execute("""
                            INSERT INTO transactions
                            (monthly_record_id, description, category_id, debit, credit, transaction_date, notes,
-                            display_order, bill_content)
-                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            display_order, bill_content, attachments)
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                            """, insert_values)
 
             transaction_id = cursor.lastrowid
@@ -2173,7 +2617,11 @@ def transactions():
             connection.commit()
             print(f"[DEBUG] Transaction committed successfully")
 
-            return jsonify({'message': 'Transaction created successfully', 'id': transaction_id}), 201
+            response = {'message': 'Transaction created successfully', 'id': transaction_id}
+            if attachment_guid:
+                response['attachment_guid'] = attachment_guid
+
+            return jsonify(response), 201
 
     except Error as e:
         return jsonify({'error': str(e)}), 500
@@ -2707,6 +3155,94 @@ def copy_transaction(transaction_id):
     except Error as e:
         logger.error(f"Error copying transaction: {e}")
         connection.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@app.route('/api/transactions/<int:transaction_id>/attachment', methods=['GET', 'DELETE'])
+@login_required
+def manage_transaction_attachment(transaction_id):
+    """Get or delete a transaction's attachment."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    try:
+        cursor = connection.cursor(dictionary=True)
+        user_id = session['user_id']
+
+        # Verify transaction belongs to user
+        cursor.execute("""
+            SELECT t.attachments, t.monthly_record_id
+            FROM transactions t
+            INNER JOIN monthly_records mr ON t.monthly_record_id = mr.id
+            WHERE t.id = %s AND mr.user_id = %s
+        """, (transaction_id, user_id))
+
+        transaction = cursor.fetchone()
+
+        if not transaction:
+            return jsonify({'error': 'Transaction not found'}), 404
+
+        attachment_guid = transaction['attachments']
+
+        if not attachment_guid:
+            return jsonify({'error': 'No attachment found for this transaction'}), 404
+
+        if request.method == 'GET':
+            # Return attachment info and URL
+            if appwrite_storage and APPWRITE_BUCKET_ID:
+                # Get integration settings for Appwrite endpoint
+                appwrite_settings = get_integration_settings('appwrite', fallback_to_env=True)
+                if appwrite_settings:
+                    endpoint = appwrite_settings.get('endpoint')
+                    project_id = appwrite_settings.get('project_id')
+                    bucket_id = appwrite_settings.get('bucket_id')
+
+                    file_url = f"{endpoint}/storage/buckets/{bucket_id}/files/{attachment_guid}/view?project={project_id}"
+                    download_url = f"{endpoint}/storage/buckets/{bucket_id}/files/{attachment_guid}/download?project={project_id}"
+
+                    return jsonify({
+                        'attachment_guid': attachment_guid,
+                        'file_url': file_url,
+                        'download_url': download_url
+                    }), 200
+                else:
+                    return jsonify({'error': 'Appwrite not configured'}), 500
+            else:
+                return jsonify({'error': 'Appwrite storage not available'}), 500
+
+        elif request.method == 'DELETE':
+            # Delete attachment from Appwrite and update transaction
+            if appwrite_storage and APPWRITE_BUCKET_ID:
+                try:
+                    # Delete file from Appwrite
+                    appwrite_storage.delete_file(
+                        bucket_id=APPWRITE_BUCKET_ID,
+                        file_id=attachment_guid
+                    )
+                    logger.info(f"Deleted attachment {attachment_guid} from Appwrite")
+                except Exception as e:
+                    logger.error(f"Failed to delete attachment from Appwrite: {str(e)}")
+                    # Continue with database update even if Appwrite deletion fails
+
+            # Remove attachment from transaction
+            cursor.execute("""
+                UPDATE transactions
+                SET attachments = NULL
+                WHERE id = %s
+            """, (transaction_id,))
+
+            connection.commit()
+
+            logger.info(f"Removed attachment from transaction {transaction_id}")
+
+            return jsonify({'message': 'Attachment deleted successfully'}), 200
+
+    except Error as e:
+        logger.error(f"Error managing attachment: {str(e)}")
         return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()
@@ -5131,6 +5667,9 @@ def scan_bill():
     """
     Scan a bill image using Gemini AI to extract shop name, amount, and line items.
 
+    NOTE: This endpoint ONLY extracts data - it does NOT upload to Appwrite.
+    The image will be uploaded when the user saves the transaction.
+
     Request:
         - Content-Type: multipart/form-data
         - Field: 'bill_image' (image file)
@@ -5180,10 +5719,10 @@ def scan_bill():
 
         if not scanner:
             return jsonify({
-                'error': 'Bill scanning service not configured. Please set GEMINI_API_KEY in .env file.'
+                'error': 'Bill scanning service not configured. Please set Gemini API key in integration settings.'
             }), 503
 
-        # Scan the bill
+        # Scan the bill with Gemini AI (no Appwrite upload yet)
         logger.info(f"Scanning bill image for user {session['user_id']}")
         result = scanner.scan_bill(image_data)
 
@@ -5199,7 +5738,7 @@ def scan_bill():
                 'raw_response': result.get('raw_response', '')
             }), 200
 
-        # Return successful result
+        # Return successful result (no file_id/file_url since we didn't upload yet)
         logger.info(
             f"Bill scanned successfully: {result['shop_name']} - {result['amount']} - {len(result.get('items', []))} items")
 
