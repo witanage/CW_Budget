@@ -15,7 +15,7 @@ from functools import wraps
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash, make_response
 from flask.json.provider import DefaultJSONProvider
-from flask_cors import CORS
+from flask_cors import CORS, cross_origin
 from mysql.connector import Error
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -4638,14 +4638,19 @@ def get_sampath_current_rate():
 
 
 @app.route('/api/exchange-rate/refresh-all', methods=['GET'])
-@token_required
+@cross_origin(origins=r'(https://console\.cron-job\.org.*)')
+#@cross_origin(origins=r'(https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+)(:\d+)?|https://console\.cron-job\.org.*)')
+
 def refresh_all_rates_manually():
     """Trigger an immediate refresh of all exchange-rate sources.
     This is the single endpoint to manually refresh all bank exchange rates.
-    Returns per-source results so the caller can see exactly which banks succeeded or failed."""
+    Returns per-source results so the caller can see exactly which banks succeeded or failed.
+    No authentication required - accessible for automated cron jobs from whitelisted origins."""
     try:
         results = refresh_all_exchange_rates(force=True)
-        log_audit(request.current_user['user_id'], 'MANUAL_EXCHANGE_RATE_REFRESH')
+        # Log audit only if user is authenticated (manual refresh)
+        if hasattr(request, 'current_user') and request.current_user:
+            log_audit(request.current_user['user_id'], 'MANUAL_EXCHANGE_RATE_REFRESH')
 
         succeeded = [k for k, v in results.items() if v.get('status') == 'success']
         failed = [k for k, v in results.items() if v.get('status') != 'success']
