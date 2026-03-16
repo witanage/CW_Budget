@@ -159,6 +159,16 @@ def get_integration_settings(integration_name, fallback_to_env=True):
 
         if row and row['is_active']:
             settings = row['settings']
+
+            # MySQL JSON columns may return as string, parse if needed
+            if isinstance(settings, str):
+                try:
+                    import json
+                    settings = json.loads(settings)
+                except (json.JSONDecodeError, ValueError) as e:
+                    logger.warning(f"Failed to parse JSON settings for {integration_name}: {e}")
+                    settings = None
+
             # Check if settings are populated (not just empty placeholders)
             if isinstance(settings, dict) and any(settings.values()):
                 logger.info(f"Loaded {integration_name} settings from database")
