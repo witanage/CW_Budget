@@ -130,126 +130,26 @@ def get_setting(key, default=None):
         connection.close()
 
 
-def get_integration_settings(integration_name, fallback_to_env=True):
-    """
-    Read integration settings from the database.
-
-    Args:
-        integration_name: Name of the integration (e.g., 'appwrite', 'gemini')
-        fallback_to_env: If True, fall back to environment variables if DB fails or is empty
-
-    Returns:
-        dict: Integration settings as a dictionary, or None if not found
-    """
-    connection = get_db_connection()
-    if not connection:
-        if fallback_to_env:
-            logger.info(f"DB unavailable, falling back to .env for {integration_name}")
-            return _get_integration_from_env(integration_name)
-        return None
-
-    cursor = None
-    try:
-        cursor = connection.cursor(dictionary=True)
-        cursor.execute(
-            "SELECT settings, is_active FROM integration_settings WHERE integration_name = %s",
-            (integration_name,)
-        )
-        row = cursor.fetchone()
-
-        if row and row['is_active']:
-            settings = row['settings']
-
-            # MySQL JSON columns may return as string, parse if needed
-            if isinstance(settings, str):
-                try:
-                    import json
-                    settings = json.loads(settings)
-                except (json.JSONDecodeError, ValueError) as e:
-                    logger.warning(f"Failed to parse JSON settings for {integration_name}: {e}")
-                    settings = None
-
-            # Check if settings are populated (not just empty placeholders)
-            if isinstance(settings, dict) and any(settings.values()):
-                logger.info(f"Loaded {integration_name} settings from database")
-                return settings
-            elif fallback_to_env:
-                logger.info(f"DB settings for {integration_name} are empty, falling back to .env")
-                return _get_integration_from_env(integration_name)
-
-        if fallback_to_env:
-            logger.info(f"No active DB settings for {integration_name}, falling back to .env")
-            return _get_integration_from_env(integration_name)
-
-        return None
-
-    except Exception as e:
-        logger.warning(f"get_integration_settings('{integration_name}'): {e}")
-        if fallback_to_env:
-            return _get_integration_from_env(integration_name)
-        return None
-    finally:
-        if cursor:
-            cursor.close()
-        connection.close()
-
-
-def _get_integration_from_env(integration_name):
-    """
-    Fallback function to read integration settings from environment variables.
-
-    Args:
-        integration_name: Name of the integration
-
-    Returns:
-        dict: Integration settings from .env file, or None if not configured
-    """
-    if integration_name == 'appwrite':
-        endpoint = os.environ.get('APPWRITE_ENDPOINT')
-        project_id = os.environ.get('APPWRITE_PROJECT_ID')
-        api_key = os.environ.get('APPWRITE_API_KEY')
-        bucket_id = os.environ.get('APPWRITE_BUCKET_ID')
-
-        if all([endpoint, project_id, api_key, bucket_id]):
-            return {
-                'endpoint': endpoint,
-                'project_id': project_id,
-                'api_key': api_key,
-                'bucket_id': bucket_id
-            }
-
-    elif integration_name == 'gemini':
-        api_key = os.environ.get('GEMINI_API_KEY')
-        if api_key:
-            return {'api_key': api_key}
-
-    return None
-
-
-# Initialize Appwrite client now that helper functions are defined
+# Initialize Appwrite client
 if APPWRITE_AVAILABLE:
     try:
-        # Try loading from database first, fallback to .env
-        appwrite_settings = get_integration_settings('appwrite', fallback_to_env=True)
+        # Load from environment variables
+        appwrite_endpoint = os.environ.get('APPWRITE_ENDPOINT')
+        appwrite_project_id = os.environ.get('APPWRITE_PROJECT_ID')
+        appwrite_api_key = os.environ.get('APPWRITE_API_KEY')
+        APPWRITE_BUCKET_ID = os.environ.get('APPWRITE_BUCKET_ID')
 
-        if appwrite_settings:
-            appwrite_endpoint = appwrite_settings.get('endpoint')
-            appwrite_project_id = appwrite_settings.get('project_id')
-            appwrite_api_key = appwrite_settings.get('api_key')
-            APPWRITE_BUCKET_ID = appwrite_settings.get('bucket_id')
+        if all([appwrite_endpoint, appwrite_project_id, appwrite_api_key, APPWRITE_BUCKET_ID]):
+            appwrite_client = Client()
+            appwrite_client.set_endpoint(appwrite_endpoint)
+            appwrite_client.set_project(appwrite_project_id)
+            appwrite_client.set_key(appwrite_api_key)
 
-            if all([appwrite_endpoint, appwrite_project_id, appwrite_api_key, APPWRITE_BUCKET_ID]):
-                appwrite_client = Client()
-                appwrite_client.set_endpoint(appwrite_endpoint)
-                appwrite_client.set_project(appwrite_project_id)
-                appwrite_client.set_key(appwrite_api_key)
-
-                appwrite_storage = Storage(appwrite_client)
-                logger.info(f"✅ Appwrite storage initialized from database (endpoint: {appwrite_endpoint})")
-            else:
-                logger.warning("Appwrite credentials incomplete. Set them in database or .env file.")
+            appwrite_storage = Storage(appwrite_client)
+            logger.info(f"✅ Appwrite storage initialized (endpoint: {appwrite_endpoint})")
         else:
-            logger.warning("Appwrite credentials not configured. Set them in database or through admin panel.")
+            logger.warning("Appwrite credentials incomplete. Set them in .env file.")
+            appwrite_storage = None
     except Exception as e:
         logger.error(f"Failed to initialize Appwrite client: {e}")
         appwrite_storage = None
@@ -1164,262 +1064,6 @@ def update_admin_setting(key):
         return jsonify({'message': 'Setting updated', 'key': key, 'value': new_value}), 200
     except Error as e:
         logger.error(f"Error updating setting '{key}': {str(e)}")
-        return jsonify({'error': str(e)}), 500
-    finally:
-        cursor.close()
-        connection.close()
-
-
-@app.route('/api/admin/integrations', methods=['GET'])
-@admin_required
-def get_all_integrations():
-    """Get all integration settings."""
-    connection = get_db_connection()
-    if not connection:
-        return jsonify({'error': 'Database connection failed'}), 500
-
-    cursor = connection.cursor(dictionary=True)
-    try:
-        cursor.execute("""
-            SELECT id, integration_name, settings, is_active, description, updated_at 
-            FROM integration_settings 
-            ORDER BY integration_name
-        """)
-        integrations = cursor.fetchall()
-
-        # Mask sensitive fields in the response
-        for integration in integrations:
-            if isinstance(integration['settings'], dict):
-                # Mask API keys and sensitive data
-                for key in integration['settings']:
-                    if 'key' in key.lower() or 'password' in key.lower() or 'secret' in key.lower():
-                        if integration['settings'][key]:
-                            integration['settings'][key] = '***masked***'
-
-        return jsonify(integrations), 200
-    except Error as e:
-        logger.error(f"Error fetching integrations: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-    finally:
-        cursor.close()
-        connection.close()
-
-
-@app.route('/api/admin/integrations/<string:integration_name>', methods=['GET'])
-@admin_required
-def get_integration(integration_name):
-    """Get a specific integration's settings (with masked sensitive fields)."""
-    connection = get_db_connection()
-    if not connection:
-        return jsonify({'error': 'Database connection failed'}), 500
-
-    cursor = connection.cursor(dictionary=True)
-    try:
-        cursor.execute("""
-            SELECT id, integration_name, settings, is_active, description, updated_at 
-            FROM integration_settings 
-            WHERE integration_name = %s
-        """, (integration_name,))
-
-        integration = cursor.fetchone()
-        if not integration:
-            return jsonify({'error': 'Integration not found'}), 404
-
-        # Mask sensitive fields
-        if isinstance(integration['settings'], dict):
-            for key in integration['settings']:
-                if 'key' in key.lower() or 'password' in key.lower() or 'secret' in key.lower():
-                    if integration['settings'][key]:
-                        integration['settings'][key] = '***masked***'
-
-        return jsonify(integration), 200
-    except Error as e:
-        logger.error(f"Error fetching integration: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-    finally:
-        cursor.close()
-        connection.close()
-
-
-@app.route('/api/admin/integrations/<string:integration_name>', methods=['PUT'])
-@admin_required
-def update_integration(integration_name):
-    """
-    Update integration settings.
-
-    Request Body:
-        {
-            "settings": {
-                "endpoint": "https://nyc.cloud.appwrite.io/v1",
-                "project_id": "xxx",
-                "api_key": "xxx",
-                "bucket_id": "xxx"
-            },
-            "is_active": true,
-            "description": "Updated description"
-        }
-    """
-    data = request.get_json()
-    if not data:
-        return jsonify({'error': 'No data provided'}), 400
-
-    connection = get_db_connection()
-    if not connection:
-        return jsonify({'error': 'Database connection failed'}), 500
-
-    cursor = connection.cursor(dictionary=True)
-    admin_id = session['user_id']
-
-    try:
-        # Check if integration exists
-        cursor.execute("SELECT id, settings FROM integration_settings WHERE integration_name = %s",
-                       (integration_name,))
-        existing = cursor.fetchone()
-
-        if not existing:
-            return jsonify({'error': 'Integration not found'}), 404
-
-        # Merge new settings with existing ones
-        # If a field is '***masked***', keep the original value
-        new_settings = data.get('settings', {})
-        current_settings = existing['settings'] if isinstance(existing['settings'], dict) else {}
-
-        merged_settings = current_settings.copy()
-        for key, value in new_settings.items():
-            if value != '***masked***':
-                merged_settings[key] = value
-
-        is_active = data.get('is_active', True)
-        description = data.get('description')
-
-        # Update the integration
-        update_fields = []
-        update_values = []
-
-        if merged_settings:
-            update_fields.append("settings = %s")
-            update_values.append(json.dumps(merged_settings))
-
-        if 'is_active' in data:
-            update_fields.append("is_active = %s")
-            update_values.append(is_active)
-
-        if description is not None:
-            update_fields.append("description = %s")
-            update_values.append(description)
-
-        if not update_fields:
-            return jsonify({'error': 'No fields to update'}), 400
-
-        update_values.append(integration_name)
-
-        cursor.execute(
-            f"UPDATE integration_settings SET {', '.join(update_fields)} WHERE integration_name = %s",
-            tuple(update_values)
-        )
-        connection.commit()
-
-        # Log the action
-        log_audit(admin_id, 'UPDATE_INTEGRATION',
-                  details=f"Updated {integration_name} integration settings")
-
-        logger.info(f"Admin {admin_id} updated {integration_name} integration")
-
-        # Reinitialize integrations if needed
-        if integration_name == 'appwrite' and is_active:
-            _reinitialize_appwrite()
-
-        return jsonify({
-            'message': 'Integration updated successfully',
-            'integration_name': integration_name,
-            'is_active': is_active
-        }), 200
-
-    except Error as e:
-        logger.error(f"Error updating integration: {str(e)}")
-        connection.rollback()
-        return jsonify({'error': str(e)}), 500
-    finally:
-        cursor.close()
-        connection.close()
-
-
-def _reinitialize_appwrite():
-    """Reinitialize Appwrite client with updated settings from database."""
-    global appwrite_client, appwrite_storage, APPWRITE_BUCKET_ID
-
-    if not APPWRITE_AVAILABLE:
-        logger.warning("Appwrite SDK not available")
-        return False
-
-    try:
-        appwrite_settings = get_integration_settings('appwrite', fallback_to_env=False)
-
-        if appwrite_settings:
-            appwrite_endpoint = appwrite_settings.get('endpoint')
-            appwrite_project_id = appwrite_settings.get('project_id')
-            appwrite_api_key = appwrite_settings.get('api_key')
-            APPWRITE_BUCKET_ID = appwrite_settings.get('bucket_id')
-
-            if all([appwrite_endpoint, appwrite_project_id, appwrite_api_key, APPWRITE_BUCKET_ID]):
-                appwrite_client = Client()
-                appwrite_client.set_endpoint(appwrite_endpoint)
-                appwrite_client.set_project(appwrite_project_id)
-                appwrite_client.set_key(appwrite_api_key)
-
-                appwrite_storage = Storage(appwrite_client)
-                logger.info(f"Appwrite storage reinitialized successfully (endpoint: {appwrite_endpoint})")
-                return True
-
-        logger.warning("Failed to reinitialize Appwrite: incomplete settings")
-        return False
-
-    except Exception as e:
-        logger.error(f"Failed to reinitialize Appwrite: {e}")
-        return False
-
-
-@app.route('/api/admin/integrations/<string:integration_name>/toggle', methods=['POST'])
-@admin_required
-def toggle_integration(integration_name):
-    """Toggle integration active status."""
-    connection = get_db_connection()
-    if not connection:
-        return jsonify({'error': 'Database connection failed'}), 500
-
-    cursor = connection.cursor(dictionary=True)
-    admin_id = session['user_id']
-
-    try:
-        cursor.execute("SELECT is_active FROM integration_settings WHERE integration_name = %s",
-                       (integration_name,))
-        integration = cursor.fetchone()
-
-        if not integration:
-            return jsonify({'error': 'Integration not found'}), 404
-
-        new_status = not integration['is_active']
-        cursor.execute("UPDATE integration_settings SET is_active = %s WHERE integration_name = %s",
-                       (new_status, integration_name))
-        connection.commit()
-
-        # Log the action
-        action = 'ENABLE_INTEGRATION' if new_status else 'DISABLE_INTEGRATION'
-        log_audit(admin_id, action, details=f"{integration_name} integration")
-
-        logger.info(f"Admin {admin_id} {'enabled' if new_status else 'disabled'} {integration_name}")
-
-        # Reinitialize if activating Appwrite
-        if integration_name == 'appwrite' and new_status:
-            _reinitialize_appwrite()
-
-        return jsonify({
-            'message': f"Integration {'enabled' if new_status else 'disabled'}",
-            'is_active': new_status
-        }), 200
-
-    except Error as e:
-        logger.error(f"Error toggling integration: {str(e)}")
         return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()
@@ -3204,15 +2848,13 @@ def manage_transaction_attachment(transaction_id):
         if request.method == 'GET':
             # Return attachment info and URL
             if appwrite_storage and APPWRITE_BUCKET_ID:
-                # Get integration settings for Appwrite endpoint
-                appwrite_settings = get_integration_settings('appwrite', fallback_to_env=True)
-                if appwrite_settings:
-                    endpoint = appwrite_settings.get('endpoint')
-                    project_id = appwrite_settings.get('project_id')
-                    bucket_id = appwrite_settings.get('bucket_id')
+                # Get Appwrite endpoint from environment
+                appwrite_endpoint = os.environ.get('APPWRITE_ENDPOINT')
+                appwrite_project_id = os.environ.get('APPWRITE_PROJECT_ID')
 
-                    file_url = f"{endpoint}/storage/buckets/{bucket_id}/files/{attachment_guid}/view?project={project_id}"
-                    download_url = f"{endpoint}/storage/buckets/{bucket_id}/files/{attachment_guid}/download?project={project_id}"
+                if appwrite_endpoint and appwrite_project_id and APPWRITE_BUCKET_ID:
+                    file_url = f"{appwrite_endpoint}/storage/buckets/{APPWRITE_BUCKET_ID}/files/{attachment_guid}/view?project={appwrite_project_id}"
+                    download_url = f"{appwrite_endpoint}/storage/buckets/{APPWRITE_BUCKET_ID}/files/{attachment_guid}/download?project={appwrite_project_id}"
 
                     return jsonify({
                         'attachment_guid': attachment_guid,
