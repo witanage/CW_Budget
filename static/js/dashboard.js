@@ -375,6 +375,12 @@ function setupFormButtons() {
     if (confirmDeleteCategoryBtn) {
         confirmDeleteCategoryBtn.addEventListener('click', deleteCategory);
     }
+
+    // View attachment button
+    const viewAttachmentBtn = document.getElementById('viewAttachmentBtn');
+    if (viewAttachmentBtn) {
+        viewAttachmentBtn.addEventListener('click', loadAndDisplayAttachment);
+    }
 }
 
 // ================================
@@ -1696,9 +1702,100 @@ function showBillContent(transactionId) {
         billContentDisplay.innerHTML = html;
     }
 
+    // Handle attachment button visibility
+    const viewAttachmentBtn = document.getElementById('viewAttachmentBtn');
+    const billAttachmentContainer = document.getElementById('billAttachmentContainer');
+
+    // Reset attachment container
+    billAttachmentContainer.style.display = 'none';
+
+    if (transaction.attachments) {
+        // Show the "View Attachment" button
+        viewAttachmentBtn.style.display = 'inline-block';
+        viewAttachmentBtn.dataset.transactionId = transactionId;
+        viewAttachmentBtn.dataset.attachmentGuid = transaction.attachments;
+    } else {
+        // Hide the "View Attachment" button
+        viewAttachmentBtn.style.display = 'none';
+    }
+
     // Show the modal
     const modal = new bootstrap.Modal(document.getElementById('billContentModal'));
     modal.show();
+}
+
+// ================================
+// ATTACHMENT DISPLAY FUNCTION
+// ================================
+
+async function loadAndDisplayAttachment() {
+    const viewAttachmentBtn = document.getElementById('viewAttachmentBtn');
+    const billAttachmentContainer = document.getElementById('billAttachmentContainer');
+
+    const transactionId = viewAttachmentBtn.dataset.transactionId;
+    const attachmentGuid = viewAttachmentBtn.dataset.attachmentGuid;
+
+    if (!transactionId || !attachmentGuid) {
+        showToast('Attachment information not available', 'danger');
+        return;
+    }
+
+    // Show loading state
+    billAttachmentContainer.innerHTML = `
+        <div class="text-center py-3">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="text-muted mt-2">Loading attachment...</p>
+        </div>
+    `;
+    billAttachmentContainer.style.display = 'block';
+
+    // Disable button while loading
+    viewAttachmentBtn.disabled = true;
+
+    try {
+        const response = await fetch(`/api/transactions/${transactionId}/attachment`);
+
+        if (!response.ok) {
+            throw new Error(`Failed to load attachment: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        if (data.file_url) {
+            // Display the image
+            billAttachmentContainer.innerHTML = `
+                <div class="attachment-display">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0">Bill Attachment</h6>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="hideAttachment()">
+                            <i class="fas fa-times"></i> Hide
+                        </button>
+                    </div>
+                    <img src="${data.file_url}" alt="Bill Attachment" class="img-fluid rounded shadow-sm" style="max-width: 100%; height: auto;"/>
+                </div>
+            `;
+        } else {
+            throw new Error('No file URL returned from server');
+        }
+    } catch (error) {
+        console.error('Error loading attachment:', error);
+        billAttachmentContainer.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Failed to load attachment: ${error.message}
+            </div>
+        `;
+    } finally {
+        // Re-enable button
+        viewAttachmentBtn.disabled = false;
+    }
+}
+
+function hideAttachment() {
+    const billAttachmentContainer = document.getElementById('billAttachmentContainer');
+    billAttachmentContainer.style.display = 'none';
 }
 
 // ================================

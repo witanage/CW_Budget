@@ -1187,8 +1187,24 @@
                         <p class="text-muted">No bill content available</p>
                     </div>
                 </div>
+                <!-- Attachment Image Container (hidden by default) -->
+                <div id="billAttachmentContainer" class="mt-4" style="display: none;">
+                    <div class="border-top pt-4">
+                        <h6 class="mb-3">
+                            <i class="fas fa-paperclip me-2"></i>Bill Image
+                        </h6>
+                        <div id="billAttachmentDisplay" class="text-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer" style="flex-shrink: 0;">
+                <button type="button" class="btn btn-info" id="viewAttachmentBtn" style="display: none;">
+                    <i class="fas fa-image me-1"></i>View Attachment
+                </button>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
@@ -2429,6 +2445,29 @@ tr[draggable="true"] {
     #billContentModal .modal-body::-webkit-scrollbar {
         width: 10px;
     }
+}
+
+/* Attachment Display Styles */
+#billAttachmentContainer {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 2px solid var(--border-color);
+}
+
+#billAttachmentContainer .attachment-display {
+    background-color: var(--bg-tertiary);
+    padding: 1rem;
+    border-radius: 0.5rem;
+}
+
+#billAttachmentContainer img {
+    border: 1px solid var(--border-color);
+    transition: transform 0.2s;
+}
+
+#billAttachmentContainer img:hover {
+    transform: scale(1.02);
+    cursor: zoom-in;
 }
 
 </style>

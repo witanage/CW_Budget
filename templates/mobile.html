@@ -365,8 +365,14 @@
                     <div id="billItemsContent">
                         <!-- Bill items will be loaded here -->
                     </div>
+                    <div id="mobileBillAttachmentContainer" class="mt-4" style="display: none;">
+                        <!-- Attachment will be displayed here -->
+                    </div>
                 </div>
                 <div class="modal-footer" style="flex-shrink: 0;">
+                    <button type="button" class="btn btn-sm btn-info" id="mobileViewAttachmentBtn" style="display: none;">
+                        <i class="fas fa-image me-1"></i>View Attachment
+                    </button>
                     <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
@@ -514,6 +520,29 @@
             border-bottom: 2px solid var(--border-color, #dee2e6);
             position: sticky;
             top: 0;
+        }
+
+        /* Mobile Attachment Display Styles */
+        #mobileBillAttachmentContainer {
+            padding-top: 1.5rem;
+            border-top: 2px solid rgba(0, 0, 0, 0.1);
+        }
+
+        #mobileBillAttachmentContainer .attachment-display {
+            background-color: rgba(0, 0, 0, 0.05);
+            padding: 1rem;
+            border-radius: 0.5rem;
+        }
+
+        #mobileBillAttachmentContainer img {
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+            max-width: 100%;
+            height: auto;
+        }
+
+        #mobileBillAttachmentContainer img:hover {
+            transform: scale(1.02);
         }
 
         #billItemsContent .table-light,

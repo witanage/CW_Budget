@@ -11,3 +11,4 @@ reportlab==4.0.7
 PyJWT==2.8.0
 google-genai==0.0.1
 Pillow==10.3.0
+appwrite==5.0.1
