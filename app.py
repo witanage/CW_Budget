@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import re
+import requests
 import threading
 import time
 import uuid
@@ -2846,23 +2847,17 @@ def manage_transaction_attachment(transaction_id):
             return jsonify({'error': 'No attachment found for this transaction'}), 404
 
         if request.method == 'GET':
-            # Return attachment info and URL
+            # Return attachment info with proxy URL (not direct Appwrite URL)
+            # Direct Appwrite URLs require authentication and won't work in img tags
             if appwrite_storage and APPWRITE_BUCKET_ID:
-                # Get Appwrite endpoint from environment
-                appwrite_endpoint = os.environ.get('APPWRITE_ENDPOINT')
-                appwrite_project_id = os.environ.get('APPWRITE_PROJECT_ID')
+                # Return proxy URL that will fetch the file server-side
+                proxy_url = url_for('serve_attachment', transaction_id=transaction_id, _external=True)
 
-                if appwrite_endpoint and appwrite_project_id and APPWRITE_BUCKET_ID:
-                    file_url = f"{appwrite_endpoint}/storage/buckets/{APPWRITE_BUCKET_ID}/files/{attachment_guid}/view?project={appwrite_project_id}"
-                    download_url = f"{appwrite_endpoint}/storage/buckets/{APPWRITE_BUCKET_ID}/files/{attachment_guid}/download?project={appwrite_project_id}"
-
-                    return jsonify({
-                        'attachment_guid': attachment_guid,
-                        'file_url': file_url,
-                        'download_url': download_url
-                    }), 200
-                else:
-                    return jsonify({'error': 'Appwrite not configured'}), 500
+                return jsonify({
+                    'attachment_guid': attachment_guid,
+                    'file_url': proxy_url,
+                    'download_url': proxy_url + '?download=1'
+                }), 200
             else:
                 return jsonify({'error': 'Appwrite storage not available'}), 500
 
@@ -2896,6 +2891,114 @@ def manage_transaction_attachment(transaction_id):
     except Error as e:
         logger.error(f"Error managing attachment: {str(e)}")
         return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@app.route('/api/transactions/<int:transaction_id>/attachment/view')
+@login_required
+def serve_attachment(transaction_id):
+    """Proxy endpoint to serve attachment files with authentication."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = None
+    try:
+        cursor = connection.cursor(dictionary=True)
+        user_id = session['user_id']
+
+        # Verify transaction belongs to user and get attachment GUID
+        cursor.execute("""
+            SELECT t.attachments
+            FROM transactions t
+            INNER JOIN monthly_records mr ON t.monthly_record_id = mr.id
+            WHERE t.id = %s AND mr.user_id = %s
+        """, (transaction_id, user_id))
+
+        transaction = cursor.fetchone()
+
+        if not transaction:
+            return "Transaction not found", 404
+
+        attachment_guid = transaction['attachments']
+
+        if not attachment_guid:
+            return "No attachment found", 404
+
+        if not appwrite_storage or not APPWRITE_BUCKET_ID:
+            return "Storage not available", 500
+
+        # Get file metadata first
+        try:
+            file_info = appwrite_storage.get_file(
+                bucket_id=APPWRITE_BUCKET_ID,
+                file_id=attachment_guid
+            )
+            mime_type = file_info.get('mimeType', 'application/octet-stream')
+            file_name = file_info.get('name', attachment_guid)
+
+            logger.info(f"Fetching attachment {attachment_guid}, mime: {mime_type}")
+
+        except Exception as e:
+            logger.error(f"Error fetching file metadata from Appwrite: {str(e)}")
+            mime_type = 'application/octet-stream'
+            file_name = attachment_guid
+
+        # Fetch the actual file content using direct HTTP request
+        try:
+            # Get Appwrite credentials
+            appwrite_endpoint = os.environ.get('APPWRITE_ENDPOINT')
+            appwrite_project_id = os.environ.get('APPWRITE_PROJECT_ID')
+            appwrite_api_key = os.environ.get('APPWRITE_API_KEY')
+
+            if not all([appwrite_endpoint, appwrite_project_id, appwrite_api_key]):
+                return "Appwrite configuration incomplete", 500
+
+            # Construct the download URL
+            download_url = f"{appwrite_endpoint}/storage/buckets/{APPWRITE_BUCKET_ID}/files/{attachment_guid}/download"
+
+            # Make authenticated request to Appwrite
+            headers = {
+                'X-Appwrite-Project': appwrite_project_id,
+                'X-Appwrite-Key': appwrite_api_key
+            }
+
+            logger.info(f"Fetching file from Appwrite: {download_url}")
+
+            response = requests.get(download_url, headers=headers, params={'project': appwrite_project_id})
+
+            if response.status_code != 200:
+                logger.error(f"Appwrite returned status {response.status_code}: {response.text}")
+                return f"Error loading attachment from storage (status {response.status_code})", 500
+
+            # Get content type from response or use detected mime type
+            content_type = response.headers.get('Content-Type', mime_type)
+
+            # Create Flask response with file content
+            flask_response = make_response(response.content)
+            flask_response.headers['Content-Type'] = content_type
+            flask_response.headers['Cache-Control'] = 'public, max-age=31536000'  # Cache for 1 year
+
+            # Check if download parameter is present
+            if request.args.get('download') == '1':
+                flask_response.headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
+            else:
+                flask_response.headers['Content-Disposition'] = 'inline'
+
+            logger.info(f"Successfully served attachment {attachment_guid}")
+            return flask_response
+
+        except Exception as e:
+            logger.error(f"Error fetching file content from Appwrite: {str(e)}")
+            logger.error(f"Bucket: {APPWRITE_BUCKET_ID}, File: {attachment_guid}")
+            return f"Error loading attachment: {str(e)}", 500
+
+
+    except Error as e:
+        logger.error(f"Error serving attachment: {str(e)}")
+        return f"Database error: {str(e)}", 500
     finally:
         cursor.close()
         connection.close()
