@@ -5695,10 +5695,19 @@ def get_intraday_refresh_logs():
             for row in rows:
                 run_key = row['run_key']
                 if run_key not in runs_dict:
+                    # Database stores timestamps in UTC, append 'Z' to indicate UTC timezone
+                    created_at = row['created_at']
+                    if hasattr(created_at, 'isoformat'):
+                        timestamp_str = created_at.isoformat()
+                        # Append 'Z' if not already present to indicate UTC
+                        if not timestamp_str.endswith('Z') and '+' not in timestamp_str:
+                            timestamp_str += 'Z'
+                    else:
+                        timestamp_str = str(created_at)
+
                     runs_dict[run_key] = {
                         'run_key': run_key,
-                        'timestamp': row['created_at'].isoformat() if hasattr(row['created_at'], 'isoformat') else str(
-                            row['created_at']),
+                        'timestamp': timestamp_str,
                         'banks': {}
                     }
 
