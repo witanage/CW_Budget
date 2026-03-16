@@ -2,12 +2,12 @@ name: Refresh Exchange Rates
 
 on:
   schedule:
-    # Every 15 minutes from 2:30 AM to 2:45 AM UTC (8:00 AM to 8:15 AM SLT)
-    - cron: '30,45 2 * * *'
-    # Every 15 minutes from 3:00 AM to 11:45 AM UTC (8:30 AM to 5:15 PM SLT)
-    - cron: '0,15,30,45 3-11 * * *'
-    # Every 15 minutes from 12:00 PM to 12:30 PM UTC (5:30 PM to 6:00 PM SLT)
-    - cron: '0,15,30 12 * * *'
+    # Every 5 minutes from 0:30 AM to 0:55 AM UTC (6:00 AM to 6:25 AM SLT)
+    - cron: '30,35,40,45,50,55 0 * * *'
+    # Every 5 minutes from 1:00 AM to 11:55 AM UTC (6:30 AM to 5:25 PM SLT)
+    - cron: '0,5,10,15,20,25,30,35,40,45,50,55 1-11 * * *'
+    # Every 5 minutes from 12:00 PM to 12:30 PM UTC (5:30 PM to 6:00 PM SLT)
+    - cron: '0,5,10,15,20,25,30 12 * * *'
   workflow_dispatch:
 
 jobs:
