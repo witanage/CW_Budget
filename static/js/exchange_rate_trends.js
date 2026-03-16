@@ -18,7 +18,8 @@
         forecastHistory: 3,
         compMonths: 1,
         intradayDate: null,
-        intradayLimit: 20
+        intradayLimit: 50,
+        intradayTimezone: 'Asia/Colombo'
     };
 
     // --------------- Colours ---------------
@@ -107,13 +108,14 @@
             });
         });
 
-        _on('ertMonthsSelector',  'change', function () { _s.months          = +this.value; _fetchAll(); });
-        _on('ertForecastDays',    'change', function () { _s.forecastDays    = +this.value; _fetchAll(); });
-        _on('ertForecastHistory', 'change', function () { _s.forecastHistory = +this.value; _fetchAll(); });
-        _on('ertCompMonths',      'change', function () { _s.compMonths      = +this.value; _fetchAll(); });
-        _on('ertRefreshBtn',      'click',  function () { _cache = null; _fetchAll(); _fetchIntraday(); });
-        _on('ertIntradayDate',    'change', function () { _s.intradayDate    = this.value; _fetchIntraday(); });
-        _on('ertIntradayLimit',   'change', function () { _s.intradayLimit   = +this.value; _fetchIntraday(); });
+        _on('ertMonthsSelector',     'change', function () { _s.months           = +this.value; _fetchAll(); });
+        _on('ertForecastDays',       'change', function () { _s.forecastDays     = +this.value; _fetchAll(); });
+        _on('ertForecastHistory',    'change', function () { _s.forecastHistory  = +this.value; _fetchAll(); });
+        _on('ertCompMonths',         'change', function () { _s.compMonths       = +this.value; _fetchAll(); });
+        _on('ertRefreshBtn',         'click',  function () { _cache = null; _fetchAll(); _fetchIntraday(); });
+        _on('ertIntradayDate',       'change', function () { _s.intradayDate     = this.value; _fetchIntraday(); });
+        _on('ertIntradayLimit',      'change', function () { _s.intradayLimit    = +this.value; _fetchIntraday(); });
+        _on('ertIntradayTimezone',   'change', function () { _s.intradayTimezone = this.value; _fetchIntraday(); });
     }
 
     function _on(id, evt, fn) {
@@ -513,6 +515,8 @@
     function _fetchIntraday() {
         if (!_s.intradayDate) return;
 
+        console.log('[ERT Intraday] Fetching data for date:', _s.intradayDate, 'timezone:', _s.intradayTimezone);
+
         var params = new URLSearchParams({
             date: _s.intradayDate,
             limit_runs: _s.intradayLimit
@@ -528,6 +532,7 @@
                 return res.json();
             })
             .then(function (data) {
+                console.log('[ERT Intraday] Received', data.runs ? data.runs.length : 0, 'runs');
                 _renderIntraday(data.runs || []);
             })
             .catch(function (err) {
@@ -545,13 +550,31 @@
             return;
         }
 
+        console.log('[ERT Intraday] Rendering chart with timezone:', _s.intradayTimezone);
+
         // Reverse to show oldest first (chronological order)
         runs = runs.slice().reverse();
 
         // Extract labels (timestamps) and prepare datasets per bank
-        var labels = runs.map(function (run) {
-            var dt = new Date(run.timestamp);
-            return dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+        var labels = runs.map(function (run, idx) {
+            // Parse timestamp from UTC
+            var timestamp = run.timestamp;
+            var dt = new Date(timestamp); // JavaScript automatically parses ISO 8601 format
+
+            // Convert to selected timezone with 12-hour format
+            var timeStr = dt.toLocaleTimeString('en-US', {
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true,
+                timeZone: _s.intradayTimezone
+            });
+
+            // Log first and last timestamp conversions for debugging
+            if (idx === 0 || idx === runs.length - 1) {
+                console.log('[ERT Intraday] Timestamp', idx + ':', timestamp, '→ UTC Date:', dt.toISOString(), '→', timeStr, 'in', _s.intradayTimezone);
+            }
+
+            return timeStr;
         });
 
         var bankNames = ['CBSL', 'HNB', 'PB', 'SAMPATH'];
@@ -577,6 +600,16 @@
                 spanGaps: true // Connect lines even when data is missing
             };
         });
+
+        // Update info text to show selected timezone
+        var infoEl = document.getElementById('ertIntradayInfo');
+        if (infoEl) {
+            var tzDisplay = _s.intradayTimezone === 'Asia/Colombo' ? 'Sri Lanka (IST)' :
+                           _s.intradayTimezone === 'UTC' ? 'UTC' : _s.intradayTimezone;
+            infoEl.innerHTML = '<i class="fas fa-info-circle me-1"></i>' +
+                'Shows exchange rate refresh attempts throughout the day. Each refresh cycle (run) fetches rates from multiple banks. ' +
+                '<strong>Times shown in: ' + tzDisplay + ' (12-hour format, DST-aware)</strong>';
+        }
 
         _lineChart('ertIntradayChart', 'intraday', labels, datasets, 'Buy Rate (LKR)');
     }
