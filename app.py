@@ -766,7 +766,8 @@ def log_audit(admin_user_id, action, target_user_id=None, details=None):
             connection.close()
 
 
-def log_exchange_rate_refresh(source, status, buy_rate=None, sell_rate=None, error_message=None, duration_ms=None, run_key=None):
+def log_exchange_rate_refresh(source, status, buy_rate=None, sell_rate=None, error_message=None, duration_ms=None,
+                              run_key=None):
     """Write one row to exchange_rate_refresh_logs for a single source attempt."""
     connection = get_db_connection()
     if connection:
@@ -4638,15 +4639,51 @@ def get_sampath_current_rate():
 
 
 @app.route('/api/exchange-rate/refresh-all', methods=['GET'])
-@cross_origin(origins=r'(https://console\.cron-job\.org.*)')
-#@cross_origin(origins=r'(https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+)(:\d+)?|https://console\.cron-job\.org.*)')
-
+@cross_origin(origins=['https://console.cron-job.org'])
 def refresh_all_rates_manually():
     """Trigger an immediate refresh of all exchange-rate sources.
     This is the single endpoint to manually refresh all bank exchange rates.
     Returns per-source results so the caller can see exactly which banks succeeded or failed.
-    No authentication required - accessible for automated cron jobs from whitelisted origins."""
+    No authentication required - accessible from cron-job.org and local networks."""
     try:
+        # Whitelist validation for both browser and non-browser requests
+        allowed_origins = ['https://console.cron-job.org', 'https://cron-job.org']
+        local_patterns = ['localhost', '127.0.0.1', '192.168.', '10.', '172.16.', '172.17.', '172.18.', '172.19.',
+                          '172.20.', '172.21.', '172.22.', '172.23.', '172.24.', '172.25.', '172.26.', '172.27.',
+                          '172.28.', '172.29.', '172.30.', '172.31.']
+
+        # Check Origin header (set by browsers and some tools)
+        origin = request.headers.get('Origin', '')
+        # Check Referer header (fallback for non-browser requests)
+        referer = request.headers.get('Referer', '')
+        # Check User-Agent to identify cron-job.org
+        user_agent = request.headers.get('User-Agent', '')
+        # Check remote address
+        remote_addr = request.remote_addr or ''
+
+        # Allow if Origin matches production domains
+        origin_allowed = any(origin.startswith(allowed) for allowed in allowed_origins)
+        # Allow if Referer matches production domains
+        referer_allowed = any(referer.startswith(allowed) for allowed in allowed_origins)
+        # Allow if User-Agent contains 'cron-job.org'
+        user_agent_allowed = 'cron-job.org' in user_agent.lower()
+        # Allow if Origin is from local network
+        local_origin = any(pattern in origin for pattern in local_patterns) or origin.startswith(
+            'http://localhost') or origin.startswith('http://127.0.0.1')
+        # Allow if Referer is from local network
+        local_referer = any(pattern in referer for pattern in local_patterns) or referer.startswith(
+            'http://localhost') or referer.startswith('http://127.0.0.1')
+        # Allow if remote address is local
+        local_addr = any(remote_addr.startswith(pattern) for pattern in local_patterns)
+
+        if not (origin_allowed or referer_allowed or user_agent_allowed or local_origin or local_referer or local_addr):
+            logger.warning(
+                f"Unauthorized refresh attempt - Origin: {origin}, Referer: {referer}, UA: {user_agent}, Remote: {remote_addr}")
+            return jsonify({
+                'error': 'Access denied',
+                'message': 'This endpoint is only accessible from authorized sources'
+            }), 403
+
         results = refresh_all_exchange_rates(force=True)
         # Log audit only if user is authenticated (manual refresh)
         if hasattr(request, 'current_user') and request.current_user:
@@ -5660,7 +5697,8 @@ def get_intraday_refresh_logs():
                 if run_key not in runs_dict:
                     runs_dict[run_key] = {
                         'run_key': run_key,
-                        'timestamp': row['created_at'].isoformat() if hasattr(row['created_at'], 'isoformat') else str(row['created_at']),
+                        'timestamp': row['created_at'].isoformat() if hasattr(row['created_at'], 'isoformat') else str(
+                            row['created_at']),
                         'banks': {}
                     }
 
