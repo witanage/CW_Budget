@@ -2566,6 +2566,35 @@ def manage_transaction(transaction_id):
         else:  # DELETE
             # Log audit trail before deleting
             user_id = session['user_id']
+
+            # Check if transaction has an attachment and delete it from Appwrite
+            dict_cursor = connection.cursor(dictionary=True)
+            dict_cursor.execute("""
+                SELECT t.attachments
+                FROM transactions t
+                WHERE t.id = %s
+                  AND t.monthly_record_id IN
+                      (SELECT id FROM monthly_records WHERE user_id = %s)
+            """, (transaction_id, user_id))
+
+            transaction = dict_cursor.fetchone()
+            dict_cursor.close()
+
+            if transaction and transaction['attachments']:
+                attachment_guid = transaction['attachments']
+                # Delete attachment from Appwrite bucket
+                if appwrite_storage and APPWRITE_BUCKET_ID:
+                    try:
+                        appwrite_storage.delete_file(
+                            bucket_id=APPWRITE_BUCKET_ID,
+                            file_id=attachment_guid
+                        )
+                        logger.info(
+                            f"Deleted attachment {attachment_guid} from Appwrite for transaction {transaction_id}")
+                    except Exception as e:
+                        logger.warning(f"Failed to delete attachment {attachment_guid} from Appwrite: {str(e)}")
+                        # Continue with transaction deletion even if Appwrite deletion fails
+
             log_transaction_audit(cursor, transaction_id, user_id, 'DELETE')
 
             cursor.execute("""

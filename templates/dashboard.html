@@ -67,6 +67,9 @@
                                 <h5 class="card-title mb-0">Manage Transactions</h5>
                             </div>
                             <div class="col-auto">
+                                <button class="btn btn-outline-primary btn-sm me-2" id="uploadBillBtn" title="Upload Bill">
+                                    <i class="fas fa-file-upload me-1"></i>Upload Bill
+                                </button>
                                 <button class="btn btn-gradient btn-sm" data-bs-toggle="modal" data-bs-target="#transactionModal">
                                     <i class="fas fa-plus me-1"></i>Add Transaction
                                 </button>
@@ -811,6 +814,9 @@
     </div>
 </div>
 
+<!-- Hidden file input for bill upload -->
+<input type="file" id="billUploadInput" accept="image/*" style="display: none;">
+
 <!-- Transaction Modal -->
 <div class="modal fade" id="transactionModal" tabindex="-1">
     <div class="modal-dialog">
@@ -821,6 +827,11 @@
             </div>
             <div class="modal-body">
                 <form id="transactionForm" novalidate>
+                    <!-- Scan Status Display -->
+                    <div id="scanStatus" class="mb-3 text-center" style="display: none; color: #ffc107;">
+                        <i class="fas fa-spinner fa-spin me-1"></i>
+                        <span id="scanStatusText">Scanning bill...</span>
+                    </div>
                     <div class="mb-3">
                         <label for="transDescription" class="form-label">Description</label>
                         <input type="text" class="form-control" id="transDescription" required>

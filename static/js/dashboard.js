@@ -34,6 +34,8 @@ let reportFiltersInitialized = false;
 let filterDropdownsInitialized = false;
 let loadedReportTabs = new Set(); // Track which report tabs have been loaded
 let reportTabsInitialized = false; // Track if tab listeners are initialized
+let scannedBillContent = null; // Store scanned bill content temporarily
+let capturedBillImage = null; // Store the actual image file for upload
 
 // Initialize everything when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
@@ -248,6 +250,23 @@ function setupFormButtons() {
         saveTransBtn.addEventListener('click', function(e) {
             e.preventDefault();
             saveTransaction();
+        });
+    }
+
+    // Reset bill data when transaction modal is closed/cancelled
+    const transactionModal = document.getElementById('transactionModal');
+    if (transactionModal) {
+        transactionModal.addEventListener('hidden.bs.modal', function() {
+            // Clear captured bill data when modal is dismissed
+            scannedBillContent = null;
+            capturedBillImage = null;
+
+            // Hide scan status if visible
+            const scanStatus = document.getElementById('scanStatus');
+            if (scanStatus) {
+                scanStatus.style.display = 'none';
+                scanStatus.style.color = '#ffc107';
+            }
         });
     }
 
@@ -1357,15 +1376,44 @@ function saveTransaction() {
         month: parseInt(month)
     };
 
+    // Include scanned bill content if available
+    if (scannedBillContent && !isEdit) {
+        data.bill_content = JSON.stringify(scannedBillContent);
+    }
+
     const url = isEdit ? `/api/transactions/${editId}` : '/api/transactions';
     const method = isEdit ? 'PUT' : 'POST';
 
     showLoading();
 
+    // Check if we have a captured bill image to upload
+    let requestBody, requestHeaders;
+    if (capturedBillImage && !isEdit) {
+        // Send as multipart/form-data with image
+        const formData = new FormData();
+
+        // Add all form fields
+        for (const key in data) {
+            if (data[key] !== null && data[key] !== undefined) {
+                formData.append(key, data[key]);
+            }
+        }
+
+        // Add the bill image
+        formData.append('bill_image', capturedBillImage);
+
+        requestBody = formData;
+        requestHeaders = {}; // Let browser set Content-Type with boundary
+    } else {
+        // Send as JSON (existing behavior for updates and non-scan transactions)
+        requestBody = JSON.stringify(data);
+        requestHeaders = { 'Content-Type': 'application/json' };
+    }
+
     fetch(url, {
         method: method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
+        headers: requestHeaders,
+        body: requestBody
     })
     .then(response => {
         // Get response as text first
@@ -1399,6 +1447,10 @@ function saveTransaction() {
             if (transDate) {
                 transDate.value = new Date().toISOString().split('T')[0];
             }
+
+            // Clear bill content and captured image
+            scannedBillContent = null;
+            capturedBillImage = null;
 
             loadTransactions();
         }
@@ -4710,3 +4762,173 @@ function deleteCalculation(calculationId) {
 
 // Note: formatCurrency, formatDate, showLoading, hideLoading, showToast
 // are defined in base.html and available globally
+
+// Bill upload functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const uploadBillBtn = document.getElementById('uploadBillBtn');
+    const billUploadInput = document.getElementById('billUploadInput');
+    const scanStatus = document.getElementById('scanStatus');
+    const scanStatusText = document.getElementById('scanStatusText');
+
+    // Handle upload bill button click
+    if (uploadBillBtn && billUploadInput) {
+        uploadBillBtn.addEventListener('click', function() {
+            console.log('Upload bill button clicked');
+            billUploadInput.click();
+        });
+    }
+
+    // Handle file selection
+    if (billUploadInput) {
+        billUploadInput.addEventListener('change', async function(event) {
+            const file = event.target.files[0];
+            if (!file) {
+                console.log('No file selected');
+                return;
+            }
+
+            console.log('File selected:', file.name, file.type, file.size);
+
+            // Validate file type
+            const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
+            if (!allowedTypes.includes(file.type)) {
+                showToast('Please select a valid image file (PNG, JPEG, GIF, WebP)', 'danger');
+                billUploadInput.value = '';
+                return;
+            }
+
+            // Validate file size (max 10MB)
+            const maxSize = 10 * 1024 * 1024; // 10MB
+            if (file.size > maxSize) {
+                showToast('Image file is too large. Please select an image under 10MB', 'danger');
+                billUploadInput.value = '';
+                return;
+            }
+
+            // Open the transaction modal immediately
+            const transactionModal = new bootstrap.Modal(document.getElementById('transactionModal'));
+            transactionModal.show();
+
+            // Show scanning status inside the modal
+            if (scanStatus && scanStatusText) {
+                scanStatus.style.display = 'block';
+                scanStatusText.textContent = 'Scanning bill...';
+            }
+
+            // Disable upload button during processing
+            if (uploadBillBtn) {
+                uploadBillBtn.disabled = true;
+                uploadBillBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Scanning...';
+            }
+
+            try {
+                // Create FormData to send the image
+                const formData = new FormData();
+                formData.append('bill_image', file);
+
+                // Send to API
+                console.log('Sending image to API...');
+                const response = await fetch('/api/scan-bill', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                console.log('API response:', result);
+
+                if (!response.ok) {
+                    throw new Error(result.error || 'Failed to scan bill');
+                }
+
+                if (result.success) {
+                    // Store the scanned bill content including items
+                    scannedBillContent = {
+                        shop_name: result.shop_name,
+                        amount: result.amount,
+                        items: result.items || []
+                    };
+
+                    // Store the captured image file for upload when transaction is saved
+                    capturedBillImage = file;
+
+                    // Populate the form with extracted data
+                    const transDescription = document.getElementById('transDescription');
+                    const transCredit = document.getElementById('transCredit');
+
+                    if (result.shop_name && result.shop_name !== 'Unknown Store' && transDescription) {
+                        transDescription.value = result.shop_name;
+                    }
+
+                    if (result.amount && parseFloat(result.amount) > 0 && transCredit) {
+                        transCredit.value = result.amount;
+                    }
+
+                    // Show success message
+                    const itemCount = result.items ? result.items.length : 0;
+                    const itemText = itemCount > 0 ? ` (${itemCount} items)` : '';
+
+                    if (scanStatusText) {
+                        scanStatusText.textContent = `✓ Bill scanned successfully!${itemText}`;
+                    }
+                    if (scanStatus) {
+                        scanStatus.style.color = '#28a745';
+                    }
+
+                    setTimeout(() => {
+                        if (scanStatus) {
+                            scanStatus.style.display = 'none';
+                            scanStatus.style.color = '#ffc107';
+                        }
+                    }, 3000);
+
+                    showToast(`Bill scanned: ${result.shop_name} - $${result.amount}${itemText}`, 'success');
+                } else {
+                    // Handle scanning error but still allow manual entry
+                    const errorMsg = result.error || 'Failed to extract bill information';
+
+                    if (scanStatusText) {
+                        scanStatusText.textContent = '✗ ' + errorMsg;
+                    }
+                    if (scanStatus) {
+                        scanStatus.style.color = '#dc3545';
+                    }
+
+                    setTimeout(() => {
+                        if (scanStatus) {
+                            scanStatus.style.display = 'none';
+                            scanStatus.style.color = '#ffc107';
+                        }
+                    }, 5000);
+
+                    showToast('Could not scan bill automatically. Please enter details manually.', 'warning');
+                }
+
+            } catch (error) {
+                console.error('Error scanning bill:', error);
+
+                if (scanStatusText) {
+                    scanStatusText.textContent = '✗ Scan failed';
+                }
+                if (scanStatus) {
+                    scanStatus.style.color = '#dc3545';
+                }
+
+                setTimeout(() => {
+                    if (scanStatus) {
+                        scanStatus.style.display = 'none';
+                        scanStatus.style.color = '#ffc107';
+                    }
+                }, 5000);
+
+                showToast(error.message || 'Failed to scan bill. Please enter details manually.', 'danger');
+            } finally {
+                // Reset button and input
+                if (uploadBillBtn) {
+                    uploadBillBtn.disabled = false;
+                    uploadBillBtn.innerHTML = '<i class="fas fa-file-upload me-1"></i>Upload Bill';
+                }
+                billUploadInput.value = '';
+            }
+        });
+    }
+});
