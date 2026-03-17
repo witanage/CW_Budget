@@ -4962,7 +4962,7 @@ def get_sampath_current_rate():
 @cross_origin(origins=['https://console.cron-job.org'])
 def refresh_all_rates_manually():
     """Trigger an immediate refresh of all exchange-rate sources.
-    This endpoint executes the refresh synchronously to avoid database connection issues.
+    This endpoint triggers the refresh in the background and returns immediately.
     No authentication required - accessible from cron-job.org and local networks."""
     try:
         # Whitelist validation for both browser and non-browser requests
@@ -5003,21 +5003,35 @@ def refresh_all_rates_manually():
                 'message': 'This endpoint is only accessible from authorized sources'
             }), 403
 
-        # Execute refresh synchronously to avoid DB connection issues
-        logger.info("Exchange rate refresh started")
-        refresh_all_exchange_rates(force=True)
-        logger.info("Exchange rate refresh completed")
-
-        # Log audit only if user is authenticated (manual refresh)
+        # Get current user for audit logging (if authenticated)
+        current_user_id = None
         if hasattr(request, 'current_user') and request.current_user:
-            log_audit(request.current_user['user_id'], 'MANUAL_EXCHANGE_RATE_REFRESH')
+            current_user_id = request.current_user['user_id']
 
-        logger.info("Exchange rate refresh completed successfully")
+        # Execute refresh in background thread to return immediately
+        def background_refresh():
+            try:
+                logger.info("Exchange rate refresh started in background")
+                refresh_all_exchange_rates(force=True)
+                logger.info("Exchange rate refresh completed")
+
+                # Log audit only if user is authenticated (manual refresh)
+                if current_user_id:
+                    log_audit(current_user_id, 'MANUAL_EXCHANGE_RATE_REFRESH')
+            except Exception as e:
+                logger.error(f"Background refresh error: {str(e)}")
+
+        # Start background thread
+        thread = threading.Thread(target=background_refresh)
+        thread.daemon = True
+        thread.start()
+
+        logger.info("Exchange rate refresh triggered successfully")
         return jsonify({
-            'message': 'Exchange rate refresh completed successfully',
-            'status': 'completed',
+            'message': 'Exchange rate refresh triggered successfully',
+            'status': 'triggered',
             'timestamp': datetime.now().isoformat()
-        }), 200
+        }), 202
     except Exception as e:
         logger.error(f"Error triggering exchange rate refresh: {str(e)}")
         return jsonify({'error': 'Failed to trigger refresh', 'details': str(e)}), 500
