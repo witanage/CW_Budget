@@ -4962,7 +4962,7 @@ def get_sampath_current_rate():
 @cross_origin(origins=['https://console.cron-job.org'])
 def refresh_all_rates_manually():
     """Trigger an immediate refresh of all exchange-rate sources.
-    This endpoint triggers the refresh in the background and returns immediately.
+    This endpoint returns immediately while fetches run synchronously in the background.
     No authentication required - accessible from cron-job.org and local networks."""
     try:
         # Whitelist validation for both browser and non-browser requests
@@ -5008,25 +5008,24 @@ def refresh_all_rates_manually():
         if hasattr(request, 'current_user') and request.current_user:
             current_user_id = request.current_user['user_id']
 
-        # Execute refresh in background thread to return immediately
-        def background_refresh():
+        # Execute refresh synchronously in a separate function
+        def run_refresh():
             try:
-                logger.info("Exchange rate refresh started in background")
-                refresh_all_exchange_rates(force=True)
-                logger.info("Exchange rate refresh completed")
+                logger.info("Exchange rate refresh started")
+                results = refresh_all_exchange_rates(force=True)
+                logger.info(f"Exchange rate refresh completed - results: {results}")
 
-                # Log audit only if user is authenticated (manual refresh)
+                # Log audit only if user is authenticated
                 if current_user_id:
                     log_audit(current_user_id, 'MANUAL_EXCHANGE_RATE_REFRESH')
             except Exception as e:
-                logger.error(f"Background refresh error: {str(e)}")
+                logger.error(f"Refresh error: {str(e)}", exc_info=True)
 
-        # Start background thread
-        thread = threading.Thread(target=background_refresh)
-        thread.daemon = True
+        # Start in a regular (non-daemon) thread so it runs to completion
+        thread = threading.Thread(target=run_refresh)
         thread.start()
 
-        logger.info("Exchange rate refresh triggered successfully")
+        logger.info("Exchange rate refresh triggered")
         return jsonify({
             'message': 'Exchange rate refresh triggered successfully',
             'status': 'triggered',
