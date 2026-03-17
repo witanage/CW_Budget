@@ -5008,18 +5008,19 @@ def refresh_all_rates_manually():
         if hasattr(request, 'current_user') and request.current_user:
             current_user_id = request.current_user['user_id']
 
-        # Execute refresh synchronously in a separate function
+        # Execute refresh synchronously in a separate function with app context
         def run_refresh():
-            try:
-                logger.info("Exchange rate refresh started")
-                results = refresh_all_exchange_rates(force=True)
-                logger.info(f"Exchange rate refresh completed - results: {results}")
+            with app.app_context():
+                try:
+                    logger.info("Exchange rate refresh started")
+                    results = refresh_all_exchange_rates(force=True)
+                    logger.info(f"Exchange rate refresh completed - results: {results}")
 
-                # Log audit only if user is authenticated
-                if current_user_id:
-                    log_audit(current_user_id, 'MANUAL_EXCHANGE_RATE_REFRESH')
-            except Exception as e:
-                logger.error(f"Refresh error: {str(e)}", exc_info=True)
+                    # Log audit only if user is authenticated
+                    if current_user_id:
+                        log_audit(current_user_id, 'MANUAL_EXCHANGE_RATE_REFRESH')
+                except Exception as e:
+                    logger.error(f"Refresh error: {str(e)}", exc_info=True)
 
         # Start in a regular (non-daemon) thread so it runs to completion
         thread = threading.Thread(target=run_refresh)
