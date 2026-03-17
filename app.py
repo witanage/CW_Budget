@@ -9,6 +9,7 @@ import requests
 import threading
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from decimal import Decimal
 from functools import wraps
@@ -395,6 +396,8 @@ def refresh_all_exchange_rates(force=False):
     Called by the Vercel cron job every 15 minutes.  When the admin sets the
     mode to ``manual`` the function returns ``None`` immediately — unless
     *force* is ``True`` (used by the admin "Refresh All" endpoint).
+
+    Fetches from all banks in parallel to minimize total execution time.
     """
     if not force:
         mode = get_setting('exchange_rate_refresh_mode', 'background')
@@ -402,7 +405,7 @@ def refresh_all_exchange_rates(force=False):
             logger.info("Scheduler: refresh mode is '%s' — skipping automatic refresh.", mode)
             return
 
-    logger.info("Scheduler: Starting exchange rate refresh (force=%s)...", force)
+    logger.info("Scheduler: Starting parallel exchange rate refresh (force=%s)...", force)
 
     # Generate a unique run key for this refresh batch
     run_key = str(uuid.uuid4())
@@ -410,125 +413,148 @@ def refresh_all_exchange_rates(force=False):
 
     results = {}
 
-    # HNB
-    hnb_start = time.time()
-    try:
-        hnb_service = get_hnb_exchange_rate_service()
-        hnb_rate = hnb_service.fetch_and_store_current_rate()
-        hnb_ms = int((time.time() - hnb_start) * 1000)
-        if hnb_rate:
-            logger.info(f"Scheduler: HNB rate updated: Buy={hnb_rate['buy_rate']}, Sell={hnb_rate['sell_rate']}")
-            log_exchange_rate_refresh('HNB', 'success',
-                                      buy_rate=hnb_rate['buy_rate'],
-                                      sell_rate=hnb_rate['sell_rate'],
-                                      duration_ms=hnb_ms,
-                                      run_key=run_key)
-            results['HNB'] = {'status': 'success', 'buy_rate': hnb_rate['buy_rate'], 'sell_rate': hnb_rate['sell_rate']}
-        else:
-            logger.warning("Scheduler: Failed to fetch HNB rate")
+    # Define fetch functions for each bank
+    def fetch_hnb():
+        hnb_start = time.time()
+        try:
+            hnb_service = get_hnb_exchange_rate_service()
+            hnb_rate = hnb_service.fetch_and_store_current_rate()
+            hnb_ms = int((time.time() - hnb_start) * 1000)
+            if hnb_rate:
+                logger.info(f"Scheduler: HNB rate updated: Buy={hnb_rate['buy_rate']}, Sell={hnb_rate['sell_rate']}")
+                log_exchange_rate_refresh('HNB', 'success',
+                                          buy_rate=hnb_rate['buy_rate'],
+                                          sell_rate=hnb_rate['sell_rate'],
+                                          duration_ms=hnb_ms,
+                                          run_key=run_key)
+                return ('HNB',
+                        {'status': 'success', 'buy_rate': hnb_rate['buy_rate'], 'sell_rate': hnb_rate['sell_rate']})
+            else:
+                logger.warning("Scheduler: Failed to fetch HNB rate")
+                log_exchange_rate_refresh('HNB', 'failure',
+                                          error_message='No rate returned by HNB API',
+                                          duration_ms=hnb_ms,
+                                          run_key=run_key)
+                return ('HNB', {'status': 'failure', 'error': 'No rate returned by HNB API'})
+        except Exception as e:
+            logger.error(f"Scheduler: Error fetching HNB rate: {str(e)}")
             log_exchange_rate_refresh('HNB', 'failure',
-                                      error_message='No rate returned by HNB API',
-                                      duration_ms=hnb_ms,
+                                      error_message=str(e),
+                                      duration_ms=int((time.time() - hnb_start) * 1000),
                                       run_key=run_key)
-            results['HNB'] = {'status': 'failure', 'error': 'No rate returned by HNB API'}
-    except Exception as e:
-        logger.error(f"Scheduler: Error fetching HNB rate: {str(e)}")
-        log_exchange_rate_refresh('HNB', 'failure',
-                                  error_message=str(e),
-                                  duration_ms=int((time.time() - hnb_start) * 1000),
-                                  run_key=run_key)
-        results['HNB'] = {'status': 'failure', 'error': str(e)}
+            return ('HNB', {'status': 'failure', 'error': str(e)})
 
-    # People's Bank
-    pb_start = time.time()
-    try:
-        pb_service = get_pb_exchange_rate_service()
-        pb_rate = pb_service.fetch_and_store_current_rate()
-        pb_ms = int((time.time() - pb_start) * 1000)
-        if pb_rate:
-            logger.info(f"Scheduler: PB rate updated: Buy={pb_rate['buy_rate']}, Sell={pb_rate['sell_rate']}")
-            log_exchange_rate_refresh('PB', 'success',
-                                      buy_rate=pb_rate['buy_rate'],
-                                      sell_rate=pb_rate['sell_rate'],
-                                      duration_ms=pb_ms,
-                                      run_key=run_key)
-            results['PB'] = {'status': 'success', 'buy_rate': pb_rate['buy_rate'], 'sell_rate': pb_rate['sell_rate']}
-        else:
-            logger.warning("Scheduler: Failed to fetch PB rate")
+    def fetch_pb():
+        pb_start = time.time()
+        try:
+            pb_service = get_pb_exchange_rate_service()
+            pb_rate = pb_service.fetch_and_store_current_rate()
+            pb_ms = int((time.time() - pb_start) * 1000)
+            if pb_rate:
+                logger.info(f"Scheduler: PB rate updated: Buy={pb_rate['buy_rate']}, Sell={pb_rate['sell_rate']}")
+                log_exchange_rate_refresh('PB', 'success',
+                                          buy_rate=pb_rate['buy_rate'],
+                                          sell_rate=pb_rate['sell_rate'],
+                                          duration_ms=pb_ms,
+                                          run_key=run_key)
+                return ('PB', {'status': 'success', 'buy_rate': pb_rate['buy_rate'], 'sell_rate': pb_rate['sell_rate']})
+            else:
+                logger.warning("Scheduler: Failed to fetch PB rate")
+                log_exchange_rate_refresh('PB', 'failure',
+                                          error_message='No rate returned by PB scraper',
+                                          duration_ms=pb_ms,
+                                          run_key=run_key)
+                return ('PB', {'status': 'failure', 'error': 'No rate returned by PB scraper'})
+        except Exception as e:
+            logger.error(f"Scheduler: Error fetching PB rate: {str(e)}")
             log_exchange_rate_refresh('PB', 'failure',
-                                      error_message='No rate returned by PB scraper',
-                                      duration_ms=pb_ms,
+                                      error_message=str(e),
+                                      duration_ms=int((time.time() - pb_start) * 1000),
                                       run_key=run_key)
-            results['PB'] = {'status': 'failure', 'error': 'No rate returned by PB scraper'}
-    except Exception as e:
-        logger.error(f"Scheduler: Error fetching PB rate: {str(e)}")
-        log_exchange_rate_refresh('PB', 'failure',
-                                  error_message=str(e),
-                                  duration_ms=int((time.time() - pb_start) * 1000),
-                                  run_key=run_key)
-        results['PB'] = {'status': 'failure', 'error': str(e)}
+            return ('PB', {'status': 'failure', 'error': str(e)})
 
-    # Sampath Bank
-    sampath_start = time.time()
-    try:
-        sampath_service = get_sampath_exchange_rate_service()
-        sampath_rate = sampath_service.fetch_and_store_current_rate()
-        sampath_ms = int((time.time() - sampath_start) * 1000)
-        if sampath_rate:
-            logger.info(
-                f"Scheduler: Sampath rate updated: Buy={sampath_rate['buy_rate']}, Sell={sampath_rate['sell_rate']}")
-            log_exchange_rate_refresh('SAMPATH', 'success',
-                                      buy_rate=sampath_rate['buy_rate'],
-                                      sell_rate=sampath_rate['sell_rate'],
-                                      duration_ms=sampath_ms,
-                                      run_key=run_key)
-            results['SAMPATH'] = {'status': 'success', 'buy_rate': sampath_rate['buy_rate'],
-                                  'sell_rate': sampath_rate['sell_rate']}
-        else:
-            logger.warning("Scheduler: Failed to fetch Sampath rate")
+    def fetch_sampath():
+        sampath_start = time.time()
+        try:
+            sampath_service = get_sampath_exchange_rate_service()
+            sampath_rate = sampath_service.fetch_and_store_current_rate()
+            sampath_ms = int((time.time() - sampath_start) * 1000)
+            if sampath_rate:
+                logger.info(
+                    f"Scheduler: Sampath rate updated: Buy={sampath_rate['buy_rate']}, Sell={sampath_rate['sell_rate']}")
+                log_exchange_rate_refresh('SAMPATH', 'success',
+                                          buy_rate=sampath_rate['buy_rate'],
+                                          sell_rate=sampath_rate['sell_rate'],
+                                          duration_ms=sampath_ms,
+                                          run_key=run_key)
+                return ('SAMPATH', {'status': 'success', 'buy_rate': sampath_rate['buy_rate'],
+                                    'sell_rate': sampath_rate['sell_rate']})
+            else:
+                logger.warning("Scheduler: Failed to fetch Sampath rate")
+                log_exchange_rate_refresh('SAMPATH', 'failure',
+                                          error_message='No rate returned by Sampath API',
+                                          duration_ms=sampath_ms,
+                                          run_key=run_key)
+                return ('SAMPATH', {'status': 'failure', 'error': 'No rate returned by Sampath API'})
+        except Exception as e:
+            logger.error(f"Scheduler: Error fetching Sampath rate: {str(e)}")
             log_exchange_rate_refresh('SAMPATH', 'failure',
-                                      error_message='No rate returned by Sampath API',
-                                      duration_ms=sampath_ms,
+                                      error_message=str(e),
+                                      duration_ms=int((time.time() - sampath_start) * 1000),
                                       run_key=run_key)
-            results['SAMPATH'] = {'status': 'failure', 'error': 'No rate returned by Sampath API'}
-    except Exception as e:
-        logger.error(f"Scheduler: Error fetching Sampath rate: {str(e)}")
-        log_exchange_rate_refresh('SAMPATH', 'failure',
-                                  error_message=str(e),
-                                  duration_ms=int((time.time() - sampath_start) * 1000),
-                                  run_key=run_key)
-        results['SAMPATH'] = {'status': 'failure', 'error': str(e)}
+            return ('SAMPATH', {'status': 'failure', 'error': str(e)})
 
-    # CBSL (for today)
-    cbsl_start = time.time()
-    try:
-        from services.exchange_rate_service import get_exchange_rate_service
-        cbsl_service = get_exchange_rate_service()
-        cbsl_rate = cbsl_service.get_exchange_rate(datetime.now())
-        cbsl_ms = int((time.time() - cbsl_start) * 1000)
-        if cbsl_rate:
-            logger.info(f"Scheduler: CBSL rate for today: Buy={cbsl_rate['buy_rate']}, Sell={cbsl_rate['sell_rate']}")
-            log_exchange_rate_refresh('CBSL', 'success',
-                                      buy_rate=cbsl_rate['buy_rate'],
-                                      sell_rate=cbsl_rate['sell_rate'],
-                                      duration_ms=cbsl_ms,
-                                      run_key=run_key)
-            results['CBSL'] = {'status': 'success', 'buy_rate': cbsl_rate['buy_rate'],
-                               'sell_rate': cbsl_rate['sell_rate']}
-        else:
-            logger.warning("Scheduler: No CBSL rate available for today")
+    def fetch_cbsl():
+        cbsl_start = time.time()
+        try:
+            from services.exchange_rate_service import get_exchange_rate_service
+            cbsl_service = get_exchange_rate_service()
+            cbsl_rate = cbsl_service.get_exchange_rate(datetime.now())
+            cbsl_ms = int((time.time() - cbsl_start) * 1000)
+            if cbsl_rate:
+                logger.info(
+                    f"Scheduler: CBSL rate for today: Buy={cbsl_rate['buy_rate']}, Sell={cbsl_rate['sell_rate']}")
+                log_exchange_rate_refresh('CBSL', 'success',
+                                          buy_rate=cbsl_rate['buy_rate'],
+                                          sell_rate=cbsl_rate['sell_rate'],
+                                          duration_ms=cbsl_ms,
+                                          run_key=run_key)
+                return ('CBSL', {'status': 'success', 'buy_rate': cbsl_rate['buy_rate'],
+                                 'sell_rate': cbsl_rate['sell_rate']})
+            else:
+                logger.warning("Scheduler: No CBSL rate available for today")
+                log_exchange_rate_refresh('CBSL', 'failure',
+                                          error_message='No CBSL rate available for today',
+                                          duration_ms=cbsl_ms,
+                                          run_key=run_key)
+                return ('CBSL', {'status': 'failure', 'error': 'No CBSL rate available for today'})
+        except Exception as e:
+            logger.error(f"Scheduler: Error fetching CBSL rate: {str(e)}")
             log_exchange_rate_refresh('CBSL', 'failure',
-                                      error_message='No CBSL rate available for today',
-                                      duration_ms=cbsl_ms,
+                                      error_message=str(e),
+                                      duration_ms=int((time.time() - cbsl_start) * 1000),
                                       run_key=run_key)
-            results['CBSL'] = {'status': 'failure', 'error': 'No CBSL rate available for today'}
-    except Exception as e:
-        logger.error(f"Scheduler: Error fetching CBSL rate: {str(e)}")
-        log_exchange_rate_refresh('CBSL', 'failure',
-                                  error_message=str(e),
-                                  duration_ms=int((time.time() - cbsl_start) * 1000),
-                                  run_key=run_key)
-        results['CBSL'] = {'status': 'failure', 'error': str(e)}
+            return ('CBSL', {'status': 'failure', 'error': str(e)})
+
+    # Execute all fetches in parallel using ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        # Submit all tasks
+        futures = {
+            executor.submit(fetch_hnb): 'HNB',
+            executor.submit(fetch_pb): 'PB',
+            executor.submit(fetch_sampath): 'SAMPATH',
+            executor.submit(fetch_cbsl): 'CBSL'
+        }
+
+        # Collect results as they complete
+        for future in as_completed(futures):
+            try:
+                bank_name, result = future.result()
+                results[bank_name] = result
+            except Exception as e:
+                bank = futures[future]
+                logger.error(f"Unexpected error in {bank} fetch thread: {str(e)}")
+                results[bank] = {'status': 'failure', 'error': f'Thread error: {str(e)}'}
 
     logger.info("Exchange rate refresh completed — results: %s", results)
     return results
@@ -4962,7 +4988,7 @@ def get_sampath_current_rate():
 @cross_origin(origins=['https://console.cron-job.org'])
 def refresh_all_rates_manually():
     """Trigger an immediate refresh of all exchange-rate sources.
-    This endpoint returns immediately while fetches run synchronously in the background.
+    This endpoint executes the refresh synchronously using parallel fetching for optimal performance.
     No authentication required - accessible from cron-job.org and local networks."""
     try:
         # Whitelist validation for both browser and non-browser requests
@@ -5003,35 +5029,22 @@ def refresh_all_rates_manually():
                 'message': 'This endpoint is only accessible from authorized sources'
             }), 403
 
-        # Get current user for audit logging (if authenticated)
-        current_user_id = None
+        # Execute refresh synchronously to avoid DB connection issues
+        logger.info("Exchange rate refresh started")
+        results = refresh_all_exchange_rates(force=True)
+        logger.info("Exchange rate refresh completed")
+
+        # Log audit only if user is authenticated (manual refresh)
         if hasattr(request, 'current_user') and request.current_user:
-            current_user_id = request.current_user['user_id']
+            log_audit(request.current_user['user_id'], 'MANUAL_EXCHANGE_RATE_REFRESH')
 
-        # Execute refresh synchronously in a separate function with app context
-        def run_refresh():
-            with app.app_context():
-                try:
-                    logger.info("Exchange rate refresh started")
-                    results = refresh_all_exchange_rates(force=True)
-                    logger.info(f"Exchange rate refresh completed - results: {results}")
-
-                    # Log audit only if user is authenticated
-                    if current_user_id:
-                        log_audit(current_user_id, 'MANUAL_EXCHANGE_RATE_REFRESH')
-                except Exception as e:
-                    logger.error(f"Refresh error: {str(e)}", exc_info=True)
-
-        # Start in a regular (non-daemon) thread so it runs to completion
-        thread = threading.Thread(target=run_refresh)
-        thread.start()
-
-        logger.info("Exchange rate refresh triggered")
+        logger.info("Exchange rate refresh completed successfully")
         return jsonify({
-            'message': 'Exchange rate refresh triggered successfully',
-            'status': 'triggered',
+            'message': 'Exchange rate refresh completed successfully',
+            'status': 'completed',
+            'results': results,
             'timestamp': datetime.now().isoformat()
-        }), 202
+        }), 200
     except Exception as e:
         logger.error(f"Error triggering exchange rate refresh: {str(e)}")
         return jsonify({'error': 'Failed to trigger refresh', 'details': str(e)}), 500
