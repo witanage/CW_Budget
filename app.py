@@ -69,6 +69,22 @@ except ImportError:
     APPWRITE_AVAILABLE = False
     logger.warning("appwrite not installed. Bill image upload will be disabled.")
 
+try:
+    from PIL import Image
+
+    PIL_AVAILABLE = True
+except ImportError:
+    PIL_AVAILABLE = False
+    logger.warning("Pillow not installed. Image optimization will be disabled.")
+
+try:
+    import PyPDF2
+
+    PYPDF2_AVAILABLE = True
+except ImportError:
+    PYPDF2_AVAILABLE = False
+    logger.warning("PyPDF2 not installed. PDF compression will be disabled.")
+
 logger.info("Environment variables loaded")
 
 # Initialize Appwrite client (will be set up after helper functions are defined)
@@ -109,6 +125,132 @@ if DB_CONFIG is None:
         "Database is NOT configured. The application will start but all "
         "database operations will fail. Copy .env.example to .env and fill "
         "in your database credentials, then restart the application.")
+
+
+# ---------------------------------------------------------------------------
+# File Optimization Utilities
+# ---------------------------------------------------------------------------
+
+def optimize_file_for_upload(file_data, file_ext, original_filename):
+    """
+    Optimize file size for upload while maintaining quality.
+
+    For images: Resizes and compresses if >1MB
+    For PDFs: Compresses if >2MB
+
+    Args:
+        file_data: bytes - The original file data
+        file_ext: str - File extension (e.g., 'jpg', 'pdf')
+        original_filename: str - Original filename for logging
+
+    Returns:
+        tuple: (optimized_data: bytes, was_optimized: bool, original_size: int, new_size: int)
+    """
+    original_size = len(file_data)
+    original_size_mb = original_size / (1024 * 1024)
+
+    # Define size thresholds
+    IMAGE_THRESHOLD_MB = 1.0  # Optimize images larger than 1MB
+    PDF_THRESHOLD_MB = 5.0  # Optimize PDFs larger than 5MB
+
+    # Image optimization
+    if file_ext in ['jpg', 'jpeg', 'png', 'gif', 'webp'] and PIL_AVAILABLE:
+        if original_size_mb > IMAGE_THRESHOLD_MB:
+            try:
+                logger.info(f"Optimizing image {original_filename}: {original_size_mb:.2f}MB")
+
+                # Load image
+                img = Image.open(io.BytesIO(file_data))
+
+                # Calculate new dimensions (max 2000px on longest side)
+                max_dimension = 2000
+                ratio = min(max_dimension / img.width, max_dimension / img.height, 1.0)
+
+                if ratio < 1.0:
+                    new_size = (int(img.width * ratio), int(img.height * ratio))
+                    img = img.resize(new_size, Image.Resampling.LANCZOS)
+                    logger.info(f"  Resized from {img.size} to {new_size}")
+
+                # Convert to RGB if necessary (for JPEG)
+                if img.mode in ('RGBA', 'P', 'LA'):
+                    # Create white background
+                    rgb_img = Image.new('RGB', img.size, (255, 255, 255))
+                    if img.mode == 'P':
+                        img = img.convert('RGBA')
+                    rgb_img.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
+                    img = rgb_img
+
+                # Save optimized version
+                output = io.BytesIO()
+
+                # Use appropriate format and quality
+                if file_ext in ['jpg', 'jpeg']:
+                    img.save(output, format='JPEG', quality=85, optimize=True)
+                elif file_ext == 'png':
+                    img.save(output, format='PNG', optimize=True, compress_level=6)
+                elif file_ext == 'webp':
+                    img.save(output, format='WEBP', quality=85)
+                else:
+                    img.save(output, format=img.format or 'JPEG', quality=85, optimize=True)
+
+                optimized_data = output.getvalue()
+                new_size = len(optimized_data)
+                new_size_mb = new_size / (1024 * 1024)
+
+                # Only use optimized version if it's actually smaller
+                if new_size < original_size:
+                    reduction_pct = ((original_size - new_size) / original_size) * 100
+                    logger.info(
+                        f"  ✓ Image optimized: {original_size_mb:.2f}MB → {new_size_mb:.2f}MB ({reduction_pct:.1f}% reduction)")
+                    return (optimized_data, True, original_size, new_size)
+                else:
+                    logger.info(f"  Optimization didn't reduce size, keeping original")
+                    return (file_data, False, original_size, original_size)
+
+            except Exception as e:
+                logger.warning(f"Image optimization failed: {str(e)}, using original")
+                return (file_data, False, original_size, original_size)
+
+    # PDF optimization
+    elif file_ext == 'pdf' and PYPDF2_AVAILABLE:
+        if original_size_mb > PDF_THRESHOLD_MB:
+            try:
+                logger.info(f"Attempting to compress PDF {original_filename}: {original_size_mb:.2f}MB")
+
+                # Read PDF
+                pdf_reader = PyPDF2.PdfReader(io.BytesIO(file_data))
+                pdf_writer = PyPDF2.PdfWriter()
+
+                # Copy pages and compress
+                for page in pdf_reader.pages:
+                    # Compress page content
+                    page.compress_content_streams()
+                    pdf_writer.add_page(page)
+
+                # Write compressed PDF
+                output = io.BytesIO()
+                pdf_writer.write(output)
+                optimized_data = output.getvalue()
+
+                new_size = len(optimized_data)
+                new_size_mb = new_size / (1024 * 1024)
+
+                # Only use compressed version if it's smaller
+                if new_size < original_size:
+                    reduction_pct = ((original_size - new_size) / original_size) * 100
+                    logger.info(
+                        f"  ✓ PDF compressed: {original_size_mb:.2f}MB → {new_size_mb:.2f}MB ({reduction_pct:.1f}% reduction)")
+                    return (optimized_data, True, original_size, new_size)
+                else:
+                    logger.info(f"  PDF compression didn't reduce size significantly, keeping original")
+                    return (file_data, False, original_size, original_size)
+
+            except Exception as e:
+                logger.warning(f"PDF compression failed: {str(e)}, using original")
+                return (file_data, False, original_size, original_size)
+
+    # No optimization needed or possible
+    return (file_data, False, original_size, original_size)
 
 
 def get_setting(key, default=None):
@@ -2197,16 +2339,56 @@ def transactions():
                     file_ext = bill_image.filename.rsplit('.', 1)[-1].lower() if '.' in bill_image.filename else ''
 
                     if file_ext in allowed_extensions:
-                        # Read image data
-                        image_data = bill_image.read()
+                        # Read file data
+                        file_data = bill_image.read()
 
-                        if len(image_data) > 0 and appwrite_storage and APPWRITE_BUCKET_ID:
+                        if len(file_data) > 0 and appwrite_storage and APPWRITE_BUCKET_ID:
                             try:
+                                # Optimize file if needed (resize images, compress PDFs)
+                                optimized_data, was_optimized, original_size, final_size = optimize_file_for_upload(
+                                    file_data,
+                                    file_ext,
+                                    bill_image.filename
+                                )
+
+                                # Use optimized data for upload
+                                image_data = optimized_data
+
+                                # Log optimization results
+                                if was_optimized:
+                                    reduction_pct = ((original_size - final_size) / original_size) * 100
+                                    logger.info(
+                                        f"✓ File optimized: {original_size / (1024 * 1024):.2f}MB → {final_size / (1024 * 1024):.2f}MB ({reduction_pct:.1f}% smaller)")
+                                else:
+                                    logger.info(
+                                        f"File size OK, no optimization needed: {original_size / (1024 * 1024):.2f}MB")
+
                                 # Generate pure GUID for filename
                                 attachment_guid = str(uuid.uuid4())
                                 filename = f"{attachment_guid}.{file_ext}"
 
-                                logger.info(f"Uploading bill image to Appwrite: {filename}")
+                                # Check file size
+                                file_size_mb = len(image_data) / (1024 * 1024)
+                                logger.info(
+                                    f"Uploading file to Appwrite: {filename}, type: {file_ext}, size: {len(image_data)} bytes ({file_size_mb:.2f}MB)")
+
+                                # Check first bytes for validation
+                                first_bytes = image_data[:8] if len(image_data) >= 8 else image_data
+                                logger.info(f"First 8 bytes: {first_bytes} (hex: {first_bytes.hex()})")
+
+                                # Validate PDF header if uploading PDF
+                                if file_ext == 'pdf':
+                                    if not first_bytes.startswith(b'%PDF'):
+                                        logger.error(
+                                            f"WARNING: PDF file does NOT start with %PDF header before upload!")
+                                        logger.error(f"First 20 bytes: {image_data[:20]}")
+                                    else:
+                                        logger.info(f"✓ PDF header valid before upload")
+
+                                # Warn if file is still unusually large after optimization
+                                if file_size_mb > 10:
+                                    logger.warning(
+                                        f"Large file upload: {file_size_mb:.2f}MB - may take time to process")
 
                                 # Upload to Appwrite with GUID as file ID
                                 result = appwrite_storage.create_file(
@@ -2215,7 +2397,8 @@ def transactions():
                                     InputFile.from_bytes(image_data, filename=filename)
                                 )
 
-                                logger.info(f"Bill image uploaded successfully: {attachment_guid}")
+                                logger.info(
+                                    f"File uploaded successfully: {attachment_guid}, stored size: {result.get('sizeOriginal', 'N/A')}")
 
                             except Exception as e:
                                 logger.error(f"Failed to upload bill image to Appwrite: {str(e)}")
@@ -2914,9 +3097,30 @@ def manage_transaction_attachment(transaction_id):
                     file_name = file_info.get('name', attachment_guid)
                     mime_type = file_info.get('mimeType', 'application/octet-stream')
                 except Exception as e:
-                    logger.error(f"Error fetching file metadata: {str(e)}")
-                    file_name = attachment_guid
-                    mime_type = 'application/octet-stream'
+                    logger.warning(f"SDK get_file failed: {str(e)}, trying HTTP API")
+                    # Fallback to HTTP API for metadata
+                    try:
+                        appwrite_endpoint = os.environ.get('APPWRITE_ENDPOINT')
+                        appwrite_project_id = os.environ.get('APPWRITE_PROJECT_ID')
+                        appwrite_api_key = os.environ.get('APPWRITE_API_KEY')
+
+                        metadata_url = f"{appwrite_endpoint}/storage/buckets/{APPWRITE_BUCKET_ID}/files/{attachment_guid}"
+                        headers = {
+                            'X-Appwrite-Project': appwrite_project_id,
+                            'X-Appwrite-Key': appwrite_api_key
+                        }
+                        metadata_response = requests.get(metadata_url, headers=headers)
+                        if metadata_response.status_code == 200:
+                            file_info = metadata_response.json()
+                            file_name = file_info.get('name', attachment_guid)
+                            mime_type = file_info.get('mimeType', 'application/octet-stream')
+                        else:
+                            file_name = attachment_guid
+                            mime_type = 'application/octet-stream'
+                    except Exception as e2:
+                        logger.error(f"HTTP metadata fetch also failed: {str(e2)}")
+                        file_name = attachment_guid
+                        mime_type = 'application/octet-stream'
 
                 # Return proxy URL that will fetch the file server-side
                 proxy_url = url_for('serve_attachment', transaction_id=transaction_id, _external=True)
@@ -3012,9 +3216,32 @@ def serve_attachment(transaction_id):
             logger.info(f"Fetching attachment {attachment_guid}, mime: {mime_type}")
 
         except Exception as e:
-            logger.error(f"Error fetching file metadata from Appwrite: {str(e)}")
-            mime_type = 'application/octet-stream'
-            file_name = attachment_guid
+            logger.warning(f"SDK get_file failed: {str(e)}, trying HTTP API for metadata")
+            # Fallback to HTTP API
+            try:
+                appwrite_endpoint = os.environ.get('APPWRITE_ENDPOINT')
+                appwrite_project_id = os.environ.get('APPWRITE_PROJECT_ID')
+                appwrite_api_key = os.environ.get('APPWRITE_API_KEY')
+
+                metadata_url = f"{appwrite_endpoint}/storage/buckets/{APPWRITE_BUCKET_ID}/files/{attachment_guid}"
+                headers = {
+                    'X-Appwrite-Project': appwrite_project_id,
+                    'X-Appwrite-Key': appwrite_api_key
+                }
+                metadata_response = requests.get(metadata_url, headers=headers)
+                if metadata_response.status_code == 200:
+                    file_info = metadata_response.json()
+                    mime_type = file_info.get('mimeType', 'application/octet-stream')
+                    file_name = file_info.get('name', attachment_guid)
+                    logger.info(f"Got metadata via HTTP: {file_name}, mime: {mime_type}")
+                else:
+                    logger.error(f"HTTP metadata fetch failed with status {metadata_response.status_code}")
+                    mime_type = 'application/octet-stream'
+                    file_name = attachment_guid
+            except Exception as e2:
+                logger.error(f"HTTP metadata fetch also failed: {str(e2)}")
+                mime_type = 'application/octet-stream'
+                file_name = attachment_guid
 
         # Fetch the actual file content using direct HTTP request
         try:
@@ -3043,6 +3270,27 @@ def serve_attachment(transaction_id):
                 logger.error(f"Appwrite returned status {response.status_code}: {response.text}")
                 return f"Error loading attachment from storage (status {response.status_code})", 500
 
+            downloaded_size = len(response.content)
+            logger.info(
+                f"Downloaded file: {downloaded_size} bytes, Content-Type from Appwrite: {response.headers.get('Content-Type')}")
+
+            # Check first bytes to verify file integrity
+            first_bytes = response.content[:8] if len(response.content) >= 8 else response.content
+            logger.info(f"First 8 bytes: {first_bytes} (hex: {first_bytes.hex()})")
+
+            # Validate PDF header if it's supposed to be a PDF
+            if mime_type == 'application/pdf' or file_name.lower().endswith('.pdf'):
+                if not first_bytes.startswith(b'%PDF'):
+                    logger.error(f"PDF file {attachment_guid} does NOT start with %PDF header! File may be corrupted.")
+                    logger.error(f"First 20 bytes: {response.content[:20]}")
+                else:
+                    logger.info(f"✓ PDF header verified: {first_bytes[:8]}")
+
+            # Warn if file is unusually large (>10MB)
+            if downloaded_size > 10 * 1024 * 1024:
+                logger.warning(
+                    f"Large file detected: {downloaded_size / (1024 * 1024):.2f}MB - this may indicate corruption or a very large scan")
+
             # Get content type from response or use detected mime type
             content_type = response.headers.get('Content-Type', mime_type)
 
@@ -3057,7 +3305,8 @@ def serve_attachment(transaction_id):
             else:
                 flask_response.headers['Content-Disposition'] = 'inline'
 
-            logger.info(f"Successfully served attachment {attachment_guid}")
+            logger.info(
+                f"Successfully served attachment {attachment_guid}: {len(response.content)} bytes, Content-Type: {content_type}, Disposition: {'attachment' if request.args.get('download') == '1' else 'inline'}")
             return flask_response
 
         except Exception as e:

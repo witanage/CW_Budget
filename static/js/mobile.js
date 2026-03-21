@@ -227,14 +227,14 @@ viewBillItemsBtn.style.display = hasBillItems ? 'inline-block' : 'none';
     // Show/hide View Attachment button in Transaction Info Modal
     const mobileViewAttachmentBtnInfo = document.getElementById('mobileViewAttachmentBtnInfo');
     const mobileInfoAttachmentContainer = document.getElementById('mobileInfoAttachmentContainer');
-
+    
     if (mobileViewAttachmentBtnInfo) {
         // Reset attachment container
         if (mobileInfoAttachmentContainer) {
             mobileInfoAttachmentContainer.style.display = 'none';
             mobileInfoAttachmentContainer.innerHTML = '';
         }
-
+        
         if (transaction.attachments) {
             // Show the "View Attachment" button in info modal
             mobileViewAttachmentBtnInfo.style.display = 'inline-block';
@@ -249,14 +249,14 @@ viewBillItemsBtn.style.display = hasBillItems ? 'inline-block' : 'none';
     // Also set up the View Attachment button for Bill Items Modal (for when they click View Bill Items)
     const mobileViewAttachmentBtn = document.getElementById('mobileViewAttachmentBtn');
     const mobileBillAttachmentContainer = document.getElementById('mobileBillAttachmentContainer');
-
+    
     if (mobileViewAttachmentBtn) {
         // Reset attachment container
         if (mobileBillAttachmentContainer) {
             mobileBillAttachmentContainer.style.display = 'none';
             mobileBillAttachmentContainer.innerHTML = '';
         }
-
+        
         if (transaction.attachments) {
             // Show the "View Attachment" button
             mobileViewAttachmentBtn.style.display = 'inline-block';
@@ -410,37 +410,51 @@ mobileViewAttachmentBtn.disabled = true;
 
 try {
     const response = await fetch(`/api/transactions/${transactionId}/attachment`);
-
+    
     if (!response.ok) {
         throw new Error(`Failed to load attachment: ${response.statusText}`);
     }
-
+    
     const data = await response.json();
-
+    
     if (data.file_url) {
         // Check if it's a PDF based on MIME type or file extension
-        const isPdf = data.mime_type === 'application/pdf' ||
+        const isPdf = data.mime_type === 'application/pdf' || 
                      (data.file_name && data.file_name.toLowerCase().endsWith('.pdf'));
-
+        
         // Display the attachment (image or PDF)
         let attachmentContent;
         if (isPdf) {
-            // Display PDF using embed tag
+            // For PDFs, provide download button and try to embed (may fail for large files)
             attachmentContent = `
-                <div style="width: 100%; height: 500px; overflow: hidden; border: 1px solid #ddd; border-radius: 5px;">
-                    <embed src="${data.file_url}" type="application/pdf" width="100%" height="100%" />
+                <div class="mb-3">
+                    <div class="alert alert-info">
+                        <i class="fas fa-file-pdf me-2"></i>
+                        <strong>PDF Attachment</strong>
+                        <div class="small mt-1">
+                            File: ${data.file_name || 'document.pdf'}
+                        </div>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <a href="${data.download_url}" class="btn btn-primary" download>
+                            <i class="fas fa-download me-1"></i>Download PDF
+                        </a>
+                        <a href="${data.file_url}" class="btn btn-outline-secondary" target="_blank">
+                            <i class="fas fa-external-link-alt me-1"></i>Open in New Tab
+                        </a>
+                    </div>
                 </div>
-                <div class="mt-2">
-                    <a href="${data.download_url}" class="btn btn-sm btn-primary" download>
-                        <i class="fas fa-download me-1"></i>Download PDF
-                    </a>
+                <div style="width: 100%; height: 500px; overflow: auto; border: 1px solid #ddd; border-radius: 5px; background: #f5f5f5;">
+                    <iframe src="${data.file_url}" type="application/pdf" width="100%" height="100%" frameborder="0" style="background: white;">
+                        <p>Your browser doesn't support PDF preview. <a href="${data.download_url}" download>Download the PDF</a> instead.</p>
+                    </iframe>
                 </div>
             `;
         } else {
             // Display image
             attachmentContent = `<img src="${data.file_url}" alt="Bill Attachment" class="img-fluid rounded shadow-sm"/>`;
         }
-
+        
         mobileBillAttachmentContainer.innerHTML = `
             <div class="attachment-display">
                 <div class="d-flex justify-content-between align-items-center mb-2">
@@ -1267,17 +1281,17 @@ month: parseInt(currentMonth)
     if (capturedBillImage && !isEdit) {
         // Send as multipart/form-data with file
         const formData = new FormData();
-
+        
         // Add all form fields
         for (const key in data) {
             if (data[key] !== null && data[key] !== undefined) {
                 formData.append(key, data[key]);
             }
         }
-
+        
         // Add the bill image
         formData.append('bill_image', capturedBillImage);
-
+        
         requestBody = formData;
         requestHeaders = {}; // Let browser set Content-Type with boundary
     } else {
@@ -1489,15 +1503,15 @@ text.textContent = 'Dark Theme';
 async function showMobileAttachmentFromInfo() {
     const mobileViewAttachmentBtnInfo = document.getElementById('mobileViewAttachmentBtnInfo');
     const mobileInfoAttachmentContainer = document.getElementById('mobileInfoAttachmentContainer');
-
+    
     const transactionId = mobileViewAttachmentBtnInfo.dataset.transactionId;
     const attachmentGuid = mobileViewAttachmentBtnInfo.dataset.attachmentGuid;
-
+    
     if (!transactionId || !attachmentGuid) {
         showToast('Attachment information not available', 'danger');
         return;
     }
-
+    
     // Show loading state
     mobileInfoAttachmentContainer.innerHTML = `
         <div class="text-center py-3">
@@ -1508,43 +1522,53 @@ async function showMobileAttachmentFromInfo() {
         </div>
     `;
     mobileInfoAttachmentContainer.style.display = 'block';
-
+    
     // Disable button while loading
     mobileViewAttachmentBtnInfo.disabled = true;
-
+    
     try {
         const response = await fetch(`/api/transactions/${transactionId}/attachment`);
-
+        
         if (!response.ok) {
             throw new Error(`Failed to load attachment: ${response.statusText}`);
         }
-
+        
         const data = await response.json();
-
+        
         if (data.file_url) {
             // Check if it's a PDF based on MIME type or file extension
-            const isPdf = data.mime_type === 'application/pdf' ||
+            const isPdf = data.mime_type === 'application/pdf' || 
                          (data.file_name && data.file_name.toLowerCase().endsWith('.pdf'));
-
+            
             // Display the attachment (image or PDF)
             let attachmentContent;
             if (isPdf) {
-                // Display PDF using embed tag
+                // For PDFs, provide download and new tab options
                 attachmentContent = `
-                    <div style="width: 100%; height: 500px; overflow: hidden; border: 1px solid #ddd; border-radius: 5px;">
-                        <embed src="${data.file_url}" type="application/pdf" width="100%" height="100%" />
+                    <div class="alert alert-info mb-3">
+                        <i class="fas fa-file-pdf me-2"></i>
+                        <strong>PDF Attachment</strong>
+                        <div class="small mt-1">${data.file_name || 'document.pdf'}</div>
                     </div>
-                    <div class="mt-2">
-                        <a href="${data.download_url}" class="btn btn-sm btn-primary" download>
+                    <div class="d-grid gap-2 mb-3">
+                        <a href="${data.download_url}" class="btn btn-primary" download>
                             <i class="fas fa-download me-1"></i>Download PDF
                         </a>
+                        <a href="${data.file_url}" class="btn btn-outline-secondary" target="_blank">
+                            <i class="fas fa-external-link-alt me-1"></i>Open in New Tab
+                        </a>
+                    </div>
+                    <div style="width: 100%; height: 500px; overflow: auto; border: 1px solid #ddd; border-radius: 5px; background: #f5f5f5;">
+                        <iframe src="${data.file_url}" width="100%" height="100%" frameborder="0" style="background: white;">
+                            <p>PDF preview not available. <a href="${data.download_url}" download>Download PDF</a></p>
+                        </iframe>
                     </div>
                 `;
             } else {
                 // Display image
                 attachmentContent = `<img src="${data.file_url}" alt="Bill Attachment" class="img-fluid rounded shadow-sm"/>`;
             }
-
+            
             mobileInfoAttachmentContainer.innerHTML = `
                 <div class="attachment-display">
                     <div class="d-flex justify-content-between align-items-center mb-2">
@@ -1988,9 +2012,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Handle add button click
     if (addBtnFloat) {
         addBtnFloat.addEventListener('click', function(e) {
-            const buttonsVisible = (scanBtnFloat && scanBtnFloat.classList.contains('visible')) ||
+            const buttonsVisible = (scanBtnFloat && scanBtnFloat.classList.contains('visible')) || 
                                   (uploadBtnFloat && uploadBtnFloat.classList.contains('visible'));
-
+            
             if (!buttonsVisible) {
                 // First click: show both buttons only, don't open modal
                 e.preventDefault();
@@ -2012,9 +2036,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Hide both buttons when clicking outside (not on scan/upload/add buttons)
     document.addEventListener('click', function(e) {
-        const buttonsVisible = (scanBtnFloat && scanBtnFloat.classList.contains('visible')) ||
+        const buttonsVisible = (scanBtnFloat && scanBtnFloat.classList.contains('visible')) || 
                               (uploadBtnFloat && uploadBtnFloat.classList.contains('visible'));
-
+        
         if (!buttonsVisible) {
             return;
         }

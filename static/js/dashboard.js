@@ -1823,15 +1823,25 @@ async function loadAndDisplayAttachment() {
             // Display the attachment (image or PDF)
             let attachmentContent;
             if (isPdf) {
-                // Display PDF using embed tag
+                // For PDFs, provide download and new tab options
                 attachmentContent = `
-                    <div style="width: 100%; height: 600px; overflow: hidden; border: 1px solid #ddd; border-radius: 5px;">
-                        <embed src="${data.file_url}" type="application/pdf" width="100%" height="100%" />
+                    <div class="alert alert-info mb-3">
+                        <i class="fas fa-file-pdf me-2"></i>
+                        <strong>PDF Attachment</strong>
+                        <div class="small mt-1">${data.file_name || 'document.pdf'}</div>
                     </div>
-                    <div class="mt-2">
-                        <a href="${data.download_url}" class="btn btn-sm btn-primary" download>
+                    <div class="d-flex gap-2 mb-3">
+                        <a href="${data.download_url}" class="btn btn-primary" download>
                             <i class="fas fa-download me-1"></i>Download PDF
                         </a>
+                        <a href="${data.file_url}" class="btn btn-outline-secondary" target="_blank">
+                            <i class="fas fa-external-link-alt me-1"></i>Open in New Tab
+                        </a>
+                    </div>
+                    <div style="width: 100%; height: 600px; overflow: auto; border: 1px solid #ddd; border-radius: 5px; background: #f5f5f5;">
+                        <iframe src="${data.file_url}" width="100%" height="100%" frameborder="0" style="background: white;">
+                            <p>PDF preview not available. <a href="${data.download_url}" download>Download PDF</a></p>
+                        </iframe>
                     </div>
                 `;
             } else {
