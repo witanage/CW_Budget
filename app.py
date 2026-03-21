@@ -131,11 +131,72 @@ if DB_CONFIG is None:
 # File Optimization Utilities
 # ---------------------------------------------------------------------------
 
+def fix_image_orientation(img):
+    """
+    Fix image orientation based on EXIF data.
+
+    Mobile devices often store images in the wrong orientation and use EXIF
+    tags to indicate how they should be rotated. This function reads the EXIF
+    orientation tag and physically rotates/transposes the image accordingly.
+
+    Args:
+        img: PIL Image object
+
+    Returns:
+        PIL Image object with corrected orientation
+    """
+    try:
+        # Get EXIF data
+        exif = img.getexif()
+
+        if exif is not None:
+            # EXIF orientation tag is 0x0112 (274 in decimal)
+            orientation = exif.get(0x0112, 1)
+
+            # Apply rotation/transpose based on orientation tag
+            # See: http://sylvana.net/jpegcrop/exif_orientation.html
+            if orientation == 2:
+                # Mirrored horizontally
+                img = img.transpose(Image.FLIP_LEFT_RIGHT)
+            elif orientation == 3:
+                # Rotated 180 degrees
+                img = img.rotate(180, expand=True)
+            elif orientation == 4:
+                # Mirrored vertically
+                img = img.transpose(Image.FLIP_TOP_BOTTOM)
+            elif orientation == 5:
+                # Mirrored horizontally then rotated 90 CCW
+                img = img.transpose(Image.FLIP_LEFT_RIGHT)
+                img = img.rotate(90, expand=True)
+            elif orientation == 6:
+                # Rotated 90 degrees CCW (or 270 CW)
+                img = img.rotate(270, expand=True)
+            elif orientation == 7:
+                # Mirrored horizontally then rotated 90 CW
+                img = img.transpose(Image.FLIP_LEFT_RIGHT)
+                img = img.rotate(270, expand=True)
+            elif orientation == 8:
+                # Rotated 90 degrees CW
+                img = img.rotate(90, expand=True)
+
+            # Reset orientation tag to normal after applying the rotation
+            if orientation != 1:
+                logger.info(f"Fixed image orientation (EXIF tag: {orientation})")
+                # Remove EXIF orientation tag by creating new EXIF data
+                exif[0x0112] = 1
+
+    except (AttributeError, KeyError, IndexError) as e:
+        # Image doesn't have EXIF data or orientation tag, that's fine
+        logger.debug(f"No EXIF orientation data found: {str(e)}")
+
+    return img
+
+
 def optimize_file_for_upload(file_data, file_ext, original_filename):
     """
     Optimize file size for upload while maintaining quality.
 
-    For images: Resizes and compresses if >1MB
+    For images: Fixes orientation, resizes and compresses if >1MB
     For PDFs: Compresses if >2MB
 
     Args:
@@ -155,13 +216,21 @@ def optimize_file_for_upload(file_data, file_ext, original_filename):
 
     # Image optimization
     if file_ext in ['jpg', 'jpeg', 'png', 'gif', 'webp'] and PIL_AVAILABLE:
-        if original_size_mb > IMAGE_THRESHOLD_MB:
-            try:
-                logger.info(f"Optimizing image {original_filename}: {original_size_mb:.2f}MB")
+        try:
+            # ALWAYS load and fix orientation for images, regardless of size
+            # This ensures mobile photos are displayed correctly
+            logger.info(f"Processing image {original_filename}: {original_size_mb:.2f}MB")
 
-                # Load image
-                img = Image.open(io.BytesIO(file_data))
+            # Load image
+            img = Image.open(io.BytesIO(file_data))
 
+            # Fix orientation FIRST (critical for mobile photos)
+            img = fix_image_orientation(img)
+
+            needs_optimization = original_size_mb > IMAGE_THRESHOLD_MB
+
+            # Resize if needed
+            if needs_optimization:
                 # Calculate new dimensions (max 2000px on longest side)
                 max_dimension = 2000
                 ratio = min(max_dimension / img.width, max_dimension / img.height, 1.0)
@@ -169,47 +238,48 @@ def optimize_file_for_upload(file_data, file_ext, original_filename):
                 if ratio < 1.0:
                     new_size = (int(img.width * ratio), int(img.height * ratio))
                     img = img.resize(new_size, Image.Resampling.LANCZOS)
-                    logger.info(f"  Resized from {img.size} to {new_size}")
+                    logger.info(f"  Resized from original to {new_size}")
 
-                # Convert to RGB if necessary (for JPEG)
-                if img.mode in ('RGBA', 'P', 'LA'):
-                    # Create white background
-                    rgb_img = Image.new('RGB', img.size, (255, 255, 255))
-                    if img.mode == 'P':
-                        img = img.convert('RGBA')
-                    rgb_img.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
-                    img = rgb_img
+            # Convert to RGB if necessary (for JPEG)
+            if img.mode in ('RGBA', 'P', 'LA'):
+                # Create white background
+                rgb_img = Image.new('RGB', img.size, (255, 255, 255))
+                if img.mode == 'P':
+                    img = img.convert('RGBA')
+                rgb_img.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
+                img = rgb_img
 
-                # Save optimized version
-                output = io.BytesIO()
+            # Save processed version (with orientation fix applied)
+            output = io.BytesIO()
 
-                # Use appropriate format and quality
-                if file_ext in ['jpg', 'jpeg']:
-                    img.save(output, format='JPEG', quality=85, optimize=True)
-                elif file_ext == 'png':
-                    img.save(output, format='PNG', optimize=True, compress_level=6)
-                elif file_ext == 'webp':
-                    img.save(output, format='WEBP', quality=85)
-                else:
-                    img.save(output, format=img.format or 'JPEG', quality=85, optimize=True)
+            # Use appropriate format and quality
+            if file_ext in ['jpg', 'jpeg']:
+                img.save(output, format='JPEG', quality=85, optimize=True)
+            elif file_ext == 'png':
+                img.save(output, format='PNG', optimize=True, compress_level=6)
+            elif file_ext == 'webp':
+                img.save(output, format='WEBP', quality=85)
+            else:
+                img.save(output, format=img.format or 'JPEG', quality=85, optimize=True)
 
-                optimized_data = output.getvalue()
-                new_size = len(optimized_data)
-                new_size_mb = new_size / (1024 * 1024)
+            processed_data = output.getvalue()
+            new_size = len(processed_data)
+            new_size_mb = new_size / (1024 * 1024)
 
-                # Only use optimized version if it's actually smaller
-                if new_size < original_size:
-                    reduction_pct = ((original_size - new_size) / original_size) * 100
-                    logger.info(
-                        f"  ✓ Image optimized: {original_size_mb:.2f}MB → {new_size_mb:.2f}MB ({reduction_pct:.1f}% reduction)")
-                    return (optimized_data, True, original_size, new_size)
-                else:
-                    logger.info(f"  Optimization didn't reduce size, keeping original")
-                    return (file_data, False, original_size, original_size)
+            # Return processed image (with orientation fix always applied)
+            if needs_optimization and new_size < original_size:
+                reduction_pct = ((original_size - new_size) / original_size) * 100
+                logger.info(
+                    f"  ✓ Image optimized: {original_size_mb:.2f}MB → {new_size_mb:.2f}MB ({reduction_pct:.1f}% reduction)")
+                return (processed_data, True, original_size, new_size)
+            else:
+                # Even if size didn't reduce, we still fixed orientation
+                logger.info(f"  ✓ Image processed (orientation fixed): {original_size_mb:.2f}MB")
+                return (processed_data, True, original_size, new_size)
 
-            except Exception as e:
-                logger.warning(f"Image optimization failed: {str(e)}, using original")
-                return (file_data, False, original_size, original_size)
+        except Exception as e:
+            logger.warning(f"Image processing failed: {str(e)}, using original")
+            return (file_data, False, original_size, original_size)
 
     # PDF optimization
     elif file_ext == 'pdf' and PYPDF2_AVAILABLE:
@@ -5787,6 +5857,29 @@ def scan_bill():
 
         if len(image_data) == 0:
             return jsonify({'error': 'Empty file'}), 400
+
+        # Fix image orientation if it's an image file (not PDF)
+        # This ensures mobile photos are correctly oriented for scanning
+        if file_ext in ['jpg', 'jpeg', 'png', 'gif', 'webp'] and PIL_AVAILABLE:
+            try:
+                img = Image.open(io.BytesIO(image_data))
+                img = fix_image_orientation(img)
+
+                # Convert back to bytes
+                output = io.BytesIO()
+                if file_ext in ['jpg', 'jpeg']:
+                    img.save(output, format='JPEG', quality=95)
+                elif file_ext == 'png':
+                    img.save(output, format='PNG')
+                elif file_ext == 'webp':
+                    img.save(output, format='WEBP', quality=95)
+                else:
+                    img.save(output, format=img.format or 'JPEG', quality=95)
+
+                image_data = output.getvalue()
+                logger.info(f"Image orientation corrected for scanning")
+            except Exception as e:
+                logger.warning(f"Failed to fix orientation, using original: {str(e)}")
 
         # Get Gemini scanner instance
         scanner = get_gemini_bill_scanner()
