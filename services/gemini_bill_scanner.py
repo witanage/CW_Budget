@@ -1,6 +1,6 @@
 """
 Gemini AI Bill Scanner Service
-This service uses Google's Gemini Flash 3 API to extract information from bill images.
+This service uses Google's Gemini Flash 3 API to extract information from bill images and PDFs.
 """
 
 import os
@@ -8,6 +8,7 @@ import json
 import logging
 from typing import Dict, Optional
 from google import genai
+from google.genai.types import Part
 from PIL import Image
 import io
 
@@ -38,10 +39,10 @@ class GeminiBillScanner:
 
     def scan_bill(self, image_data: bytes) -> Dict[str, Optional[str]]:
         """
-        Scan a bill image and extract shop name, amount, and line items.
+        Scan a bill image or PDF and extract shop name, amount, and line items.
 
         Args:
-            image_data: Raw image bytes (JPEG, PNG, etc.)
+            image_data: Raw file bytes (JPEG, PNG, PDF, etc.)
 
         Returns:
             Dictionary with 'shop_name', 'amount', and 'items' keys.
@@ -59,12 +60,12 @@ class GeminiBillScanner:
             }
         """
         try:
-            # Open image from bytes
-            image = Image.open(io.BytesIO(image_data))
+            # Detect if it's a PDF
+            is_pdf = image_data[:4] == b'%PDF'
 
             # Create the prompt for bill extraction
             prompt = """
-You are a bill/receipt analyzer. Extract the following information from this bill/receipt image:
+You are a bill/receipt analyzer. Extract the following information from this bill/receipt:
 
 1. Shop/Store Name: The name of the business or store (merchant name)
 2. Total Amount: The final total amount to be paid (look for "Total", "Amount Due", "Grand Total", etc.)
@@ -93,11 +94,26 @@ Respond in this exact JSON format (no markdown, no code blocks, just raw JSON):
 }
 """
 
-            # Generate content with the image
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=[prompt, image]
-            )
+            # Prepare content based on file type
+            if is_pdf:
+                # For PDF files, use Part with inline_data
+                logger.info("Processing PDF bill")
+                file_part = Part.from_bytes(
+                    data=image_data,
+                    mime_type="application/pdf"
+                )
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=[prompt, file_part]
+                )
+            else:
+                # For image files, use PIL
+                logger.info("Processing image bill")
+                image = Image.open(io.BytesIO(image_data))
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=[prompt, image]
+                )
 
             # Extract text from response
             response_text = response.text.strip()

@@ -1083,7 +1083,7 @@ html[data-theme="light"] .bill-items-table tfoot td {
 }
 
 .bill-empty-state {
-    color: #aaa;
+    color: #ccc;
     padding: 40px 20px;
     text-align: center;
 }
@@ -1093,7 +1093,7 @@ html[data-theme="light"] .bill-empty-state {
 }
 
 .bill-empty-state i {
-    color: #555;
+    color: #999;
     font-size: 2rem;
     margin-bottom: 10px;
     display: block;

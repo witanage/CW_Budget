@@ -137,13 +137,13 @@
     <button class="scan-btn-float" id="scanBillBtnFloat" title="Scan Bill">
         <i class="fas fa-camera"></i>
     </button>
-    <input type="file" id="billImageInput" accept="image/*" capture="environment" style="display: none;">
+    <input type="file" id="billImageInput" accept="image/*,application/pdf" capture="environment" style="display: none;">
 
     <!-- Floating Upload Bill Button -->
-    <button class="upload-btn-float" id="uploadBillBtnFloat" title="Upload Bill Image">
+    <button class="upload-btn-float" id="uploadBillBtnFloat" title="Upload Bill">
         <i class="fas fa-file-upload"></i>
     </button>
-    <input type="file" id="uploadImageInput" accept="image/*" style="display: none;">
+    <input type="file" id="uploadImageInput" accept="image/*,application/pdf" style="display: none;">
 
     <!-- Floating Add Button -->
     <button class="add-btn-float" id="addBtnFloat">
@@ -340,12 +340,18 @@
                         <label class="form-label fw-bold" style="color: #aaa;">Paid At:</label>
                         <p id="infoPaidAt" style="color: #fff; margin: 0;">-</p>
                     </div>
+                    <div id="mobileInfoAttachmentContainer" class="mt-4" style="display: none;">
+                        <!-- Attachment will be displayed here -->
+                    </div>
                 </div>
                 <div class="modal-footer" style="border-top: 1px solid #333;">
-                    <button type="button" class="btn btn-primary" id="viewBillItemsBtn" style="display: none;" onclick="showMobileBillItems()">
+                    <button type="button" class="btn btn-sm btn-primary" id="viewBillItemsBtn" style="display: none;" onclick="showMobileBillItems()">
                         <i class="fas fa-receipt me-1"></i>View Bill Items
                     </button>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-sm btn-info" id="mobileViewAttachmentBtnInfo" style="display: none;" onclick="showMobileAttachmentFromInfo()">
+                        <i class="fas fa-paperclip me-1"></i>View Attachment
+                    </button>
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>

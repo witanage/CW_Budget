@@ -890,11 +890,11 @@ font-size: 1.25rem;
 filter: invert(1);
 }
 
-.progress {
-height: 25px;
-border-radius: 15px;
-background-color: var(--bg-tertiary);
+/* General text-muted visibility in dark mode */
+[data-theme="dark"] .text-muted {
+    color: #999 !important;
 }
+
 
 .progress-bar {
 font-size: 0.9rem;

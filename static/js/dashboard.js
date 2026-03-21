@@ -35,7 +35,7 @@ let filterDropdownsInitialized = false;
 let loadedReportTabs = new Set(); // Track which report tabs have been loaded
 let reportTabsInitialized = false; // Track if tab listeners are initialized
 let scannedBillContent = null; // Store scanned bill content temporarily
-let capturedBillImage = null; // Store the actual image file for upload
+let capturedBillImage = null; // Store the actual file (image or PDF) for upload
 
 // Initialize everything when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
@@ -1386,10 +1386,10 @@ function saveTransaction() {
 
     showLoading();
 
-    // Check if we have a captured bill image to upload
+    // Check if we have a captured bill file to upload
     let requestBody, requestHeaders;
     if (capturedBillImage && !isEdit) {
-        // Send as multipart/form-data with image
+        // Send as multipart/form-data with file
         const formData = new FormData();
 
         // Add all form fields
@@ -1816,7 +1816,29 @@ async function loadAndDisplayAttachment() {
         const data = await response.json();
 
         if (data.file_url) {
-            // Display the image
+            // Check if it's a PDF based on MIME type or file extension
+            const isPdf = data.mime_type === 'application/pdf' ||
+                         (data.file_name && data.file_name.toLowerCase().endsWith('.pdf'));
+
+            // Display the attachment (image or PDF)
+            let attachmentContent;
+            if (isPdf) {
+                // Display PDF using embed tag
+                attachmentContent = `
+                    <div style="width: 100%; height: 600px; overflow: hidden; border: 1px solid #ddd; border-radius: 5px;">
+                        <embed src="${data.file_url}" type="application/pdf" width="100%" height="100%" />
+                    </div>
+                    <div class="mt-2">
+                        <a href="${data.download_url}" class="btn btn-sm btn-primary" download>
+                            <i class="fas fa-download me-1"></i>Download PDF
+                        </a>
+                    </div>
+                `;
+            } else {
+                // Display image
+                attachmentContent = `<img src="${data.file_url}" alt="Bill Attachment" class="img-fluid rounded shadow-sm" style="max-width: 100%; height: auto;"/>`;
+            }
+
             billAttachmentContainer.innerHTML = `
                 <div class="attachment-display">
                     <div class="d-flex justify-content-between align-items-center mb-2">
@@ -1825,7 +1847,7 @@ async function loadAndDisplayAttachment() {
                             <i class="fas fa-times"></i> Hide
                         </button>
                     </div>
-                    <img src="${data.file_url}" alt="Bill Attachment" class="img-fluid rounded shadow-sm" style="max-width: 100%; height: auto;"/>
+                    ${attachmentContent}
                 </div>
             `;
         } else {
@@ -4790,17 +4812,17 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('File selected:', file.name, file.type, file.size);
 
             // Validate file type
-            const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
+            const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp', 'application/pdf'];
             if (!allowedTypes.includes(file.type)) {
-                showToast('Please select a valid image file (PNG, JPEG, GIF, WebP)', 'danger');
+                showToast('Please select a valid file (PNG, JPEG, GIF, WebP, or PDF)', 'danger');
                 billUploadInput.value = '';
                 return;
             }
 
-            // Validate file size (max 10MB)
-            const maxSize = 10 * 1024 * 1024; // 10MB
+            // Validate file size (max 15MB)
+            const maxSize = 15 * 1024 * 1024; // 15MB
             if (file.size > maxSize) {
-                showToast('Image file is too large. Please select an image under 10MB', 'danger');
+                showToast('File is too large. Please select a file under 15MB', 'danger');
                 billUploadInput.value = '';
                 return;
             }
@@ -4822,12 +4844,12 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             try {
-                // Create FormData to send the image
+                // Create FormData to send the file
                 const formData = new FormData();
                 formData.append('bill_image', file);
 
                 // Send to API
-                console.log('Sending image to API...');
+                console.log('Sending file to API...');
                 const response = await fetch('/api/scan-bill', {
                     method: 'POST',
                     body: formData
@@ -4848,7 +4870,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         items: result.items || []
                     };
 
-                    // Store the captured image file for upload when transaction is saved
+                    // Store the captured file for upload when transaction is saved
                     capturedBillImage = file;
 
                     // Populate the form with extracted data
