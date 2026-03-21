@@ -2193,7 +2193,7 @@ def transactions():
 
                 if bill_image and bill_image.filename:
                     # Validate file type
-                    allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+                    allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf'}
                     file_ext = bill_image.filename.rsplit('.', 1)[-1].lower() if '.' in bill_image.filename else ''
 
                     if file_ext in allowed_extensions:
@@ -2210,9 +2210,9 @@ def transactions():
 
                                 # Upload to Appwrite with GUID as file ID
                                 result = appwrite_storage.create_file(
-                                    bucket_id=APPWRITE_BUCKET_ID,
-                                    file_id=attachment_guid,  # Use GUID as file ID
-                                    file=InputFile.from_bytes(image_data, filename=filename)
+                                    APPWRITE_BUCKET_ID,
+                                    attachment_guid,  # Use GUID as file ID
+                                    InputFile.from_bytes(image_data, filename=filename)
                                 )
 
                                 logger.info(f"Bill image uploaded successfully: {attachment_guid}")
@@ -2612,8 +2612,8 @@ def manage_transaction(transaction_id):
                 if appwrite_storage and APPWRITE_BUCKET_ID:
                     try:
                         appwrite_storage.delete_file(
-                            bucket_id=APPWRITE_BUCKET_ID,
-                            file_id=attachment_guid
+                            APPWRITE_BUCKET_ID,
+                            attachment_guid
                         )
                         logger.info(
                             f"Deleted attachment {attachment_guid} from Appwrite for transaction {transaction_id}")
@@ -2905,13 +2905,28 @@ def manage_transaction_attachment(transaction_id):
             # Return attachment info with proxy URL (not direct Appwrite URL)
             # Direct Appwrite URLs require authentication and won't work in img tags
             if appwrite_storage and APPWRITE_BUCKET_ID:
+                # Get file metadata to determine file type
+                try:
+                    file_info = appwrite_storage.get_file(
+                        APPWRITE_BUCKET_ID,
+                        attachment_guid
+                    )
+                    file_name = file_info.get('name', attachment_guid)
+                    mime_type = file_info.get('mimeType', 'application/octet-stream')
+                except Exception as e:
+                    logger.error(f"Error fetching file metadata: {str(e)}")
+                    file_name = attachment_guid
+                    mime_type = 'application/octet-stream'
+
                 # Return proxy URL that will fetch the file server-side
                 proxy_url = url_for('serve_attachment', transaction_id=transaction_id, _external=True)
 
                 return jsonify({
                     'attachment_guid': attachment_guid,
                     'file_url': proxy_url,
-                    'download_url': proxy_url + '?download=1'
+                    'download_url': proxy_url + '?download=1',
+                    'file_name': file_name,
+                    'mime_type': mime_type
                 }), 200
             else:
                 return jsonify({'error': 'Appwrite storage not available'}), 500
@@ -2922,8 +2937,8 @@ def manage_transaction_attachment(transaction_id):
                 try:
                     # Delete file from Appwrite
                     appwrite_storage.delete_file(
-                        bucket_id=APPWRITE_BUCKET_ID,
-                        file_id=attachment_guid
+                        APPWRITE_BUCKET_ID,
+                        attachment_guid
                     )
                     logger.info(f"Deleted attachment {attachment_guid} from Appwrite")
                 except Exception as e:
@@ -2988,8 +3003,8 @@ def serve_attachment(transaction_id):
         # Get file metadata first
         try:
             file_info = appwrite_storage.get_file(
-                bucket_id=APPWRITE_BUCKET_ID,
-                file_id=attachment_guid
+                APPWRITE_BUCKET_ID,
+                attachment_guid
             )
             mime_type = file_info.get('mimeType', 'application/octet-stream')
             file_name = file_info.get('name', attachment_guid)
@@ -5475,14 +5490,14 @@ def create_transaction():
 @login_required
 def scan_bill():
     """
-    Scan a bill image using Gemini AI to extract shop name, amount, and line items.
+    Scan a bill image or PDF using Gemini AI to extract shop name, amount, and line items.
 
     NOTE: This endpoint ONLY extracts data - it does NOT upload to Appwrite.
-    The image will be uploaded when the user saves the transaction.
+    The file will be uploaded when the user saves the transaction.
 
     Request:
         - Content-Type: multipart/form-data
-        - Field: 'bill_image' (image file)
+        - Field: 'bill_image' (image or PDF file)
 
     Returns:
         JSON with extracted shop_name, amount, and items
@@ -5501,9 +5516,9 @@ def scan_bill():
         Body: FormData with 'bill_image' file
     """
     try:
-        # Check if image file is present
+        # Check if file is present
         if 'bill_image' not in request.files:
-            return jsonify({'error': 'No bill image provided'}), 400
+            return jsonify({'error': 'No bill file provided'}), 400
 
         bill_image = request.files['bill_image']
 
@@ -5512,17 +5527,17 @@ def scan_bill():
             return jsonify({'error': 'No file selected'}), 400
 
         # Validate file type
-        allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+        allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf'}
         file_ext = bill_image.filename.rsplit('.', 1)[-1].lower() if '.' in bill_image.filename else ''
 
         if file_ext not in allowed_extensions:
             return jsonify({'error': f'Invalid file type. Allowed: {", ".join(allowed_extensions)}'}), 400
 
-        # Read image data
+        # Read file data
         image_data = bill_image.read()
 
         if len(image_data) == 0:
-            return jsonify({'error': 'Empty image file'}), 400
+            return jsonify({'error': 'Empty file'}), 400
 
         # Get Gemini scanner instance
         scanner = get_gemini_bill_scanner()
@@ -5533,7 +5548,7 @@ def scan_bill():
             }), 503
 
         # Scan the bill with Gemini AI (no Appwrite upload yet)
-        logger.info(f"Scanning bill image for user {session['user_id']}")
+        logger.info(f"Scanning bill file for user {session['user_id']}")
         result = scanner.scan_bill(image_data)
 
         # Check if there was an error

@@ -54,7 +54,7 @@ bootstrapModal.show();
 let paymentMethods = [];
 let selectedTransactionIdForPayment = null;
 let scannedBillContent = null; // Store scanned bill content temporarily
-let capturedBillImage = null; // Store the actual image file for upload
+let capturedBillImage = null; // Store the actual file (image or PDF) for upload
 
 // Load payment methods
 function loadPaymentMethods() {
@@ -224,37 +224,76 @@ console.error('Error parsing bill content:', e);
 viewBillItemsBtn.style.display = hasBillItems ? 'inline-block' : 'none';
 }
 
-// Show the modal
-const modal = new bootstrap.Modal(document.getElementById('transactionInfoModal'));
-modal.show();
+    // Show/hide View Attachment button in Transaction Info Modal
+    const mobileViewAttachmentBtnInfo = document.getElementById('mobileViewAttachmentBtnInfo');
+    const mobileInfoAttachmentContainer = document.getElementById('mobileInfoAttachmentContainer');
+
+    if (mobileViewAttachmentBtnInfo) {
+        // Reset attachment container
+        if (mobileInfoAttachmentContainer) {
+            mobileInfoAttachmentContainer.style.display = 'none';
+            mobileInfoAttachmentContainer.innerHTML = '';
+        }
+
+        if (transaction.attachments) {
+            // Show the "View Attachment" button in info modal
+            mobileViewAttachmentBtnInfo.style.display = 'inline-block';
+            mobileViewAttachmentBtnInfo.dataset.transactionId = transaction.id;
+            mobileViewAttachmentBtnInfo.dataset.attachmentGuid = transaction.attachments;
+        } else {
+            // Hide the "View Attachment" button
+            mobileViewAttachmentBtnInfo.style.display = 'none';
+        }
+    }
+
+    // Also set up the View Attachment button for Bill Items Modal (for when they click View Bill Items)
+    const mobileViewAttachmentBtn = document.getElementById('mobileViewAttachmentBtn');
+    const mobileBillAttachmentContainer = document.getElementById('mobileBillAttachmentContainer');
+
+    if (mobileViewAttachmentBtn) {
+        // Reset attachment container
+        if (mobileBillAttachmentContainer) {
+            mobileBillAttachmentContainer.style.display = 'none';
+            mobileBillAttachmentContainer.innerHTML = '';
+        }
+
+        if (transaction.attachments) {
+            // Show the "View Attachment" button
+            mobileViewAttachmentBtn.style.display = 'inline-block';
+            mobileViewAttachmentBtn.dataset.transactionId = transaction.id;
+            mobileViewAttachmentBtn.dataset.attachmentGuid = transaction.attachments;
+        } else {
+            // Hide the "View Attachment" button
+            mobileViewAttachmentBtn.style.display = 'none';
+        }
+    }
+
+    // Show the modal
+    const modal = new bootstrap.Modal(document.getElementById('transactionInfoModal'));
+    modal.show();
 }
 
 // Show bill items modal
 function showMobileBillItems() {
-if (!currentTransactionForBillItems) {
-showToast('No transaction selected', 'danger');
-return;
-}
+    if (!currentTransactionForBillItems) {
+        showToast('Bill items view not available', 'danger');
+        return;
+    }
 
-const transaction = currentTransactionForBillItems;
-const billItemsContent = document.getElementById('billItemsContent');
+    const transaction = currentTransactionForBillItems;
+    const billItemsContent = document.getElementById('billItemsContent');
 
-if (!billItemsContent) {
-showToast('Bill items view not available', 'danger');
-return;
-}
-
-// Parse bill content
-let billContent = null;
-try {
-if (typeof transaction.bill_content === 'string') {
-billContent = JSON.parse(transaction.bill_content);
-} else if (typeof transaction.bill_content === 'object') {
-billContent = transaction.bill_content;
-}
-} catch (e) {
-console.error('Error parsing bill content:', e);
-}
+    // Parse bill content
+    let billContent = null;
+    try {
+        if (typeof transaction.bill_content === 'string') {
+            billContent = JSON.parse(transaction.bill_content);
+        } else if (typeof transaction.bill_content === 'object') {
+            billContent = transaction.bill_content;
+        }
+    } catch (e) {
+        console.error('Error parsing bill content:', e);
+    }
 
 if (!billContent || !billContent.items || billContent.items.length === 0) {
 billItemsContent.innerHTML = `
@@ -379,7 +418,29 @@ try {
     const data = await response.json();
 
     if (data.file_url) {
-        // Display the image
+        // Check if it's a PDF based on MIME type or file extension
+        const isPdf = data.mime_type === 'application/pdf' ||
+                     (data.file_name && data.file_name.toLowerCase().endsWith('.pdf'));
+
+        // Display the attachment (image or PDF)
+        let attachmentContent;
+        if (isPdf) {
+            // Display PDF using embed tag
+            attachmentContent = `
+                <div style="width: 100%; height: 500px; overflow: hidden; border: 1px solid #ddd; border-radius: 5px;">
+                    <embed src="${data.file_url}" type="application/pdf" width="100%" height="100%" />
+                </div>
+                <div class="mt-2">
+                    <a href="${data.download_url}" class="btn btn-sm btn-primary" download>
+                        <i class="fas fa-download me-1"></i>Download PDF
+                    </a>
+                </div>
+            `;
+        } else {
+            // Display image
+            attachmentContent = `<img src="${data.file_url}" alt="Bill Attachment" class="img-fluid rounded shadow-sm"/>`;
+        }
+
         mobileBillAttachmentContainer.innerHTML = `
             <div class="attachment-display">
                 <div class="d-flex justify-content-between align-items-center mb-2">
@@ -388,7 +449,7 @@ try {
                         <i class="fas fa-times"></i> Hide
                     </button>
                 </div>
-                <img src="${data.file_url}" alt="Bill Attachment" class="img-fluid rounded shadow-sm"/>
+                ${attachmentContent}
             </div>
         `;
     } else {
@@ -1201,10 +1262,10 @@ month: parseInt(currentMonth)
 
     showLoading();
 
-    // Check if we have a captured bill image to upload
+    // Check if we have a captured bill file to upload
     let requestBody, requestHeaders;
     if (capturedBillImage && !isEdit) {
-        // Send as multipart/form-data with image
+        // Send as multipart/form-data with file
         const formData = new FormData();
 
         // Add all form fields
@@ -1422,6 +1483,103 @@ text.textContent = 'Light Theme';
 icon.className = 'fas fa-moon';
 text.textContent = 'Dark Theme';
 }
+}
+
+// Function to show attachment directly from transaction info modal
+async function showMobileAttachmentFromInfo() {
+    const mobileViewAttachmentBtnInfo = document.getElementById('mobileViewAttachmentBtnInfo');
+    const mobileInfoAttachmentContainer = document.getElementById('mobileInfoAttachmentContainer');
+
+    const transactionId = mobileViewAttachmentBtnInfo.dataset.transactionId;
+    const attachmentGuid = mobileViewAttachmentBtnInfo.dataset.attachmentGuid;
+
+    if (!transactionId || !attachmentGuid) {
+        showToast('Attachment information not available', 'danger');
+        return;
+    }
+
+    // Show loading state
+    mobileInfoAttachmentContainer.innerHTML = `
+        <div class="text-center py-3">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="text-muted mt-2">Loading attachment...</p>
+        </div>
+    `;
+    mobileInfoAttachmentContainer.style.display = 'block';
+
+    // Disable button while loading
+    mobileViewAttachmentBtnInfo.disabled = true;
+
+    try {
+        const response = await fetch(`/api/transactions/${transactionId}/attachment`);
+
+        if (!response.ok) {
+            throw new Error(`Failed to load attachment: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        if (data.file_url) {
+            // Check if it's a PDF based on MIME type or file extension
+            const isPdf = data.mime_type === 'application/pdf' ||
+                         (data.file_name && data.file_name.toLowerCase().endsWith('.pdf'));
+
+            // Display the attachment (image or PDF)
+            let attachmentContent;
+            if (isPdf) {
+                // Display PDF using embed tag
+                attachmentContent = `
+                    <div style="width: 100%; height: 500px; overflow: hidden; border: 1px solid #ddd; border-radius: 5px;">
+                        <embed src="${data.file_url}" type="application/pdf" width="100%" height="100%" />
+                    </div>
+                    <div class="mt-2">
+                        <a href="${data.download_url}" class="btn btn-sm btn-primary" download>
+                            <i class="fas fa-download me-1"></i>Download PDF
+                        </a>
+                    </div>
+                `;
+            } else {
+                // Display image
+                attachmentContent = `<img src="${data.file_url}" alt="Bill Attachment" class="img-fluid rounded shadow-sm"/>`;
+            }
+
+            mobileInfoAttachmentContainer.innerHTML = `
+                <div class="attachment-display">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0">Bill Attachment</h6>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="hideMobileInfoAttachment()">
+                            <i class="fas fa-times"></i> Hide
+                        </button>
+                    </div>
+                    ${attachmentContent}
+                </div>
+            `;
+        } else {
+            throw new Error('No file URL returned from server');
+        }
+    } catch (error) {
+        console.error('Error loading attachment:', error);
+        mobileInfoAttachmentContainer.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Failed to load attachment: ${error.message}
+            </div>
+        `;
+    } finally {
+        // Re-enable button
+        mobileViewAttachmentBtnInfo.disabled = false;
+    }
+}
+
+// Function to hide attachment in info modal
+function hideMobileInfoAttachment() {
+    const mobileInfoAttachmentContainer = document.getElementById('mobileInfoAttachmentContainer');
+    if (mobileInfoAttachmentContainer) {
+        mobileInfoAttachmentContainer.style.display = 'none';
+        mobileInfoAttachmentContainer.innerHTML = '';
+    }
 }
 
 // Initialize
@@ -1932,17 +2090,17 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('File selected:', file.name, file.type, file.size);
 
         // Validate file type
-        const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
+        const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp', 'application/pdf'];
         if (!allowedTypes.includes(file.type)) {
-            showToast('Please select a valid image file (PNG, JPEG, GIF, WebP)', 'danger');
+            showToast('Please select a valid file (PNG, JPEG, GIF, WebP, or PDF)', 'danger');
             inputElement.value = '';
             return;
         }
 
-        // Validate file size (max 10MB)
-        const maxSize = 10 * 1024 * 1024; // 10MB
+        // Validate file size (max 15MB)
+        const maxSize = 15 * 1024 * 1024; // 15MB
         if (file.size > maxSize) {
-            showToast('Image file is too large. Please select an image under 10MB', 'danger');
+            showToast('File is too large. Please select a file under 15MB', 'danger');
             inputElement.value = '';
             return;
         }
@@ -1964,12 +2122,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         try {
-            // Create FormData to send the image
+            // Create FormData to send the file
             const formData = new FormData();
             formData.append('bill_image', file);
 
             // Send to API
-            console.log('Sending image to API...');
+            console.log('Sending file to API...');
             const response = await fetch('/api/scan-bill', {
                 method: 'POST',
                 body: formData
@@ -1990,7 +2148,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     items: result.items || []
                 };
 
-                // Store the captured image file for upload when transaction is saved
+                // Store the captured file for upload when transaction is saved
                 capturedBillImage = file;
 
                 // Populate the form with extracted data
