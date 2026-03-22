@@ -1303,7 +1303,7 @@ loadTransactions();
 }
 
 // Save transaction
-function saveTransaction() {
+async function saveTransaction() {
 // Check if this is an edit
 const editId = document.getElementById('transactionForm').dataset.editId;
 const isEdit = editId && editId !== '';
@@ -1352,6 +1352,9 @@ month: parseInt(currentMonth)
     // Check if we have a captured bill file to upload
     let requestBody, requestHeaders;
     if (capturedBillImage && !isEdit) {
+        // Compress file if needed (Vercel has a ~4.5 MB body limit)
+        const { fileToSend } = await compressFileForUpload(capturedBillImage);
+
         // Send as multipart/form-data with file
         const formData = new FormData();
 
@@ -1363,7 +1366,7 @@ month: parseInt(currentMonth)
         }
 
         // Add the bill image
-        formData.append('bill_image', capturedBillImage);
+        formData.append('bill_image', fileToSend);
 
         requestBody = formData;
         requestHeaders = {}; // Let browser set Content-Type with boundary
@@ -1378,7 +1381,18 @@ month: parseInt(currentMonth)
         headers: requestHeaders,
         body: requestBody
     })
-    .then(response => response.json())
+    .then(response => {
+        if (response.status === 413) {
+            throw new Error('File is too large. Please try with a smaller file.');
+        }
+        return response.text().then(text => {
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                throw new Error('Server returned non-JSON response');
+            }
+        });
+    })
     .then(result => {
         hideLoading();
         if (result.error) {
@@ -2255,8 +2269,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     items: result.items || []
                 };
 
-                // Store the captured file for upload when transaction is saved
-                capturedBillImage = file;
+                // Store the compressed file for upload when transaction is saved
+                capturedBillImage = fileToSend;
 
                 // Populate the form with extracted data
                 if (result.shop_name && result.shop_name !== 'Unknown Store') {
