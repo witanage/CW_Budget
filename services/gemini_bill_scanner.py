@@ -33,7 +33,7 @@ class GeminiBillScanner:
         self.client = genai.Client(api_key=self.api_key)
 
         # Use Gemini Flash 3 Preview model
-        self.model_name = 'gemini-3-flash-preview'
+        self.model_name = 'gemini-3.1-flash-lite-preview' # gemini-3-flash-preview
 
         logger.info("Gemini Bill Scanner initialized successfully")
 
