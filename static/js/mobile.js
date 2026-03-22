@@ -208,8 +208,7 @@ paidAtElement.textContent = '-';
 }
 }
 
-// Show/hide View Bill Items button based on bill_content
-if (viewBillItemsBtn) {
+// Check if bill items exist
 let hasBillItems = false;
 try {
 if (transaction.bill_content) {
@@ -221,22 +220,26 @@ hasBillItems = billContent && billContent.items && billContent.items.length > 0;
 } catch (e) {
 console.error('Error parsing bill content:', e);
 }
+
+// Show/hide View Bill Items button based on bill_content
+if (viewBillItemsBtn) {
 viewBillItemsBtn.style.display = hasBillItems ? 'inline-block' : 'none';
 }
 
     // Show/hide View Attachment button in Transaction Info Modal
+    // Hide it when bill items exist (attachment can be viewed from Bill Items modal instead)
     const mobileViewAttachmentBtnInfo = document.getElementById('mobileViewAttachmentBtnInfo');
     const mobileInfoAttachmentContainer = document.getElementById('mobileInfoAttachmentContainer');
-    
+
     if (mobileViewAttachmentBtnInfo) {
         // Reset attachment container
         if (mobileInfoAttachmentContainer) {
             mobileInfoAttachmentContainer.style.display = 'none';
             mobileInfoAttachmentContainer.innerHTML = '';
         }
-        
-        if (transaction.attachments) {
-            // Show the "View Attachment" button in info modal
+
+        if (transaction.attachments && !hasBillItems) {
+            // Show the "View Attachment" button only when no bill items
             mobileViewAttachmentBtnInfo.style.display = 'inline-block';
             mobileViewAttachmentBtnInfo.dataset.transactionId = transaction.id;
             mobileViewAttachmentBtnInfo.dataset.attachmentGuid = transaction.attachments;
