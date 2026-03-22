@@ -1418,7 +1418,7 @@ function editTransaction(id) {
     modal.show();
 }
 
-function saveTransaction() {
+async function saveTransaction() {
     const editId = document.getElementById('editTransactionId')?.value;
     const isEdit = editId && editId !== '';
 
@@ -1490,6 +1490,9 @@ function saveTransaction() {
     // Check if we have a captured bill file to upload
     let requestBody, requestHeaders;
     if (capturedBillImage && !isEdit) {
+        // Compress file if needed (Vercel has a ~4.5 MB body limit)
+        const { fileToSend } = await compressFileForUpload(capturedBillImage);
+
         // Send as multipart/form-data with file
         const formData = new FormData();
 
@@ -1501,7 +1504,7 @@ function saveTransaction() {
         }
 
         // Add the bill image
-        formData.append('bill_image', capturedBillImage);
+        formData.append('bill_image', fileToSend);
 
         requestBody = formData;
         requestHeaders = {}; // Let browser set Content-Type with boundary
@@ -4991,8 +4994,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         items: result.items || []
                     };
 
-                    // Store the captured file for upload when transaction is saved
-                    capturedBillImage = file;
+                    // Store the compressed file for upload when transaction is saved
+                    capturedBillImage = fileToSend;
 
                     // Populate the form with extracted data
                     const transDescription = document.getElementById('transDescription');
