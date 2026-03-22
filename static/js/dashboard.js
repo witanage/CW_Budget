@@ -37,6 +37,107 @@ let reportTabsInitialized = false; // Track if tab listeners are initialized
 let scannedBillContent = null; // Store scanned bill content temporarily
 let capturedBillImage = null; // Store the actual file (image or PDF) for upload
 
+// --- Client-side file compression for Vercel's 4.5 MB body limit ---
+const UPLOAD_MAX_BYTES = 4 * 1024 * 1024; // 4 MB target (leaves headroom for form overhead)
+
+/**
+ * Compress an image file using Canvas.
+ * Returns a Blob ≤ targetBytes (JPEG).
+ */
+async function compressImageFile(file, targetBytes = UPLOAD_MAX_BYTES) {
+    const bitmap = await createImageBitmap(file);
+    let { width, height } = bitmap;
+
+    // Scale down so longest side ≤ 2000 px
+    const maxDim = 2000;
+    if (width > maxDim || height > maxDim) {
+        const ratio = Math.min(maxDim / width, maxDim / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(bitmap, 0, 0, width, height);
+
+    // Try decreasing quality until under target
+    for (let q = 0.85; q >= 0.3; q -= 0.1) {
+        const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', q));
+        if (blob.size <= targetBytes) return blob;
+    }
+    // Return lowest quality attempt
+    return await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.3));
+}
+
+/**
+ * Render the first page of a PDF to a JPEG image using pdf.js.
+ * Falls back to sending the original if pdf.js is unavailable.
+ */
+async function compressPdfFile(file, targetBytes = UPLOAD_MAX_BYTES) {
+    if (typeof pdfjsLib === 'undefined') {
+        console.warn('pdf.js not loaded – sending PDF as-is');
+        return file;
+    }
+
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+    // Render each page to canvas and collect images
+    // For bill scanning, first page is usually sufficient
+    const page = await pdf.getPage(1);
+    const scale = 2; // 2x for readability
+    const viewport = page.getViewport({ scale });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext('2d');
+    await page.render({ canvasContext: ctx, viewport }).promise;
+
+    for (let q = 0.85; q >= 0.3; q -= 0.1) {
+        const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', q));
+        if (blob.size <= targetBytes) return blob;
+    }
+    return await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.3));
+}
+
+/**
+ * Compress a file (image or PDF) if it exceeds the upload limit.
+ * Returns { fileToSend, wasCompressed }.
+ */
+async function compressFileForUpload(file) {
+    if (file.size <= UPLOAD_MAX_BYTES) {
+        return { fileToSend: file, wasCompressed: false };
+    }
+
+    console.log(`File ${file.name} is ${(file.size / (1024*1024)).toFixed(1)} MB – compressing…`);
+
+    try {
+        let blob;
+        if (file.type === 'application/pdf') {
+            blob = await compressPdfFile(file);
+        } else {
+            blob = await compressImageFile(file);
+        }
+
+        // Build a new File so FormData gets a proper filename
+        const ext = file.type === 'application/pdf' ? '.jpg' : '.' + (file.name.split('.').pop() || 'jpg');
+        const baseName = file.name.replace(/\.[^.]+$/, '');
+        const newName = file.type === 'application/pdf'
+            ? baseName + '_scan.jpg'
+            : baseName + ext;
+        const compressed = new File([blob], newName, { type: blob.type });
+
+        console.log(`Compressed: ${(file.size / (1024*1024)).toFixed(1)} MB → ${(compressed.size / (1024*1024)).toFixed(1)} MB`);
+        return { fileToSend: compressed, wasCompressed: true };
+    } catch (err) {
+        console.error('Compression failed, sending original:', err);
+        return { fileToSend: file, wasCompressed: false };
+    }
+}
+
 // Initialize everything when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
     console.log('=== Dashboard Loading ===');
@@ -4829,10 +4930,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            // Validate file size (max 15MB)
-            const maxSize = 15 * 1024 * 1024; // 15MB
+            // Validate file size (max 50MB before compression)
+            const maxSize = 50 * 1024 * 1024;
             if (file.size > maxSize) {
-                showToast('File is too large. Please select a file under 15MB', 'danger');
+                showToast('File is too large. Please select a file under 50MB', 'danger');
                 billUploadInput.value = '';
                 return;
             }
@@ -4844,7 +4945,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Show scanning status inside the modal
             if (scanStatus && scanStatusText) {
                 scanStatus.style.display = 'block';
-                scanStatusText.textContent = 'Scanning bill...';
+                scanStatusText.textContent = 'Compressing & scanning bill...';
             }
 
             // Disable upload button during processing
@@ -4854,19 +4955,25 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             try {
+                // Compress file if needed (Vercel has a ~4.5 MB body limit)
+                const { fileToSend, wasCompressed } = await compressFileForUpload(file);
+                if (wasCompressed && scanStatusText) {
+                    scanStatusText.textContent = 'Scanning bill...';
+                }
+
                 // Create FormData to send the file
                 const formData = new FormData();
-                formData.append('bill_image', file);
+                formData.append('bill_image', fileToSend);
 
                 // Send to API
-                console.log('Sending file to API...');
+                console.log('Sending file to API...', (fileToSend.size / (1024*1024)).toFixed(1), 'MB');
                 const response = await fetch('/api/scan-bill', {
                     method: 'POST',
                     body: formData
                 });
 
                 if (response.status === 413) {
-                    throw new Error('File is too large. Maximum upload size is 16 MB.');
+                    throw new Error('File is too large even after compression. Please use a smaller file.');
                 }
 
                 const result = await response.json();
