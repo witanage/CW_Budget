@@ -14,8 +14,9 @@
 -- - Performance views for reporting
 -- - Category spending analysis (weekly, monthly, yearly)
 -- - Tax calculator with assessment year-wise tracking
+-- - Bill image attachments support
 --
--- Date: 2025-11-20
+-- Date: 2026-03-22
 -- ============================================================
 
 -- ============================================================
@@ -138,6 +139,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     paid_at TIMESTAMP NULL,
     display_order INT NOT NULL DEFAULT 0 COMMENT 'Order for displaying transactions (lower numbers first)',
     bill_content JSON NULL COMMENT 'Scanned bill content with line items in JSON format',
+    attachments TEXT NULL COMMENT 'GUID of bill image stored in Appwrite (e.g., 550e8400-e29b-41d4-a716-446655440000)',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (monthly_record_id) REFERENCES monthly_records(id) ON DELETE CASCADE,
     FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL,
@@ -149,7 +151,8 @@ CREATE TABLE IF NOT EXISTS transactions (
     INDEX idx_is_done (is_done),
     INDEX idx_is_paid (is_paid),
     INDEX idx_display_order (display_order),
-    INDEX idx_monthly_record_order (monthly_record_id, display_order, id)
+    INDEX idx_monthly_record_order (monthly_record_id, display_order, id),
+    INDEX idx_attachments (attachments)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
@@ -589,4 +592,5 @@ INSERT IGNORE INTO category_keywords (category_id, keyword) VALUES
 (37,'cash out'),(37,'withdrawal'),(37,'atm withdrawal'),(37,'cash withdraw'),
 -- CEFT Fee (41)
 (41,'ceft fee'),(41,'ceft charge'),(41,'transfer fee'),(41,'ceft');
+
 

@@ -6,6 +6,7 @@ import logging
 import os
 import re
 import requests
+import tempfile
 import threading
 import time
 import uuid
@@ -2461,11 +2462,18 @@ def transactions():
                                         f"Large file upload: {file_size_mb:.2f}MB - may take time to process")
 
                                 # Upload to Appwrite with GUID as file ID
-                                result = appwrite_storage.create_file(
-                                    APPWRITE_BUCKET_ID,
-                                    attachment_guid,  # Use GUID as file ID
-                                    InputFile.from_bytes(image_data, filename=filename)
-                                )
+                                # Use from_path with a temp file to avoid SDK chunked upload bug
+                                # (from_bytes calculates wrong byte range for last chunk on files >= 5MB)
+                                with tempfile.TemporaryDirectory() as tmp_dir:
+                                    tmp_path = os.path.join(tmp_dir, filename)
+                                    with open(tmp_path, 'wb') as f:
+                                        f.write(image_data)
+
+                                    result = appwrite_storage.create_file(
+                                        APPWRITE_BUCKET_ID,
+                                        attachment_guid,  # Use GUID as file ID
+                                        InputFile.from_path(tmp_path)
+                                    )
 
                                 logger.info(
                                     f"File uploaded successfully: {attachment_guid}, stored size: {result.get('sizeOriginal', 'N/A')}")
