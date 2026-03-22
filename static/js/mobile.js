@@ -56,6 +56,76 @@ let selectedTransactionIdForPayment = null;
 let scannedBillContent = null; // Store scanned bill content temporarily
 let capturedBillImage = null; // Store the actual file (image or PDF) for upload
 
+// --- Client-side file compression for Vercel's 4.5 MB body limit ---
+const UPLOAD_MAX_BYTES = 4 * 1024 * 1024;
+
+async function compressImageFile(file, targetBytes = UPLOAD_MAX_BYTES) {
+    const bitmap = await createImageBitmap(file);
+    let { width, height } = bitmap;
+    const maxDim = 2000;
+    if (width > maxDim || height > maxDim) {
+        const ratio = Math.min(maxDim / width, maxDim / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    for (let q = 0.85; q >= 0.3; q -= 0.1) {
+        const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', q));
+        if (blob.size <= targetBytes) return blob;
+    }
+    return await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.3));
+}
+
+async function compressPdfFile(file, targetBytes = UPLOAD_MAX_BYTES) {
+    if (typeof pdfjsLib === 'undefined') {
+        console.warn('pdf.js not loaded – sending PDF as-is');
+        return file;
+    }
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const page = await pdf.getPage(1);
+    const scale = 2;
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext('2d');
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    for (let q = 0.85; q >= 0.3; q -= 0.1) {
+        const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', q));
+        if (blob.size <= targetBytes) return blob;
+    }
+    return await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.3));
+}
+
+async function compressFileForUpload(file) {
+    if (file.size <= UPLOAD_MAX_BYTES) {
+        return { fileToSend: file, wasCompressed: false };
+    }
+    console.log(`File ${file.name} is ${(file.size / (1024*1024)).toFixed(1)} MB – compressing…`);
+    try {
+        let blob;
+        if (file.type === 'application/pdf') {
+            blob = await compressPdfFile(file);
+        } else {
+            blob = await compressImageFile(file);
+        }
+        const ext = file.type === 'application/pdf' ? '.jpg' : '.' + (file.name.split('.').pop() || 'jpg');
+        const baseName = file.name.replace(/\.[^.]+$/, '');
+        const newName = file.type === 'application/pdf' ? baseName + '_scan.jpg' : baseName + ext;
+        const compressed = new File([blob], newName, { type: blob.type });
+        console.log(`Compressed: ${(file.size / (1024*1024)).toFixed(1)} MB → ${(compressed.size / (1024*1024)).toFixed(1)} MB`);
+        return { fileToSend: compressed, wasCompressed: true };
+    } catch (err) {
+        console.error('Compression failed, sending original:', err);
+        return { fileToSend: file, wasCompressed: false };
+    }
+}
+
 // Load payment methods
 function loadPaymentMethods() {
 console.log('Starting to load payment methods...');
@@ -252,14 +322,14 @@ viewBillItemsBtn.style.display = hasBillItems ? 'inline-block' : 'none';
     // Also set up the View Attachment button for Bill Items Modal (for when they click View Bill Items)
     const mobileViewAttachmentBtn = document.getElementById('mobileViewAttachmentBtn');
     const mobileBillAttachmentContainer = document.getElementById('mobileBillAttachmentContainer');
-    
+
     if (mobileViewAttachmentBtn) {
         // Reset attachment container
         if (mobileBillAttachmentContainer) {
             mobileBillAttachmentContainer.style.display = 'none';
             mobileBillAttachmentContainer.innerHTML = '';
         }
-        
+
         if (transaction.attachments) {
             // Show the "View Attachment" button
             mobileViewAttachmentBtn.style.display = 'inline-block';
@@ -413,18 +483,18 @@ mobileViewAttachmentBtn.disabled = true;
 
 try {
     const response = await fetch(`/api/transactions/${transactionId}/attachment`);
-    
+
     if (!response.ok) {
         throw new Error(`Failed to load attachment: ${response.statusText}`);
     }
-    
+
     const data = await response.json();
-    
+
     if (data.file_url) {
         // Check if it's a PDF based on MIME type or file extension
-        const isPdf = data.mime_type === 'application/pdf' || 
+        const isPdf = data.mime_type === 'application/pdf' ||
                      (data.file_name && data.file_name.toLowerCase().endsWith('.pdf'));
-        
+
         // Display the attachment (image or PDF)
         let attachmentContent;
         if (isPdf) {
@@ -457,7 +527,7 @@ try {
             // Display image
             attachmentContent = `<img src="${data.file_url}" alt="Bill Attachment" class="img-fluid rounded shadow-sm"/>`;
         }
-        
+
         mobileBillAttachmentContainer.innerHTML = `
             <div class="attachment-display">
                 <div class="d-flex justify-content-between align-items-center mb-2">
@@ -1284,17 +1354,17 @@ month: parseInt(currentMonth)
     if (capturedBillImage && !isEdit) {
         // Send as multipart/form-data with file
         const formData = new FormData();
-        
+
         // Add all form fields
         for (const key in data) {
             if (data[key] !== null && data[key] !== undefined) {
                 formData.append(key, data[key]);
             }
         }
-        
+
         // Add the bill image
         formData.append('bill_image', capturedBillImage);
-        
+
         requestBody = formData;
         requestHeaders = {}; // Let browser set Content-Type with boundary
     } else {
@@ -1506,15 +1576,15 @@ text.textContent = 'Dark Theme';
 async function showMobileAttachmentFromInfo() {
     const mobileViewAttachmentBtnInfo = document.getElementById('mobileViewAttachmentBtnInfo');
     const mobileInfoAttachmentContainer = document.getElementById('mobileInfoAttachmentContainer');
-    
+
     const transactionId = mobileViewAttachmentBtnInfo.dataset.transactionId;
     const attachmentGuid = mobileViewAttachmentBtnInfo.dataset.attachmentGuid;
-    
+
     if (!transactionId || !attachmentGuid) {
         showToast('Attachment information not available', 'danger');
         return;
     }
-    
+
     // Show loading state
     mobileInfoAttachmentContainer.innerHTML = `
         <div class="text-center py-3">
@@ -1525,24 +1595,24 @@ async function showMobileAttachmentFromInfo() {
         </div>
     `;
     mobileInfoAttachmentContainer.style.display = 'block';
-    
+
     // Disable button while loading
     mobileViewAttachmentBtnInfo.disabled = true;
-    
+
     try {
         const response = await fetch(`/api/transactions/${transactionId}/attachment`);
-        
+
         if (!response.ok) {
             throw new Error(`Failed to load attachment: ${response.statusText}`);
         }
-        
+
         const data = await response.json();
-        
+
         if (data.file_url) {
             // Check if it's a PDF based on MIME type or file extension
-            const isPdf = data.mime_type === 'application/pdf' || 
+            const isPdf = data.mime_type === 'application/pdf' ||
                          (data.file_name && data.file_name.toLowerCase().endsWith('.pdf'));
-            
+
             // Display the attachment (image or PDF)
             let attachmentContent;
             if (isPdf) {
@@ -1571,7 +1641,7 @@ async function showMobileAttachmentFromInfo() {
                 // Display image
                 attachmentContent = `<img src="${data.file_url}" alt="Bill Attachment" class="img-fluid rounded shadow-sm"/>`;
             }
-            
+
             mobileInfoAttachmentContainer.innerHTML = `
                 <div class="attachment-display">
                     <div class="d-flex justify-content-between align-items-center mb-2">
@@ -2015,9 +2085,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Handle add button click
     if (addBtnFloat) {
         addBtnFloat.addEventListener('click', function(e) {
-            const buttonsVisible = (scanBtnFloat && scanBtnFloat.classList.contains('visible')) || 
+            const buttonsVisible = (scanBtnFloat && scanBtnFloat.classList.contains('visible')) ||
                                   (uploadBtnFloat && uploadBtnFloat.classList.contains('visible'));
-            
+
             if (!buttonsVisible) {
                 // First click: show both buttons only, don't open modal
                 e.preventDefault();
@@ -2039,9 +2109,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Hide both buttons when clicking outside (not on scan/upload/add buttons)
     document.addEventListener('click', function(e) {
-        const buttonsVisible = (scanBtnFloat && scanBtnFloat.classList.contains('visible')) || 
+        const buttonsVisible = (scanBtnFloat && scanBtnFloat.classList.contains('visible')) ||
                               (uploadBtnFloat && uploadBtnFloat.classList.contains('visible'));
-        
+
         if (!buttonsVisible) {
             return;
         }
@@ -2124,10 +2194,10 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Validate file size (max 15MB)
-        const maxSize = 15 * 1024 * 1024; // 15MB
+        // Validate file size (max 50MB before compression)
+        const maxSize = 50 * 1024 * 1024;
         if (file.size > maxSize) {
-            showToast('File is too large. Please select a file under 15MB', 'danger');
+            showToast('File is too large. Please select a file under 50MB', 'danger');
             inputElement.value = '';
             return;
         }
@@ -2138,7 +2208,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Show scanning status inside the modal
         scanStatus.style.display = 'block';
-        scanStatusText.textContent = 'Scanning bill...';
+        scanStatusText.textContent = 'Compressing & scanning bill...';
         if (scanBillBtnFloat) {
             scanBillBtnFloat.disabled = true;
             scanBillBtnFloat.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
@@ -2149,16 +2219,26 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         try {
+            // Compress file if needed (Vercel has a ~4.5 MB body limit)
+            const { fileToSend, wasCompressed } = await compressFileForUpload(file);
+            if (wasCompressed) {
+                scanStatusText.textContent = 'Scanning bill...';
+            }
+
             // Create FormData to send the file
             const formData = new FormData();
-            formData.append('bill_image', file);
+            formData.append('bill_image', fileToSend);
 
             // Send to API
-            console.log('Sending file to API...');
+            console.log('Sending file to API...', (fileToSend.size / (1024*1024)).toFixed(1), 'MB');
             const response = await fetch('/api/scan-bill', {
                 method: 'POST',
                 body: formData
             });
+
+            if (response.status === 413) {
+                throw new Error('File is too large even after compression. Please use a smaller file.');
+            }
 
             const result = await response.json();
             console.log('API response:', result);
