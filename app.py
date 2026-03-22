@@ -113,6 +113,7 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Allow cookies in same-site cont
 app.config['SESSION_COOKIE_HTTPONLY'] = True  # Prevent JavaScript access for security
 app.config['SESSION_COOKIE_SECURE'] = False  # Set to True if using HTTPS in production
 app.config['SESSION_COOKIE_NAME'] = 'session'  # Explicit session cookie name
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB max upload size
 
 CORS(app)
 
