@@ -4865,6 +4865,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     body: formData
                 });
 
+                if (response.status === 413) {
+                    throw new Error('File is too large. Maximum upload size is 16 MB.');
+                }
+
                 const result = await response.json();
                 console.log('API response:', result);
 
