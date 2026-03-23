@@ -164,12 +164,31 @@ function initApp() {
         // 4. Initialize charts
         initCharts();
 
-        // 5. Load default page (transactions)
-        navigateToPage('transactions');
+        // 5. Load user's preferred default page (or fallback to transactions)
+        loadUserPreferredPage();
 
         console.log('✓ Dashboard loaded successfully');
     } catch (error) {
         console.error('✗ Dashboard initialization failed:', error);
+    }
+}
+
+// Load user's preferred default page
+async function loadUserPreferredPage() {
+    try {
+        const response = await fetch('/api/user-preferences');
+        if (response.ok) {
+            const data = await response.json();
+            const defaultPage = data.default_page || 'transactions';
+            console.log('✓ Loading user preferred page:', defaultPage);
+            navigateToPage(defaultPage);
+        } else {
+            console.warn('Failed to fetch user preferences, loading default page');
+            navigateToPage('transactions');
+        }
+    } catch (error) {
+        console.error('Error fetching user preferences:', error);
+        navigateToPage('transactions');
     }
 }
 

@@ -70,5 +70,7 @@
 {% endblock %}
 
 {% block extra_js %}
+<!-- Ensure base.js is loaded first -->
+<script src="{{ url_for('static', filename='js/base.js') }}"></script>
 <script src="{{ url_for('static', filename='js/register.js') }}"></script>
 {% endblock %}

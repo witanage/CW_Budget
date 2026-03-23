@@ -80,14 +80,18 @@ async function compressImageFile(file, targetBytes = UPLOAD_MAX_BYTES) {
     return await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.3));
 }
 
-async function compressPdfFile(file, targetBytes = UPLOAD_MAX_BYTES) {
+async function convertPdfToImage(file, targetBytes = UPLOAD_MAX_BYTES) {
     if (typeof pdfjsLib === 'undefined') {
-        console.warn('pdf.js not loaded – sending PDF as-is');
-        return file;
+        throw new Error('PDF.js not loaded – cannot convert PDF');
     }
+
+    console.log(`Converting PDF to image: ${file.name} (${(file.size / (1024*1024)).toFixed(1)} MB)`);
+
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     const page = await pdf.getPage(1);
+
+    // Use scale factor to get good quality
     const scale = 2;
     const viewport = page.getViewport({ scale });
     const canvas = document.createElement('canvas');
@@ -95,28 +99,54 @@ async function compressPdfFile(file, targetBytes = UPLOAD_MAX_BYTES) {
     canvas.height = viewport.height;
     const ctx = canvas.getContext('2d');
     await page.render({ canvasContext: ctx, viewport }).promise;
+
+    // Try different quality levels to meet target size
     for (let q = 0.85; q >= 0.3; q -= 0.1) {
         const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', q));
-        if (blob.size <= targetBytes) return blob;
+        if (blob.size <= targetBytes) {
+            console.log(`PDF converted to JPEG: ${(blob.size / (1024*1024)).toFixed(1)} MB at quality ${(q*100).toFixed(0)}%`);
+            return blob;
+        }
     }
-    return await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.3));
+
+    // Return lowest quality if still too large
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.3));
+    console.log(`PDF converted to JPEG: ${(blob.size / (1024*1024)).toFixed(1)} MB at quality 30%`);
+    return blob;
 }
 
 async function compressFileForUpload(file) {
+    // Handle PDFs - convert to image if large, send as-is if small
+    if (file.type === 'application/pdf') {
+        if (file.size > UPLOAD_MAX_BYTES) {
+            console.log(`PDF is too large (${(file.size / (1024*1024)).toFixed(1)} MB), converting to image...`);
+            try {
+                const blob = await convertPdfToImage(file);
+                const baseName = file.name.replace(/\.[^.]+$/, '');
+                const newName = baseName + '_scan.jpg';
+                const converted = new File([blob], newName, { type: 'image/jpeg' });
+                console.log(`PDF converted: ${(file.size / (1024*1024)).toFixed(1)} MB → ${(converted.size / (1024*1024)).toFixed(1)} MB`);
+                return { fileToSend: converted, wasCompressed: true };
+            } catch (err) {
+                console.error('PDF conversion failed:', err);
+                throw new Error(`PDF is too large and conversion failed: ${err.message}`);
+            }
+        } else {
+            console.log(`PDF is small enough (${(file.size / (1024*1024)).toFixed(1)} MB), sending as-is`);
+            return { fileToSend: file, wasCompressed: false };
+        }
+    }
+
+    // For images, compress if needed
     if (file.size <= UPLOAD_MAX_BYTES) {
         return { fileToSend: file, wasCompressed: false };
     }
     console.log(`File ${file.name} is ${(file.size / (1024*1024)).toFixed(1)} MB – compressing…`);
     try {
-        let blob;
-        if (file.type === 'application/pdf') {
-            blob = await compressPdfFile(file);
-        } else {
-            blob = await compressImageFile(file);
-        }
-        const ext = file.type === 'application/pdf' ? '.jpg' : '.' + (file.name.split('.').pop() || 'jpg');
+        const blob = await compressImageFile(file);
+        const ext = '.' + (file.name.split('.').pop() || 'jpg');
         const baseName = file.name.replace(/\.[^.]+$/, '');
-        const newName = file.type === 'application/pdf' ? baseName + '_scan.jpg' : baseName + ext;
+        const newName = baseName + ext;
         const compressed = new File([blob], newName, { type: blob.type });
         console.log(`Compressed: ${(file.size / (1024*1024)).toFixed(1)} MB → ${(compressed.size / (1024*1024)).toFixed(1)} MB`);
         return { fileToSend: compressed, wasCompressed: true };
@@ -491,36 +521,27 @@ try {
     const data = await response.json();
 
     if (data.file_url) {
-        // Check if it's a PDF based on MIME type or file extension
+        // Check if it's a PDF
         const isPdf = data.mime_type === 'application/pdf' ||
                      (data.file_name && data.file_name.toLowerCase().endsWith('.pdf'));
 
-        // Display the attachment (image or PDF)
+        // Display based on file type
         let attachmentContent;
         if (isPdf) {
-            // For PDFs, provide download button and try to embed (may fail for large files)
+            // For PDFs, show download and open options
             attachmentContent = `
-                <div class="mb-3">
-                    <div class="alert alert-info">
-                        <i class="fas fa-file-pdf me-2"></i>
-                        <strong>PDF Attachment</strong>
-                        <div class="small mt-1">
-                            File: ${data.file_name || 'document.pdf'}
-                        </div>
-                    </div>
-                    <div class="d-grid gap-2">
-                        <a href="${data.download_url}" class="btn btn-primary" download>
-                            <i class="fas fa-download me-1"></i>Download PDF
-                        </a>
-                        <a href="${data.file_url}" class="btn btn-outline-secondary" target="_blank">
-                            <i class="fas fa-external-link-alt me-1"></i>Open in New Tab
-                        </a>
-                    </div>
+                <div class="alert alert-info mb-3">
+                    <i class="fas fa-file-pdf me-2"></i>
+                    <strong>PDF Document</strong>
+                    <div class="small mt-1">${data.file_name || 'document.pdf'}</div>
                 </div>
-                <div style="width: 100%; height: 500px; overflow: auto; border: 1px solid #ddd; border-radius: 5px; background: #f5f5f5;">
-                    <iframe src="${data.file_url}" type="application/pdf" width="100%" height="100%" frameborder="0" style="background: white;">
-                        <p>Your browser doesn't support PDF preview. <a href="${data.download_url}" download>Download the PDF</a> instead.</p>
-                    </iframe>
+                <div class="d-grid gap-2">
+                    <a href="${data.download_url}" class="btn btn-primary" download>
+                        <i class="fas fa-download me-2"></i>Download PDF
+                    </a>
+                    <a href="${data.file_url}" class="btn btn-outline-secondary" target="_blank">
+                        <i class="fas fa-external-link-alt me-2"></i>Open in New Tab
+                    </a>
                 </div>
             `;
         } else {

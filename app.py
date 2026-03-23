@@ -78,13 +78,7 @@ except ImportError:
     PIL_AVAILABLE = False
     logger.warning("Pillow not installed. Image optimization will be disabled.")
 
-try:
-    import PyPDF2
-
-    PYPDF2_AVAILABLE = True
-except ImportError:
-    PYPDF2_AVAILABLE = False
-    logger.warning("PyPDF2 not installed. PDF compression will be disabled.")
+# PyPDF2 removed - PDFs are converted to images on frontend before upload
 
 logger.info("Environment variables loaded")
 
@@ -199,7 +193,6 @@ def optimize_file_for_upload(file_data, file_ext, original_filename):
     Optimize file size for upload while maintaining quality.
 
     For images: Fixes orientation, resizes and compresses if >1MB
-    For PDFs: Compresses if >2MB
 
     Args:
         file_data: bytes - The original file data
@@ -214,7 +207,6 @@ def optimize_file_for_upload(file_data, file_ext, original_filename):
 
     # Define size thresholds
     IMAGE_THRESHOLD_MB = 1.0  # Optimize images larger than 1MB
-    PDF_THRESHOLD_MB = 5.0  # Optimize PDFs larger than 5MB
 
     # Image optimization
     if file_ext in ['jpg', 'jpeg', 'png', 'gif', 'webp'] and PIL_AVAILABLE:
@@ -282,44 +274,6 @@ def optimize_file_for_upload(file_data, file_ext, original_filename):
         except Exception as e:
             logger.warning(f"Image processing failed: {str(e)}, using original")
             return (file_data, False, original_size, original_size)
-
-    # PDF optimization
-    elif file_ext == 'pdf' and PYPDF2_AVAILABLE:
-        if original_size_mb > PDF_THRESHOLD_MB:
-            try:
-                logger.info(f"Attempting to compress PDF {original_filename}: {original_size_mb:.2f}MB")
-
-                # Read PDF
-                pdf_reader = PyPDF2.PdfReader(io.BytesIO(file_data))
-                pdf_writer = PyPDF2.PdfWriter()
-
-                # Copy pages and compress
-                for page in pdf_reader.pages:
-                    # Compress page content
-                    page.compress_content_streams()
-                    pdf_writer.add_page(page)
-
-                # Write compressed PDF
-                output = io.BytesIO()
-                pdf_writer.write(output)
-                optimized_data = output.getvalue()
-
-                new_size = len(optimized_data)
-                new_size_mb = new_size / (1024 * 1024)
-
-                # Only use compressed version if it's smaller
-                if new_size < original_size:
-                    reduction_pct = ((original_size - new_size) / original_size) * 100
-                    logger.info(
-                        f"  ✓ PDF compressed: {original_size_mb:.2f}MB → {new_size_mb:.2f}MB ({reduction_pct:.1f}% reduction)")
-                    return (optimized_data, True, original_size, new_size)
-                else:
-                    logger.info(f"  PDF compression didn't reduce size significantly, keeping original")
-                    return (file_data, False, original_size, original_size)
-
-            except Exception as e:
-                logger.warning(f"PDF compression failed: {str(e)}, using original")
-                return (file_data, False, original_size, original_size)
 
     # No optimization needed or possible
     return (file_data, False, original_size, original_size)
@@ -908,6 +862,76 @@ def change_password():
         connection.close()
 
 
+@app.route('/api/user-preferences', methods=['GET'])
+@login_required
+def get_user_preferences():
+    """Get current user's preferences."""
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor(dictionary=True)
+    user_id = session['user_id']
+
+    try:
+        cursor.execute("SELECT default_page FROM users WHERE id = %s", (user_id,))
+        user = cursor.fetchone()
+
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        return jsonify({
+            'default_page': user.get('default_page', 'transactions')
+        }), 200
+
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@app.route('/api/user-preferences', methods=['PUT'])
+@login_required
+def update_user_preferences():
+    """Update current user's preferences."""
+    data = request.get_json()
+    default_page = data.get('default_page')
+
+    # Validate default_page value
+    valid_pages = ['transactions', 'tax', 'reports', 'rateTrends']
+    if default_page not in valid_pages:
+        return jsonify({
+            'error': f'Invalid default_page. Must be one of: {", ".join(valid_pages)}'
+        }), 400
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor(dictionary=True)
+    user_id = session['user_id']
+
+    try:
+        cursor.execute(
+            "UPDATE users SET default_page = %s WHERE id = %s",
+            (default_page, user_id)
+        )
+        connection.commit()
+
+        logger.info(f"User {session.get('username')} updated default_page to {default_page}")
+        return jsonify({
+            'message': 'Preferences updated successfully',
+            'default_page': default_page
+        }), 200
+
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+
 @app.route('/dashboard')
 @login_required
 def dashboard():
@@ -943,13 +967,14 @@ def admin_dashboard():
                                   u.is_admin,
                                   u.is_active,
                                   u.last_login,
+                                  u.default_page,
                                   u.created_at,
                                   COUNT(DISTINCT mr.id) as monthly_records_count,
                                   COUNT(DISTINCT t.id)  as transactions_count
                            FROM users u
                                     LEFT JOIN monthly_records mr ON u.id = mr.user_id
                                     LEFT JOIN transactions t ON mr.id = t.monthly_record_id
-                           GROUP BY u.id, u.username, u.email, u.is_admin, u.is_active, u.last_login, u.created_at
+                           GROUP BY u.id, u.username, u.email, u.is_admin, u.is_active, u.last_login, u.default_page, u.created_at
                            ORDER BY u.created_at DESC
                            """)
             users = cursor.fetchall()
@@ -1200,6 +1225,61 @@ def delete_user(user_id):
     except Error as e:
         logger.error(f"Error deleting user: {str(e)}")
         connection.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@app.route('/api/admin/users/<int:user_id>/default-page', methods=['PUT'])
+@admin_required
+def admin_update_user_default_page(user_id):
+    """Update a user's default landing page (admin only)."""
+    data = request.get_json()
+    default_page = data.get('default_page')
+
+    # Validate default_page value
+    valid_pages = ['transactions', 'tax', 'reports', 'rateTrends']
+    if default_page not in valid_pages:
+        return jsonify({
+            'error': f'Invalid default_page. Must be one of: {", ".join(valid_pages)}'
+        }), 400
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    cursor = connection.cursor(dictionary=True)
+    admin_id = session['user_id']
+
+    try:
+        # Get user details
+        cursor.execute("SELECT username FROM users WHERE id = %s", (user_id,))
+        user = cursor.fetchone()
+
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        # Update default page
+        cursor.execute(
+            "UPDATE users SET default_page = %s WHERE id = %s",
+            (default_page, user_id)
+        )
+        connection.commit()
+
+        # Log the action
+        log_audit(admin_id, 'Updated user preferences', user_id,
+                  f"User '{user['username']}' default page changed to '{default_page}'")
+
+        logger.info(f"Admin {admin_id} updated default_page for user {user_id} ({user['username']}) to {default_page}")
+
+        return jsonify({
+            'message': 'Default page updated successfully',
+            'default_page': default_page
+        }), 200
+
+    except Error as e:
+        logger.error(f"Error updating user default page: {str(e)}")
         return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()
@@ -1700,6 +1780,413 @@ def admin_db_backup():
     finally:
         cursor.close()
         connection.close()
+
+
+# ---------------------------------------------------------------------------
+# Async DB backup → Appwrite upload (triggered by external cron)
+# ---------------------------------------------------------------------------
+
+def _run_backup_and_upload():
+    """Run mysqldump (or Python fallback) and upload the .sql file to Appwrite.
+
+    Executed in a background thread so the triggering HTTP request can return
+    immediately (important for cron services with short timeout windows).
+    """
+    import subprocess
+    import shutil
+
+    if not APPWRITE_AVAILABLE:
+        logger.error("Backup aborted: appwrite SDK not installed")
+        return
+
+    backup_endpoint = os.environ.get('APPWRITE_BACKUP_ENDPOINT', os.environ.get('APPWRITE_ENDPOINT'))
+    backup_project = os.environ.get('APPWRITE_BACKUP_PROJECT_ID')
+    backup_key = os.environ.get('APPWRITE_BACKUP_API_KEY')
+    backup_bucket = os.environ.get('APPWRITE_BACKUP_BUCKET_ID')
+
+    if not all([backup_endpoint, backup_project, backup_key, backup_bucket]):
+        logger.error("Backup aborted: APPWRITE_BACKUP_PROJECT_ID, APPWRITE_BACKUP_API_KEY, "
+                     "or APPWRITE_BACKUP_BUCKET_ID not configured")
+        return
+
+    # Build a dedicated Appwrite client for backups
+    try:
+        backup_client = Client()
+        backup_client.set_endpoint(backup_endpoint)
+        backup_client.set_project(backup_project)
+        backup_client.set_key(backup_key)
+        backup_storage = Storage(backup_client)
+    except Exception as e:
+        logger.error("Failed to initialise backup Appwrite client: %s", e)
+        return
+
+    db_name = DB_CONFIG['database']
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = f"{db_name}_{timestamp}.sql"
+
+    sql_bytes = None
+
+    # ── Try mysqldump first ─────────────────────────────────────
+    mysqldump_path = shutil.which('mysqldump')
+    if mysqldump_path:
+        try:
+            cmd = [
+                mysqldump_path,
+                '--host', DB_CONFIG['host'],
+                '--port', str(DB_CONFIG['port']),
+                '--user', DB_CONFIG['user'],
+                f'--password={DB_CONFIG["password"]}',
+                '--routines', '--events', '--triggers',
+                '--single-transaction',
+                '--set-gtid-purged=OFF',
+                '--column-statistics=0',
+                '--skip-lock-tables',
+                '--default-character-set=utf8mb4',
+                db_name,
+            ]
+            result = subprocess.run(cmd, capture_output=True, timeout=300)
+            if result.returncode == 0 and result.stdout:
+                sql_bytes = result.stdout
+                logger.info("Backup via mysqldump succeeded (%d bytes)", len(sql_bytes))
+            else:
+                logger.warning("mysqldump failed (rc=%s): %s",
+                               result.returncode, result.stderr[:500])
+        except Exception as e:
+            logger.warning("mysqldump error: %s", e)
+
+    # ── Fallback: Python-based dump (reuse existing logic) ──────
+    if sql_bytes is None:
+        connection = get_db_connection()
+        if not connection:
+            logger.error("Backup aborted: DB connection failed for Python dump")
+            return
+        cursor = connection.cursor()
+        try:
+            output = io.StringIO()
+            cursor.execute("SELECT VERSION()")
+            mysql_version = cursor.fetchone()[0]
+
+            output.write("-- MySQL dump\n")
+            output.write(f"-- Host: {DB_CONFIG['host']}    Database: {db_name}\n")
+            output.write("-- ------------------------------------------------------\n")
+            output.write(f"-- Server version\t{mysql_version}\n\n")
+            output.write("/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;\n")
+            output.write("/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;\n")
+            output.write("/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;\n")
+            output.write("/*!40101 SET NAMES utf8mb4 */;\n")
+            output.write("/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;\n")
+            output.write("/*!40103 SET TIME_ZONE='+00:00' */;\n")
+            output.write("/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;\n")
+            output.write("/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;\n")
+            output.write("/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;\n")
+            output.write("/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;\n")
+            output.write("/*!80000 SET @OLD_SQL_REQUIRE_PRIMARY_KEY=@@SQL_REQUIRE_PRIMARY_KEY, SQL_REQUIRE_PRIMARY_KEY=0 */;\n\n")
+
+            def _sql_escape(val):
+                if val is None:
+                    return 'NULL'
+                if isinstance(val, bool):
+                    return '1' if val else '0'
+                if isinstance(val, (int, float, Decimal)):
+                    return str(val)
+                if isinstance(val, (bytes, bytearray)):
+                    hex_str = val.hex()
+                    return f"X'{hex_str}'" if hex_str else "''"
+                if isinstance(val, datetime):
+                    return f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'"
+                if isinstance(val, timedelta):
+                    total = int(val.total_seconds())
+                    h, rem = divmod(abs(total), 3600)
+                    m, s = divmod(rem, 60)
+                    sign = '-' if total < 0 else ''
+                    return f"'{sign}{h:02d}:{m:02d}:{s:02d}'"
+                s = str(val)
+                s = s.replace('\\', '\\\\')
+                s = s.replace("'", "\\'")
+                s = s.replace('\n', '\\n')
+                s = s.replace('\r', '\\r')
+                s = s.replace('\x00', '\\0')
+                s = s.replace('\x1a', '\\Z')
+                return f"'{s}'"
+
+            cursor.execute("SHOW FULL TABLES WHERE Table_type = 'BASE TABLE'")
+            tables = [row[0] for row in cursor.fetchall()]
+
+            cursor.execute("SHOW FULL TABLES WHERE Table_type = 'VIEW'")
+            views = [row[0] for row in cursor.fetchall()]
+
+            cursor.execute(
+                "SELECT ROUTINE_NAME FROM INFORMATION_SCHEMA.ROUTINES "
+                "WHERE ROUTINE_SCHEMA = %s AND ROUTINE_TYPE = 'PROCEDURE'", (db_name,))
+            procedures = [row[0] for row in cursor.fetchall()]
+
+            cursor.execute(
+                "SELECT ROUTINE_NAME FROM INFORMATION_SCHEMA.ROUTINES "
+                "WHERE ROUTINE_SCHEMA = %s AND ROUTINE_TYPE = 'FUNCTION'", (db_name,))
+            functions = [row[0] for row in cursor.fetchall()]
+
+            cursor.execute(
+                "SELECT TRIGGER_NAME FROM INFORMATION_SCHEMA.TRIGGERS "
+                "WHERE TRIGGER_SCHEMA = %s", (db_name,))
+            triggers = [row[0] for row in cursor.fetchall()]
+
+            cursor.execute(
+                "SELECT EVENT_NAME FROM INFORMATION_SCHEMA.EVENTS "
+                "WHERE EVENT_SCHEMA = %s", (db_name,))
+            events = [row[0] for row in cursor.fetchall()]
+
+            logger.info("Backup objects: %d tables, %d views, %d procedures, "
+                        "%d functions, %d triggers, %d events",
+                        len(tables), len(views), len(procedures),
+                        len(functions), len(triggers), len(events))
+
+            # ── Tables: structure + data ────────────────────────────
+            for table in tables:
+                output.write(f"--\n-- Table structure for table `{table}`\n--\n\n")
+                output.write(f"DROP TABLE IF EXISTS `{table}`;\n")
+                output.write("/*!40101 SET @saved_cs_client     = @@character_set_client */;\n")
+                output.write("/*!40101 SET character_set_client = utf8 */;\n")
+                cursor.execute(f"SHOW CREATE TABLE `{table}`")
+                output.write(f"{cursor.fetchone()[1]};\n")
+                output.write("/*!40101 SET character_set_client = @saved_cs_client */;\n\n")
+                cursor.execute(f"SELECT * FROM `{table}`")
+                rows = cursor.fetchall()
+                if rows:
+                    col_names = [d[0] for d in cursor.description]
+                    col_list = ', '.join(f'`{c}`' for c in col_names)
+                    output.write(f"--\n-- Dumping data for table `{table}`\n--\n\n")
+                    output.write(f"LOCK TABLES `{table}` WRITE;\n")
+                    output.write(f"/*!40000 ALTER TABLE `{table}` DISABLE KEYS */;\n")
+                    for i in range(0, len(rows), 100):
+                        batch = rows[i:i + 100]
+                        output.write(f"INSERT INTO `{table}` ({col_list}) VALUES\n")
+                        output.write(',\n'.join(
+                            '(' + ', '.join(_sql_escape(v) for v in row) + ')' for row in batch
+                        ))
+                        output.write(';\n')
+                    output.write(f"/*!40000 ALTER TABLE `{table}` ENABLE KEYS */;\n")
+                    output.write("UNLOCK TABLES;\n\n")
+
+            # ── Views ───────────────────────────────────────────────
+            if views:
+                output.write("--\n-- Final view structure for views\n--\n\n")
+                for view in views:
+                    output.write(f"--\n-- Final view structure for view `{view}`\n--\n\n")
+                    output.write(f"/*!50001 DROP VIEW IF EXISTS `{view}`*/;\n")
+                    output.write("/*!50001 SET @saved_cs_client          = @@character_set_client */;\n")
+                    output.write("/*!50001 SET @saved_cs_results         = @@character_set_results */;\n")
+                    output.write("/*!50001 SET @saved_col_connection     = @@collation_connection */;\n")
+                    output.write("/*!50001 SET character_set_client      = utf8mb4 */;\n")
+                    output.write("/*!50001 SET character_set_results     = utf8mb4 */;\n")
+                    output.write("/*!50001 SET collation_connection      = utf8mb4_0900_ai_ci */;\n")
+                    try:
+                        cursor.execute(f"SHOW CREATE VIEW `{view}`")
+                        result = cursor.fetchone()
+                        if result and len(result) >= 2:
+                            output.write(f"/*!50001 {result[1]} */;\n")
+                            output.write("/*!50001 SET character_set_client      = @saved_cs_client */;\n")
+                            output.write("/*!50001 SET character_set_results     = @saved_cs_results */;\n")
+                            output.write("/*!50001 SET collation_connection      = @saved_col_connection */;\n\n")
+                    except Exception as e:
+                        output.write(f"-- Error exporting view `{view}`: {e}\n\n")
+
+            # ── Stored Procedures ───────────────────────────────────
+            if procedures:
+                output.write("--\n-- Dumping routines for database '" + db_name + "'\n--\n")
+                for proc in procedures:
+                    output.write(f"--\n-- Procedure `{proc}`\n--\n\n")
+                    output.write(f"/*!50003 DROP PROCEDURE IF EXISTS `{proc}` */;\n")
+                    output.write("/*!50003 SET @saved_cs_client      = @@character_set_client */ ;\n")
+                    output.write("/*!50003 SET @saved_cs_results     = @@character_set_results */ ;\n")
+                    output.write("/*!50003 SET @saved_col_connection = @@collation_connection */ ;\n")
+                    output.write("/*!50003 SET character_set_client  = utf8mb4 */ ;\n")
+                    output.write("/*!50003 SET character_set_results = utf8mb4 */ ;\n")
+                    output.write("/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;\n")
+                    output.write("/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;\n")
+                    output.write("/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;\n")
+                    output.write("DELIMITER ;;\n")
+                    try:
+                        cursor.execute(f"SHOW CREATE PROCEDURE `{proc}`")
+                        result = cursor.fetchone()
+                        if result and len(result) >= 3:
+                            output.write(f"{result[2]} ;;\n")
+                    except Exception as e:
+                        output.write(f"-- Error exporting procedure `{proc}`: {e}\n")
+                    output.write("DELIMITER ;\n")
+                    output.write("/*!50003 SET sql_mode              = @saved_sql_mode */ ;\n")
+                    output.write("/*!50003 SET character_set_client  = @saved_cs_client */ ;\n")
+                    output.write("/*!50003 SET character_set_results = @saved_cs_results */ ;\n")
+                    output.write("/*!50003 SET collation_connection  = @saved_col_connection */ ;\n\n")
+
+            # ── Functions ───────────────────────────────────────────
+            if functions:
+                for func in functions:
+                    output.write(f"--\n-- Function `{func}`\n--\n\n")
+                    output.write(f"/*!50003 DROP FUNCTION IF EXISTS `{func}` */;\n")
+                    output.write("/*!50003 SET @saved_cs_client      = @@character_set_client */ ;\n")
+                    output.write("/*!50003 SET @saved_cs_results     = @@character_set_results */ ;\n")
+                    output.write("/*!50003 SET @saved_col_connection = @@collation_connection */ ;\n")
+                    output.write("/*!50003 SET character_set_client  = utf8mb4 */ ;\n")
+                    output.write("/*!50003 SET character_set_results = utf8mb4 */ ;\n")
+                    output.write("/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;\n")
+                    output.write("/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;\n")
+                    output.write("/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;\n")
+                    output.write("DELIMITER ;;\n")
+                    try:
+                        cursor.execute(f"SHOW CREATE FUNCTION `{func}`")
+                        result = cursor.fetchone()
+                        if result and len(result) >= 3:
+                            output.write(f"{result[2]} ;;\n")
+                    except Exception as e:
+                        output.write(f"-- Error exporting function `{func}`: {e}\n")
+                    output.write("DELIMITER ;\n")
+                    output.write("/*!50003 SET sql_mode              = @saved_sql_mode */ ;\n")
+                    output.write("/*!50003 SET character_set_client  = @saved_cs_client */ ;\n")
+                    output.write("/*!50003 SET character_set_results = @saved_cs_results */ ;\n")
+                    output.write("/*!50003 SET collation_connection  = @saved_col_connection */ ;\n\n")
+
+            # ── Triggers ────────────────────────────────────────────
+            if triggers:
+                for trigger in triggers:
+                    output.write(f"--\n-- Trigger `{trigger}`\n--\n\n")
+                    output.write("/*!50003 SET @saved_cs_client      = @@character_set_client */ ;\n")
+                    output.write("/*!50003 SET @saved_cs_results     = @@character_set_results */ ;\n")
+                    output.write("/*!50003 SET @saved_col_connection = @@collation_connection */ ;\n")
+                    output.write("/*!50003 SET character_set_client  = utf8mb4 */ ;\n")
+                    output.write("/*!50003 SET character_set_results = utf8mb4 */ ;\n")
+                    output.write("/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;\n")
+                    output.write("/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;\n")
+                    output.write("/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;\n")
+                    output.write("DELIMITER ;;\n")
+                    try:
+                        cursor.execute(f"SHOW CREATE TRIGGER `{trigger}`")
+                        result = cursor.fetchone()
+                        if result and len(result) >= 3:
+                            output.write(f"/*!50003 {result[2]} */;;\n")
+                    except Exception as e:
+                        output.write(f"-- Error exporting trigger `{trigger}`: {e}\n")
+                    output.write("DELIMITER ;\n")
+                    output.write("/*!50003 SET sql_mode              = @saved_sql_mode */ ;\n")
+                    output.write("/*!50003 SET character_set_client  = @saved_cs_client */ ;\n")
+                    output.write("/*!50003 SET character_set_results = @saved_cs_results */ ;\n")
+                    output.write("/*!50003 SET collation_connection  = @saved_col_connection */ ;\n\n")
+
+            # ── Events ──────────────────────────────────────────────
+            if events:
+                output.write("--\n-- Dumping events for database '" + db_name + "'\n--\n")
+                for event in events:
+                    output.write(f"--\n-- Event `{event}`\n--\n\n")
+                    output.write(f"/*!50106 DROP EVENT IF EXISTS `{event}` */;\n")
+                    output.write("DELIMITER ;;\n")
+                    output.write("/*!50106 SET @save_time_zone= @@TIME_ZONE */ ;;\n")
+                    output.write("/*!50106 SET TIME_ZONE= 'SYSTEM' */ ;;\n")
+                    output.write("/*!50106 SET @saved_cs_client      = @@character_set_client */ ;;\n")
+                    output.write("/*!50106 SET @saved_cs_results     = @@character_set_results */ ;;\n")
+                    output.write("/*!50106 SET @saved_col_connection = @@collation_connection */ ;;\n")
+                    output.write("/*!50106 SET character_set_client  = utf8mb4 */ ;;\n")
+                    output.write("/*!50106 SET character_set_results = utf8mb4 */ ;;\n")
+                    output.write("/*!50106 SET collation_connection  = utf8mb4_0900_ai_ci */ ;;\n")
+                    output.write("/*!50106 SET @saved_sql_mode       = @@sql_mode */ ;;\n")
+                    output.write("/*!50106 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;;\n")
+                    try:
+                        cursor.execute(f"SHOW CREATE EVENT `{event}`")
+                        result = cursor.fetchone()
+                        if result and len(result) >= 4:
+                            output.write(f"/*!50106 {result[3]} */ ;;\n")
+                    except Exception as e:
+                        output.write(f"-- Error exporting event `{event}`: {e}\n")
+                    output.write("/*!50106 SET sql_mode              = @saved_sql_mode */ ;;\n")
+                    output.write("/*!50106 SET character_set_client  = @saved_cs_client */ ;;\n")
+                    output.write("/*!50106 SET character_set_results = @saved_cs_results */ ;;\n")
+                    output.write("/*!50106 SET collation_connection  = @saved_col_connection */ ;;\n")
+                    output.write("/*!50106 SET TIME_ZONE= @save_time_zone */ ;;\n")
+                    output.write("DELIMITER ;\n\n")
+
+            # ── Footer ──────────────────────────────────────────────
+            output.write("/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;\n")
+            output.write("/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;\n")
+            output.write("/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;\n")
+            output.write("/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;\n")
+            output.write("/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;\n")
+            output.write("/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;\n")
+            output.write("/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;\n")
+            output.write("/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;\n")
+            output.write("/*!80000 SET SQL_REQUIRE_PRIMARY_KEY=@OLD_SQL_REQUIRE_PRIMARY_KEY */;\n\n")
+
+            output.write(f"-- Dump completed on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            sql_bytes = output.getvalue().encode('utf-8')
+            logger.info("Python-based backup completed (%d bytes)", len(sql_bytes))
+        except Exception as e:
+            logger.error("Python backup failed: %s", e, exc_info=True)
+            return
+        finally:
+            cursor.close()
+            connection.close()
+
+    # ── Upload to Appwrite ──────────────────────────────────────
+    try:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = os.path.join(tmp_dir, filename)
+            with open(tmp_path, 'wb') as f:
+                f.write(sql_bytes if isinstance(sql_bytes, bytes) else sql_bytes.encode('utf-8'))
+
+            file_id = f"{db_name}_{timestamp}"
+            backup_storage.create_file(
+                backup_bucket,
+                file_id,
+                InputFile.from_path(tmp_path),
+            )
+        size_mb = len(sql_bytes) / (1024 * 1024)
+        logger.info("✅ Backup uploaded to Appwrite bucket %s — file_id=%s (%.2f MB)",
+                     backup_bucket, file_id, size_mb)
+    except Exception as e:
+        logger.error("Appwrite upload failed: %s", e, exc_info=True)
+
+
+@app.route('/api/admin/trigger-backup', methods=['GET'])
+@cross_origin(origins=['https://console.cron-job.org'])
+def trigger_db_backup():
+    """Trigger an async database backup that uploads to Appwrite.
+
+    Returns immediately — the actual backup runs in a background thread.
+    Access control mirrors /api/exchange-rate/refresh-all (cron-job.org +
+    local networks).
+    """
+    allowed_origins = ['https://console.cron-job.org', 'https://cron-job.org']
+    local_patterns = [
+        'localhost', '127.0.0.1', '192.168.', '10.',
+        '172.16.', '172.17.', '172.18.', '172.19.',
+        '172.20.', '172.21.', '172.22.', '172.23.',
+        '172.24.', '172.25.', '172.26.', '172.27.',
+        '172.28.', '172.29.', '172.30.', '172.31.',
+    ]
+
+    origin = request.headers.get('Origin', '')
+    referer = request.headers.get('Referer', '')
+    user_agent = request.headers.get('User-Agent', '')
+    remote_addr = request.remote_addr or ''
+
+    origin_ok = any(origin.startswith(a) for a in allowed_origins)
+    referer_ok = any(referer.startswith(a) for a in allowed_origins)
+    ua_ok = 'cron-job.org' in user_agent.lower()
+    local_origin = any(p in origin for p in local_patterns) or origin.startswith('http://localhost') or origin.startswith('http://127.0.0.1')
+    local_referer = any(p in referer for p in local_patterns) or referer.startswith('http://localhost') or referer.startswith('http://127.0.0.1')
+    local_addr = any(remote_addr.startswith(p) for p in local_patterns)
+
+    if not (origin_ok or referer_ok or ua_ok or local_origin or local_referer or local_addr):
+        logger.warning("Unauthorized backup trigger — Origin: %s, Referer: %s, UA: %s, Remote: %s",
+                        origin, referer, user_agent, remote_addr)
+        return jsonify({'error': 'Access denied',
+                        'message': 'This endpoint is only accessible from authorized sources'}), 403
+
+    thread = threading.Thread(target=_run_backup_and_upload, daemon=True)
+    thread.start()
+    logger.info("Database backup triggered (background thread started)")
+
+    return jsonify({
+        'status': 'triggered',
+        'message': 'Database backup started in background. It will be uploaded to Appwrite upon completion.',
+    }), 202
 
 
 @app.route('/api/admin/users/<int:user_id>/payment-methods', methods=['GET'])
