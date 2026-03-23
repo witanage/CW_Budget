@@ -163,18 +163,75 @@ console.error('Error:', error);
 });
 }
 
+// Default Page Preference functionality
+const saveDefaultPageBtn = document.getElementById('saveDefaultPageBtn');
+const defaultPageModal = document.getElementById('defaultPageModal');
+const defaultPageSelect = document.getElementById('defaultPageSelect');
+
+if (saveDefaultPageBtn && defaultPageSelect) {
+    // Load current preference when modal is shown
+    if (defaultPageModal) {
+        defaultPageModal.addEventListener('show.bs.modal', async function() {
+            try {
+                const response = await fetch('/api/user-preferences');
+                if (response.ok) {
+                    const data = await response.json();
+                    defaultPageSelect.value = data.default_page || 'transactions';
+                }
+            } catch (error) {
+                console.error('Error loading preferences:', error);
+            }
+        });
+    }
+
+    // Save preference
+    saveDefaultPageBtn.addEventListener('click', async function() {
+        const defaultPage = defaultPageSelect.value;
+
+        if (!defaultPage) {
+            showToast('Please select a default page', 'warning');
+            return;
+        }
+
+        showLoading();
+        try {
+            const response = await fetch('/api/user-preferences', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ default_page: defaultPage })
+            });
+
+            const data = await response.json();
+            hideLoading();
+
+            if (response.ok) {
+                showToast(data.message, 'success');
+                // Close modal
+                const modal = bootstrap.Modal.getInstance(defaultPageModal);
+                modal.hide();
+            } else {
+                showToast(data.error || 'Failed to update preference', 'danger');
+            }
+        } catch (error) {
+            hideLoading();
+            showToast('Error updating preference', 'danger');
+            console.error('Error:', error);
+        }
+    });
+}
+
 // Initialize theme on page load
 (function initTheme() {
-// Check for saved theme preference or default to 'dark'
-const savedTheme = localStorage.getItem('theme') || 'dark';
+    // Check for saved theme preference or default to 'dark'
+    const savedTheme = localStorage.getItem('theme') || 'dark';
 
-// Set the theme
-document.documentElement.setAttribute('data-theme', savedTheme);
+    // Set the theme
+    document.documentElement.setAttribute('data-theme', savedTheme);
 
-// Update button if it exists
-if (document.getElementById('themeIcon')) {
-updateThemeButton(savedTheme);
-}
+    // Update button if it exists
+    if (document.getElementById('themeIcon')) {
+        updateThemeButton(savedTheme);
+    }
 })();
 
 // Initialize Bootstrap dropdowns properly

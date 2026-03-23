@@ -87,6 +87,9 @@
                             <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
                                 <i class="fas fa-key me-2"></i>Change Password
                             </a></li>
+                            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#defaultPageModal">
+                                <i class="fas fa-home me-2"></i>Default Page
+                            </a></li>
                             <li><a class="dropdown-item" href="#" id="themeToggle" onclick="toggleTheme(); return false;">
                                 <i class="fas fa-moon me-2 theme-toggle-icon" id="themeIcon"></i>
                                 <span id="themeText">Light Theme</span>
@@ -111,10 +114,10 @@
             </div>
         </div>
     </nav>
-    
+
     <!-- Main Content -->
     {% block content %}{% endblock %}
-    
+
     <!-- Loading Spinner -->
     <div class="loading-spinner">
         <div class="loading-overlay">
@@ -129,7 +132,7 @@
             </div>
         </div>
     </div>
-    
+
     <!-- Toast Container -->
     <div class="toast-container"></div>
 
@@ -161,6 +164,37 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="button" class="btn btn-primary" id="savePasswordBtn">Change Password</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Default Page Preference Modal -->
+    <div class="modal fade" id="defaultPageModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Set Default Landing Page</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted mb-3">Choose which page you want to see when you first log in or open the app.</p>
+                    <form id="defaultPageForm">
+                        <div class="mb-3">
+                            <label for="defaultPageSelect" class="form-label">Default Page</label>
+                            <select class="form-select" id="defaultPageSelect" required>
+                                <option value="transactions">Transactions</option>
+                                <option value="tax">Tax Calculator</option>
+                                <option value="reports">Reports</option>
+                                <option value="rateTrends">Exchange Rate Trends</option>
+                            </select>
+                            <div class="form-text">This will be applied the next time you log in or refresh the page.</div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="saveDefaultPageBtn">Save Preference</button>
                 </div>
             </div>
         </div>

@@ -381,35 +381,8 @@
                     </h2>
                 </div>
                 <div class="section-body">
-                    <!-- Refresh-mode radio toggle -->
-                    <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
-                        <label style="color: var(--text-primary); font-weight: 600; min-width: 300px;">
-                            <i class="fas fa-sync-alt"></i> Exchange Rate Refresh Mode
-                        </label>
-                        <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
-                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-primary);">
-                                <input type="radio" name="refreshMode" id="modeBackground" value="background"
-                                       {% if settings.get('exchange_rate_refresh_mode', {}).get('value', 'background') == 'background' %}checked{% endif %}
-                                       oninput="onModeChange()">
-                                <span>Background (automatic)</span>
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-primary);">
-                                <input type="radio" name="refreshMode" id="modeManual" value="manual"
-                                       {% if settings.get('exchange_rate_refresh_mode', {}).get('value', 'background') == 'manual' %}checked{% endif %}
-                                       oninput="onModeChange()">
-                                <span>Manual</span>
-                            </label>
-                            <button class="btn-sm btn-primary" id="saveModeBtn" onclick="saveRefreshMode()" disabled>
-                                <i class="fas fa-save"></i> Save
-                            </button>
-                        </div>
-                    </div>
-                    <p style="color: var(--text-secondary); margin-top: 8px; font-size: 0.9rem;">
-                        {{ settings.get('exchange_rate_refresh_mode', {}).get('description', '') }}
-                    </p>
-
-                    <!-- Manual "Refresh All" button (always visible) -->
-                    <div style="margin-top: 18px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                    <!-- Manual "Refresh All" button -->
+                    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
                         <button class="btn-sm btn-primary" id="refreshAllBtn" onclick="refreshAllRates()">
                             <i class="fas fa-sync-alt"></i> Refresh All Rates Now
                         </button>
@@ -420,27 +393,6 @@
                 </div>
             </div>
 
-            <!-- Database Backup Section -->
-            <div class="section-card">
-                <div class="section-header">
-                    <h2 style="margin: 0; font-size: 1.5rem; color: var(--text-primary);">
-                        <i class="fas fa-database"></i> Database Backup
-                    </h2>
-                </div>
-                <div class="section-body">
-                    <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9rem;">
-                        Download a complete SQL backup of the entire database. The backup includes all tables,
-                        data, views, stored procedures, functions, triggers, and events in MySQL Workbench
-                        compatible format (<code>.sql</code>).
-                    </p>
-                    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                        <button class="btn-sm btn-primary" id="dbBackupBtn" onclick="downloadDbBackup()" style="padding: 8px 20px; font-size: 0.95rem;">
-                            <i class="fas fa-download"></i> Download Full Backup
-                        </button>
-                        <span id="dbBackupStatus" style="color: var(--text-secondary); font-size: 0.9rem;"></span>
-                    </div>
-                </div>
-            </div>
         </div>
 
         <!-- CSV Import Tab -->
@@ -634,6 +586,7 @@
                                 <th>Email</th>
                                 <th>Status</th>
                                 <th>Role</th>
+                                <th>Default Page</th>
                                 <th>Last Login</th>
                                 <th>Created</th>
                                 <th>Records</th>
@@ -660,6 +613,17 @@
                                     {% else %}
                                     <span class="badge badge-secondary">User</span>
                                     {% endif %}
+                                </td>
+                                <td>
+                                    <select class="form-select form-select-sm default-page-select"
+                                            data-user-id="{{ user.id }}"
+                                            onchange="updateUserDefaultPage({{ user.id }}, this.value)"
+                                            style="min-width: 140px; font-size: 0.875rem;">
+                                        <option value="transactions" {% if user.default_page == 'transactions' or not user.default_page %}selected{% endif %}>Transactions</option>
+                                        <option value="tax" {% if user.default_page == 'tax' %}selected{% endif %}>Tax</option>
+                                        <option value="reports" {% if user.default_page == 'reports' %}selected{% endif %}>Reports</option>
+                                        <option value="rateTrends" {% if user.default_page == 'rateTrends' %}selected{% endif %}>Rate Trends</option>
+                                    </select>
                                 </td>
                                 <td>{{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else 'Never' }}</td>
                                 <td>{{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else 'N/A' }}</td>
@@ -869,6 +833,8 @@
 {% endblock %}
 
 {% block extra_js %}
+<!-- Ensure base.js is loaded first -->
+<script src="{{ url_for('static', filename='js/base.js') }}"></script>
 <script>
     console.log('Admin Dashboard JavaScript Loaded');
     console.log('Users loaded:', {{ users|length }});
@@ -1015,6 +981,32 @@
         );
     }
 
+    // Update user's default landing page
+    async function updateUserDefaultPage(userId, defaultPage) {
+        try {
+            const response = await fetch(`/api/admin/users/${userId}/default-page`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ default_page: defaultPage })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                showAlert(data.message, 'success');
+            } else {
+                showAlert(data.error || 'Failed to update default page', 'danger');
+                // Reload to reset the dropdown to the previous value
+                setTimeout(() => location.reload(), 1000);
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showAlert('Network error: ' + error.message, 'danger');
+            // Reload to reset the dropdown to the previous value
+            setTimeout(() => location.reload(), 1000);
+        }
+    }
+
     // Show delete confirmation modal
     function showDeleteModal(userId, username) {
         currentDeleteUserId = userId;
@@ -1087,44 +1079,6 @@
 
     console.log('Admin Dashboard fully initialized - All overlays cleared');
 
-    // ── System Settings: refresh mode ───────────────────────────
-    const _modeOriginal = document.querySelector('input[name="refreshMode"]:checked').value;
-
-    function onModeChange() {
-        const current = document.querySelector('input[name="refreshMode"]:checked').value;
-        document.getElementById('saveModeBtn').disabled = (current === _modeOriginal);
-    }
-
-    async function saveRefreshMode() {
-        const value = document.querySelector('input[name="refreshMode"]:checked').value;
-        const btn   = document.getElementById('saveModeBtn');
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving\u2026';
-
-        try {
-            const response = await fetch('/api/admin/settings/exchange_rate_refresh_mode', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ value: value })
-            });
-            const data = await response.json();
-            if (response.ok) {
-                showAlert('Refresh mode set to \u201c' + value + '\u201d', 'success');
-                btn.innerHTML = '<i class="fas fa-save"></i> Save';
-                // keep disabled — value now matches server
-            } else {
-                showAlert(data.error || 'Failed to update setting', 'danger');
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-save"></i> Save';
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            showAlert('Network error: ' + error.message, 'danger');
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-save"></i> Save';
-        }
-    }
-
     // ── System Settings: on-demand refresh ───────────────────────
     async function refreshAllRates() {
         const btn = document.getElementById('refreshAllBtn');
@@ -1161,52 +1115,6 @@
         }
         btn.disabled = false;
         btn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh All Rates Now';
-    }
-
-    // ── Database Backup ────────────────────────────────────────
-    async function downloadDbBackup() {
-        const btn = document.getElementById('dbBackupBtn');
-        const status = document.getElementById('dbBackupStatus');
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating backup\u2026';
-        status.textContent = 'This may take a moment for large databases.';
-
-        try {
-            const response = await fetch('/api/admin/db-backup');
-
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.error || 'Backup failed');
-            }
-
-            // Get filename from Content-Disposition header
-            const disposition = response.headers.get('Content-Disposition');
-            let fname = 'database_backup.sql';
-            if (disposition) {
-                const match = disposition.match(/filename=([^\s;]+)/);
-                if (match) fname = match[1];
-            }
-
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = fname;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            window.URL.revokeObjectURL(url);
-
-            const sizeMB = (blob.size / (1024 * 1024)).toFixed(2);
-            status.textContent = `Backup downloaded (${sizeMB} MB)`;
-            showAlert('Database backup downloaded successfully', 'success');
-        } catch (error) {
-            console.error('Error:', error);
-            status.textContent = '';
-            showAlert('Backup failed: ' + error.message, 'danger');
-        }
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-download"></i> Download Full Backup';
     }
 
     // ── CSV Import ──────────────────────────────────────────────

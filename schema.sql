@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS users (
     is_admin BOOLEAN DEFAULT FALSE,
     is_active BOOLEAN DEFAULT FALSE,
     last_login TIMESTAMP NULL,
+    default_page VARCHAR(50) DEFAULT 'transactions' COMMENT 'Default landing page: transactions, tax, reports, rateTrends',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_username (username),
