@@ -1787,27 +1787,28 @@ def admin_db_backup():
 # ---------------------------------------------------------------------------
 
 def _run_backup_and_upload():
-    """Run mysqldump (or Python fallback) and upload the .sql file to Appwrite.
+    """Generate a MySQL database backup and upload it to Appwrite.
 
-    Executed in a background thread so the triggering HTTP request can return
-    immediately (important for cron services with short timeout windows).
+    Uses pure Python to create a mysqldump-compatible SQL file.
+    Works on serverless platforms like Vercel where mysqldump isn't available.
+    Supports configurable timeout via BACKUP_TIMEOUT_SECONDS env var.
     """
-    import subprocess
-    import shutil
+    import signal
 
     if not APPWRITE_AVAILABLE:
         logger.error("Backup aborted: appwrite SDK not installed")
-        return
+        return False, "Appwrite SDK not available"
 
     backup_endpoint = os.environ.get('APPWRITE_BACKUP_ENDPOINT', os.environ.get('APPWRITE_ENDPOINT'))
     backup_project = os.environ.get('APPWRITE_BACKUP_PROJECT_ID')
     backup_key = os.environ.get('APPWRITE_BACKUP_API_KEY')
     backup_bucket = os.environ.get('APPWRITE_BACKUP_BUCKET_ID')
+    backup_timeout = int(os.environ.get('BACKUP_TIMEOUT_SECONDS', '50'))  # Default 50s for Vercel
 
     if not all([backup_endpoint, backup_project, backup_key, backup_bucket]):
         logger.error("Backup aborted: APPWRITE_BACKUP_PROJECT_ID, APPWRITE_BACKUP_API_KEY, "
                      "or APPWRITE_BACKUP_BUCKET_ID not configured")
-        return
+        return False, "Backup credentials not configured"
 
     # Build a dedicated Appwrite client for backups
     try:
@@ -1818,310 +1819,314 @@ def _run_backup_and_upload():
         backup_storage = Storage(backup_client)
     except Exception as e:
         logger.error("Failed to initialise backup Appwrite client: %s", e)
-        return
+        return False, f"Appwrite client initialization failed: {e}"
+
+    def timeout_handler(signum, frame):
+        raise TimeoutError(f"Backup exceeded {backup_timeout}s timeout")
 
     db_name = DB_CONFIG['database']
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     filename = f"{db_name}_{timestamp}.sql"
 
+    # ── Python-based database dump (with timeout) ───────────────
+    connection = get_db_connection()
+    if not connection:
+        logger.error("Backup aborted: DB connection failed")
+        return False, "Database connection failed"
+
+    cursor = connection.cursor()
     sql_bytes = None
 
-    # ── Try mysqldump first ─────────────────────────────────────
-    mysqldump_path = shutil.which('mysqldump')
-    if mysqldump_path:
-        try:
-            cmd = [
-                mysqldump_path,
-                '--host', DB_CONFIG['host'],
-                '--port', str(DB_CONFIG['port']),
-                '--user', DB_CONFIG['user'],
-                f'--password={DB_CONFIG["password"]}',
-                '--routines', '--events', '--triggers',
-                '--single-transaction',
-                '--set-gtid-purged=OFF',
-                '--column-statistics=0',
-                '--skip-lock-tables',
-                '--default-character-set=utf8mb4',
-                db_name,
-            ]
-            result = subprocess.run(cmd, capture_output=True, timeout=300)
-            if result.returncode == 0 and result.stdout:
-                sql_bytes = result.stdout
-                logger.info("Backup via mysqldump succeeded (%d bytes)", len(sql_bytes))
-            else:
-                logger.warning("mysqldump failed (rc=%s): %s",
-                               result.returncode, result.stderr[:500])
-        except Exception as e:
-            logger.warning("mysqldump error: %s", e)
+    # Set up timeout (Unix only - Windows doesn't support SIGALRM)
+    old_handler = None
+    try:
+        if hasattr(signal, 'SIGALRM'):
+            old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(backup_timeout)
+    except Exception as e:
+        logger.warning("Could not set backup timeout: %s", e)
 
-    # ── Fallback: Python-based dump (reuse existing logic) ──────
-    if sql_bytes is None:
-        connection = get_db_connection()
-        if not connection:
-            logger.error("Backup aborted: DB connection failed for Python dump")
-            return
-        cursor = connection.cursor()
-        try:
-            output = io.StringIO()
-            cursor.execute("SELECT VERSION()")
-            mysql_version = cursor.fetchone()[0]
+    try:
+        output = io.StringIO()
+        cursor.execute("SELECT VERSION()")
+        mysql_version = cursor.fetchone()[0]
 
-            output.write("-- MySQL dump\n")
-            output.write(f"-- Host: {DB_CONFIG['host']}    Database: {db_name}\n")
-            output.write("-- ------------------------------------------------------\n")
-            output.write(f"-- Server version\t{mysql_version}\n\n")
-            output.write("/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;\n")
-            output.write("/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;\n")
-            output.write("/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;\n")
-            output.write("/*!40101 SET NAMES utf8mb4 */;\n")
-            output.write("/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;\n")
-            output.write("/*!40103 SET TIME_ZONE='+00:00' */;\n")
-            output.write("/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;\n")
-            output.write("/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;\n")
-            output.write("/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;\n")
-            output.write("/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;\n")
-            output.write("/*!80000 SET @OLD_SQL_REQUIRE_PRIMARY_KEY=@@SQL_REQUIRE_PRIMARY_KEY, SQL_REQUIRE_PRIMARY_KEY=0 */;\n\n")
+        output.write("-- MySQL dump\n")
+        output.write(f"-- Host: {DB_CONFIG['host']}    Database: {db_name}\n")
+        output.write("-- ------------------------------------------------------\n")
+        output.write(f"-- Server version\t{mysql_version}\n\n")
+        output.write("/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;\n")
+        output.write("/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;\n")
+        output.write("/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;\n")
+        output.write("/*!40101 SET NAMES utf8mb4 */;\n")
+        output.write("/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;\n")
+        output.write("/*!40103 SET TIME_ZONE='+00:00' */;\n")
+        output.write("/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;\n")
+        output.write("/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;\n")
+        output.write("/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;\n")
+        output.write("/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;\n")
+        output.write(
+            "/*!80000 SET @OLD_SQL_REQUIRE_PRIMARY_KEY=@@SQL_REQUIRE_PRIMARY_KEY, SQL_REQUIRE_PRIMARY_KEY=0 */;\n\n")
 
-            def _sql_escape(val):
-                if val is None:
-                    return 'NULL'
-                if isinstance(val, bool):
-                    return '1' if val else '0'
-                if isinstance(val, (int, float, Decimal)):
-                    return str(val)
-                if isinstance(val, (bytes, bytearray)):
-                    hex_str = val.hex()
-                    return f"X'{hex_str}'" if hex_str else "''"
-                if isinstance(val, datetime):
-                    return f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'"
-                if isinstance(val, timedelta):
-                    total = int(val.total_seconds())
-                    h, rem = divmod(abs(total), 3600)
-                    m, s = divmod(rem, 60)
-                    sign = '-' if total < 0 else ''
-                    return f"'{sign}{h:02d}:{m:02d}:{s:02d}'"
-                s = str(val)
-                s = s.replace('\\', '\\\\')
-                s = s.replace("'", "\\'")
-                s = s.replace('\n', '\\n')
-                s = s.replace('\r', '\\r')
-                s = s.replace('\x00', '\\0')
-                s = s.replace('\x1a', '\\Z')
-                return f"'{s}'"
+        def _sql_escape(val):
+            if val is None:
+                return 'NULL'
+            if isinstance(val, bool):
+                return '1' if val else '0'
+            if isinstance(val, (int, float, Decimal)):
+                return str(val)
+            if isinstance(val, (bytes, bytearray)):
+                hex_str = val.hex()
+                return f"X'{hex_str}'" if hex_str else "''"
+            if isinstance(val, datetime):
+                return f"'{val.strftime('%Y-%m-%d %H:%M:%S')}'"
+            if isinstance(val, timedelta):
+                total = int(val.total_seconds())
+                h, rem = divmod(abs(total), 3600)
+                m, s = divmod(rem, 60)
+                sign = '-' if total < 0 else ''
+                return f"'{sign}{h:02d}:{m:02d}:{s:02d}'"
+            s = str(val)
+            s = s.replace('\\', '\\\\')
+            s = s.replace("'", "\\'")
+            s = s.replace('\n', '\\n')
+            s = s.replace('\r', '\\r')
+            s = s.replace('\x00', '\\0')
+            s = s.replace('\x1a', '\\Z')
+            return f"'{s}'"
 
-            cursor.execute("SHOW FULL TABLES WHERE Table_type = 'BASE TABLE'")
-            tables = [row[0] for row in cursor.fetchall()]
+        cursor.execute("SHOW FULL TABLES WHERE Table_type = 'BASE TABLE'")
+        tables = [row[0] for row in cursor.fetchall()]
 
-            cursor.execute("SHOW FULL TABLES WHERE Table_type = 'VIEW'")
-            views = [row[0] for row in cursor.fetchall()]
+        cursor.execute("SHOW FULL TABLES WHERE Table_type = 'VIEW'")
+        views = [row[0] for row in cursor.fetchall()]
 
-            cursor.execute(
-                "SELECT ROUTINE_NAME FROM INFORMATION_SCHEMA.ROUTINES "
-                "WHERE ROUTINE_SCHEMA = %s AND ROUTINE_TYPE = 'PROCEDURE'", (db_name,))
-            procedures = [row[0] for row in cursor.fetchall()]
+        cursor.execute(
+            "SELECT ROUTINE_NAME FROM INFORMATION_SCHEMA.ROUTINES "
+            "WHERE ROUTINE_SCHEMA = %s AND ROUTINE_TYPE = 'PROCEDURE'", (db_name,))
+        procedures = [row[0] for row in cursor.fetchall()]
 
-            cursor.execute(
-                "SELECT ROUTINE_NAME FROM INFORMATION_SCHEMA.ROUTINES "
-                "WHERE ROUTINE_SCHEMA = %s AND ROUTINE_TYPE = 'FUNCTION'", (db_name,))
-            functions = [row[0] for row in cursor.fetchall()]
+        cursor.execute(
+            "SELECT ROUTINE_NAME FROM INFORMATION_SCHEMA.ROUTINES "
+            "WHERE ROUTINE_SCHEMA = %s AND ROUTINE_TYPE = 'FUNCTION'", (db_name,))
+        functions = [row[0] for row in cursor.fetchall()]
 
-            cursor.execute(
-                "SELECT TRIGGER_NAME FROM INFORMATION_SCHEMA.TRIGGERS "
-                "WHERE TRIGGER_SCHEMA = %s", (db_name,))
-            triggers = [row[0] for row in cursor.fetchall()]
+        cursor.execute(
+            "SELECT TRIGGER_NAME FROM INFORMATION_SCHEMA.TRIGGERS "
+            "WHERE TRIGGER_SCHEMA = %s", (db_name,))
+        triggers = [row[0] for row in cursor.fetchall()]
 
-            cursor.execute(
-                "SELECT EVENT_NAME FROM INFORMATION_SCHEMA.EVENTS "
-                "WHERE EVENT_SCHEMA = %s", (db_name,))
-            events = [row[0] for row in cursor.fetchall()]
+        cursor.execute(
+            "SELECT EVENT_NAME FROM INFORMATION_SCHEMA.EVENTS "
+            "WHERE EVENT_SCHEMA = %s", (db_name,))
+        events = [row[0] for row in cursor.fetchall()]
 
-            logger.info("Backup objects: %d tables, %d views, %d procedures, "
-                        "%d functions, %d triggers, %d events",
-                        len(tables), len(views), len(procedures),
-                        len(functions), len(triggers), len(events))
+        logger.info("Backup objects: %d tables, %d views, %d procedures, "
+                    "%d functions, %d triggers, %d events",
+                    len(tables), len(views), len(procedures),
+                    len(functions), len(triggers), len(events))
 
-            # ── Tables: structure + data ────────────────────────────
-            for table in tables:
-                output.write(f"--\n-- Table structure for table `{table}`\n--\n\n")
-                output.write(f"DROP TABLE IF EXISTS `{table}`;\n")
-                output.write("/*!40101 SET @saved_cs_client     = @@character_set_client */;\n")
-                output.write("/*!40101 SET character_set_client = utf8 */;\n")
-                cursor.execute(f"SHOW CREATE TABLE `{table}`")
-                output.write(f"{cursor.fetchone()[1]};\n")
-                output.write("/*!40101 SET character_set_client = @saved_cs_client */;\n\n")
-                cursor.execute(f"SELECT * FROM `{table}`")
-                rows = cursor.fetchall()
-                if rows:
-                    col_names = [d[0] for d in cursor.description]
-                    col_list = ', '.join(f'`{c}`' for c in col_names)
-                    output.write(f"--\n-- Dumping data for table `{table}`\n--\n\n")
-                    output.write(f"LOCK TABLES `{table}` WRITE;\n")
-                    output.write(f"/*!40000 ALTER TABLE `{table}` DISABLE KEYS */;\n")
-                    for i in range(0, len(rows), 100):
-                        batch = rows[i:i + 100]
-                        output.write(f"INSERT INTO `{table}` ({col_list}) VALUES\n")
-                        output.write(',\n'.join(
-                            '(' + ', '.join(_sql_escape(v) for v in row) + ')' for row in batch
-                        ))
-                        output.write(';\n')
-                    output.write(f"/*!40000 ALTER TABLE `{table}` ENABLE KEYS */;\n")
-                    output.write("UNLOCK TABLES;\n\n")
+        # ── Tables: structure + data ────────────────────────────
+        for table in tables:
+            output.write(f"--\n-- Table structure for table `{table}`\n--\n\n")
+            output.write(f"DROP TABLE IF EXISTS `{table}`;\n")
+            output.write("/*!40101 SET @saved_cs_client     = @@character_set_client */;\n")
+            output.write("/*!40101 SET character_set_client = utf8 */;\n")
+            cursor.execute(f"SHOW CREATE TABLE `{table}`")
+            output.write(f"{cursor.fetchone()[1]};\n")
+            output.write("/*!40101 SET character_set_client = @saved_cs_client */;\n\n")
+            cursor.execute(f"SELECT * FROM `{table}`")
+            rows = cursor.fetchall()
+            if rows:
+                col_names = [d[0] for d in cursor.description]
+                col_list = ', '.join(f'`{c}`' for c in col_names)
+                output.write(f"--\n-- Dumping data for table `{table}`\n--\n\n")
+                output.write(f"LOCK TABLES `{table}` WRITE;\n")
+                output.write(f"/*!40000 ALTER TABLE `{table}` DISABLE KEYS */;\n")
+                for i in range(0, len(rows), 100):
+                    batch = rows[i:i + 100]
+                    output.write(f"INSERT INTO `{table}` ({col_list}) VALUES\n")
+                    output.write(',\n'.join(
+                        '(' + ', '.join(_sql_escape(v) for v in row) + ')' for row in batch
+                    ))
+                    output.write(';\n')
+                output.write(f"/*!40000 ALTER TABLE `{table}` ENABLE KEYS */;\n")
+                output.write("UNLOCK TABLES;\n\n")
 
-            # ── Views ───────────────────────────────────────────────
-            if views:
-                output.write("--\n-- Final view structure for views\n--\n\n")
-                for view in views:
-                    output.write(f"--\n-- Final view structure for view `{view}`\n--\n\n")
-                    output.write(f"/*!50001 DROP VIEW IF EXISTS `{view}`*/;\n")
-                    output.write("/*!50001 SET @saved_cs_client          = @@character_set_client */;\n")
-                    output.write("/*!50001 SET @saved_cs_results         = @@character_set_results */;\n")
-                    output.write("/*!50001 SET @saved_col_connection     = @@collation_connection */;\n")
-                    output.write("/*!50001 SET character_set_client      = utf8mb4 */;\n")
-                    output.write("/*!50001 SET character_set_results     = utf8mb4 */;\n")
-                    output.write("/*!50001 SET collation_connection      = utf8mb4_0900_ai_ci */;\n")
-                    try:
-                        cursor.execute(f"SHOW CREATE VIEW `{view}`")
-                        result = cursor.fetchone()
-                        if result and len(result) >= 2:
-                            output.write(f"/*!50001 {result[1]} */;\n")
-                            output.write("/*!50001 SET character_set_client      = @saved_cs_client */;\n")
-                            output.write("/*!50001 SET character_set_results     = @saved_cs_results */;\n")
-                            output.write("/*!50001 SET collation_connection      = @saved_col_connection */;\n\n")
-                    except Exception as e:
-                        output.write(f"-- Error exporting view `{view}`: {e}\n\n")
+        # ── Views ───────────────────────────────────────────────
+        if views:
+            output.write("--\n-- Final view structure for views\n--\n\n")
+            for view in views:
+                output.write(f"--\n-- Final view structure for view `{view}`\n--\n\n")
+                output.write(f"/*!50001 DROP VIEW IF EXISTS `{view}`*/;\n")
+                output.write("/*!50001 SET @saved_cs_client          = @@character_set_client */;\n")
+                output.write("/*!50001 SET @saved_cs_results         = @@character_set_results */;\n")
+                output.write("/*!50001 SET @saved_col_connection     = @@collation_connection */;\n")
+                output.write("/*!50001 SET character_set_client      = utf8mb4 */;\n")
+                output.write("/*!50001 SET character_set_results     = utf8mb4 */;\n")
+                output.write("/*!50001 SET collation_connection      = utf8mb4_0900_ai_ci */;\n")
+                try:
+                    cursor.execute(f"SHOW CREATE VIEW `{view}`")
+                    result = cursor.fetchone()
+                    if result and len(result) >= 2:
+                        output.write(f"/*!50001 {result[1]} */;\n")
+                        output.write("/*!50001 SET character_set_client      = @saved_cs_client */;\n")
+                        output.write("/*!50001 SET character_set_results     = @saved_cs_results */;\n")
+                        output.write("/*!50001 SET collation_connection      = @saved_col_connection */;\n\n")
+                except Exception as e:
+                    output.write(f"-- Error exporting view `{view}`: {e}\n\n")
 
-            # ── Stored Procedures ───────────────────────────────────
-            if procedures:
-                output.write("--\n-- Dumping routines for database '" + db_name + "'\n--\n")
-                for proc in procedures:
-                    output.write(f"--\n-- Procedure `{proc}`\n--\n\n")
-                    output.write(f"/*!50003 DROP PROCEDURE IF EXISTS `{proc}` */;\n")
-                    output.write("/*!50003 SET @saved_cs_client      = @@character_set_client */ ;\n")
-                    output.write("/*!50003 SET @saved_cs_results     = @@character_set_results */ ;\n")
-                    output.write("/*!50003 SET @saved_col_connection = @@collation_connection */ ;\n")
-                    output.write("/*!50003 SET character_set_client  = utf8mb4 */ ;\n")
-                    output.write("/*!50003 SET character_set_results = utf8mb4 */ ;\n")
-                    output.write("/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;\n")
-                    output.write("/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;\n")
-                    output.write("/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;\n")
-                    output.write("DELIMITER ;;\n")
-                    try:
-                        cursor.execute(f"SHOW CREATE PROCEDURE `{proc}`")
-                        result = cursor.fetchone()
-                        if result and len(result) >= 3:
-                            output.write(f"{result[2]} ;;\n")
-                    except Exception as e:
-                        output.write(f"-- Error exporting procedure `{proc}`: {e}\n")
-                    output.write("DELIMITER ;\n")
-                    output.write("/*!50003 SET sql_mode              = @saved_sql_mode */ ;\n")
-                    output.write("/*!50003 SET character_set_client  = @saved_cs_client */ ;\n")
-                    output.write("/*!50003 SET character_set_results = @saved_cs_results */ ;\n")
-                    output.write("/*!50003 SET collation_connection  = @saved_col_connection */ ;\n\n")
+        # ── Stored Procedures ───────────────────────────────────
+        if procedures:
+            output.write("--\n-- Dumping routines for database '" + db_name + "'\n--\n")
+            for proc in procedures:
+                output.write(f"--\n-- Procedure `{proc}`\n--\n\n")
+                output.write(f"/*!50003 DROP PROCEDURE IF EXISTS `{proc}` */;\n")
+                output.write("/*!50003 SET @saved_cs_client      = @@character_set_client */ ;\n")
+                output.write("/*!50003 SET @saved_cs_results     = @@character_set_results */ ;\n")
+                output.write("/*!50003 SET @saved_col_connection = @@collation_connection */ ;\n")
+                output.write("/*!50003 SET character_set_client  = utf8mb4 */ ;\n")
+                output.write("/*!50003 SET character_set_results = utf8mb4 */ ;\n")
+                output.write("/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;\n")
+                output.write("/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;\n")
+                output.write(
+                    "/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;\n")
+                output.write("DELIMITER ;;\n")
+                try:
+                    cursor.execute(f"SHOW CREATE PROCEDURE `{proc}`")
+                    result = cursor.fetchone()
+                    if result and len(result) >= 3:
+                        output.write(f"{result[2]} ;;\n")
+                except Exception as e:
+                    output.write(f"-- Error exporting procedure `{proc}`: {e}\n")
+                output.write("DELIMITER ;\n")
+                output.write("/*!50003 SET sql_mode              = @saved_sql_mode */ ;\n")
+                output.write("/*!50003 SET character_set_client  = @saved_cs_client */ ;\n")
+                output.write("/*!50003 SET character_set_results = @saved_cs_results */ ;\n")
+                output.write("/*!50003 SET collation_connection  = @saved_col_connection */ ;\n\n")
 
-            # ── Functions ───────────────────────────────────────────
-            if functions:
-                for func in functions:
-                    output.write(f"--\n-- Function `{func}`\n--\n\n")
-                    output.write(f"/*!50003 DROP FUNCTION IF EXISTS `{func}` */;\n")
-                    output.write("/*!50003 SET @saved_cs_client      = @@character_set_client */ ;\n")
-                    output.write("/*!50003 SET @saved_cs_results     = @@character_set_results */ ;\n")
-                    output.write("/*!50003 SET @saved_col_connection = @@collation_connection */ ;\n")
-                    output.write("/*!50003 SET character_set_client  = utf8mb4 */ ;\n")
-                    output.write("/*!50003 SET character_set_results = utf8mb4 */ ;\n")
-                    output.write("/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;\n")
-                    output.write("/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;\n")
-                    output.write("/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;\n")
-                    output.write("DELIMITER ;;\n")
-                    try:
-                        cursor.execute(f"SHOW CREATE FUNCTION `{func}`")
-                        result = cursor.fetchone()
-                        if result and len(result) >= 3:
-                            output.write(f"{result[2]} ;;\n")
-                    except Exception as e:
-                        output.write(f"-- Error exporting function `{func}`: {e}\n")
-                    output.write("DELIMITER ;\n")
-                    output.write("/*!50003 SET sql_mode              = @saved_sql_mode */ ;\n")
-                    output.write("/*!50003 SET character_set_client  = @saved_cs_client */ ;\n")
-                    output.write("/*!50003 SET character_set_results = @saved_cs_results */ ;\n")
-                    output.write("/*!50003 SET collation_connection  = @saved_col_connection */ ;\n\n")
+        # ── Functions ───────────────────────────────────────────
+        if functions:
+            for func in functions:
+                output.write(f"--\n-- Function `{func}`\n--\n\n")
+                output.write(f"/*!50003 DROP FUNCTION IF EXISTS `{func}` */;\n")
+                output.write("/*!50003 SET @saved_cs_client      = @@character_set_client */ ;\n")
+                output.write("/*!50003 SET @saved_cs_results     = @@character_set_results */ ;\n")
+                output.write("/*!50003 SET @saved_col_connection = @@collation_connection */ ;\n")
+                output.write("/*!50003 SET character_set_client  = utf8mb4 */ ;\n")
+                output.write("/*!50003 SET character_set_results = utf8mb4 */ ;\n")
+                output.write("/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;\n")
+                output.write("/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;\n")
+                output.write(
+                    "/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;\n")
+                output.write("DELIMITER ;;\n")
+                try:
+                    cursor.execute(f"SHOW CREATE FUNCTION `{func}`")
+                    result = cursor.fetchone()
+                    if result and len(result) >= 3:
+                        output.write(f"{result[2]} ;;\n")
+                except Exception as e:
+                    output.write(f"-- Error exporting function `{func}`: {e}\n")
+                output.write("DELIMITER ;\n")
+                output.write("/*!50003 SET sql_mode              = @saved_sql_mode */ ;\n")
+                output.write("/*!50003 SET character_set_client  = @saved_cs_client */ ;\n")
+                output.write("/*!50003 SET character_set_results = @saved_cs_results */ ;\n")
+                output.write("/*!50003 SET collation_connection  = @saved_col_connection */ ;\n\n")
 
-            # ── Triggers ────────────────────────────────────────────
-            if triggers:
-                for trigger in triggers:
-                    output.write(f"--\n-- Trigger `{trigger}`\n--\n\n")
-                    output.write("/*!50003 SET @saved_cs_client      = @@character_set_client */ ;\n")
-                    output.write("/*!50003 SET @saved_cs_results     = @@character_set_results */ ;\n")
-                    output.write("/*!50003 SET @saved_col_connection = @@collation_connection */ ;\n")
-                    output.write("/*!50003 SET character_set_client  = utf8mb4 */ ;\n")
-                    output.write("/*!50003 SET character_set_results = utf8mb4 */ ;\n")
-                    output.write("/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;\n")
-                    output.write("/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;\n")
-                    output.write("/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;\n")
-                    output.write("DELIMITER ;;\n")
-                    try:
-                        cursor.execute(f"SHOW CREATE TRIGGER `{trigger}`")
-                        result = cursor.fetchone()
-                        if result and len(result) >= 3:
-                            output.write(f"/*!50003 {result[2]} */;;\n")
-                    except Exception as e:
-                        output.write(f"-- Error exporting trigger `{trigger}`: {e}\n")
-                    output.write("DELIMITER ;\n")
-                    output.write("/*!50003 SET sql_mode              = @saved_sql_mode */ ;\n")
-                    output.write("/*!50003 SET character_set_client  = @saved_cs_client */ ;\n")
-                    output.write("/*!50003 SET character_set_results = @saved_cs_results */ ;\n")
-                    output.write("/*!50003 SET collation_connection  = @saved_col_connection */ ;\n\n")
+        # ── Triggers ────────────────────────────────────────────
+        if triggers:
+            for trigger in triggers:
+                output.write(f"--\n-- Trigger `{trigger}`\n--\n\n")
+                output.write("/*!50003 SET @saved_cs_client      = @@character_set_client */ ;\n")
+                output.write("/*!50003 SET @saved_cs_results     = @@character_set_results */ ;\n")
+                output.write("/*!50003 SET @saved_col_connection = @@collation_connection */ ;\n")
+                output.write("/*!50003 SET character_set_client  = utf8mb4 */ ;\n")
+                output.write("/*!50003 SET character_set_results = utf8mb4 */ ;\n")
+                output.write("/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;\n")
+                output.write("/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;\n")
+                output.write(
+                    "/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;\n")
+                output.write("DELIMITER ;;\n")
+                try:
+                    cursor.execute(f"SHOW CREATE TRIGGER `{trigger}`")
+                    result = cursor.fetchone()
+                    if result and len(result) >= 3:
+                        output.write(f"/*!50003 {result[2]} */;;\n")
+                except Exception as e:
+                    output.write(f"-- Error exporting trigger `{trigger}`: {e}\n")
+                output.write("DELIMITER ;\n")
+                output.write("/*!50003 SET sql_mode              = @saved_sql_mode */ ;\n")
+                output.write("/*!50003 SET character_set_client  = @saved_cs_client */ ;\n")
+                output.write("/*!50003 SET character_set_results = @saved_cs_results */ ;\n")
+                output.write("/*!50003 SET collation_connection  = @saved_col_connection */ ;\n\n")
 
-            # ── Events ──────────────────────────────────────────────
-            if events:
-                output.write("--\n-- Dumping events for database '" + db_name + "'\n--\n")
-                for event in events:
-                    output.write(f"--\n-- Event `{event}`\n--\n\n")
-                    output.write(f"/*!50106 DROP EVENT IF EXISTS `{event}` */;\n")
-                    output.write("DELIMITER ;;\n")
-                    output.write("/*!50106 SET @save_time_zone= @@TIME_ZONE */ ;;\n")
-                    output.write("/*!50106 SET TIME_ZONE= 'SYSTEM' */ ;;\n")
-                    output.write("/*!50106 SET @saved_cs_client      = @@character_set_client */ ;;\n")
-                    output.write("/*!50106 SET @saved_cs_results     = @@character_set_results */ ;;\n")
-                    output.write("/*!50106 SET @saved_col_connection = @@collation_connection */ ;;\n")
-                    output.write("/*!50106 SET character_set_client  = utf8mb4 */ ;;\n")
-                    output.write("/*!50106 SET character_set_results = utf8mb4 */ ;;\n")
-                    output.write("/*!50106 SET collation_connection  = utf8mb4_0900_ai_ci */ ;;\n")
-                    output.write("/*!50106 SET @saved_sql_mode       = @@sql_mode */ ;;\n")
-                    output.write("/*!50106 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;;\n")
-                    try:
-                        cursor.execute(f"SHOW CREATE EVENT `{event}`")
-                        result = cursor.fetchone()
-                        if result and len(result) >= 4:
-                            output.write(f"/*!50106 {result[3]} */ ;;\n")
-                    except Exception as e:
-                        output.write(f"-- Error exporting event `{event}`: {e}\n")
-                    output.write("/*!50106 SET sql_mode              = @saved_sql_mode */ ;;\n")
-                    output.write("/*!50106 SET character_set_client  = @saved_cs_client */ ;;\n")
-                    output.write("/*!50106 SET character_set_results = @saved_cs_results */ ;;\n")
-                    output.write("/*!50106 SET collation_connection  = @saved_col_connection */ ;;\n")
-                    output.write("/*!50106 SET TIME_ZONE= @save_time_zone */ ;;\n")
-                    output.write("DELIMITER ;\n\n")
+        # ── Events ──────────────────────────────────────────────
+        if events:
+            output.write("--\n-- Dumping events for database '" + db_name + "'\n--\n")
+            for event in events:
+                output.write(f"--\n-- Event `{event}`\n--\n\n")
+                output.write(f"/*!50106 DROP EVENT IF EXISTS `{event}` */;\n")
+                output.write("DELIMITER ;;\n")
+                output.write("/*!50106 SET @save_time_zone= @@TIME_ZONE */ ;;\n")
+                output.write("/*!50106 SET TIME_ZONE= 'SYSTEM' */ ;;\n")
+                output.write("/*!50106 SET @saved_cs_client      = @@character_set_client */ ;;\n")
+                output.write("/*!50106 SET @saved_cs_results     = @@character_set_results */ ;;\n")
+                output.write("/*!50106 SET @saved_col_connection = @@collation_connection */ ;;\n")
+                output.write("/*!50106 SET character_set_client  = utf8mb4 */ ;;\n")
+                output.write("/*!50106 SET character_set_results = utf8mb4 */ ;;\n")
+                output.write("/*!50106 SET collation_connection  = utf8mb4_0900_ai_ci */ ;;\n")
+                output.write("/*!50106 SET @saved_sql_mode       = @@sql_mode */ ;;\n")
+                output.write(
+                    "/*!50106 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;;\n")
+                try:
+                    cursor.execute(f"SHOW CREATE EVENT `{event}`")
+                    result = cursor.fetchone()
+                    if result and len(result) >= 4:
+                        output.write(f"/*!50106 {result[3]} */ ;;\n")
+                except Exception as e:
+                    output.write(f"-- Error exporting event `{event}`: {e}\n")
+                output.write("/*!50106 SET sql_mode              = @saved_sql_mode */ ;;\n")
+                output.write("/*!50106 SET character_set_client  = @saved_cs_client */ ;;\n")
+                output.write("/*!50106 SET character_set_results = @saved_cs_results */ ;;\n")
+                output.write("/*!50106 SET collation_connection  = @saved_col_connection */ ;;\n")
+                output.write("/*!50106 SET TIME_ZONE= @save_time_zone */ ;;\n")
+                output.write("DELIMITER ;\n\n")
 
-            # ── Footer ──────────────────────────────────────────────
-            output.write("/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;\n")
-            output.write("/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;\n")
-            output.write("/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;\n")
-            output.write("/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;\n")
-            output.write("/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;\n")
-            output.write("/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;\n")
-            output.write("/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;\n")
-            output.write("/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;\n")
-            output.write("/*!80000 SET SQL_REQUIRE_PRIMARY_KEY=@OLD_SQL_REQUIRE_PRIMARY_KEY */;\n\n")
+        # ── Footer ──────────────────────────────────────────────
+        output.write("/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;\n")
+        output.write("/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;\n")
+        output.write("/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;\n")
+        output.write("/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;\n")
+        output.write("/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;\n")
+        output.write("/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;\n")
+        output.write("/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;\n")
+        output.write("/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;\n")
+        output.write("/*!80000 SET SQL_REQUIRE_PRIMARY_KEY=@OLD_SQL_REQUIRE_PRIMARY_KEY */;\n\n")
 
-            output.write(f"-- Dump completed on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            sql_bytes = output.getvalue().encode('utf-8')
-            logger.info("Python-based backup completed (%d bytes)", len(sql_bytes))
-        except Exception as e:
-            logger.error("Python backup failed: %s", e, exc_info=True)
-            return
-        finally:
-            cursor.close()
-            connection.close()
+        output.write(f"-- Dump completed on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        sql_bytes = output.getvalue().encode('utf-8')
+        logger.info("Python-based backup completed (%d bytes)", len(sql_bytes))
+    except TimeoutError as e:
+        logger.error("Backup timeout: %s", e)
+        cursor.close()
+        connection.close()
+        return False, f"Backup timed out after {backup_timeout}s"
+    except Exception as e:
+        logger.error("Python backup failed: %s", e, exc_info=True)
+        cursor.close()
+        connection.close()
+        return False, f"Backup generation failed: {e}"
+    finally:
+        # Cancel the alarm
+        if hasattr(signal, 'SIGALRM') and old_handler is not None:
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, old_handler)
+        cursor.close()
+        connection.close()
+
+    if not sql_bytes:
+        logger.error("Backup failed: no data generated")
+        return False, "No backup data generated"
 
     # ── Upload to Appwrite ──────────────────────────────────────
     try:
@@ -2138,19 +2143,20 @@ def _run_backup_and_upload():
             )
         size_mb = len(sql_bytes) / (1024 * 1024)
         logger.info("✅ Backup uploaded to Appwrite bucket %s — file_id=%s (%.2f MB)",
-                     backup_bucket, file_id, size_mb)
+                    backup_bucket, file_id, size_mb)
+        return True, f"Backup uploaded successfully: {file_id} ({size_mb:.2f} MB)"
     except Exception as e:
         logger.error("Appwrite upload failed: %s", e, exc_info=True)
+        return False, f"Upload failed: {e}"
 
 
 @app.route('/api/admin/trigger-backup', methods=['GET'])
 @cross_origin(origins=['https://console.cron-job.org'])
 def trigger_db_backup():
-    """Trigger an async database backup that uploads to Appwrite.
+    """Trigger a database backup that uploads to Appwrite.
 
-    Returns immediately — the actual backup runs in a background thread.
-    Access control mirrors /api/exchange-rate/refresh-all (cron-job.org +
-    local networks).
+    Can run synchronously (for Vercel) or asynchronously (for local dev).
+    Set BACKUP_MODE=sync in environment for Vercel/serverless platforms.
     """
     allowed_origins = ['https://console.cron-job.org', 'https://cron-job.org']
     local_patterns = [
@@ -2169,24 +2175,62 @@ def trigger_db_backup():
     origin_ok = any(origin.startswith(a) for a in allowed_origins)
     referer_ok = any(referer.startswith(a) for a in allowed_origins)
     ua_ok = 'cron-job.org' in user_agent.lower()
-    local_origin = any(p in origin for p in local_patterns) or origin.startswith('http://localhost') or origin.startswith('http://127.0.0.1')
-    local_referer = any(p in referer for p in local_patterns) or referer.startswith('http://localhost') or referer.startswith('http://127.0.0.1')
+    local_origin = any(p in origin for p in local_patterns) or origin.startswith(
+        'http://localhost') or origin.startswith('http://127.0.0.1')
+    local_referer = any(p in referer for p in local_patterns) or referer.startswith(
+        'http://localhost') or referer.startswith('http://127.0.0.1')
     local_addr = any(remote_addr.startswith(p) for p in local_patterns)
 
     if not (origin_ok or referer_ok or ua_ok or local_origin or local_referer or local_addr):
         logger.warning("Unauthorized backup trigger — Origin: %s, Referer: %s, UA: %s, Remote: %s",
-                        origin, referer, user_agent, remote_addr)
+                       origin, referer, user_agent, remote_addr)
         return jsonify({'error': 'Access denied',
                         'message': 'This endpoint is only accessible from authorized sources'}), 403
 
-    thread = threading.Thread(target=_run_backup_and_upload, daemon=True)
-    thread.start()
-    logger.info("Database backup triggered (background thread started)")
+    # Determine if we should run synchronously (for Vercel) or async (for local)
+    backup_mode = os.environ.get('BACKUP_MODE', 'async').lower()
 
-    return jsonify({
-        'status': 'triggered',
-        'message': 'Database backup started in background. It will be uploaded to Appwrite upon completion.',
-    }), 202
+    if backup_mode == 'sync':
+        # Run synchronously (Vercel-friendly)
+        logger.info("Starting synchronous database backup")
+        try:
+            success, message = _run_backup_and_upload()
+            if success:
+                return jsonify({
+                    'status': 'completed',
+                    'message': message
+                }), 200
+            else:
+                return jsonify({
+                    'status': 'failed',
+                    'error': message
+                }), 500
+        except Exception as e:
+            logger.error("Backup failed with exception: %s", e, exc_info=True)
+            return jsonify({
+                'status': 'failed',
+                'error': str(e)
+            }), 500
+    else:
+        # Run asynchronously (local dev)
+        def _async_backup_wrapper():
+            try:
+                success, message = _run_backup_and_upload()
+                if success:
+                    logger.info("Background backup completed: %s", message)
+                else:
+                    logger.error("Background backup failed: %s", message)
+            except Exception as e:
+                logger.error("Background backup exception: %s", e, exc_info=True)
+
+        thread = threading.Thread(target=_async_backup_wrapper, daemon=True)
+        thread.start()
+        logger.info("Database backup triggered (background thread started)")
+
+        return jsonify({
+            'status': 'triggered',
+            'message': 'Database backup started in background. It will be uploaded to Appwrite upon completion.',
+        }), 202
 
 
 @app.route('/api/admin/users/<int:user_id>/payment-methods', methods=['GET'])
