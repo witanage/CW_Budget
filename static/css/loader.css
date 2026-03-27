@@ -1,3 +1,26 @@
+/* ======================================
+   PROFESSIONAL LOADER STYLES v2.2
+   Last Updated: 2026-03-27 (Text removed)
+   ======================================
+
+   Components included:
+   1. Page Loader - Full-screen loading animation with glassmorphism
+   2. Page Transition Loader - Inter-tab/page loading overlay
+   3. Professional Spinner - Large inline spinner (.professional-spinner)
+   4. Small Spinner - For buttons and inline use (.professional-spinner-sm)
+   5. Content Loading - For loading states in content areas (.content-loading)
+   6. Pulse Loader - Alternative dot-based loader (.pulse-loader)
+   7. Linear Progress - Horizontal progress bar (.linear-progress)
+   8. Skeleton Loader - Content placeholder animation (.skeleton-loader)
+
+   Usage Examples:
+   - Page load: Use #pageLoader div (auto-handled)
+   - Page transition: Use #pageTransitionLoader (called by navigateToPage)
+   - Content area: <div class="content-loading"><div class="professional-spinner"></div></div>
+   - Button: <span class="professional-spinner-sm"></span>
+   - Progress: <div class="linear-progress"><div class="linear-progress-bar"></div></div>
+*/
+
 /* Page Loader Styles */
 .page-loader {
     position: fixed;
@@ -5,7 +28,8 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: var(--bg-primary);
+    background: linear-gradient(135deg, var(--bg-primary) 0%, rgba(0, 0, 0, 0.05) 100%);
+    backdrop-filter: blur(10px);
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -25,7 +49,7 @@
 
 .loader-content {
     text-align: center;
-    animation: fadeInUp 0.6s ease-out;
+    animation: fadeInUp 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
     position: relative;
     z-index: 1;
 }
@@ -33,9 +57,9 @@
 /* Loader Icon */
 .loader-icon {
     position: relative;
-    width: 120px;
-    height: 120px;
-    margin: 0 auto 30px;
+    width: 140px;
+    height: 140px;
+    margin: 0 auto 35px;
 }
 
 .loader-circle {
@@ -43,23 +67,31 @@
     width: 100%;
     height: 100%;
     border-radius: 50%;
-    border: 4px solid transparent;
+    border: 5px solid transparent;
+    animation: spin 1.5s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite;
+}
+
+.loader-circle:nth-child(1) {
     border-top-color: var(--accent-color);
-    animation: spin 1.2s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
+    border-right-color: var(--accent-color);
+    opacity: 1;
+    filter: drop-shadow(0 0 8px var(--accent-color));
 }
 
 .loader-circle:nth-child(2) {
-    border-top-color: var(--text-primary);
-    opacity: 0.6;
-    animation-delay: -0.4s;
-    animation-duration: 1.6s;
+    border-top-color: rgba(100, 200, 255, 0.7);
+    border-left-color: rgba(100, 200, 255, 0.7);
+    animation-delay: -0.5s;
+    animation-duration: 2s;
+    filter: drop-shadow(0 0 6px rgba(100, 200, 255, 0.7));
 }
 
 .loader-circle:nth-child(3) {
-    border-top-color: var(--text-secondary);
-    opacity: 0.3;
-    animation-delay: -0.8s;
-    animation-duration: 2s;
+    border-bottom-color: rgba(150, 150, 255, 0.4);
+    border-right-color: rgba(150, 150, 255, 0.4);
+    animation-delay: -1s;
+    animation-duration: 2.5s;
+    filter: drop-shadow(0 0 4px rgba(150, 150, 255, 0.4));
 }
 
 /* Center Icon */
@@ -68,43 +100,52 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 50px;
-    height: 50px;
-    background: var(--card-bg);
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, var(--card-bg) 0%, rgba(255, 255, 255, 0.1) 100%);
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: var(--shadow);
-    animation: pulse 2s ease-in-out infinite;
-    border: 2px solid var(--border-color);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3),
+                0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+    animation: pulseGlow 2s ease-in-out infinite;
+    border: 2px solid rgba(255, 255, 255, 0.15);
 }
 
 .loader-center i {
-    font-size: 24px;
+    font-size: 28px;
     color: var(--accent-color);
-    animation: rotate 3s ease-in-out infinite;
+    animation: floatRotate 4s ease-in-out infinite;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
 }
 
 /* Loader Text */
 .loader-text {
     color: var(--text-primary);
-    margin-top: 20px;
+    margin-top: 25px;
 }
 
 .loader-text h3 {
-    font-size: 24px;
-    font-weight: 600;
-    margin: 0 0 10px;
-    text-shadow: var(--shadow);
-    animation: fadeIn 0.8s ease-out;
+    font-size: 26px;
+    font-weight: 700;
+    margin: 0 0 12px;
+    background: linear-gradient(135deg, var(--text-primary) 0%, rgba(255, 255, 255, 0.8) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    animation: fadeIn 0.8s ease-out, shimmer 3s ease-in-out infinite;
+    letter-spacing: 0.5px;
 }
 
 .loader-text p {
-    font-size: 14px;
+    font-size: 15px;
     margin: 0;
     color: var(--text-secondary);
     animation: fadeIn 1s ease-out;
+    font-weight: 500;
+    opacity: 0.9;
 }
 
 /* Loading Dots Animation */
@@ -134,14 +175,14 @@
 
 /* Progress Bar */
 .loader-progress {
-    width: 200px;
-    height: 3px;
-    background: var(--glass-bg);
-    border-radius: 3px;
-    margin: 25px auto 0;
+    width: 240px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    margin: 30px auto 0;
     overflow: hidden;
     position: relative;
-    border: 1px solid var(--glass-border);
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1) inset;
 }
 
 .loader-progress-bar {
@@ -149,10 +190,17 @@
     top: 0;
     left: 0;
     height: 100%;
-    background: var(--accent-color);
-    border-radius: 3px;
-    animation: progress 2s ease-in-out infinite;
-    box-shadow: 0 0 10px var(--accent-color);
+    background: linear-gradient(90deg,
+        var(--accent-color) 0%,
+        rgba(100, 200, 255, 0.8) 50%,
+        var(--accent-color) 100%);
+    border-radius: 10px;
+    animation: progressSlide 2.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    box-shadow: 0 0 20px var(--accent-color),
+                0 0 40px rgba(100, 200, 255, 0.5);
+    background-size: 200% 100%;
+    animation: progressSlide 2.5s cubic-bezier(0.4, 0, 0.2, 1) infinite,
+               shimmerBar 2s ease-in-out infinite;
 }
 
 /* Animations */
@@ -165,21 +213,33 @@
     }
 }
 
-@keyframes pulse {
+@keyframes pulseGlow {
     0%, 100% {
         transform: translate(-50%, -50%) scale(1);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3),
+                    0 0 0 1px rgba(255, 255, 255, 0.1) inset,
+                    0 0 20px rgba(var(--accent-color), 0.3);
     }
     50% {
-        transform: translate(-50%, -50%) scale(1.05);
+        transform: translate(-50%, -50%) scale(1.08);
+        box-shadow: 0 15px 50px rgba(0, 0, 0, 0.4),
+                    0 0 0 1px rgba(255, 255, 255, 0.15) inset,
+                    0 0 30px rgba(var(--accent-color), 0.5);
     }
 }
 
-@keyframes rotate {
+@keyframes floatRotate {
     0%, 100% {
-        transform: rotate(0deg);
+        transform: translateY(0) rotate(0deg);
+    }
+    25% {
+        transform: translateY(-3px) rotate(-5deg);
     }
     50% {
-        transform: rotate(180deg);
+        transform: translateY(0) rotate(0deg);
+    }
+    75% {
+        transform: translateY(3px) rotate(5deg);
     }
 }
 
@@ -195,7 +255,7 @@
 @keyframes fadeInUp {
     from {
         opacity: 0;
-        transform: translateY(30px);
+        transform: translateY(40px);
     }
     to {
         opacity: 1;
@@ -203,13 +263,13 @@
     }
 }
 
-@keyframes progress {
+@keyframes progressSlide {
     0% {
         width: 0%;
         left: 0;
     }
     50% {
-        width: 70%;
+        width: 75%;
         left: 0;
     }
     100% {
@@ -218,18 +278,414 @@
     }
 }
 
+@keyframes shimmer {
+    0%, 100% {
+        background-position: 0% center;
+    }
+    50% {
+        background-position: 100% center;
+    }
+}
+
+@keyframes shimmerBar {
+    0%, 100% {
+        background-position: 0% center;
+    }
+    50% {
+        background-position: 200% center;
+    }
+}
+
 /* Theme support is now automatically handled by CSS variables */
+
+/* ======================================
+   PAGE TRANSITION LOADER - Inter-tab navigation
+   ====================================== */
+
+.page-transition-loader {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+}
+
+.page-transition-loader.active {
+    display: flex;
+    animation: fadeInTransition 0.15s ease-out forwards;
+}
+
+.page-transition-loader.fade-out {
+    animation: fadeOutTransition 0.15s ease-out forwards;
+}
+
+.page-transition-content {
+    text-align: center;
+}
+
+.page-transition-content .professional-spinner {
+    margin: 0 auto;
+    width: 40px;
+    height: 40px;
+    display: inline-block;
+}
+
+.page-transition-content .professional-spinner::before,
+.page-transition-content .professional-spinner::after {
+    border-width: 4px;
+}
+
+.page-transition-content .professional-spinner::after {
+    inset: 5px;
+}
+
+.page-transition-text {
+    display: none; /* Hide text for cleaner look */
+}
+
+@keyframes fadeInTransition {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes fadeOutTransition {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+/* ======================================
+   INLINE LOADERS - For use within content areas
+   ====================================== */
+
+/* Professional Spinner - Large (replaces Bootstrap spinner-border) */
+.professional-spinner {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    position: relative;
+    display: inline-block;
+    animation: rotate 1s linear infinite;
+}
+
+.professional-spinner::before,
+.professional-spinner::after {
+    content: "";
+    box-sizing: border-box;
+    position: absolute;
+    inset: 0px;
+    border-radius: 50%;
+    border: 5px solid rgba(255, 255, 255, 0.2);
+    animation: prixClipFix 2s linear infinite;
+}
+
+.professional-spinner::after {
+    border-color: var(--accent-color);
+    animation: prixClipFix 2s linear infinite, rotate 0.5s linear infinite reverse;
+    inset: 6px;
+}
+
+@keyframes rotate {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes prixClipFix {
+    0% {
+        clip-path: polygon(50% 50%, 0 0, 0 0, 0 0, 0 0, 0 0);
+    }
+    25% {
+        clip-path: polygon(50% 50%, 0 0, 100% 0, 100% 0, 100% 0, 100% 0);
+    }
+    50% {
+        clip-path: polygon(50% 50%, 0 0, 100% 0, 100% 100%, 100% 100%, 100% 100%);
+    }
+    75% {
+        clip-path: polygon(50% 50%, 0 0, 100% 0, 100% 100%, 0 100%, 0 100%);
+    }
+    100% {
+        clip-path: polygon(50% 50%, 0 0, 100% 0, 100% 100%, 0 100%, 0 0);
+    }
+}
+
+@keyframes spinSmooth {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+/* Dual-ring spinner variant (for areas needing more visual emphasis) */
+.professional-spinner-dual {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    position: relative;
+    display: inline-block;
+    animation: rotate 1s linear infinite;
+}
+
+.professional-spinner-dual::before,
+.professional-spinner-dual::after {
+    content: "";
+    box-sizing: border-box;
+    position: absolute;
+    inset: 0px;
+    border-radius: 50%;
+    border: 5px solid rgba(255, 255, 255, 0.2);
+    animation: prixClipFix 2s linear infinite;
+}
+
+.professional-spinner-dual::after {
+    border-color: var(--accent-color);
+    animation: prixClipFix 2s linear infinite, rotate 0.5s linear infinite reverse;
+    inset: 6px;
+}
+
+/* Small Spinner - For buttons and inline use */
+.professional-spinner-sm {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    position: relative;
+    animation: rotate 1s linear infinite;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.professional-spinner-sm::before,
+.professional-spinner-sm::after {
+    content: "";
+    box-sizing: border-box;
+    position: absolute;
+    inset: 0px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    animation: prixClipFix 2s linear infinite;
+}
+
+.professional-spinner-sm::after {
+    border-color: var(--accent-color);
+    animation: prixClipFix 2s linear infinite, rotate 0.5s linear infinite reverse;
+    inset: 2px;
+}
+
+/* Content Loading Container */
+.content-loading {
+    text-align: center;
+    padding: 4rem 2rem;
+    position: relative;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.content-loading .professional-spinner {
+    margin-bottom: 1.5rem;
+    position: relative;
+    z-index: 1;
+    display: inline-block;
+}
+
+.content-loading-text {
+    display: none; /* Hide text for cleaner loader */
+}
+
+/* Pulse Dot Loader - Alternative Style */
+.pulse-loader {
+    display: inline-flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.pulse-loader span {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--accent-color);
+    animation: pulseDot 1.4s ease-in-out infinite;
+    box-shadow: 0 0 12px var(--accent-color);
+}
+
+.pulse-loader span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.pulse-loader span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes pulseDot {
+    0%, 60%, 100% {
+        transform: scale(0.7);
+        opacity: 0.5;
+    }
+    30% {
+        transform: scale(1.1);
+        opacity: 1;
+    }
+}
+
+/* Linear Progress Bar - For loading states */
+.linear-progress {
+    width: 100%;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+}
+
+.linear-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg,
+        var(--accent-color) 0%,
+        rgba(100, 200, 255, 0.8) 50%,
+        var(--accent-color) 100%);
+    border-radius: 10px;
+    animation: progressSlide 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    box-shadow: 0 0 15px var(--accent-color);
+    background-size: 200% 100%;
+}
+
+/* Skeleton Loader - For content placeholders */
+.skeleton-loader {
+    background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.05) 25%,
+        rgba(255, 255, 255, 0.1) 50%,
+        rgba(255, 255, 255, 0.05) 75%
+    );
+    background-size: 200% 100%;
+    animation: skeleton 1.5s ease-in-out infinite;
+    border-radius: 8px;
+}
+
+@keyframes skeleton {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+.skeleton-text {
+    height: 16px;
+    margin-bottom: 10px;
+}
+
+.skeleton-text:last-child {
+    width: 60%;
+}
+
+.skeleton-circle {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+}
 
 /* Mobile Responsive */
 @media (max-width: 768px) {
+    .loader-content {
+        padding: 30px 25px;
+        border-radius: 25px;
+    }
+
     .loader-icon {
-        width: 100px;
-        height: 100px;
+        width: 110px;
+        height: 110px;
+        margin-bottom: 30px;
+    }
+
+    .loader-circle {
+        border-width: 4px;
     }
 
     .loader-center {
-        width: 40px;
-        height: 40px;
+        width: 50px;
+        height: 50px;
+    }
+
+    .loader-center i {
+        font-size: 24px;
+    }
+
+    .loader-text h3 {
+        font-size: 22px;
+        margin-bottom: 10px;
+    }
+
+    .loader-text p {
+        font-size: 14px;
+    }
+
+    .loader-progress {
+        width: 180px;
+        margin-top: 25px;
+    }
+
+    /* Inline loaders */
+    .professional-spinner,
+    .professional-spinner-dual {
+        width: 42px;
+        height: 42px;
+    }
+
+    .professional-spinner::before,
+    .professional-spinner::after,
+    .professional-spinner-dual::before,
+    .professional-spinner-dual::after {
+        border-width: 4px;
+    }
+
+    .professional-spinner::after,
+    .professional-spinner-dual::after {
+        inset: 5px;
+    }
+
+    .content-loading {
+        padding: 3rem 1.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .loader-content {
+        padding: 25px 20px;
+        border-radius: 20px;
+    }
+
+    .loader-icon {
+        width: 90px;
+        height: 90px;
+        margin-bottom: 25px;
+    }
+
+    .loader-circle {
+        border-width: 3px;
+    }
+
+    .loader-center {
+        width: 42px;
+        height: 42px;
     }
 
     .loader-center i {
@@ -238,6 +694,7 @@
 
     .loader-text h3 {
         font-size: 20px;
+        margin-bottom: 8px;
     }
 
     .loader-text p {
@@ -246,5 +703,49 @@
 
     .loader-progress {
         width: 160px;
+        height: 3px;
+        margin-top: 20px;
+    }
+
+    /* Inline loaders */
+    .professional-spinner,
+    .professional-spinner-dual {
+        width: 36px;
+        height: 36px;
+    }
+
+    .professional-spinner::before,
+    .professional-spinner::after,
+    .professional-spinner-dual::before,
+    .professional-spinner-dual::after {
+        border-width: 3px;
+    }
+
+    .professional-spinner::after,
+    .professional-spinner-dual::after {
+        inset: 4px;
+    }
+
+    .professional-spinner-sm {
+        width: 14px;
+        height: 14px;
+    }
+
+    .professional-spinner-sm::before,
+    .professional-spinner-sm::after {
+        border-width: 2px;
+    }
+
+    .professional-spinner-sm::after {
+        inset: 2px;
+    }
+
+    .content-loading {
+        padding: 2.5rem 1rem;
+    }
+
+    .pulse-loader span {
+        width: 10px;
+        height: 10px;
     }
 }
