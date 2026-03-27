@@ -3,6 +3,13 @@
 {% block title %}Login - Personal Finance Manager{% endblock %}
 
 {% block content %}
+<!-- Page Transition Loader -->
+<div id="pageTransitionLoader" class="page-transition-loader">
+    <div class="page-transition-content">
+        <div class="professional-spinner"></div>
+    </div>
+</div>
+
 <div class="container mt-5">
     <div class="row justify-content-center">
         <div class="col-md-6 col-lg-4">
@@ -40,7 +47,7 @@
                         </div>
 
                         <button type="submit" class="btn btn-primary w-100 mb-3 d-flex align-items-center justify-content-center" id="loginButton">
-                            <span class="spinner-border spinner-border-sm me-2 d-none" id="loginSpinner" role="status" aria-hidden="true"></span>
+                            <span class="professional-spinner-sm me-2 d-none" id="loginSpinner" role="status" aria-hidden="true"></span>
                             <span id="loginButtonText">Login</span>
                         </button>
                     </form>
@@ -58,6 +65,6 @@
 
 {% block extra_js %}
 <!-- Ensure base.js is loaded first -->
-<script src="{{ url_for('static', filename='js/base.js') }}"></script>
-<script src="{{ url_for('static', filename='js/login.js') }}"></script>
+<script src="{{ url_for('static', filename='js/base.js') }}?v=3.0"></script>
+<script src="{{ url_for('static', filename='js/login.js') }}?v=3.0"></script>
 {% endblock %}

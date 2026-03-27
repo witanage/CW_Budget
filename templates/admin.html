@@ -293,6 +293,13 @@
 {% endblock %}
 
 {% block content %}
+<!-- Page Transition Loader -->
+<div id="pageTransitionLoader" class="page-transition-loader">
+    <div class="page-transition-content">
+        <div class="professional-spinner"></div>
+    </div>
+</div>
+
 <script>
     // Add admin-page class to body for specific styling
     document.body.classList.add('admin-page');
@@ -834,7 +841,7 @@
 
 {% block extra_js %}
 <!-- Ensure base.js is loaded first -->
-<script src="{{ url_for('static', filename='js/base.js') }}"></script>
+<script src="{{ url_for('static', filename='js/base.js') }}?v=3.0"></script>
 <script>
     console.log('Admin Dashboard JavaScript Loaded');
     console.log('Users loaded:', {{ users|length }});

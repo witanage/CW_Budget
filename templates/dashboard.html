@@ -3,7 +3,7 @@
 {% block title %}Dashboard - Personal Finance Manager{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/loader.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/loader.css') }}?v=2.2">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/exchange_rate_trends.css') }}">
 {% endblock %}
 
@@ -78,6 +78,13 @@
             <!-- Vertical expand tab (shown when sidebar is collapsed) -->
             <div id="sidebarExpandTab" class="sidebar-expand-tab" title="Expand sidebar" style="display: none;">
                 <i class="fas fa-chevron-right"></i>
+            </div>
+
+            <!-- Page Transition Loader -->
+            <div id="pageTransitionLoader" class="page-transition-loader">
+                <div class="page-transition-content">
+                    <div class="professional-spinner"></div>
+                </div>
             </div>
 
             <!-- Transactions Page -->
@@ -636,10 +643,7 @@
 
                     <!-- Loading -->
                     <div id="ertLoading" class="text-center py-5">
-                        <div class="spinner-border text-primary" role="status">
-                            <span class="visually-hidden">Loading...</span>
-                        </div>
-                        <p class="mt-2 text-muted">Loading exchange rate data...</p>
+                        <div class="professional-spinner"></div>
                     </div>
 
                     <!-- Error -->
@@ -1188,11 +1192,8 @@
             </div>
             <div class="modal-body">
                 <div id="auditLogContent">
-                    <div class="text-center">
-                        <div class="spinner-border text-primary" role="status">
-                            <span class="visually-hidden">Loading...</span>
-                        </div>
-                        <p class="mt-2">Loading audit logs...</p>
+                    <div class="text-center py-4">
+                        <div class="professional-spinner"></div>
                     </div>
                 </div>
             </div>
@@ -1226,10 +1227,8 @@
                         <h6 class="mb-3">
                             <i class="fas fa-paperclip me-2"></i>Bill Attachment
                         </h6>
-                        <div id="billAttachmentDisplay" class="text-center">
-                            <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
+                        <div id="billAttachmentDisplay" class="text-center py-3">
+                            <div class="professional-spinner"></div>
                         </div>
                     </div>
                 </div>
@@ -2519,7 +2518,7 @@ tr[draggable="true"] {
     }
 </script>
 <!-- Ensure base.js is loaded first -->
-<script src="{{ url_for('static', filename='js/base.js') }}"></script>
-<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
-<script src="{{ url_for('static', filename='js/exchange_rate_trends.js') }}"></script>
+<script src="{{ url_for('static', filename='js/base.js') }}?v=3.0"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=3.0"></script>
+<script src="{{ url_for('static', filename='js/exchange_rate_trends.js') }}?v=3.0"></script>
 {% endblock %}

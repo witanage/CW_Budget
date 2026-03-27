@@ -127,6 +127,11 @@
     // Single API fetch
     // ===================================================================
     function _fetchAll() {
+        // Hide global loading spinner if it's active (for standalone page)
+        if (typeof hideLoading === 'function') {
+            hideLoading();
+        }
+
         _show('ertLoading', true);
         _show('ertError',   false);
         _show('ertContent',  false);

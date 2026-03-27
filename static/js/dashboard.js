@@ -388,32 +388,65 @@ function setupSidebarToggle() {
 function navigateToPage(pageName) {
     console.log('→ Navigating to:', pageName);
 
-    // Hide all pages
-    const allPages = document.querySelectorAll('.page-content');
-    allPages.forEach(page => page.style.display = 'none');
+    // Get the page transition loader
+    const transitionLoader = document.getElementById('pageTransitionLoader');
 
-    // Remove active from all nav links
-    const allLinks = document.querySelectorAll('.sidebar .nav-link');
-    allLinks.forEach(link => link.classList.remove('active'));
-
-    // Show target page
-    const targetPage = document.getElementById(pageName + 'Page');
-    if (targetPage) {
-        targetPage.style.display = 'block';
-        console.log('✓ Showing:', pageName + 'Page');
-    } else {
-        console.error('✗ Page not found:', pageName + 'Page');
-        return;
+    // Show transition loader
+    if (transitionLoader) {
+        transitionLoader.classList.add('active');
     }
 
-    // Set active nav link
-    const activeLink = document.querySelector(`[data-page="${pageName}"]`);
-    if (activeLink) {
-        activeLink.classList.add('active');
-    }
+    // Small delay to ensure loader is visible before switching
+    setTimeout(() => {
+        // Hide all pages
+        const allPages = document.querySelectorAll('.page-content');
+        allPages.forEach(page => {
+            page.style.display = 'none';
+            page.style.opacity = '0';
+        });
 
-    // Load page-specific data
-    loadPageData(pageName);
+        // Remove active from all nav links
+        const allLinks = document.querySelectorAll('.sidebar .nav-link');
+        allLinks.forEach(link => link.classList.remove('active'));
+
+        // Show target page
+        const targetPage = document.getElementById(pageName + 'Page');
+        if (targetPage) {
+            targetPage.style.display = 'block';
+            console.log('✓ Showing:', pageName + 'Page');
+
+            // Fade in the page
+            setTimeout(() => {
+                targetPage.style.transition = 'opacity 0.3s ease-in-out';
+                targetPage.style.opacity = '1';
+            }, 50);
+        } else {
+            console.error('✗ Page not found:', pageName + 'Page');
+            if (transitionLoader) {
+                transitionLoader.classList.remove('active');
+            }
+            return;
+        }
+
+        // Set active nav link
+        const activeLink = document.querySelector(`[data-page="${pageName}"]`);
+        if (activeLink) {
+            activeLink.classList.add('active');
+        }
+
+        // Load page-specific data
+        loadPageData(pageName);
+
+        // Hide transition loader after content is ready
+        setTimeout(() => {
+            if (transitionLoader) {
+                transitionLoader.classList.add('fade-out');
+                setTimeout(() => {
+                    transitionLoader.classList.remove('active', 'fade-out');
+                }, 150);
+            }
+        }, 300);
+    }, 50);
 }
 
 function loadPageData(pageName) {

@@ -16,7 +16,8 @@
 
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
-    
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/loader.css') }}?v=2.2">
+
     {% block extra_css %}{% endblock %}
 </head>
 <body>
@@ -118,17 +119,11 @@
     <!-- Main Content -->
     {% block content %}{% endblock %}
 
-    <!-- Loading Spinner -->
+    <!-- Loading Spinner (Global) -->
     <div class="loading-spinner">
         <div class="loading-overlay">
             <div class="loading-content">
-                <div class="spinner-wrapper">
-                    <div class="spinner-ring"></div>
-                    <div class="spinner-ring"></div>
-                    <div class="spinner-ring"></div>
-                    <div class="spinner-ring"></div>
-                </div>
-                <div class="loading-text">Loading...</div>
+                <div class="professional-spinner"></div>
             </div>
         </div>
     </div>
@@ -221,12 +216,12 @@
 
     <!-- Bootstrap JS Bundle with Popper -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    
+
     <!-- jQuery (optional) -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
     <!-- Common JavaScript Functions -->
-    <script src="{{ url_for('static', filename='js/base.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/base.js') }}?v=3.0"></script>
     
     {% block extra_js %}{% endblock %}
 </body>

@@ -111,6 +111,28 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB max upload size
 
 CORS(app)
 
+
+# ---------------------------------------------------------------------------
+# Cache Control - Disable caching during development
+# ---------------------------------------------------------------------------
+@app.after_request
+def add_header(response):
+    """
+    Add headers to disable caching for HTML, CSS, and JS files.
+    This ensures changes are immediately visible during development.
+
+    Remove or modify this in production for better performance.
+    """
+    # Don't cache HTML, CSS, JS, or JSON responses
+    if response.content_type and any(ct in response.content_type for ct in
+                                     ['text/html', 'text/css', 'application/javascript',
+                                      'application/json', 'text/javascript']):
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+    return response
+
+
 # ---------------------------------------------------------------------------
 # Database connection pool (centralised in db.py)
 # ---------------------------------------------------------------------------
