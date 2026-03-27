@@ -3,10 +3,32 @@
 {% block title %}Dashboard - Personal Finance Manager{% endblock %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/loader.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/exchange_rate_trends.css') }}">
 {% endblock %}
 
 {% block content %}
+<!-- Page Loader -->
+<div id="pageLoader" class="page-loader">
+    <div class="loader-content">
+        <div class="loader-icon">
+            <div class="loader-circle"></div>
+            <div class="loader-circle"></div>
+            <div class="loader-circle"></div>
+            <div class="loader-center">
+                <i class="fas fa-chart-line"></i>
+            </div>
+        </div>
+        <div class="loader-text">
+            <h3>Loading Your Dashboard</h3>
+            <p class="loading-dots">Please wait</p>
+        </div>
+        <div class="loader-progress">
+            <div class="loader-progress-bar"></div>
+        </div>
+    </div>
+</div>
+
 <!-- Mobile Sidebar Overlay -->
 <div id="sidebarOverlay" class="sidebar-overlay"></div>
 
@@ -2486,6 +2508,10 @@ tr[draggable="true"] {
 {% endblock %}
 
 {% block extra_js %}
+<!-- Vanta.js for animated background -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.birds.min.js"></script>
+<!-- PDF.js for bill scanning -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
     if (typeof pdfjsLib !== 'undefined') {
