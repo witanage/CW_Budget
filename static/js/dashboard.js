@@ -138,9 +138,17 @@ async function compressFileForUpload(file) {
     }
 }
 
+// Global variable for Vanta effect
+let vantaEffect = null;
+
 // Initialize everything when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
     console.log('=== Dashboard Loading ===');
+
+    // Initialize Vanta.js background animation
+    initVantaBackground();
+
+    // Loader is shown by default in HTML, will be hidden after initialization
     initApp();
 });
 
@@ -170,6 +178,77 @@ function initApp() {
         console.log('✓ Dashboard loaded successfully');
     } catch (error) {
         console.error('✗ Dashboard initialization failed:', error);
+        hideLoader(); // Hide loader even on error
+    }
+}
+
+// Initialize Vanta.js background animation
+// Initialize Vanta.js background animation
+function initVantaBackground() {
+    if (typeof VANTA !== 'undefined' && typeof VANTA.BIRDS !== 'undefined') {
+        const loader = document.getElementById('pageLoader');
+        if (loader) {
+            // Get current theme
+            const theme = document.documentElement.getAttribute('data-theme') || 'dark';
+
+            // Set colors based on theme
+            const colors = theme === 'dark' ? {
+                backgroundColor: 0x1a1a1a,
+                color1: 0x007acc,
+                color2: 0x0066ff,
+                colorMode: 'variance'
+            } : {
+                backgroundColor: 0xf8fafc,
+                color1: 0x0866ff,
+                color2: 0x4299e1,
+                colorMode: 'variance'
+            };
+
+            vantaEffect = VANTA.BIRDS({
+                el: loader,
+                mouseControls: true,
+                touchControls: true,
+                gyroControls: false,
+                minHeight: 200.00,
+                minWidth: 200.00,
+                scale: 0.50,
+                scaleMobile: 0.50,
+                ...colors,
+                quantity: 8.00,
+                speedLimit: 4.00,
+                separation: 50.00,
+                alignment: 50.00,
+                cohesion: 50.00
+            });
+        }
+    }
+}
+
+// Hide the page loader
+function hideLoader() {
+    const loader = document.getElementById('pageLoader');
+    if (loader) {
+        loader.classList.add('fade-out');
+        // Destroy Vanta effect
+        if (vantaEffect) {
+            vantaEffect.destroy();
+            vantaEffect = null;
+        }
+        // Remove from DOM after animation completes
+        setTimeout(() => {
+            loader.style.display = 'none';
+        }, 500);
+    }
+}
+
+// Show the page loader (for manual refresh)
+function showLoader() {
+    const loader = document.getElementById('pageLoader');
+    if (loader) {
+        loader.style.display = 'flex';
+        loader.classList.remove('fade-out');
+        // Reinitialize Vanta effect
+        initVantaBackground();
     }
 }
 
@@ -182,13 +261,17 @@ async function loadUserPreferredPage() {
             const defaultPage = data.default_page || 'transactions';
             console.log('✓ Loading user preferred page:', defaultPage);
             navigateToPage(defaultPage);
+            // Hide loader after navigation and a brief moment for data to load
+            setTimeout(hideLoader, 800);
         } else {
             console.warn('Failed to fetch user preferences, loading default page');
             navigateToPage('transactions');
+            setTimeout(hideLoader, 800);
         }
     } catch (error) {
         console.error('Error fetching user preferences:', error);
         navigateToPage('transactions');
+        setTimeout(hideLoader, 800);
     }
 }
 
