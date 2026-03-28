@@ -2507,14 +2507,14 @@ tr[draggable="true"] {
 {% endblock %}
 
 {% block extra_js %}
-<!-- Vanta.js for animated background -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.birds.min.js"></script>
-<!-- PDF.js for bill scanning -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<!-- Vanta.js for animated background (self-hosted) -->
+<script src="{{ url_for('static', filename='js/vendor/three.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/vendor/vanta.birds.min.js') }}"></script>
+<!-- PDF.js for bill scanning (self-hosted) -->
+<script src="{{ url_for('static', filename='js/vendor/pdf.min.js') }}"></script>
 <script>
     if (typeof pdfjsLib !== 'undefined') {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "{{ url_for('static', filename='js/vendor/pdf.worker.min.js') }}";
     }
 </script>
 <!-- Ensure base.js is loaded first -->
