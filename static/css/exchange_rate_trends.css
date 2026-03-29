@@ -90,6 +90,16 @@
     width: 100%;
 }
 
+/* Chart legend hover effect */
+.ert-chart-container canvas {
+    transition: cursor 0.2s ease;
+}
+
+/* Make chart legend items more prominent */
+.ert-container canvas:hover {
+    /* Cursor will be dynamically set by JavaScript */
+}
+
 /* Period selector buttons */
 #ertPeriodSelector .btn-outline-primary {
     border-color: var(--accent-color);

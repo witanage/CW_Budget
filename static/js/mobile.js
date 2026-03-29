@@ -528,7 +528,7 @@ try {
         // Display based on file type
         let attachmentContent;
         if (isPdf) {
-            // For PDFs, show download and open options
+            // For PDFs, show download and open options (no loading spinner needed for non-preview)
             attachmentContent = `
                 <div class="alert alert-info mb-3">
                     <i class="fas fa-file-pdf me-2"></i>
@@ -545,8 +545,16 @@ try {
                 </div>
             `;
         } else {
-            // Display image
-            attachmentContent = `<img src="${data.file_url}" alt="Bill Attachment" class="img-fluid rounded shadow-sm"/>`;
+            // Display image with loading state
+            attachmentContent = `
+                <div id="mobileImageLoadingSpinner" class="text-center py-3">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading image...</span>
+                    </div>
+                    <p class="text-muted mt-2">Loading image...</p>
+                </div>
+                <img src="${data.file_url}" alt="Bill Attachment" class="img-fluid rounded shadow-sm" style="display: none;" onload="this.style.display='block'; document.getElementById('mobileImageLoadingSpinner').style.display='none';" onerror="this.style.display='none'; document.getElementById('mobileImageLoadingSpinner').innerHTML='&lt;div class=&quot;alert alert-danger&quot;&gt;&lt;i class=&quot;fas fa-exclamation-triangle me-2&quot;&gt;&lt;/i&gt;Failed to load image&lt;/div&gt;';">
+            `;
         }
 
         mobileBillAttachmentContainer.innerHTML = `
@@ -1651,7 +1659,7 @@ async function showMobileAttachmentFromInfo() {
             // Display the attachment (image or PDF)
             let attachmentContent;
             if (isPdf) {
-                // For PDFs, provide download and new tab options
+                // For PDFs, provide download and new tab options with loading state
                 attachmentContent = `
                     <div class="alert alert-info mb-3">
                         <i class="fas fa-file-pdf me-2"></i>
@@ -1666,15 +1674,29 @@ async function showMobileAttachmentFromInfo() {
                             <i class="fas fa-external-link-alt me-1"></i>Open in New Tab
                         </a>
                     </div>
-                    <div style="width: 100%; height: 500px; overflow: auto; border: 1px solid #ddd; border-radius: 5px; background: #f5f5f5;">
-                        <iframe src="${data.file_url}" width="100%" height="100%" frameborder="0" style="background: white;">
+                    <div id="mobileInfoPdfLoadingSpinner" class="text-center py-3">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading PDF...</span>
+                        </div>
+                        <p class="text-muted mt-2">Loading PDF preview...</p>
+                    </div>
+                    <div style="width: 100%; height: 500px; overflow: auto; border: 1px solid #ddd; border-radius: 5px; background: #f5f5f5; display: none;" id="mobileInfoPdfIframeContainer">
+                        <iframe src="${data.file_url}" width="100%" height="100%" frameborder="0" style="background: white;" onload="document.getElementById('mobileInfoPdfLoadingSpinner').style.display='none'; document.getElementById('mobileInfoPdfIframeContainer').style.display='block';">
                             <p>PDF preview not available. <a href="${data.download_url}" download>Download PDF</a></p>
                         </iframe>
                     </div>
                 `;
             } else {
-                // Display image
-                attachmentContent = `<img src="${data.file_url}" alt="Bill Attachment" class="img-fluid rounded shadow-sm"/>`;
+                // Display image with loading state
+                attachmentContent = `
+                    <div id="mobileInfoImageLoadingSpinner" class="text-center py-3">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading image...</span>
+                        </div>
+                        <p class="text-muted mt-2">Loading image...</p>
+                    </div>
+                    <img src="${data.file_url}" alt="Bill Attachment" class="img-fluid rounded shadow-sm" style="display: none;" onload="this.style.display='block'; document.getElementById('mobileInfoImageLoadingSpinner').style.display='none';" onerror="this.style.display='none'; document.getElementById('mobileInfoImageLoadingSpinner').innerHTML='&lt;div class=&quot;alert alert-danger&quot;&gt;&lt;i class=&quot;fas fa-exclamation-triangle me-2&quot;&gt;&lt;/i&gt;Failed to load image&lt;/div&gt;';">
+                `;
             }
 
             mobileInfoAttachmentContainer.innerHTML = `
