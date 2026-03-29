@@ -28,8 +28,12 @@ let activeFilters = {
     maxAmount: null,
     startDate: null,
     endDate: null,
-    notes: ''
+    notes: '',
+    caseSensitive: false,
+    excludeWeekends: false
 };
+let savedFilterPresets = JSON.parse(localStorage.getItem('filterPresets') || '[]');
+let recentFilters = JSON.parse(localStorage.getItem('recentFilters') || '[]');
 let reportFiltersInitialized = false;
 let filterDropdownsInitialized = false;
 let loadedReportTabs = new Set(); // Track which report tabs have been loaded
@@ -575,10 +579,28 @@ function setupFormButtons() {
         clearFiltersPageBtn.addEventListener('click', clearFilters);
     }
 
+    // Preview filters button
+    const previewFiltersBtn = document.getElementById('previewFiltersBtn');
+    if (previewFiltersBtn) {
+        previewFiltersBtn.addEventListener('click', previewFilterResults);
+    }
+
+    // Save current preset button
+    const saveCurrentPresetBtn = document.getElementById('saveCurrentPresetBtn');
+    if (saveCurrentPresetBtn) {
+        saveCurrentPresetBtn.addEventListener('click', saveCurrentPreset);
+    }
+
     // Setup filter modal to populate checkboxes when shown
     const filterModal = document.getElementById('filterModal');
     if (filterModal) {
-        filterModal.addEventListener('shown.bs.modal', populateFilterDropdowns);
+        filterModal.addEventListener('shown.bs.modal', function() {
+            populateFilterDropdowns();
+            displaySavedPresets();
+            displayRecentFilters();
+            setupFilterSearchListeners();
+            updateFilterPreview();
+        });
     }
 
     // Setup manage categories modal to load categories when shown
@@ -2077,15 +2099,29 @@ async function loadAndDisplayAttachment() {
                             <i class="fas fa-external-link-alt me-1"></i>Open in New Tab
                         </a>
                     </div>
-                    <div style="width: 100%; height: 600px; overflow: auto; border: 1px solid #ddd; border-radius: 5px; background: #f5f5f5;">
-                        <iframe src="${data.file_url}" width="100%" height="100%" frameborder="0" style="background: white;">
+                    <div id="pdfLoadingSpinner" class="text-center py-3">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading PDF...</span>
+                        </div>
+                        <p class="text-muted mt-2">Loading PDF preview...</p>
+                    </div>
+                    <div style="width: 100%; height: 600px; overflow: auto; border: 1px solid #ddd; border-radius: 5px; background: #f5f5f5; display: none;" id="pdfIframeContainer">
+                        <iframe src="${data.file_url}" width="100%" height="100%" frameborder="0" style="background: white;" onload="document.getElementById('pdfLoadingSpinner').style.display='none'; document.getElementById('pdfIframeContainer').style.display='block';">
                             <p>PDF preview not available. <a href="${data.download_url}" download>Download PDF</a></p>
                         </iframe>
                     </div>
                 `;
             } else {
-                // Display image
-                attachmentContent = `<img src="${data.file_url}" alt="Bill Attachment" class="img-fluid rounded shadow-sm" style="max-width: 100%; height: auto;"/>`;
+                // Display image with loading state
+                attachmentContent = `
+                    <div id="imageLoadingSpinner" class="text-center py-3">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading image...</span>
+                        </div>
+                        <p class="text-muted mt-2">Loading image...</p>
+                    </div>
+                    <img src="${data.file_url}" alt="Bill Attachment" class="img-fluid rounded shadow-sm" style="max-width: 100%; height: auto; display: none;" onload="this.style.display='block'; document.getElementById('imageLoadingSpinner').style.display='none';" onerror="this.style.display='none'; document.getElementById('imageLoadingSpinner').innerHTML='&lt;div class=&quot;alert alert-danger&quot;&gt;&lt;i class=&quot;fas fa-exclamation-triangle me-2&quot;&gt;&lt;/i&gt;Failed to load image&lt;/div&gt;';">
+                `;
             }
 
             billAttachmentContainer.innerHTML = `
@@ -2459,6 +2495,17 @@ function applyQuickFilter(filterType) {
             document.getElementById('filterEndDate').value = todayStr;
             break;
 
+        case 'yesterday':
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yyyyY = yesterday.getFullYear();
+            const mmY = String(yesterday.getMonth() + 1).padStart(2, '0');
+            const ddY = String(yesterday.getDate()).padStart(2, '0');
+            const yesterdayStr = `${yyyyY}-${mmY}-${ddY}`;
+            document.getElementById('filterStartDate').value = yesterdayStr;
+            document.getElementById('filterEndDate').value = yesterdayStr;
+            break;
+
         case 'last7days':
             const last7days = new Date(today);
             last7days.setDate(last7days.getDate() - 7);
@@ -2469,11 +2516,47 @@ function applyQuickFilter(filterType) {
             document.getElementById('filterEndDate').value = todayStr;
             break;
 
+        case 'last30days':
+            const last30days = new Date(today);
+            last30days.setDate(last30days.getDate() - 30);
+            const yyyy30 = last30days.getFullYear();
+            const mm30 = String(last30days.getMonth() + 1).padStart(2, '0');
+            const dd30 = String(last30days.getDate()).padStart(2, '0');
+            document.getElementById('filterStartDate').value = `${yyyy30}-${mm30}-${dd30}`;
+            document.getElementById('filterEndDate').value = todayStr;
+            break;
+
         case 'thisMonth':
             const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
             const yyyyFirst = firstDay.getFullYear();
             const mmFirst = String(firstDay.getMonth() + 1).padStart(2, '0');
             document.getElementById('filterStartDate').value = `${yyyyFirst}-${mmFirst}-01`;
+            document.getElementById('filterEndDate').value = todayStr;
+            break;
+
+        case 'lastMonth':
+            const lastMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
+            const yyyyLM = lastMonthDate.getFullYear();
+            const mmLM = String(lastMonthDate.getMonth() + 1).padStart(2, '0');
+            const yyyyLME = lastMonthEnd.getFullYear();
+            const mmLME = String(lastMonthEnd.getMonth() + 1).padStart(2, '0');
+            const ddLME = String(lastMonthEnd.getDate()).padStart(2, '0');
+            document.getElementById('filterStartDate').value = `${yyyyLM}-${mmLM}-01`;
+            document.getElementById('filterEndDate').value = `${yyyyLME}-${mmLME}-${ddLME}`;
+            break;
+
+        case 'thisQuarter':
+            const currentQuarter = Math.floor(today.getMonth() / 3);
+            const quarterStart = new Date(today.getFullYear(), currentQuarter * 3, 1);
+            const yyyyQS = quarterStart.getFullYear();
+            const mmQS = String(quarterStart.getMonth() + 1).padStart(2, '0');
+            document.getElementById('filterStartDate').value = `${yyyyQS}-${mmQS}-01`;
+            document.getElementById('filterEndDate').value = todayStr;
+            break;
+
+        case 'thisYear':
+            document.getElementById('filterStartDate').value = `${yyyy}-01-01`;
             document.getElementById('filterEndDate').value = todayStr;
             break;
 
@@ -2488,6 +2571,14 @@ function applyQuickFilter(filterType) {
         case 'unpaid':
             document.getElementById('filterStatusUnpaid').checked = true;
             break;
+
+        case 'paid':
+            document.getElementById('filterStatusPaid').checked = true;
+            break;
+
+        case 'highValue':
+            document.getElementById('filterMinAmount').value = '500';
+            break;
     }
 
     // Apply the filters
@@ -2497,24 +2588,73 @@ function applyQuickFilter(filterType) {
 // Select/Deselect All Functions
 function selectAllCategories() {
     document.querySelectorAll('.filter-category-checkbox').forEach(cb => cb.checked = true);
+    updateFilterPreview();
 }
 
 function deselectAllCategories() {
     document.querySelectorAll('.filter-category-checkbox').forEach(cb => cb.checked = false);
+    updateFilterPreview();
 }
 
 function selectAllPaymentMethods() {
     document.querySelectorAll('.filter-payment-checkbox').forEach(cb => cb.checked = true);
+    updateFilterPreview();
 }
 
 function deselectAllPaymentMethods() {
     document.querySelectorAll('.filter-payment-checkbox').forEach(cb => cb.checked = false);
+    updateFilterPreview();
+}
+
+// New filter helper functions
+function selectIncomeCategoriesOnly() {
+    document.querySelectorAll('.filter-category-checkbox').forEach(cb => {
+        const catId = parseInt(cb.value);
+        const cat = currentCategories.find(c => c.id === catId);
+        cb.checked = cat && cat.type === 'income';
+    });
+    updateFilterPreview();
+}
+
+function selectExpenseCategoriesOnly() {
+    document.querySelectorAll('.filter-category-checkbox').forEach(cb => {
+        const catId = parseInt(cb.value);
+        const cat = currentCategories.find(c => c.id === catId);
+        cb.checked = cat && cat.type === 'expense';
+    });
+    updateFilterPreview();
+}
+
+function selectCashPaymentMethodsOnly() {
+    document.querySelectorAll('.filter-payment-checkbox').forEach(cb => {
+        const methodId = parseInt(cb.value);
+        const method = paymentMethods.find(m => m.id === methodId);
+        cb.checked = method && method.type === 'cash';
+    });
+    updateFilterPreview();
+}
+
+function selectCardPaymentMethodsOnly() {
+    document.querySelectorAll('.filter-payment-checkbox').forEach(cb => {
+        const methodId = parseInt(cb.value);
+        const method = paymentMethods.find(m => m.id === methodId);
+        cb.checked = method && method.type === 'credit_card';
+    });
+    updateFilterPreview();
+}
+
+function setAmountRange(min, max) {
+    document.getElementById('filterMinAmount').value = min || '';
+    document.getElementById('filterMaxAmount').value = max || '';
+    updateFilterPreview();
 }
 
 function applyFilters() {
     // Get filter values
     activeFilters.description = document.getElementById('filterDescription')?.value.trim() || '';
     activeFilters.notes = document.getElementById('filterNotes')?.value.trim() || '';
+    activeFilters.caseSensitive = document.getElementById('filterCaseSensitive')?.checked || false;
+    activeFilters.excludeWeekends = document.getElementById('filterExcludeWeekends')?.checked || false;
 
     // Get selected categories (from checkboxes)
     activeFilters.categories = [];
@@ -2552,6 +2692,9 @@ function applyFilters() {
 
     console.log('Active filters:', activeFilters);
 
+    // Save to recent filters
+    saveToRecentFilters();
+
     // Update active filters display
     displayActiveFilters();
 
@@ -2576,7 +2719,9 @@ function clearFiltersWithoutReload() {
         maxAmount: null,
         startDate: null,
         endDate: null,
-        notes: ''
+        notes: '',
+        caseSensitive: false,
+        excludeWeekends: false
     };
 
     // Clear form inputs
@@ -2586,6 +2731,8 @@ function clearFiltersWithoutReload() {
     const maxAmountInput = document.getElementById('filterMaxAmount');
     const startDateInput = document.getElementById('filterStartDate');
     const endDateInput = document.getElementById('filterEndDate');
+    const caseSensitiveInput = document.getElementById('filterCaseSensitive');
+    const excludeWeekendsInput = document.getElementById('filterExcludeWeekends');
 
     if (descInput) descInput.value = '';
     if (notesInput) notesInput.value = '';
@@ -2593,6 +2740,8 @@ function clearFiltersWithoutReload() {
     if (maxAmountInput) maxAmountInput.value = '';
     if (startDateInput) startDateInput.value = '';
     if (endDateInput) endDateInput.value = '';
+    if (caseSensitiveInput) caseSensitiveInput.checked = false;
+    if (excludeWeekendsInput) excludeWeekendsInput.checked = false;
 
     // Uncheck all filter checkboxes
     document.querySelectorAll('.filter-category-checkbox').forEach(checkbox => {
@@ -2610,6 +2759,7 @@ function clearFiltersWithoutReload() {
 
     // Update active filters display and badge
     displayActiveFilters();
+    updateFilterPreview();
 }
 
 function clearFilters() {
@@ -2769,6 +2919,324 @@ function displayActiveFilters() {
     if (clearFiltersPageBtn) {
         clearFiltersPageBtn.style.display = hasActiveFilters ? 'inline-block' : 'none';
     }
+
+    // Always update in modal preview
+    updateFilterPreviewDisplay();
+}
+
+// New filter functions for presets, recent, and search
+
+function saveToRecentFilters() {
+    // Create a snapshot of current filters
+    const filterSnapshot = {
+        timestamp: new Date().toISOString(),
+        filters: JSON.parse(JSON.stringify(activeFilters))
+    };
+
+    // Add to beginning of array
+    recentFilters.unshift(filterSnapshot);
+
+    // Keep only last 5
+    recentFilters = recentFilters.slice(0, 5);
+
+    // Save to localStorage
+    localStorage.setItem('recentFilters', JSON.stringify(recentFilters));
+
+    // Update UI
+    displayRecentFilters();
+}
+
+function displayRecentFilters() {
+    const container = document.getElementById('recentFiltersContainer');
+    if (!container) return;
+
+    if (recentFilters.length === 0) {
+        container.innerHTML = '<small class="text-muted">No recent filters</small>';
+        return;
+    }
+
+    container.innerHTML = '';
+    recentFilters.forEach((filterSnapshot, index) => {
+        const filters = filterSnapshot.filters;
+        const date = new Date(filterSnapshot.timestamp);
+        const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        // Create short description
+        let desc = [];
+        if (filters.description) desc.push('Desc');
+        if (filters.categories.length > 0) desc.push(`${filters.categories.length} Cat`);
+        if (filters.types.length > 0) desc.push(filters.types.join('/'));
+        if (filters.minAmount || filters.maxAmount) desc.push('Amount');
+        if (filters.startDate || filters.endDate) desc.push('Date');
+
+        const badge = document.createElement('span');
+        badge.className = 'badge bg-info preset-badge';
+        badge.innerHTML = `
+            <i class="fas fa-history me-1"></i>
+            ${desc.length > 0 ? desc.join(', ') : 'Filter'} (${timeStr})
+        `;
+        badge.style.cursor = 'pointer';
+        badge.onclick = () => loadFilterFromSnapshot(filterSnapshot);
+        container.appendChild(badge);
+    });
+}
+
+function displaySavedPresets() {
+    const container = document.getElementById('savedPresetsContainer');
+    if (!container) return;
+
+    if (savedFilterPresets.length === 0) {
+        container.innerHTML = '<small class="text-muted">No saved presets yet</small>';
+        return;
+    }
+
+    container.innerHTML = '';
+    savedFilterPresets.forEach((preset, index) => {
+        const badge = document.createElement('span');
+        badge.className = 'badge bg-primary preset-badge';
+        badge.innerHTML = `
+            <i class="fas fa-bookmark me-1"></i>
+            ${preset.name}
+            <button class="btn-close btn-close-white" onclick="event.stopPropagation(); deletePreset(${index})"></button>
+        `;
+        badge.style.cursor = 'pointer';
+        badge.onclick = () => loadFilterFromPreset(preset);
+        container.appendChild(badge);
+    });
+}
+
+function loadFilterFromSnapshot(snapshot) {
+    const filters = snapshot.filters;
+    loadFiltersIntoForm(filters);
+    showToast('Recent filter loaded', 'info');
+}
+
+function loadFilterFromPreset(preset) {
+    loadFiltersIntoForm(preset.filters);
+    showToast(`Preset "${preset.name}" loaded`, 'success');
+}
+
+function loadFiltersIntoForm(filters) {
+    // Clear first
+    clearFiltersWithoutReload();
+
+    // Load text inputs
+    if (filters.description) document.getElementById('filterDescription').value = filters.description;
+    if (filters.notes) document.getElementById('filterNotes').value = filters.notes;
+    if (filters.caseSensitive) document.getElementById('filterCaseSensitive').checked = true;
+    if (filters.excludeWeekends) document.getElementById('filterExcludeWeekends').checked = true;
+
+    // Load categories
+    filters.categories.forEach(catId => {
+        const checkbox = document.querySelector(`.filter-category-checkbox[value="${catId}"]`);
+        if (checkbox) checkbox.checked = true;
+    });
+
+    // Load payment methods
+    filters.paymentMethods.forEach(methodId => {
+        const checkbox = document.querySelector(`.filter-payment-checkbox[value="${methodId}"]`);
+        if (checkbox) checkbox.checked = true;
+    });
+
+    // Load types
+    filters.types.forEach(type => {
+        const checkbox = document.querySelector(`.filter-type-checkbox[value="${type}"]`);
+        if (checkbox) checkbox.checked = true;
+    });
+
+    // Load statuses
+    filters.statuses.forEach(status => {
+        const checkbox = document.querySelector(`.filter-status-checkbox[value="${status}"]`);
+        if (checkbox) checkbox.checked = true;
+    });
+
+    // Load amounts
+    if (filters.minAmount !== null) document.getElementById('filterMinAmount').value = filters.minAmount;
+    if (filters.maxAmount !== null) document.getElementById('filterMaxAmount').value = filters.maxAmount;
+
+    // Load dates
+    if (filters.startDate) document.getElementById('filterStartDate').value = filters.startDate;
+    if (filters.endDate) document.getElementById('filterEndDate').value = filters.endDate;
+
+    updateFilterPreview();
+}
+
+function saveCurrentPreset() {
+    const presetName = prompt('Enter a name for this filter preset:');
+    if (!presetName || presetName.trim() === '') {
+        showToast('Preset name is required', 'warning');
+        return;
+    }
+
+    // Get current filter values from form
+    const currentFilters = {
+        description: document.getElementById('filterDescription')?.value.trim() || '',
+        notes: document.getElementById('filterNotes')?.value.trim() || '',
+        caseSensitive: document.getElementById('filterCaseSensitive')?.checked || false,
+        excludeWeekends: document.getElementById('filterExcludeWeekends')?.checked || false,
+        categories: Array.from(document.querySelectorAll('.filter-category-checkbox:checked')).map(cb => cb.value),
+        paymentMethods: Array.from(document.querySelectorAll('.filter-payment-checkbox:checked')).map(cb => cb.value),
+        types: Array.from(document.querySelectorAll('.filter-type-checkbox:checked')).map(cb => cb.value),
+        statuses: Array.from(document.querySelectorAll('.filter-status-checkbox:checked')).map(cb => cb.value),
+        minAmount: document.getElementById('filterMinAmount')?.value ? parseFloat(document.getElementById('filterMinAmount').value) : null,
+        maxAmount: document.getElementById('filterMaxAmount')?.value ? parseFloat(document.getElementById('filterMaxAmount').value) : null,
+        startDate: document.getElementById('filterStartDate')?.value || null,
+        endDate: document.getElementById('filterEndDate')?.value || null
+    };
+
+    const preset = {
+        name: presetName.trim(),
+        filters: currentFilters,
+        created: new Date().toISOString()
+    };
+
+    savedFilterPresets.push(preset);
+    localStorage.setItem('filterPresets', JSON.stringify(savedFilterPresets));
+
+    displaySavedPresets();
+    showToast(`Preset "${presetName}" saved successfully`, 'success');
+}
+
+function deletePreset(index) {
+    const preset = savedFilterPresets[index];
+    if (confirm(`Delete preset "${preset.name}"?`)) {
+        savedFilterPresets.splice(index, 1);
+        localStorage.setItem('filterPresets', JSON.stringify(savedFilterPresets));
+        displaySavedPresets();
+        showToast('Preset deleted', 'info');
+    }
+}
+
+// Filter preview functionality
+function updateFilterPreview() {
+    // This will be called when filter inputs change
+    // For now, just update the display
+    updateFilterPreviewDisplay();
+}
+
+function updateFilterPreviewDisplay() {
+    const listEl = document.getElementById('activeFiltersList');
+    if (!listEl) return;
+
+    // Collect current filter selections
+    const desc = document.getElementById('filterDescription')?.value.trim() || '';
+    const notes = document.getElementById('filterNotes')?.value.trim() || '';
+    const categories = Array.from(document.querySelectorAll('.filter-category-checkbox:checked'));
+    const paymentMethods = Array.from(document.querySelectorAll('.filter-payment-checkbox:checked'));
+    const types = Array.from(document.querySelectorAll('.filter-type-checkbox:checked'));
+    const statuses = Array.from(document.querySelectorAll('.filter-status-checkbox:checked'));
+    const minAmount = document.getElementById('filterMinAmount')?.value;
+    const maxAmount = document.getElementById('filterMaxAmount')?.value;
+    const startDate = document.getElementById('filterStartDate')?.value;
+    const endDate = document.getElementById('filterEndDate')?.value;
+
+    listEl.innerHTML = '';
+    let hasFilters = false;
+
+    if (desc) {
+        hasFilters = true;
+        listEl.innerHTML += `<span class="badge bg-primary rounded-pill"><i class="fas fa-file-alt me-1"></i>Desc: "${desc}"</span>`;
+    }
+    if (notes) {
+        hasFilters = true;
+        listEl.innerHTML += `<span class="badge bg-primary rounded-pill"><i class="fas fa-sticky-note me-1"></i>Notes: "${notes}"</span>`;
+    }
+    if (categories.length > 0) {
+        hasFilters = true;
+        listEl.innerHTML += `<span class="badge bg-info text-dark rounded-pill"><i class="fas fa-tags me-1"></i>${categories.length} Categories</span>`;
+    }
+    if (paymentMethods.length > 0) {
+        hasFilters = true;
+        listEl.innerHTML += `<span class="badge bg-info text-dark rounded-pill"><i class="fas fa-credit-card me-1"></i>${paymentMethods.length} Payment Methods</span>`;
+    }
+    if (types.length > 0) {
+        hasFilters = true;
+        listEl.innerHTML += `<span class="badge bg-warning text-dark rounded-pill"><i class="fas fa-exchange-alt me-1"></i>${types.map(t => t.value).join('/')}</span>`;
+    }
+    if (statuses.length > 0) {
+        hasFilters = true;
+        listEl.innerHTML += `<span class="badge bg-success rounded-pill"><i class="fas fa-check-circle me-1"></i>${statuses.length} Statuses</span>`;
+    }
+    if (minAmount || maxAmount) {
+        hasFilters = true;
+        let amtText = '';
+        if (minAmount && maxAmount) amtText = `$${minAmount} - $${maxAmount}`;
+        else if (minAmount) amtText = `≥ $${minAmount}`;
+        else amtText = `≤ $${maxAmount}`;
+        listEl.innerHTML += `<span class="badge bg-secondary rounded-pill"><i class="fas fa-dollar-sign me-1"></i>${amtText}</span>`;
+    }
+    if (startDate || endDate) {
+        hasFilters = true;
+        let dateText = '';
+        if (startDate && endDate) dateText = `${startDate} to ${endDate}`;
+        else if (startDate) dateText = `From ${startDate}`;
+        else dateText = `Until ${endDate}`;
+        listEl.innerHTML += `<span class="badge bg-secondary rounded-pill"><i class="fas fa-calendar me-1"></i>${dateText}</span>`;
+    }
+
+    if (!hasFilters) {
+        listEl.innerHTML = '<span class="badge bg-secondary">No filters applied</span>';
+    }
+}
+
+function previewFilterResults() {
+    // This would ideally make an API call to get count without actually applying filters
+    // For now, just show a message
+    showToast('Filter preview: Apply filters to see results', 'info');
+
+    // Update the count badge (placeholder)
+    const countBadge = document.getElementById('filterPreviewCount');
+    if (countBadge) {
+        countBadge.textContent = 'Preview not available';
+    }
+}
+
+// Search within categories and payment methods
+function setupFilterSearchListeners() {
+    const categorySearch = document.getElementById('categorySearchInput');
+    const paymentSearch = document.getElementById('paymentSearchInput');
+
+    if (categorySearch) {
+        categorySearch.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            document.querySelectorAll('#filterCategoryCheckboxes .form-check').forEach(checkDiv => {
+                const label = checkDiv.querySelector('label');
+                const text = label ? label.textContent.toLowerCase() : '';
+                checkDiv.style.display = text.includes(searchTerm) ? 'block' : 'none';
+            });
+        });
+    }
+
+    if (paymentSearch) {
+        paymentSearch.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            document.querySelectorAll('#filterPaymentMethodCheckboxes .form-check').forEach(checkDiv => {
+                const label = checkDiv.querySelector('label');
+                const text = label ? label.textContent.toLowerCase() : '';
+                checkDiv.style.display = text.includes(searchTerm) ? 'block' : 'none';
+            });
+        });
+    }
+
+    // Add change listeners to all filter inputs for live preview
+    const filterInputs = [
+        'filterDescription', 'filterNotes', 'filterMinAmount', 'filterMaxAmount',
+        'filterStartDate', 'filterEndDate', 'filterCaseSensitive', 'filterExcludeWeekends'
+    ];
+    filterInputs.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('input', updateFilterPreview);
+            el.addEventListener('change', updateFilterPreview);
+        }
+    });
+
+    // Add listeners to checkboxes
+    document.addEventListener('change', function(e) {
+        if (e.target.matches('.filter-category-checkbox, .filter-payment-checkbox, .filter-type-checkbox, .filter-status-checkbox')) {
+            updateFilterPreview();
+        }
+    });
 }
 
 function executeCloneMonth() {

@@ -458,7 +458,104 @@
                 interaction: { mode: 'index', intersect: false },
                 plugins: {
                     legend: {
-                        labels: { color: t.text, font: { size: 11 }, usePointStyle: true, pointStyle: 'line' }
+                        labels: { color: t.text, font: { size: 11 }, usePointStyle: true, pointStyle: 'line' },
+                        onHover: function (evt, legendItem, legend) {
+                            // Dim the line for the hovered legend item
+                            var chart = legend.chart;
+                            var datasetIndex = legendItem.datasetIndex;
+
+                            // Store original alpha values if not already stored
+                            chart.data.datasets.forEach(function (dataset, i) {
+                                if (!dataset._originalBorderAlpha) {
+                                    dataset._originalBorderAlpha = 1.0;
+                                }
+                                if (!dataset._originalBackgroundAlpha) {
+                                    // Extract alpha from rgba string if it exists
+                                    var bgColor = dataset.backgroundColor;
+                                    if (typeof bgColor === 'string' && bgColor.startsWith('rgba')) {
+                                        var match = bgColor.match(/rgba\([^,]+,[^,]+,[^,]+,([^)]+)\)/);
+                                        dataset._originalBackgroundAlpha = match ? parseFloat(match[1]) : 0.1;
+                                    } else {
+                                        dataset._originalBackgroundAlpha = 0.1;
+                                    }
+                                }
+
+                                // Dim the hovered dataset
+                                if (i === datasetIndex) {
+                                    // Reduce opacity by 70% (to 30%)
+                                    var bc = dataset.borderColor;
+                                    var rgb = _extractRGB(bc);
+                                    dataset.borderColor = 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',0.3)';
+
+                                    if (dataset.backgroundColor && dataset.backgroundColor !== 'transparent') {
+                                        var bgRgb = _extractRGB(dataset.backgroundColor);
+                                        var originalAlpha = dataset._originalBackgroundAlpha;
+                                        dataset.backgroundColor = 'rgba(' + bgRgb.r + ',' + bgRgb.g + ',' + bgRgb.b + ',' + (originalAlpha * 0.3) + ')';
+                                    }
+
+                                    // Dim point colors as well
+                                    if (dataset.pointBackgroundColor) {
+                                        var ptBgRgb = _extractRGB(dataset.pointBackgroundColor);
+                                        dataset.pointBackgroundColor = 'rgba(' + ptBgRgb.r + ',' + ptBgRgb.g + ',' + ptBgRgb.b + ',0.3)';
+                                    }
+                                    if (dataset.pointBorderColor) {
+                                        var ptBrRgb = _extractRGB(dataset.pointBorderColor);
+                                        dataset.pointBorderColor = 'rgba(' + ptBrRgb.r + ',' + ptBrRgb.g + ',' + ptBrRgb.b + ',0.3)';
+                                    }
+                                    if (dataset.pointHoverBackgroundColor) {
+                                        var ptHvBgRgb = _extractRGB(dataset.pointHoverBackgroundColor);
+                                        dataset.pointHoverBackgroundColor = 'rgba(' + ptHvBgRgb.r + ',' + ptHvBgRgb.g + ',' + ptHvBgRgb.b + ',0.3)';
+                                    }
+                                    if (dataset.pointHoverBorderColor) {
+                                        var ptHvBrRgb = _extractRGB(dataset.pointHoverBorderColor);
+                                        dataset.pointHoverBorderColor = 'rgba(' + ptHvBrRgb.r + ',' + ptHvBrRgb.g + ',' + ptHvBrRgb.b + ',0.3)';
+                                    }
+                                }
+                            });
+
+                            chart.update('none');
+                            el.style.cursor = 'pointer';
+                        },
+                        onLeave: function (evt, legendItem, legend) {
+                            // Restore original line opacity
+                            var chart = legend.chart;
+
+                            chart.data.datasets.forEach(function (dataset) {
+                                // Restore original colors
+                                var bc = dataset.borderColor;
+                                if (bc && bc.includes('0.3)')) {
+                                    var rgb = _extractRGB(bc);
+                                    dataset.borderColor = 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',1.0)';
+                                }
+
+                                if (dataset.backgroundColor && dataset.backgroundColor !== 'transparent' && dataset.backgroundColor.includes('rgba')) {
+                                    var bgRgb = _extractRGB(dataset.backgroundColor);
+                                    var originalAlpha = dataset._originalBackgroundAlpha || 0.1;
+                                    dataset.backgroundColor = 'rgba(' + bgRgb.r + ',' + bgRgb.g + ',' + bgRgb.b + ',' + originalAlpha + ')';
+                                }
+
+                                // Restore point colors
+                                if (dataset.pointBackgroundColor && typeof dataset.pointBackgroundColor === 'string' && dataset.pointBackgroundColor.includes('0.3)')) {
+                                    var ptBgRgb = _extractRGB(dataset.pointBackgroundColor);
+                                    dataset.pointBackgroundColor = 'rgba(' + ptBgRgb.r + ',' + ptBgRgb.g + ',' + ptBgRgb.b + ',1.0)';
+                                }
+                                if (dataset.pointBorderColor && typeof dataset.pointBorderColor === 'string' && dataset.pointBorderColor.includes('0.3)')) {
+                                    var ptBrRgb = _extractRGB(dataset.pointBorderColor);
+                                    dataset.pointBorderColor = 'rgba(' + ptBrRgb.r + ',' + ptBrRgb.g + ',' + ptBrRgb.b + ',1.0)';
+                                }
+                                if (dataset.pointHoverBackgroundColor && typeof dataset.pointHoverBackgroundColor === 'string' && dataset.pointHoverBackgroundColor.includes('0.3)')) {
+                                    var ptHvBgRgb = _extractRGB(dataset.pointHoverBackgroundColor);
+                                    dataset.pointHoverBackgroundColor = 'rgba(' + ptHvBgRgb.r + ',' + ptHvBgRgb.g + ',' + ptHvBgRgb.b + ',1.0)';
+                                }
+                                if (dataset.pointHoverBorderColor && typeof dataset.pointHoverBorderColor === 'string' && dataset.pointHoverBorderColor.includes('0.3)')) {
+                                    var ptHvBrRgb = _extractRGB(dataset.pointHoverBorderColor);
+                                    dataset.pointHoverBorderColor = 'rgba(' + ptHvBrRgb.r + ',' + ptHvBrRgb.g + ',' + ptHvBrRgb.b + ',1.0)';
+                                }
+                            });
+
+                            chart.update('none');
+                            el.style.cursor = 'default';
+                        }
                     },
                     tooltip: {
                         backgroundColor: 'rgba(0,0,0,0.85)',
@@ -488,6 +585,41 @@
                 }
             }
         });
+    }
+
+    // ===================================================================
+    // Helper to extract RGB values from color string
+    // ===================================================================
+    function _extractRGB(colorStr) {
+        if (!colorStr) return { r: 0, g: 0, b: 0 };
+
+        // Handle rgba format
+        if (colorStr.startsWith('rgba')) {
+            var match = colorStr.match(/rgba\(([^,]+),([^,]+),([^,]+)/);
+            if (match) {
+                return { r: parseInt(match[1]), g: parseInt(match[2]), b: parseInt(match[3]) };
+            }
+        }
+
+        // Handle rgb format
+        if (colorStr.startsWith('rgb')) {
+            var match = colorStr.match(/rgb\(([^,]+),([^,]+),([^,]+)/);
+            if (match) {
+                return { r: parseInt(match[1]), g: parseInt(match[2]), b: parseInt(match[3]) };
+            }
+        }
+
+        // Handle hex format
+        if (colorStr.startsWith('#')) {
+            var hex = colorStr.substring(1);
+            return {
+                r: parseInt(hex.substring(0, 2), 16),
+                g: parseInt(hex.substring(2, 4), 16),
+                b: parseInt(hex.substring(4, 6), 16)
+            };
+        }
+
+        return { r: 0, g: 0, b: 0 };
     }
 
     // ===================================================================
