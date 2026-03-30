@@ -116,6 +116,7 @@
         _on('ertIntradayDate',       'change', function () { _s.intradayDate     = this.value; _fetchIntraday(); });
         _on('ertIntradayLimit',      'change', function () { _s.intradayLimit    = +this.value; _fetchIntraday(); });
         _on('ertIntradayTimezone',   'change', function () { _s.intradayTimezone = this.value; _fetchIntraday(); });
+        _on('ertAiInsightsBtn',      'click',  function () { _showAiInsights(); });
     }
 
     function _on(id, evt, fn) {
@@ -749,6 +750,207 @@
         }
 
         _lineChart('ertIntradayChart', 'intraday', labels, datasets, 'Buy Rate (LKR)');
+    }
+
+    // ===================================================================
+    // AI Insights Modal
+    // ===================================================================
+    function _showAiInsights() {
+        // Show modal
+        var modal = document.getElementById('aiInsightsModal');
+        if (!modal) {
+            console.error('AI Insights modal not found');
+            return;
+        }
+
+        var bsModal = new bootstrap.Modal(modal);
+        bsModal.show();
+
+        // Show loading state
+        _show('aiInsightsLoading', true);
+        _show('aiInsightsError', false);
+        _show('aiInsightsData', false);
+
+        // Use comparison months setting for analysis (default 3 months)
+        var analysisMonths = _s.compMonths || 3;
+
+        var params = new URLSearchParams({
+            months: analysisMonths,
+            currency_from: 'USD',
+            currency_to: 'LKR'
+        });
+
+        console.log('🔍 Requesting AI insights with params:', {
+            months: analysisMonths,
+            currency_from: 'USD',
+            currency_to: 'LKR'
+        });
+        console.log('ℹ️  Backend will fetch CBSL, PB, and HNB data from YOUR database');
+
+        fetch('/api/exchange-rate/ai-insights?' + params)
+            .then(function (res) {
+                if (!res.ok) {
+                    return res.json().catch(function () { return {}; }).then(function (j) {
+                        throw new Error(j.message || j.error || 'Server error ' + res.status);
+                    });
+                }
+                return res.json();
+            })
+            .then(function (data) {
+                console.log('✅ AI Insights received (using YOUR database data):', data);
+
+                // Log bank data if available
+                if (data.statistics && data.statistics.banks) {
+                    console.log('📊 Bank data from YOUR database:');
+                    console.log('  - HNB (your bank):', data.statistics.banks.HNB);
+                    console.log('  - CBSL:', data.statistics.banks.CBSL);
+                    console.log('  - PB:', data.statistics.banks.PB);
+                }
+
+                _renderAiInsights(data);
+            })
+            .catch(function (err) {
+                console.error('AI Insights error:', err);
+                _show('aiInsightsLoading', false);
+                _show('aiInsightsError', true);
+                var errMsgEl = document.getElementById('aiInsightsErrorMsg');
+                if (errMsgEl) {
+                    errMsgEl.textContent = err.message || 'Failed to generate AI insights. Please try again.';
+                }
+            });
+    }
+
+    function _renderAiInsights(data) {
+        // Hide loading, show content
+        _show('aiInsightsLoading', false);
+        _show('aiInsightsError', false);
+        _show('aiInsightsData', true);
+
+        // Recommendation
+        var reco = document.getElementById('aiRecommendation');
+        if (reco) {
+            reco.textContent = data.recommendation || 'No recommendation available';
+        }
+
+        // Confidence badge
+        var confBadge = document.getElementById('aiConfidenceBadge');
+        if (confBadge && data.confidence) {
+            var confClass = data.confidence === 'HIGH' ? 'bg-success' :
+                           data.confidence === 'MEDIUM' ? 'bg-warning' : 'bg-secondary';
+            confBadge.className = 'badge ' + confClass;
+            confBadge.textContent = 'Confidence: ' + data.confidence;
+        }
+
+        // Risk badge
+        var riskBadge = document.getElementById('aiRiskBadge');
+        if (riskBadge && data.risk_level) {
+            var riskClass = data.risk_level === 'LOW' ? 'bg-success' :
+                           data.risk_level === 'MEDIUM' ? 'bg-warning' : 'bg-danger';
+            riskBadge.className = 'badge ' + riskClass;
+            riskBadge.textContent = 'Risk: ' + data.risk_level;
+        }
+
+        // Statistics - Multi-bank data
+        var stats = data.statistics || {};
+        var banks = stats.banks || {};
+        var userBank = stats.user_bank || 'HNB';
+
+        // Show HNB (user's bank) statistics
+        if (banks[userBank]) {
+            var hnbStats = banks[userBank];
+            _txt('aiCurrentRate', hnbStats.current ? hnbStats.current.toFixed(4) + ' LKR (HNB)' : '--');
+            _txt('aiAvgRate', hnbStats.avg ? hnbStats.avg.toFixed(4) + ' LKR' : '--');
+            _txt('aiRateRange', (hnbStats.min && hnbStats.max) ?
+                hnbStats.min.toFixed(4) + ' - ' + hnbStats.max.toFixed(4) : '--');
+
+            // Calculate volatility for display
+            var volatility = hnbStats.max && hnbStats.min ?
+                ((hnbStats.max - hnbStats.min) / hnbStats.avg * 100).toFixed(2) + '%' : '--';
+            _txt('aiVolatility', volatility);
+        }
+
+        // HNB Position (new field from multi-bank analysis)
+        if (data.hnb_position) {
+            var trend = document.getElementById('aiTrend');
+            if (trend) {
+                trend.innerHTML = '<strong>HNB Position:</strong> ' + data.hnb_position + '<br><br>' +
+                                 (data.trend || 'No trend analysis available');
+            }
+        } else {
+            // Fallback for old single-bank format
+            var trend = document.getElementById('aiTrend');
+            if (trend) {
+                trend.textContent = data.trend || 'No trend analysis available';
+            }
+        }
+
+        // Bank Comparison (new field)
+        if (data.bank_comparison) {
+            var bestTime = document.getElementById('aiBestTime');
+            if (bestTime) {
+                bestTime.innerHTML = (data.best_time || 'No specific recommendation') +
+                                    '<br><br><strong>Bank Comparison:</strong> ' + data.bank_comparison;
+            }
+        } else {
+            // Fallback for old format
+            var bestTime = document.getElementById('aiBestTime');
+            if (bestTime) {
+                bestTime.textContent = data.best_time || 'No specific recommendation';
+            }
+        }
+
+        // Insights list
+        var insightsList = document.getElementById('aiInsightsList');
+        if (insightsList && data.insights) {
+            insightsList.innerHTML = '';
+            var insights = Array.isArray(data.insights) ? data.insights : [data.insights];
+            insights.forEach(function (insight) {
+                var li = document.createElement('li');
+                li.textContent = insight;
+                li.className = 'mb-1';
+                insightsList.appendChild(li);
+            });
+        }
+
+        // Forecast
+        var forecast = document.getElementById('aiForecast');
+        if (forecast) {
+            forecast.textContent = data.forecast || 'No forecast available';
+        }
+
+        // Action items
+        var actionsList = document.getElementById('aiActionItemsList');
+        if (actionsList && data.action_items) {
+            actionsList.innerHTML = '';
+            var actions = Array.isArray(data.action_items) ? data.action_items : [data.action_items];
+            actions.forEach(function (action) {
+                var li = document.createElement('li');
+                li.textContent = action;
+                li.className = 'mb-1';
+                actionsList.appendChild(li);
+            });
+        }
+
+        // Metadata
+        var stats = data.statistics || {};
+        var banks = stats.banks || {};
+        var userBank = stats.user_bank || 'HNB';
+
+        if (banks[userBank] && banks[userBank].count) {
+            _txt('aiDataPoints', banks[userBank].count + ' (' + userBank + ')');
+            if (banks[userBank].first_date && banks[userBank].last_date) {
+                _txt('aiDataPeriod', banks[userBank].first_date + ' to ' + banks[userBank].last_date);
+            }
+        } else {
+            _txt('aiDataPoints', stats.data_points || '--');
+            _txt('aiDataPeriod', stats.period || '--');
+        }
+
+        var genAt = document.getElementById('aiGeneratedAt');
+        if (genAt && data.generated_at) {
+            var date = new Date(data.generated_at);
+            genAt.textContent = date.toLocaleString();
+        }
     }
 
 })();

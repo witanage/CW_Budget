@@ -727,11 +727,16 @@
                         <div class="card mb-3">
                             <div class="card-header d-flex justify-content-between align-items-center">
                                 <h6 class="card-title mb-0"><i class="fas fa-balance-scale me-2"></i>Bank Comparison</h6>
-                                <select class="form-select form-select-sm" id="ertCompMonths" style="width:auto;">
-                                    <option value="1">1M</option>
-                                    <option value="3" selected>3M</option>
-                                    <option value="6">6M</option>
-                                </select>
+                                <div class="d-flex align-items-center gap-2">
+                                    <button class="btn btn-sm btn-success" id="ertAiInsightsBtn" title="Get AI-powered insights about the best time to exchange currency">
+                                        <i class="fas fa-brain me-1"></i>Best Time to Exchange
+                                    </button>
+                                    <select class="form-select form-select-sm" id="ertCompMonths" style="width:auto;">
+                                        <option value="1">1M</option>
+                                        <option value="3" selected>3M</option>
+                                        <option value="6">6M</option>
+                                    </select>
+                                </div>
                             </div>
                             <div class="card-body">
                                 <div class="ert-chart-container"><canvas id="ertSourceChart"></canvas></div>
@@ -842,6 +847,153 @@
 
 <!-- Hidden file input for bill upload -->
 <input type="file" id="billUploadInput" accept="image/*,application/pdf" style="display: none;">
+
+<!-- AI Insights Modal -->
+<div class="modal fade" id="aiInsightsModal" tabindex="-1" aria-labelledby="aiInsightsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="aiInsightsModalLabel">
+                    <i class="fas fa-brain me-2"></i>AI Currency Exchange Insights
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="aiInsightsContent">
+                <!-- Loading state -->
+                <div id="aiInsightsLoading" class="text-center py-5">
+                    <div class="spinner-border text-primary mb-3" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="text-muted">Analyzing exchange rate trends with AI...</p>
+                </div>
+
+                <!-- Error state -->
+                <div id="aiInsightsError" style="display: none;">
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Analysis Failed</strong>
+                        <p class="mb-0 mt-2" id="aiInsightsErrorMsg">An error occurred while analyzing the data.</p>
+                    </div>
+                </div>
+
+                <!-- Content -->
+                <div id="aiInsightsData" style="display: none;">
+                    <!-- Recommendation Card -->
+                    <div class="card mb-3 border-0 bg-light">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-3 text-muted">
+                                <i class="fas fa-lightbulb me-1"></i>Recommendation
+                            </h6>
+                            <div id="aiRecommendation" class="h5 mb-2"></div>
+                            <div class="d-flex gap-2 flex-wrap mb-2">
+                                <span class="badge" id="aiConfidenceBadge"></span>
+                                <span class="badge" id="aiRiskBadge"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Statistics Grid -->
+                    <div class="row g-2 mb-3">
+                        <div class="col-6 col-md-3">
+                            <div class="card border-0 bg-light">
+                                <div class="card-body p-2 text-center">
+                                    <div class="small text-muted">Current Rate</div>
+                                    <div class="fw-bold" id="aiCurrentRate">--</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="card border-0 bg-light">
+                                <div class="card-body p-2 text-center">
+                                    <div class="small text-muted">Average</div>
+                                    <div class="fw-bold" id="aiAvgRate">--</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="card border-0 bg-light">
+                                <div class="card-body p-2 text-center">
+                                    <div class="small text-muted">Range</div>
+                                    <div class="fw-bold" id="aiRateRange">--</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="card border-0 bg-light">
+                                <div class="card-body p-2 text-center">
+                                    <div class="small text-muted">Volatility</div>
+                                    <div class="fw-bold" id="aiVolatility">--</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Best Time -->
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">
+                                <i class="fas fa-clock me-1"></i>Best Time to Exchange
+                            </h6>
+                            <p id="aiBestTime" class="mb-0"></p>
+                        </div>
+                    </div>
+
+                    <!-- Trend Analysis -->
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">
+                                <i class="fas fa-chart-line me-1"></i>Trend Analysis
+                            </h6>
+                            <p id="aiTrend" class="mb-0"></p>
+                        </div>
+                    </div>
+
+                    <!-- Key Insights -->
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">
+                                <i class="fas fa-key me-1"></i>Key Insights
+                            </h6>
+                            <ul id="aiInsightsList" class="mb-0"></ul>
+                        </div>
+                    </div>
+
+                    <!-- Forecast -->
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">
+                                <i class="fas fa-crystal-ball me-1"></i>Short-term Forecast
+                            </h6>
+                            <p id="aiForecast" class="mb-0"></p>
+                        </div>
+                    </div>
+
+                    <!-- Action Items -->
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">
+                                <i class="fas fa-tasks me-1"></i>Action Items
+                            </h6>
+                            <ul id="aiActionItemsList" class="mb-0"></ul>
+                        </div>
+                    </div>
+
+                    <!-- Metadata -->
+                    <div class="text-muted small">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Analysis based on <span id="aiDataPoints">--</span> data points
+                        (<span id="aiDataPeriod">--</span>)
+                        <br>
+                        Generated: <span id="aiGeneratedAt">--</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Transaction Modal -->
 <div class="modal fade" id="transactionModal" tabindex="-1">
