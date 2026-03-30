@@ -26,6 +26,7 @@ from services.hnb_exchange_rate_service import get_hnb_exchange_rate_service
 from services.pb_exchange_rate_service import get_pb_exchange_rate_service
 from services.sampath_exchange_rate_service import get_sampath_exchange_rate_service
 from services.gemini_bill_scanner import get_gemini_bill_scanner
+from services.gemini_exchange_analyzer import get_gemini_exchange_analyzer
 
 # Load environment variables from .env file
 load_dotenv()
@@ -6909,6 +6910,123 @@ def get_exchange_rate_trends_all():
     except Exception as e:
         logger.error(f"Error fetching exchange rate trends: {str(e)}")
         return jsonify({'error': 'Failed to fetch trend data', 'details': str(e)}), 500
+
+
+@app.route('/api/exchange-rate/ai-insights', methods=['GET'])
+@login_required
+def get_exchange_rate_ai_insights():
+    """
+    Get AI-powered insights about the best time to exchange currency.
+    Uses Gemini AI to analyze recent exchange rate trends and provide recommendations.
+
+    Query Parameters:
+        months: Number of months of history to analyze (default: 3, max: 12)
+        currency_from: Source currency (default: USD)
+        currency_to: Target currency (default: LKR)
+
+    Returns:
+        JSON with AI analysis including:
+        - recommendation: Best time to exchange
+        - trend: Trend analysis
+        - insights: Detailed insights
+        - forecast: Short-term forecast
+        - statistics: Key statistics
+    """
+    try:
+        months = min(int(request.args.get('months', 3)), 12)
+        currency_from = request.args.get('currency_from', 'USD')
+        currency_to = request.args.get('currency_to', 'LKR')
+
+        # Get Gemini Exchange Analyzer instance
+        analyzer = get_gemini_exchange_analyzer()
+        if not analyzer:
+            return jsonify({
+                'error': 'AI service not available',
+                'message': 'Gemini API is not configured. Please check your GEMINI_API_KEY.'
+            }), 503
+
+        # Fetch exchange rate data from database
+        connection = get_db_connection()
+        if not connection:
+            return jsonify({'error': 'Database connection failed'}), 500
+
+        cursor = connection.cursor(dictionary=True)
+
+        try:
+            # Get daily buy rates per bank (CBSL, PB, HNB) for the specified period
+            cursor.execute("""
+                SELECT date, source, buy_rate
+                FROM exchange_rates
+                WHERE date >= DATE_SUB(CURDATE(), INTERVAL %s MONTH)
+                  AND source IN ('CBSL', 'PB', 'HNB')
+                ORDER BY date, source
+            """, (months,))
+
+            all_data = cursor.fetchall()
+
+            logger.info(f"✅ Fetched {len(all_data)} exchange rate records from YOUR database")
+
+            if not all_data or len(all_data) < 6:
+                return jsonify({
+                    'error': 'Insufficient data',
+                    'message': 'Not enough historical data available for analysis.'
+                }), 400
+
+            # Organize data by bank
+            bank_data = {'CBSL': [], 'PB': [], 'HNB': []}
+            for row in all_data:
+                source = row['source']
+                if source in bank_data:
+                    bank_data[source].append({
+                        'date': row['date'].isoformat() if hasattr(row['date'], 'isoformat') else str(row['date']),
+                        'rate': float(row['buy_rate']) if isinstance(row['buy_rate'], Decimal) else row['buy_rate']
+                    })
+
+            # Get current rates for each bank (latest date)
+            current_rates = {}
+            for bank, data in bank_data.items():
+                if data:
+                    current_rates[bank] = data[-1]['rate']
+
+            # Log data summary for verification
+            logger.info(f"📊 Data organized by bank:")
+            logger.info(
+                f"  - HNB: {len(bank_data['HNB'])} data points, current rate: {current_rates.get('HNB', 'N/A')}")
+            logger.info(
+                f"  - CBSL: {len(bank_data['CBSL'])} data points, current rate: {current_rates.get('CBSL', 'N/A')}")
+            logger.info(f"  - PB: {len(bank_data['PB'])} data points, current rate: {current_rates.get('PB', 'N/A')}")
+
+            # Log sample of recent HNB data (your bank)
+            if bank_data['HNB']:
+                recent_hnb = bank_data['HNB'][-5:]
+                logger.info(f"📈 Recent HNB rates (last 5 days): {recent_hnb}")
+
+            # Call AI analysis with multi-bank data
+            logger.info(f"🤖 Sending YOUR database data to AI for analysis...")
+            analysis = analyzer.analyze_multi_bank_patterns(
+                bank_data=bank_data,
+                current_rates=current_rates,
+                user_bank='HNB',
+                currency_from=currency_from,
+                currency_to=currency_to
+            )
+
+            # Add timestamp
+            analysis['generated_at'] = datetime.now().isoformat()
+            analysis['data_period_months'] = months
+
+            return jsonify(analysis), 200
+
+        finally:
+            cursor.close()
+            connection.close()
+
+    except ValueError as e:
+        logger.error(f"Invalid parameter in AI insights request: {str(e)}")
+        return jsonify({'error': 'Invalid parameters', 'details': str(e)}), 400
+    except Exception as e:
+        logger.error(f"Error generating AI insights: {str(e)}", exc_info=True)
+        return jsonify({'error': 'Failed to generate AI insights', 'details': str(e)}), 500
 
 
 @app.route('/api/exchange-rate/intraday-logs', methods=['GET'])

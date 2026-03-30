@@ -195,3 +195,116 @@
         height: 220px;
     }
 }
+
+/* ============================================================
+   AI Insights Modal Styles
+   ============================================================ */
+
+#aiInsightsModal .modal-content {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+}
+
+#aiInsightsModal .modal-header {
+    border-bottom: 1px solid var(--border-color);
+}
+
+#aiInsightsModal .modal-body {
+    color: var(--text-primary);
+}
+
+#aiInsightsModal .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    transition: all 0.2s ease;
+}
+
+#aiInsightsModal .card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dark"] #aiInsightsModal .card:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+#aiInsightsModal .bg-light {
+    background-color: var(--card-header-bg) !important;
+}
+
+#aiInsightsModal #aiRecommendation {
+    color: var(--accent-color);
+    font-weight: 600;
+}
+
+#aiInsightsModal .badge {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+#aiInsightsModal ul {
+    padding-left: 1.5rem;
+}
+
+#aiInsightsModal ul li {
+    color: var(--text-primary);
+}
+
+#aiInsightsModal .text-muted {
+    color: var(--text-secondary) !important;
+}
+
+#aiInsightsModal .card-subtitle {
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+#aiInsightsModal .spinner-border {
+    width: 3rem;
+    height: 3rem;
+}
+
+/* Button styling */
+#ertAiInsightsBtn {
+    font-size: 0.875rem;
+    font-weight: 500;
+    padding: 0.375rem 0.75rem;
+    transition: all 0.2s ease;
+}
+
+#ertAiInsightsBtn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
+}
+
+#ertAiInsightsBtn i {
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+/* Responsive modal */
+@media (max-width: 768px) {
+    #aiInsightsModal .modal-dialog {
+        margin: 0.5rem;
+    }
+
+    #aiInsightsModal .modal-body {
+        padding: 1rem;
+    }
+
+    #aiInsightsModal .card-body {
+        padding: 0.75rem;
+    }
+}

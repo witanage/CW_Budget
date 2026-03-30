@@ -419,6 +419,41 @@ COMMENT='Stores income input data only - tax calculations computed on-the-fly wh
 -- ============================================================
 
 -- ============================================================
+-- AI Service Configurations Table
+-- ============================================================
+-- Stores configuration for AI services (API keys, models, endpoints)
+-- Allows switching between different AI providers without code changes
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS ai_configs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    service_name VARCHAR(50) NOT NULL UNIQUE COMMENT 'Unique identifier for the AI service (bill_scanner, exchange_analyzer)',
+    provider VARCHAR(50) NOT NULL DEFAULT 'gemini' COMMENT 'AI provider name (gemini, openai, anthropic, etc.)',
+    api_key VARCHAR(500) NOT NULL COMMENT 'API key for authentication',
+    api_url VARCHAR(500) NULL COMMENT 'API endpoint URL (NULL for default provider endpoint)',
+    model_name VARCHAR(100) NOT NULL COMMENT 'AI model identifier (e.g., gemini-3.1-flash-lite-preview)',
+    is_active BOOLEAN DEFAULT TRUE COMMENT 'Enable/disable this AI service',
+    description TEXT NULL COMMENT 'Description of what this service does',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_service_name (service_name),
+    INDEX idx_provider (provider),
+    INDEX idx_is_active (is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+COMMENT='Configuration for AI services (API keys, models, endpoints)';
+
+-- Seed AI service configurations
+-- Note: Replace 'YOUR_GEMINI_API_KEY' with your actual API key after running this schema
+--       Or use the migration script which reads from .env automatically
+--       api_url is set to NULL to use the default Google Generative AI endpoint
+--       (https://generativelanguage.googleapis.com is handled by the SDK internally)
+INSERT IGNORE INTO ai_configs (service_name, provider, api_key, api_url, model_name, description) VALUES
+('bill_scanner', 'gemini', 'YOUR_GEMINI_API_KEY', 'https://generativelanguage.googleapis.com', 'gemini-3.1-flash-lite-preview',
+ 'Scans bill images and PDFs to extract shop name, amount, and line items'),
+('exchange_analyzer', 'gemini', 'YOUR_GEMINI_API_KEY', 'https://generativelanguage.googleapis.com', 'gemini-3.1-flash-lite-preview',
+ 'Analyzes exchange rate patterns and trends across multiple banks');
+
+-- ============================================================
 -- Exchange Rates Table
 -- ============================================================
 -- Stores USD to LKR exchange rates from CBSL
