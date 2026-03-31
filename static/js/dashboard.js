@@ -187,15 +187,11 @@ function initApp() {
 }
 
 // Initialize Vanta.js background animation
-// Initialize Vanta.js background animation
 function initVantaBackground() {
     if (typeof VANTA !== 'undefined' && typeof VANTA.BIRDS !== 'undefined') {
         const loader = document.getElementById('pageLoader');
         if (loader) {
-            // Get current theme
             const theme = document.documentElement.getAttribute('data-theme') || 'dark';
-
-            // Set colors based on theme
             const colors = theme === 'dark' ? {
                 backgroundColor: 0x1a1a1a,
                 color1: 0x007acc,
@@ -207,7 +203,6 @@ function initVantaBackground() {
                 color2: 0x4299e1,
                 colorMode: 'variance'
             };
-
             vantaEffect = VANTA.BIRDS({
                 el: loader,
                 mouseControls: true,
