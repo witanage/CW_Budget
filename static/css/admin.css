@@ -28,9 +28,9 @@ input:disabled, button:disabled, select:disabled, textarea:disabled {
     cursor: not-allowed;
 }
 
-/* Tab persistence via hash */
+/* Tab persistence via hash (animation removed for performance) */
 .tab-pane {
-    animation: fadeIn 0.2s ease;
+    /* No animation for better performance */
 }
 
 /* Responsive adjustments */
@@ -130,7 +130,7 @@ input:disabled, button:disabled, select:disabled, textarea:disabled {
 }
 
 .section-card {
-    animation: fadeIn 0.3s ease;
+    /* Animation removed for better performance */
 }
 
 /* Accessibility improvements */
