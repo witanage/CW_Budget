@@ -36,6 +36,7 @@ let savedFilterPresets = JSON.parse(localStorage.getItem('filterPresets') || '[]
 let recentFilters = JSON.parse(localStorage.getItem('recentFilters') || '[]');
 let reportFiltersInitialized = false;
 let filterDropdownsInitialized = false;
+let filterSearchListenersInitialized = false; // Track if filter search listeners are initialized
 let loadedReportTabs = new Set(); // Track which report tabs have been loaded
 let reportTabsInitialized = false; // Track if tab listeners are initialized
 let scannedBillContent = null; // Store scanned bill content temporarily
@@ -590,10 +591,16 @@ function setupFormButtons() {
     const filterModal = document.getElementById('filterModal');
     if (filterModal) {
         filterModal.addEventListener('shown.bs.modal', function() {
-            populateFilterDropdowns();
+            // Only populate dropdowns and setup listeners once
+            if (!filterDropdownsInitialized) {
+                populateFilterDropdowns();
+            }
+            if (!filterSearchListenersInitialized) {
+                setupFilterSearchListeners();
+            }
+            // These can be updated each time (lightweight operations)
             displaySavedPresets();
             displayRecentFilters();
-            setupFilterSearchListeners();
             updateFilterPreview();
         });
     }
@@ -832,60 +839,72 @@ function loadCategoriesForManagement() {
     // Hide edit form when reloading categories
     hideEditCategoryForm();
 
-    // Show loading state
+    // If categories are already loaded, use cached data
+    if (currentCategories && currentCategories.length > 0) {
+        displayCategoriesInManagement(currentCategories, incomeList, expenseList);
+        return;
+    }
+
+    // Show loading state only if we need to fetch
     incomeList.innerHTML = '<div class="text-center p-3"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
     expenseList.innerHTML = '<div class="text-center p-3"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
 
     fetch('/api/categories')
         .then(response => response.json())
         .then(categories => {
-            // Separate categories by type
-            const incomeCategories = categories.filter(cat => cat.type === 'income');
-            const expenseCategories = categories.filter(cat => cat.type === 'expense');
-
-            // Display income categories
-            if (incomeCategories.length > 0) {
-                incomeList.innerHTML = incomeCategories.map(cat => `
-                    <div class="list-group-item d-flex justify-content-between align-items-center">
-                        <span><i class="fas fa-tag me-2"></i>${cat.name}</span>
-                        <div class="btn-group btn-group-sm">
-                            <button class="btn btn-outline-primary" onclick="editCategory(${cat.id}, '${cat.name.replace(/'/g, "\\'")}', '${cat.type}')" title="Edit">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button class="btn btn-outline-danger" onclick="showDeleteCategoryConfirm(${cat.id}, '${cat.name.replace(/'/g, "\\'")}')">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                    </div>
-                `).join('');
-            } else {
-                incomeList.innerHTML = '<div class="opacity-75 text-center p-3">No income categories</div>';
-            }
-
-            // Display expense categories
-            if (expenseCategories.length > 0) {
-                expenseList.innerHTML = expenseCategories.map(cat => `
-                    <div class="list-group-item d-flex justify-content-between align-items-center">
-                        <span><i class="fas fa-tag me-2"></i>${cat.name}</span>
-                        <div class="btn-group btn-group-sm">
-                            <button class="btn btn-outline-primary" onclick="editCategory(${cat.id}, '${cat.name.replace(/'/g, "\\'")}', '${cat.type}')" title="Edit">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button class="btn btn-outline-danger" onclick="showDeleteCategoryConfirm(${cat.id}, '${cat.name.replace(/'/g, "\\'")}')">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                    </div>
-                `).join('');
-            } else {
-                expenseList.innerHTML = '<div class="opacity-75 text-center p-3">No expense categories</div>';
-            }
+            currentCategories = categories; // Cache the categories
+            displayCategoriesInManagement(categories, incomeList, expenseList);
         })
         .catch(error => {
             console.error('Error loading categories:', error);
             incomeList.innerHTML = '<div class="alert alert-danger">Failed to load categories</div>';
             expenseList.innerHTML = '<div class="alert alert-danger">Failed to load categories</div>';
         });
+}
+
+// Helper function to display categories in management modal
+function displayCategoriesInManagement(categories, incomeList, expenseList) {
+    // Separate categories by type
+    const incomeCategories = categories.filter(cat => cat.type === 'income');
+    const expenseCategories = categories.filter(cat => cat.type === 'expense');
+
+    // Display income categories
+    if (incomeCategories.length > 0) {
+        incomeList.innerHTML = incomeCategories.map(cat => `
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-tag me-2"></i>${cat.name}</span>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-primary" onclick="editCategory(${cat.id}, '${cat.name.replace(/'/g, "\\'")}', '${cat.type}')" title="Edit">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-outline-danger" onclick="showDeleteCategoryConfirm(${cat.id}, '${cat.name.replace(/'/g, "\\'")}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    } else {
+        incomeList.innerHTML = '<div class="opacity-75 text-center p-3">No income categories</div>';
+    }
+
+    // Display expense categories
+    if (expenseCategories.length > 0) {
+        expenseList.innerHTML = expenseCategories.map(cat => `
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-tag me-2"></i>${cat.name}</span>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-primary" onclick="editCategory(${cat.id}, '${cat.name.replace(/'/g, "\\'")}', '${cat.type}')" title="Edit">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-outline-danger" onclick="showDeleteCategoryConfirm(${cat.id}, '${cat.name.replace(/'/g, "\\'")}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    } else {
+        expenseList.innerHTML = '<div class="opacity-75 text-center p-3">No expense categories</div>';
+    }
 }
 
 let categoryToDelete = null;
@@ -3103,10 +3122,15 @@ function deletePreset(index) {
 }
 
 // Filter preview functionality
+let updateFilterPreviewTimeout = null;
 function updateFilterPreview() {
-    // This will be called when filter inputs change
-    // For now, just update the display
-    updateFilterPreviewDisplay();
+    // Debounce the update to avoid blocking the UI on rapid input changes
+    if (updateFilterPreviewTimeout) {
+        clearTimeout(updateFilterPreviewTimeout);
+    }
+    updateFilterPreviewTimeout = setTimeout(() => {
+        updateFilterPreviewDisplay();
+    }, 100); // 100ms debounce
 }
 
 function updateFilterPreviewDisplay() {
@@ -3188,6 +3212,11 @@ function previewFilterResults() {
 
 // Search within categories and payment methods
 function setupFilterSearchListeners() {
+    // Only initialize once to prevent duplicate event listeners
+    if (filterSearchListenersInitialized) {
+        return;
+    }
+
     const categorySearch = document.getElementById('categorySearchInput');
     const paymentSearch = document.getElementById('paymentSearchInput');
 
@@ -3232,6 +3261,8 @@ function setupFilterSearchListeners() {
             updateFilterPreview();
         }
     });
+
+    filterSearchListenersInitialized = true;
 }
 
 function executeCloneMonth() {
