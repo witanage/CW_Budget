@@ -159,10 +159,11 @@ max-height: 50px;
 flex-shrink: 0;
 position: relative;
 z-index: 1100;
+overflow: visible !important;
 /* Performance optimizations */
-will-change: transform;
-transform: translateZ(0);
-contain: layout style paint;
+will-change: auto;
+transform: none;
+contain: none;
 }
 
 /* Ensure all navbar links and buttons are clickable */
@@ -170,6 +171,15 @@ contain: layout style paint;
 .navbar button {
 pointer-events: auto;
 position: relative;
+}
+
+/* Specific rule for dropdowns - override any blocking styles */
+.navbar .dropdown,
+.navbar .nav-item.dropdown,
+.navbar .dropdown-toggle {
+pointer-events: auto !important;
+cursor: pointer !important;
+user-select: none;
 }
 
 /* Ensure navbar items are vertically centered */
@@ -180,6 +190,7 @@ height: 100%;
 padding-top: 0;
 position: relative;
 z-index: auto;
+overflow: visible !important;
 }
 
 /* Prevent navbar toggler from blocking elements */
@@ -209,6 +220,8 @@ max-height: none;
 
 .navbar-nav {
 align-items: center;
+position: relative;
+z-index: 1200;
 }
 
 /* Ensure navbar collapse doesn't block dropdowns on desktop */
@@ -217,11 +230,13 @@ align-items: center;
 position: static;
 pointer-events: auto;
 z-index: auto;
+overflow: visible !important;
 }
 
 .navbar-collapse.show,
 .navbar-collapse.collapsing {
 position: static;
+overflow: visible !important;
 }
 
 /* Ensure nav items are clickable */
@@ -909,7 +924,7 @@ will-change: transform;
 
 /* Modals */
 .modal-content {
-background: var(--glass-bg);
+background: rgba(45, 45, 45, 0.85);
 backdrop-filter: blur(6px);
 -webkit-backdrop-filter: blur(6px);
 color: var(--text-primary);
@@ -922,11 +937,26 @@ transform: translateZ(0);
 contain: layout style paint;
 }
 
+/* Light theme modals - more opaque */
+[data-theme="light"] .modal-content {
+background: rgba(248, 250, 252, 0.92);
+}
+
+/* Modal backdrop - darker for better contrast */
+.modal-backdrop {
+background-color: rgba(0, 0, 0, 0.7) !important;
+}
+
+[data-theme="light"] .modal-backdrop {
+background-color: rgba(0, 0, 0, 0.5) !important;
+}
+
 .modal-header {
 background: rgba(255, 255, 255, 0.05);
 border-bottom: 1px solid var(--glass-border);
 border-radius: 16px 16px 0 0;
 padding: 20px 24px;
+color: var(--text-primary) !important;
 }
 
 .modal-footer {
@@ -943,10 +973,101 @@ padding: 24px;
 .modal-title {
 font-weight: 600;
 font-size: 1.25rem;
+color: var(--text-primary) !important;
+}
+
+/* Ensure all modal header elements match theme */
+.modal-header * {
+color: var(--text-primary) !important;
+}
+
+/* Override Bootstrap primary color in modals */
+.modal-header .text-primary,
+.modal-title.text-primary {
+color: var(--text-primary) !important;
+}
+
+/* Ensure h1-h6 in modal headers use theme color */
+.modal-header h1,
+.modal-header h2,
+.modal-header h3,
+.modal-header h4,
+.modal-header h5,
+.modal-header h6 {
+color: var(--text-primary) !important;
+}
+
+/* Override Bootstrap bg-primary on modal headers */
+.modal-header.bg-primary {
+background: rgba(255, 255, 255, 0.05) !important;
+border-bottom: 1px solid var(--glass-border);
+}
+
+[data-theme="dark"] .modal-header.bg-primary {
+background: rgba(255, 255, 255, 0.05) !important;
+}
+
+[data-theme="light"] .modal-header.bg-primary {
+background: rgba(0, 0, 0, 0.03) !important;
+}
+
+/* Override text-white on modal headers */
+.modal-header.text-white,
+.modal-header.text-white *,
+.modal-header.text-white .modal-title {
+color: var(--text-primary) !important;
+}
+
+/* Override btn-close-white to match theme */
+.modal-header .btn-close-white {
+filter: brightness(0) invert(1);
+}
+
+[data-theme="light"] .modal-header .btn-close-white {
+filter: brightness(0) invert(0);
+}
+
+/* Catch-all for any Bootstrap primary backgrounds on modals */
+.modal .bg-primary {
+background: rgba(255, 255, 255, 0.05) !important;
+background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+[data-theme="light"] .modal .bg-primary {
+background: rgba(0, 0, 0, 0.03) !important;
+background-color: rgba(0, 0, 0, 0.03) !important;
+}
+
+/* Force all text in modals with bg-primary to use theme color */
+.modal .bg-primary,
+.modal .bg-primary * {
+color: var(--text-primary) !important;
 }
 
 [data-theme="dark"] .btn-close {
 filter: invert(1);
+}
+
+/* Dark theme modal header - ensure consistency */
+[data-theme="dark"] .modal-header {
+background: rgba(255, 255, 255, 0.05);
+color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .modal-header *,
+[data-theme="dark"] .modal-title {
+color: var(--text-primary) !important;
+}
+
+/* Light theme modal header - ensure consistency */
+[data-theme="light"] .modal-header {
+background: rgba(0, 0, 0, 0.03);
+color: var(--text-primary) !important;
+}
+
+[data-theme="light"] .modal-header *,
+[data-theme="light"] .modal-title {
+color: var(--text-primary) !important;
 }
 
 /* General text-muted visibility in dark mode */
@@ -1303,12 +1424,14 @@ border: 1px solid var(--glass-border);
 box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 z-index: 1050;
 display: none;
+pointer-events: auto !important;
 }
 
 .dropdown-menu.show {
 display: block !important;
 visibility: visible !important;
 opacity: 1 !important;
+pointer-events: auto !important;
 }
 
 .dropdown-item {
@@ -1335,12 +1458,22 @@ opacity: 1 !important;
 
 .navbar .dropdown {
 position: relative;
-z-index: auto;
+z-index: 1200 !important;
+pointer-events: auto !important;
 }
 
 .navbar .nav-item.dropdown {
 position: relative;
-z-index: auto !important;
+z-index: 1200 !important;
+pointer-events: auto !important;
+}
+
+/* Ensure dropdown toggle is always clickable */
+.navbar .dropdown-toggle {
+position: relative;
+z-index: 1201 !important;
+pointer-events: auto !important;
+cursor: pointer !important;
 }
 
 /* Ensure navbar doesn't clip dropdown */
@@ -1363,17 +1496,18 @@ overflow: visible !important;
 z-index: 1100;
 }
 
-.navbar .dropdown-toggle {
-position: relative;
-z-index: auto !important;
-pointer-events: auto !important;
-cursor: pointer !important;
-}
-
 @media (min-width: 992px) {
 .navbar .nav-item.dropdown {
 position: relative;
-z-index: auto !important;
+z-index: 1200 !important;
+pointer-events: auto !important;
+}
+
+.navbar .dropdown-toggle {
+position: relative;
+z-index: 1201 !important;
+pointer-events: auto !important;
+cursor: pointer !important;
 }
 }
 
@@ -1400,6 +1534,11 @@ padding: 6px 12px !important;
 border-radius: 50px;
 transition: all 0.3s ease;
 background-color: rgba(255, 255, 255, 0.1);
+/* Ensure clickability */
+position: relative !important;
+z-index: 1200 !important;
+pointer-events: auto !important;
+cursor: pointer !important;
 }
 
 .user-profile-toggle:hover {
@@ -1449,6 +1588,16 @@ box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
 margin-top: 8px !important;
 overflow: hidden;
 background-color: var(--card-bg) !important;
+z-index: 9999 !important;
+pointer-events: auto !important;
+}
+
+/* Ensure user dropdown parent is clickable */
+#userDropdown {
+position: relative !important;
+z-index: 1201 !important;
+pointer-events: auto !important;
+cursor: pointer !important;
 }
 
 /* Remove animation initially to test if it's causing the flash

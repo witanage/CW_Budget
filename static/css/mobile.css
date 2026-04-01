@@ -678,9 +678,23 @@ border-radius: 12px;
 
 .modal-header {
 background: linear-gradient(135deg, #3d3d3d 0%, #2d2d2d 100%);
-color: white;
+color: var(--text-primary) !important;
 border-bottom: 1px solid #555555;
 border-radius: 12px 12px 0 0;
+}
+
+.modal-title {
+color: var(--text-primary) !important;
+}
+
+/* Override Bootstrap bg-primary on modal headers in mobile */
+.modal-header.bg-primary {
+background: linear-gradient(135deg, #3d3d3d 0%, #2d2d2d 100%) !important;
+}
+
+.modal-header.text-white,
+.modal-header.text-white * {
+color: var(--text-primary) !important;
 }
 
 .modal-footer {

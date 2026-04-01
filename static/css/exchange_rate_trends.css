@@ -201,12 +201,31 @@
    ============================================================ */
 
 #aiInsightsModal .modal-content {
-    background: var(--card-bg);
+    background: rgba(45, 45, 45, 0.85);
     border: 1px solid var(--border-color);
+}
+
+[data-theme="light"] #aiInsightsModal .modal-content {
+    background: rgba(248, 250, 252, 0.92);
 }
 
 #aiInsightsModal .modal-header {
     border-bottom: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary) !important;
+}
+
+#aiInsightsModal .modal-header.bg-primary {
+    background: rgba(255, 255, 255, 0.05) !important;
+}
+
+#aiInsightsModal .modal-header.text-white,
+#aiInsightsModal .modal-header.text-white * {
+    color: var(--text-primary) !important;
+}
+
+#aiInsightsModal .modal-title {
+    color: var(--text-primary) !important;
 }
 
 #aiInsightsModal .modal-body {
