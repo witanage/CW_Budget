@@ -1,3 +1,14 @@
+/* ======================================
+   PERFORMANCE-OPTIMIZED GLASSMORPHISM
+   Optimized: 2026-04-01
+   ====================================== */
+
+/* Global performance hints */
+* {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
 /* Dark theme (default) */
 :root[data-theme="dark"] {
 --bg-primary: #1a1a1a;
@@ -123,6 +134,10 @@ color: var(--text-primary);
 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 overflow: hidden;
 height: 100vh;
+/* Performance optimizations */
+-webkit-font-smoothing: antialiased;
+-moz-osx-font-smoothing: grayscale;
+text-rendering: optimizeLegibility;
 }
 
 /* Admin page: allow normal scrolling */
@@ -134,8 +149,8 @@ min-height: 100vh;
 
 .navbar {
 background: var(--glass-bg);
-backdrop-filter: blur(10px);
--webkit-backdrop-filter: blur(10px);
+backdrop-filter: blur(6px);
+-webkit-backdrop-filter: blur(6px);
 box-shadow: 0 2px 5px rgba(0,0,0,0.3);
 border-bottom: 1px solid var(--glass-border);
 padding: 0.5rem 1rem;
@@ -144,6 +159,10 @@ max-height: 50px;
 flex-shrink: 0;
 position: relative;
 z-index: 1100;
+/* Performance optimizations */
+will-change: transform;
+transform: translateZ(0);
+contain: layout style paint;
 }
 
 /* Ensure all navbar links and buttons are clickable */
@@ -236,14 +255,17 @@ top: 100%;
 left: 0;
 right: 0;
 background: var(--glass-bg);
-backdrop-filter: blur(10px);
--webkit-backdrop-filter: blur(10px);
+backdrop-filter: blur(6px);
+-webkit-backdrop-filter: blur(6px);
 border-bottom: 1px solid var(--glass-border);
 padding: 1rem;
 box-shadow: 0 4px 10px rgba(0,0,0,0.3);
 max-height: 70vh;
 overflow-y: auto;
 z-index: 1101;
+/* Performance optimizations */
+will-change: transform;
+transform: translateZ(0);
 }
 }
 
@@ -265,8 +287,8 @@ justify-content: center;
 .sidebar {
 height: calc(100vh - 50px);
 background: var(--glass-bg);
-backdrop-filter: blur(8px);
--webkit-backdrop-filter: blur(8px);
+backdrop-filter: blur(5px);
+-webkit-backdrop-filter: blur(5px);
 box-shadow: 2px 0 10px rgba(0,0,0,0.1);
 padding: 1rem 0;
 border-right: 1px solid var(--glass-border);
@@ -274,6 +296,10 @@ overflow-y: auto;
 overflow-x: hidden;
 position: relative;
 z-index: 10;
+/* Performance optimizations */
+will-change: transform;
+transform: translateZ(0);
+contain: layout style;
 }
 
 /* Ensure sidebar content is clickable */
@@ -327,11 +353,13 @@ pointer-events: auto;
         padding: 0.5rem 1rem;
         box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
         background: var(--glass-bg) !important;
-        backdrop-filter: blur(10px) !important;
-        -webkit-backdrop-filter: blur(10px) !important;
+        backdrop-filter: blur(6px) !important;
+        -webkit-backdrop-filter: blur(6px) !important;
         border: 1px solid var(--glass-border) !important;
         color: var(--text-primary) !important;
         font-weight: 600;
+        will-change: transform;
+        transform: translateZ(0);
     }
 
     /* Overlay when sidebar is open on mobile */
@@ -405,6 +433,9 @@ backdrop-filter: blur(2px);
 color: var(--text-primary);
 box-shadow: var(--card-shadow);
 overflow: hidden;
+/* Performance optimizations */
+contain: layout style paint;
+transform: translateZ(0);
 }
 
 .card:hover {
@@ -535,12 +566,13 @@ max-height: 250px;
 /* Dark theme buttons */
 .btn-gradient, .btn-primary, .btn-success, .btn-info, .btn-warning, .btn-danger {
 background: rgba(45, 45, 45, 0.5);
-backdrop-filter: blur(5px);
--webkit-backdrop-filter: blur(5px);
+backdrop-filter: blur(3px);
+-webkit-backdrop-filter: blur(3px);
 border: 1px solid rgba(255, 255, 255, 0.1);
 color: #ffffff;
-transition: all 0.3s ease;
+transition: transform 0.2s ease, box-shadow 0.2s ease;
 font-weight: 500;
+will-change: transform;
 }
 
 .btn-gradient:hover, .btn-primary:hover, .btn-success:hover, .btn-info:hover, .btn-warning:hover, .btn-danger:hover {
@@ -555,10 +587,11 @@ border-radius: 8px;
 padding: 10px 20px;
 font-weight: 500;
 background: rgba(45, 45, 45, 0.5);
-backdrop-filter: blur(5px);
--webkit-backdrop-filter: blur(5px);
+backdrop-filter: blur(3px);
+-webkit-backdrop-filter: blur(3px);
 border: 1px solid rgba(255, 255, 255, 0.1);
 color: #ffffff;
+will-change: transform;
 }
 
 .btn:hover {
@@ -568,10 +601,11 @@ border-color: rgba(255, 255, 255, 0.15);
 
 .btn-sm {
 background: rgba(45, 45, 45, 0.5);
-backdrop-filter: blur(5px);
--webkit-backdrop-filter: blur(5px);
+backdrop-filter: blur(3px);
+-webkit-backdrop-filter: blur(3px);
 border: 1px solid rgba(255, 255, 255, 0.1);
 color: #ffffff;
+will-change: transform;
 }
 
 .btn-sm:hover {
@@ -826,12 +860,13 @@ background-color: var(--danger-color);
 /* Forms */
 .form-control, .form-select {
 background: var(--glass-bg);
-backdrop-filter: blur(5px);
--webkit-backdrop-filter: blur(5px);
+backdrop-filter: blur(3px);
+-webkit-backdrop-filter: blur(3px);
 border: 1px solid var(--glass-border);
 border-radius: 8px;
 color: var(--text-primary);
 padding: 10px 14px;
+will-change: transform;
 }
 
 /* Reduce font size for dropdowns to prevent text clipping */
@@ -842,8 +877,8 @@ line-height: 1.5;
 
 .form-control:focus, .form-select:focus {
 background: var(--glass-bg);
-backdrop-filter: blur(8px);
--webkit-backdrop-filter: blur(8px);
+backdrop-filter: blur(4px);
+-webkit-backdrop-filter: blur(4px);
 border-color: var(--primary-color);
 color: var(--text-primary);
 box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
@@ -866,20 +901,25 @@ margin-bottom: 8px;
 
 textarea.form-control {
 background: var(--glass-bg);
-backdrop-filter: blur(5px);
--webkit-backdrop-filter: blur(5px);
+backdrop-filter: blur(3px);
+-webkit-backdrop-filter: blur(3px);
 color: var(--text-primary);
+will-change: transform;
 }
 
 /* Modals */
 .modal-content {
 background: var(--glass-bg);
-backdrop-filter: blur(10px);
--webkit-backdrop-filter: blur(10px);
+backdrop-filter: blur(6px);
+-webkit-backdrop-filter: blur(6px);
 color: var(--text-primary);
 border: 1px solid var(--glass-border);
 border-radius: 16px;
 box-shadow: var(--card-shadow);
+/* Performance optimizations */
+will-change: transform;
+transform: translateZ(0);
+contain: layout style paint;
 }
 
 .modal-header {
@@ -1761,3 +1801,69 @@ color: #ffffff;
         display: none;
     }
 }
+
+/* ======================================
+   GLASSMORPHISM PERFORMANCE OPTIMIZATIONS
+   Applied: 2026-04-01
+   ====================================== */
+
+/* 1. Optimize transitions - use specific properties instead of 'all' */
+.sidebar .nav-link,
+.card,
+.btn,
+.btn-gradient,
+.btn-primary,
+.btn-success,
+.btn-info,
+.btn-warning,
+.btn-danger {
+    transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* 2. GPU acceleration for animated elements */
+.modal.fade .modal-dialog,
+.page-transition-loader,
+.professional-spinner {
+    will-change: transform, opacity;
+    transform: translateZ(0);
+}
+
+/* 3. Reduce repaints/reflows */
+.table,
+.table-responsive,
+#transactionsTable {
+    contain: layout style;
+}
+
+/* 4. Optimize backdrop-filter layers */
+.navbar,
+.sidebar,
+.modal-content,
+.card {
+    backface-visibility: hidden;
+    perspective: 1000px;
+}
+
+/* 5. Disable animations on low-end devices */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+}
+
+/* 6. Optimize scrolling performance */
+.page-content,
+.sidebar,
+.table-responsive {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+}
+
+/* ====================================== */
+
