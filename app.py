@@ -18,7 +18,9 @@ from functools import wraps
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash, make_response
 from flask.json.provider import DefaultJSONProvider
-from flask_cors import CORS, cross_origin
+from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from mysql.connector import Error
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -100,17 +102,82 @@ class DecimalJSONProvider(DefaultJSONProvider):
 # Flask app configuration
 app = Flask(__name__)
 app.json = DecimalJSONProvider(app)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
+
+# Require SECRET_KEY from environment (no fallback for security)
+if not os.environ.get('SECRET_KEY'):
+    raise ValueError("SECRET_KEY environment variable is required. Please set it in your .env file.")
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365)  # Remember me for 1 year
 
 # Session cookie configuration for mobile browser compatibility
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Allow cookies in same-site context
 app.config['SESSION_COOKIE_HTTPONLY'] = True  # Prevent JavaScript access for security
-app.config['SESSION_COOKIE_SECURE'] = False  # Set to True if using HTTPS in production
+# Enable secure cookies only when HTTPS is available (production)
+IS_HTTPS = os.environ.get('HTTPS_ENABLED', 'False').lower() == 'true'
+app.config['SESSION_COOKIE_SECURE'] = IS_HTTPS
 app.config['SESSION_COOKIE_NAME'] = 'session'  # Explicit session cookie name
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB max upload size
 
-CORS(app)
+# Configure CORS with restricted origins for security
+allowed_origins = []
+cors_origins_env = os.environ.get('CORS_ALLOWED_ORIGINS', '')
+
+if cors_origins_env:
+    # Use explicitly configured origins from environment variable
+    allowed_origins = [origin.strip() for origin in cors_origins_env.split(',') if origin.strip()]
+else:
+    # Fallback: Allow localhost for development, or require explicit configuration for production
+    if IS_HTTPS:
+        logger.warning("HTTPS enabled but CORS_ALLOWED_ORIGINS not set. CORS will be restrictive.")
+        allowed_origins = []  # No origins allowed - must be explicitly configured
+    else:
+        # Development mode - allow localhost
+        allowed_origins = [
+            'http://localhost:5000',
+            'http://127.0.0.1:5000'
+        ]
+
+if allowed_origins:
+    CORS(app, origins=allowed_origins, supports_credentials=True)
+    logger.info(f"CORS configured with allowed origins: {allowed_origins}")
+else:
+    logger.warning("CORS not configured - no origins allowed. Set CORS_ALLOWED_ORIGINS in environment.")
+
+# ---------------------------------------------------------------------------
+# Rate Limiting Configuration
+# ---------------------------------------------------------------------------
+# Initialize Flask-Limiter for rate limiting (brute force protection)
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=[],  # No global limits, we'll set per-endpoint
+    storage_uri="memory://",  # Use in-memory storage (switch to Redis for production scaling)
+    strategy="fixed-window",  # Fixed window strategy
+)
+
+# Load rate limit thresholds from environment variables with fallback defaults
+RATE_LIMIT_LOGIN = os.environ.get('RATE_LIMIT_LOGIN', '5 per 15 minutes')
+RATE_LIMIT_REGISTER = os.environ.get('RATE_LIMIT_REGISTER', '3 per hour')
+RATE_LIMIT_CHANGE_PASSWORD = os.environ.get('RATE_LIMIT_CHANGE_PASSWORD', '3 per hour')
+RATE_LIMIT_ADMIN = os.environ.get('RATE_LIMIT_ADMIN', '30 per minute')
+RATE_LIMIT_API = os.environ.get('RATE_LIMIT_API', '100 per minute')
+
+logger.info(
+    f"Rate limiting configured - Login: {RATE_LIMIT_LOGIN}, Register: {RATE_LIMIT_REGISTER}, Admin: {RATE_LIMIT_ADMIN}")
+
+
+# ---------------------------------------------------------------------------
+# Rate Limit Error Handler
+# ---------------------------------------------------------------------------
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    """Handle rate limit exceeded errors."""
+    logger.warning(f"Rate limit exceeded for IP: {get_remote_address()} - {request.path}")
+    return jsonify({
+        'error': 'Rate limit exceeded',
+        'message': 'Too many requests. Please try again later.',
+        'retry_after': e.description
+    }), 429
 
 
 # ---------------------------------------------------------------------------
@@ -541,6 +608,7 @@ def index():
 
 
 @app.route('/register', methods=['GET', 'POST'])
+@limiter.limit(RATE_LIMIT_REGISTER)
 def register():
     """User registration."""
     if request.method == 'POST':
@@ -761,6 +829,7 @@ def _resolve_rate(service, date):
 
 
 @app.route('/login', methods=['GET', 'POST'])
+@limiter.limit(RATE_LIMIT_LOGIN)
 def login():
     """User login."""
     if request.method == 'POST':
@@ -837,6 +906,7 @@ def logout():
 
 @app.route('/api/change-password', methods=['POST'])
 @login_required
+@limiter.limit(RATE_LIMIT_CHANGE_PASSWORD)
 def change_password():
     """Change user password."""
     data = request.get_json()
@@ -887,6 +957,7 @@ def change_password():
 
 @app.route('/api/user-preferences', methods=['GET'])
 @login_required
+@limiter.limit(RATE_LIMIT_API)
 def get_user_preferences():
     """Get current user's preferences."""
     connection = get_db_connection()
@@ -916,6 +987,7 @@ def get_user_preferences():
 
 @app.route('/api/user-preferences', methods=['PUT'])
 @login_required
+@limiter.limit(RATE_LIMIT_API)
 def update_user_preferences():
     """Update current user's preferences."""
     data = request.get_json()
@@ -1041,6 +1113,7 @@ def admin_dashboard():
 
 @app.route('/api/admin/users', methods=['GET'])
 @admin_required
+@limiter.limit(RATE_LIMIT_ADMIN)
 def get_all_users():
     """Get all users with their details."""
     connection = get_db_connection()
@@ -1118,6 +1191,7 @@ def log_exchange_rate_refresh(source, status, buy_rate=None, sell_rate=None, err
 
 @app.route('/api/admin/users/<int:user_id>/toggle-active', methods=['POST'])
 @admin_required
+@limiter.limit(RATE_LIMIT_ADMIN)
 def toggle_user_active(user_id):
     """Activate or deactivate a user."""
     connection = get_db_connection()
@@ -1166,6 +1240,7 @@ def toggle_user_active(user_id):
 
 @app.route('/api/admin/users/<int:user_id>/toggle-admin', methods=['POST'])
 @admin_required
+@limiter.limit(RATE_LIMIT_ADMIN)
 def toggle_user_admin(user_id):
     """Grant or revoke admin privileges."""
     connection = get_db_connection()
@@ -1213,6 +1288,7 @@ def toggle_user_admin(user_id):
 
 @app.route('/api/admin/users/<int:user_id>', methods=['DELETE'])
 @admin_required
+@limiter.limit(RATE_LIMIT_ADMIN)
 def delete_user(user_id):
     """Delete a user and all their data."""
     connection = get_db_connection()
@@ -1256,6 +1332,7 @@ def delete_user(user_id):
 
 @app.route('/api/admin/users/<int:user_id>/default-page', methods=['PUT'])
 @admin_required
+@limiter.limit(RATE_LIMIT_ADMIN)
 def admin_update_user_default_page(user_id):
     """Update a user's default landing page (admin only)."""
     data = request.get_json()
@@ -1311,6 +1388,7 @@ def admin_update_user_default_page(user_id):
 
 @app.route('/api/admin/audit-logs', methods=['GET'])
 @admin_required
+@limiter.limit(RATE_LIMIT_ADMIN)
 def get_audit_logs():
     """Get audit logs of admin actions."""
     connection = get_db_connection()
@@ -1349,6 +1427,7 @@ def get_audit_logs():
 
 @app.route('/api/admin/settings', methods=['GET'])
 @admin_required
+@limiter.limit(RATE_LIMIT_ADMIN)
 def get_admin_settings():
     """Get all application settings."""
     connection = get_db_connection()
@@ -1373,6 +1452,7 @@ def get_admin_settings():
 
 @app.route('/api/admin/settings/<string:key>', methods=['PUT'])
 @admin_required
+@limiter.limit(RATE_LIMIT_ADMIN)
 def update_admin_setting(key):
     """Update a single application setting.  Only keys that already exist in
     app_settings may be written — arbitrary keys are rejected."""
@@ -1416,6 +1496,7 @@ def update_admin_setting(key):
 
 @app.route('/api/admin/db-backup', methods=['GET'])
 @admin_required
+@limiter.limit(RATE_LIMIT_ADMIN)
 def admin_db_backup():
     """Generate a full MySQL database backup in MySQL Workbench compatible format.
 
@@ -2174,21 +2255,19 @@ def _run_backup_and_upload():
 
 
 @app.route('/api/admin/trigger-backup', methods=['GET'])
-@cross_origin(origins=['https://console.cron-job.org'])
 def trigger_db_backup():
     """Trigger a database backup that uploads to Appwrite.
 
     Can run synchronously (for Vercel) or asynchronously (for local dev).
     Set BACKUP_MODE=sync in environment for Vercel/serverless platforms.
     """
-    allowed_origins = ['https://console.cron-job.org', 'https://cron-job.org']
-    local_patterns = [
-        'localhost', '127.0.0.1', '192.168.', '10.',
-        '172.16.', '172.17.', '172.18.', '172.19.',
-        '172.20.', '172.21.', '172.22.', '172.23.',
-        '172.24.', '172.25.', '172.26.', '172.27.',
-        '172.28.', '172.29.', '172.30.', '172.31.',
-    ]
+    # Get allowed origins from environment variable
+    backup_origins_env = os.environ.get('BACKUP_ALLOWED_ORIGINS', '')
+    allowed_origins = [origin.strip() for origin in backup_origins_env.split(',') if origin.strip()]
+
+    # Get local patterns from environment variable
+    local_patterns_env = os.environ.get('BACKUP_LOCAL_PATTERNS', 'localhost,127.0.0.1')
+    local_patterns = [pattern.strip() for pattern in local_patterns_env.split(',') if pattern.strip()]
 
     origin = request.headers.get('Origin', '')
     referer = request.headers.get('Referer', '')
@@ -2258,6 +2337,7 @@ def trigger_db_backup():
 
 @app.route('/api/admin/users/<int:user_id>/payment-methods', methods=['GET'])
 @admin_required
+@limiter.limit(RATE_LIMIT_ADMIN)
 def admin_get_user_payment_methods(user_id):
     """Return active payment methods for a given user (admin only)."""
     connection = get_db_connection()
@@ -2282,6 +2362,7 @@ def admin_get_user_payment_methods(user_id):
 
 @app.route('/api/admin/import-csv', methods=['POST'])
 @admin_required
+@limiter.limit(RATE_LIMIT_ADMIN)
 def admin_import_csv():
     """Import transactions from a CSV file for a specific user/month/year.
 
@@ -2556,6 +2637,7 @@ def admin_import_csv():
 
 @app.route('/api/admin/users/<int:user_id>/monthly-records', methods=['GET'])
 @admin_required
+@limiter.limit(RATE_LIMIT_ADMIN)
 def admin_get_user_monthly_records(user_id):
     """Return monthly records for a given user with transaction counts (admin only)."""
     connection = get_db_connection()
@@ -2585,6 +2667,7 @@ def admin_get_user_monthly_records(user_id):
 
 @app.route('/api/admin/users/<int:user_id>/monthly-records/<int:record_id>', methods=['DELETE'])
 @admin_required
+@limiter.limit(RATE_LIMIT_ADMIN)
 def admin_delete_monthly_record(user_id, record_id):
     """Delete a monthly record and all its transactions for a given user (admin only)."""
     connection = get_db_connection()
@@ -2634,6 +2717,7 @@ def admin_delete_monthly_record(user_id, record_id):
 
 @app.route('/api/dashboard-stats')
 @login_required
+@limiter.limit(RATE_LIMIT_API)
 def dashboard_stats():
     """Get dashboard statistics."""
     connection = get_db_connection()
@@ -2772,6 +2856,7 @@ def dashboard_stats():
 
 @app.route('/api/transactions', methods=['GET', 'POST'])
 @login_required
+@limiter.limit(RATE_LIMIT_API)
 def transactions():
     """Get or create transactions."""
     connection = get_db_connection()
@@ -5882,17 +5967,18 @@ def get_sampath_current_rate():
 
 
 @app.route('/api/exchange-rate/refresh-all', methods=['GET'])
-@cross_origin(origins=['https://console.cron-job.org'])
 def refresh_all_rates_manually():
     """Trigger an immediate refresh of all exchange-rate sources.
     This endpoint executes the refresh synchronously using parallel fetching for optimal performance.
     No authentication required - accessible from cron-job.org and local networks."""
     try:
-        # Whitelist validation for both browser and non-browser requests
-        allowed_origins = ['https://console.cron-job.org', 'https://cron-job.org']
-        local_patterns = ['localhost', '127.0.0.1', '192.168.', '10.', '172.16.', '172.17.', '172.18.', '172.19.',
-                          '172.20.', '172.21.', '172.22.', '172.23.', '172.24.', '172.25.', '172.26.', '172.27.',
-                          '172.28.', '172.29.', '172.30.', '172.31.']
+        # Get allowed origins from environment variable
+        backup_origins_env = os.environ.get('BACKUP_ALLOWED_ORIGINS', '')
+        allowed_origins = [origin.strip() for origin in backup_origins_env.split(',') if origin.strip()]
+
+        # Get local patterns from environment variable
+        local_patterns_env = os.environ.get('BACKUP_LOCAL_PATTERNS', 'localhost,127.0.0.1')
+        local_patterns = [pattern.strip() for pattern in local_patterns_env.split(',') if pattern.strip()]
 
         # Check Origin header (set by browsers and some tools)
         origin = request.headers.get('Origin', '')
