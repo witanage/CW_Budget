@@ -37,7 +37,7 @@
     <i class="fas fa-bars"></i> Menu
 </button>
 
-<div class="container-fluid">
+<div class="container-fluid" id="dashboardContent" style="display: none;">
     <div class="row">
         <!-- Sidebar -->
         <nav class="col-md-3 col-lg-2 d-md-block sidebar" id="sidebar">
@@ -161,19 +161,18 @@
 
                         <!-- Transactions Table -->
                         <div class="table-responsive">
-                            <table class="table table-hover table-sm" id="transactionsTable" style="font-size: 0.875rem;">
+                            <table class="table table-hover table-sm" id="transactionsTable" style="font-size: 0.875rem; table-layout: fixed; width: 100%;">
                                 <thead>
                                     <tr>
-                                        <th></th>
-                                        <th>Method</th>
-                                        <th>Description</th>
-                                        <th>Category</th>
-                                        <th>Debit</th>
-                                        <th>Credit</th>
-                                        <th>Balance</th>
-                                        <th>Paid At</th>
-                                        <th>Notes</th>
-                                        <th>Actions</th>
+                                        <th style="width: 2%;"></th>
+                                        <th style="width: 25%;">Description</th>
+                                        <th style="width: 9%;">Category</th>
+                                        <th style="width: 8%;">Debit</th>
+                                        <th style="width: 8%;">Credit</th>
+                                        <th style="width: 8%;">Balance</th>
+                                        <th style="width: 8%;">Paid At</th>
+                                        <th style="width: 15%;">Notes</th>
+                                        <th style="width: 18%;">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1069,8 +1068,12 @@
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label for="transDate" class="form-label">Date</label>
-                        <input type="date" class="form-control" id="transDate">
+                        <label for="transPaymentMethod" class="form-label">Payment Method</label>
+                        <select class="form-select" id="transPaymentMethod">
+                            <option value="">None (Not Paid)</option>
+                            <!-- Payment methods will be loaded here -->
+                        </select>
+                        <small class="form-text text-muted">Select payment method to mark transaction as paid</small>
                     </div>
                     <div class="mb-3">
                         <label for="transNotes" class="form-label">Notes</label>
@@ -2015,13 +2018,86 @@
 }
 
 /* Compact Transaction Table Rows */
+#transactionsPage .card-body {
+    padding-right: 0.25rem !important;
+}
+
+#transactionsPage .table-responsive {
+    padding-right: 0;
+}
+
 #transactionsTable tbody td {
     padding: 0.25rem 0.5rem !important;
     vertical-align: middle;
 }
 
+#transactionsTable tbody td:last-child {
+    padding-right: 0.15rem !important;
+}
+
 #transactionsTable thead th {
     padding: 0.5rem !important;
+}
+
+/* Action Button Group - flex wrap for responsive layout */
+.action-btn-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+}
+
+/* iOS-style icon buttons */
+.action-btn {
+    width: 28px !important;
+    height: 28px !important;
+    padding: 0 !important;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    border-radius: 7px !important;
+    border: none !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.18), 0 0.5px 1px rgba(0,0,0,0.12);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+}
+
+.action-btn:hover {
+    transform: scale(1.12);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.22), 0 1px 3px rgba(0,0,0,0.14);
+}
+
+.action-btn:active {
+    transform: scale(0.93);
+    box-shadow: 0 0.5px 2px rgba(0,0,0,0.15);
+}
+
+.action-btn i {
+    font-size: 0.75rem !important;
+    position: relative;
+    z-index: 1;
+}
+
+/* iOS gradient backgrounds */
+.action-btn.btn-primary {
+    background: linear-gradient(180deg, #5a9cff 0%, #0a6efd 100%) !important;
+}
+.action-btn.btn-danger {
+    background: linear-gradient(180deg, #ff6b6b 0%, #dc3545 100%) !important;
+}
+.action-btn.btn-warning {
+    background: linear-gradient(180deg, #ffda6b 0%, #f0ad00 100%) !important;
+}
+.action-btn.btn-success {
+    background: linear-gradient(180deg, #5dd39e 0%, #198754 100%) !important;
+}
+.action-btn.btn-secondary {
+    background: linear-gradient(180deg, #a0a8b4 0%, #6c757d 100%) !important;
+}
+.action-btn.btn-info {
+    background: linear-gradient(180deg, #6ee7f7 0%, #0cb5d6 100%) !important;
 }
 
 /* Drag Handle Styling */
@@ -2240,8 +2316,9 @@ tr[draggable="true"] {
     }
 
     /* Slightly smaller action buttons */
-    #transactionsTable .btn-sm {
-        padding: 3px 5px !important;
+    .action-btn {
+        width: 26px !important;
+        height: 26px !important;
     }
 }
 
@@ -2267,13 +2344,18 @@ tr[draggable="true"] {
     }
 
     /* Smaller action buttons */
-    #transactionsTable .btn-sm {
-        padding: 2px 4px !important;
+    .action-btn {
+        width: 24px !important;
+        height: 24px !important;
+        border-radius: 6px !important;
+    }
+
+    .action-btn i {
         font-size: 0.65rem !important;
     }
 
-    #transactionsTable .btn-sm i {
-        font-size: 0.8rem !important;
+    .action-btn-group {
+        gap: 3px;
     }
 
     /* Compact control row buttons */
@@ -2307,13 +2389,18 @@ tr[draggable="true"] {
     }
 
     /* Very compact action buttons */
-    #transactionsTable .btn-sm {
-        padding: 1px 3px !important;
+    .action-btn {
+        width: 22px !important;
+        height: 22px !important;
+        border-radius: 5px !important;
+    }
+
+    .action-btn i {
         font-size: 0.6rem !important;
     }
 
-    #transactionsTable .btn-sm i {
-        font-size: 0.75rem !important;
+    .action-btn-group {
+        gap: 2px;
     }
 
     /* Stack control buttons on multiple rows */
@@ -2356,23 +2443,25 @@ tr[draggable="true"] {
     #transactionsTable tbody td {
         padding: 0.15rem 0.2rem !important;
         font-size: 0.65rem !important;
-        max-height: 24px;
     }
 
     #transactionsTable tbody tr {
-        height: 24px;
-        max-height: 24px;
+        max-height: none;
     }
 
     /* Minimal action buttons */
-    #transactionsTable .btn-sm {
-        padding: 1px 2px !important;
-        font-size: 0.55rem !important;
-        margin-right: 0.1rem !important;
+    .action-btn {
+        width: 20px !important;
+        height: 20px !important;
+        border-radius: 5px !important;
     }
 
-    #transactionsTable .btn-sm i {
-        font-size: 0.7rem !important;
+    .action-btn i {
+        font-size: 0.55rem !important;
+    }
+
+    .action-btn-group {
+        gap: 2px;
     }
 
     /* Stack all controls vertically */
@@ -2931,6 +3020,43 @@ tr[draggable="true"] {
 <!-- Vanta.js for animated background (self-hosted) -->
 <script src="{{ url_for('static', filename='js/vendor/three.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/vendor/vanta.birds.min.js') }}"></script>
+<!-- Initialize Vanta background immediately -->
+<script>
+    // Initialize birds animation as soon as scripts are loaded
+    if (typeof VANTA !== 'undefined' && typeof VANTA.BIRDS !== 'undefined') {
+        const loader = document.getElementById('pageLoader');
+        if (loader) {
+            const theme = document.documentElement.getAttribute('data-theme') || 'dark';
+            const colors = theme === 'dark' ? {
+                backgroundColor: 0x1a1a1a,
+                color1: 0x007acc,
+                color2: 0x0066ff,
+                colorMode: 'variance'
+            } : {
+                backgroundColor: 0xf8fafc,
+                color1: 0x0866ff,
+                color2: 0x4299e1,
+                colorMode: 'variance'
+            };
+            window.vantaEffect = VANTA.BIRDS({
+                el: loader,
+                mouseControls: true,
+                touchControls: true,
+                gyroControls: false,
+                minHeight: 200.00,
+                minWidth: 200.00,
+                scale: 0.50,
+                scaleMobile: 0.50,
+                ...colors,
+                quantity: 8.00,
+                speedLimit: 4.00,
+                separation: 50.00,
+                alignment: 50.00,
+                cohesion: 50.00
+            });
+        }
+    }
+</script>
 <!-- PDF.js for bill scanning (self-hosted) -->
 <script src="{{ url_for('static', filename='js/vendor/pdf.min.js') }}"></script>
 <script>
