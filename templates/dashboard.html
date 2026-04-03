@@ -164,15 +164,15 @@
                             <table class="table table-hover table-sm" id="transactionsTable" style="font-size: 0.875rem; table-layout: fixed; width: 100%;">
                                 <thead>
                                     <tr>
-                                        <th style="width: 2%;"></th>
-                                        <th style="width: 25%;">Description</th>
+                                        <th style="width: 3%;"></th>
+                                        <th style="width: 22%;">Description</th>
                                         <th style="width: 9%;">Category</th>
-                                        <th style="width: 8%;">Debit</th>
-                                        <th style="width: 8%;">Credit</th>
-                                        <th style="width: 8%;">Balance</th>
-                                        <th style="width: 8%;">Paid At</th>
-                                        <th style="width: 15%;">Notes</th>
-                                        <th style="width: 18%;">Actions</th>
+                                        <th style="width: 10%;">Debit</th>
+                                        <th style="width: 10%;">Credit</th>
+                                        <th style="width: 10%;">Balance</th>
+                                        <th style="width: 10%;">Paid At</th>
+                                        <th style="width: 16%;">Notes</th>
+                                        <th style="width: 18%;"></th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -2019,11 +2019,12 @@
 
 /* Compact Transaction Table Rows */
 #transactionsPage .card-body {
-    padding-right: 0.25rem !important;
+    padding-right: 0 !important;
 }
 
 #transactionsPage .table-responsive {
     padding-right: 0;
+    margin-right: 0;
 }
 
 #transactionsTable tbody td {
@@ -2032,19 +2033,25 @@
 }
 
 #transactionsTable tbody td:last-child {
-    padding-right: 0.15rem !important;
+    padding-right: 2px !important;
 }
 
 #transactionsTable thead th {
     padding: 0.5rem !important;
 }
 
-/* Action Button Group - flex wrap for responsive layout */
+#transactionsTable thead th:last-child {
+    padding-right: 2px !important;
+    text-align: right;
+}
+
+/* Action Button Group - no wrap, single line */
 .action-btn-group {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 4px;
     align-items: center;
+    justify-content: flex-end;
 }
 
 /* iOS-style icon buttons */
