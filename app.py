@@ -3182,15 +3182,16 @@ def transactions():
                 data.get('notes'),
                 next_display_order,
                 bill_content,
-                attachment_guid  # Store GUID in attachments column
+                attachment_guid,  # Store GUID in attachments column
+                data.get('payment_method_id')  # Add payment method
             )
             print(f"[DEBUG] Inserting transaction with values: {insert_values}")
 
             cursor.execute("""
                            INSERT INTO transactions
                            (monthly_record_id, description, category_id, debit, credit, transaction_date, notes,
-                            display_order, bill_content, attachments)
-                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            display_order, bill_content, attachments, payment_method_id)
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                            """, insert_values)
 
             transaction_id = cursor.lastrowid
@@ -3418,6 +3419,16 @@ def manage_transaction(transaction_id):
             if not transaction_date or transaction_date == '':
                 transaction_date = datetime.now().date()
 
+            # Handle payment method and is_done logic
+            # If payment_method_id is provided (and not empty), set is_done to TRUE
+            # If payment_method_id is None/empty, set is_done to FALSE
+            payment_method_id = data.get('payment_method_id')
+            if payment_method_id:
+                is_done = True
+            else:
+                is_done = False
+                payment_method_id = None
+
             # Update transaction (balance will be calculated on frontend)
             cursor.execute("""
                            UPDATE transactions
@@ -3426,7 +3437,9 @@ def manage_transaction(transaction_id):
                                debit            = %s,
                                credit           = %s,
                                transaction_date = %s,
-                               notes            = %s
+                               notes            = %s,
+                               payment_method_id = %s,
+                               is_done          = %s
                            WHERE id = %s
                            """, (
                 data.get('description'),
@@ -3435,6 +3448,8 @@ def manage_transaction(transaction_id):
                 credit if credit > 0 else None,
                 transaction_date,
                 data.get('notes'),
+                payment_method_id,
+                is_done,
                 transaction_id
             ))
 
@@ -3485,6 +3500,21 @@ def manage_transaction(transaction_id):
             if old_notes != new_notes:
                 log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'notes',
                                       old_transaction['notes'], data.get('notes'))
+
+            # Compare payment_method_id (handle None)
+            old_payment_method = old_transaction['payment_method_id']
+            new_payment_method = int(data.get('payment_method_id')) if data.get('payment_method_id') else None
+            if old_payment_method != new_payment_method:
+                log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'payment_method_id',
+                                      old_payment_method, new_payment_method)
+
+            # Compare is_done status
+            old_is_done = old_transaction.get('is_done', False)
+            # Calculate new is_done based on payment method
+            new_is_done = True if new_payment_method else False
+            if old_is_done != new_is_done:
+                log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'is_done',
+                                      old_is_done, new_is_done)
 
             connection.commit()
             print(f"[DEBUG] Transaction update committed successfully")

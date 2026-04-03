@@ -144,14 +144,17 @@ async function compressFileForUpload(file) {
 }
 
 // Global variable for Vanta effect
-let vantaEffect = null;
+let vantaEffect = window.vantaEffect || null;
 
 // Initialize everything when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
     console.log('=== Dashboard Loading ===');
 
-    // Initialize Vanta.js background animation
-    initVantaBackground();
+    // Vanta background already initialized inline, no need to call again
+    // Just ensure we have the reference
+    if (window.vantaEffect) {
+        vantaEffect = window.vantaEffect;
+    }
 
     // Loader is shown by default in HTML, will be hidden after initialization
     initApp();
@@ -189,6 +192,12 @@ function initApp() {
 
 // Initialize Vanta.js background animation
 function initVantaBackground() {
+    // Skip if already initialized
+    if (vantaEffect) {
+        console.log('Vanta effect already initialized');
+        return;
+    }
+
     if (typeof VANTA !== 'undefined' && typeof VANTA.BIRDS !== 'undefined') {
         const loader = document.getElementById('pageLoader');
         if (loader) {
@@ -220,6 +229,7 @@ function initVantaBackground() {
                 alignment: 50.00,
                 cohesion: 50.00
             });
+            window.vantaEffect = vantaEffect;
         }
     }
 }
@@ -227,12 +237,19 @@ function initVantaBackground() {
 // Hide the page loader
 function hideLoader() {
     const loader = document.getElementById('pageLoader');
+    const dashboardContent = document.getElementById('dashboardContent');
+
     if (loader) {
         loader.classList.add('fade-out');
         // Destroy Vanta effect
         if (vantaEffect) {
             vantaEffect.destroy();
             vantaEffect = null;
+            window.vantaEffect = null;
+        }
+        // Show dashboard content
+        if (dashboardContent) {
+            dashboardContent.style.display = 'block';
         }
         // Remove from DOM after animation completes
         setTimeout(() => {
@@ -244,11 +261,19 @@ function hideLoader() {
 // Show the page loader (for manual refresh)
 function showLoader() {
     const loader = document.getElementById('pageLoader');
+    const dashboardContent = document.getElementById('dashboardContent');
+
     if (loader) {
+        // Hide dashboard content
+        if (dashboardContent) {
+            dashboardContent.style.display = 'none';
+        }
         loader.style.display = 'flex';
         loader.classList.remove('fade-out');
-        // Reinitialize Vanta effect
-        initVantaBackground();
+        // Reinitialize Vanta effect if not already present
+        if (!vantaEffect) {
+            initVantaBackground();
+        }
     }
 }
 
@@ -503,6 +528,17 @@ function setupFormButtons() {
                 scanStatus.style.display = 'none';
                 scanStatus.style.color = '#ffc107';
             }
+
+            // Reset the form and modal title for next use
+            document.getElementById('transactionForm').reset();
+            document.getElementById('editTransactionId').value = '';
+            document.querySelector('#transactionModal .modal-title').textContent = 'Add Transaction';
+
+            // Reset payment method dropdown to "None"
+            const paymentMethodSelect = document.getElementById('transPaymentMethod');
+            if (paymentMethodSelect) {
+                paymentMethodSelect.value = '';
+            }
         });
     }
 
@@ -533,12 +569,6 @@ function setupFormButtons() {
     const viewPaymentTotalsBtn = document.getElementById('viewPaymentTotalsBtn');
     if (viewPaymentTotalsBtn) {
         viewPaymentTotalsBtn.addEventListener('click', loadPaymentTotals);
-    }
-
-    // Set today's date in transaction form
-    const transDate = document.getElementById('transDate');
-    if (transDate) {
-        transDate.value = new Date().toISOString().split('T')[0];
     }
 
     // Credit card management
@@ -1282,11 +1312,8 @@ function displayTransactions(transactions) {
     transactions.forEach(t => {
         const row = document.createElement('tr');
 
-        // Checkbox for marking done/undone (handle both boolean and numeric values)
+        // Check if transaction has payment method (handle both boolean and numeric values)
         const isDone = t.is_done === true || t.is_done === 1;
-        const checkboxHtml = isDone
-            ? `<input type="checkbox" class="form-check-input" checked onchange="unmarkTransaction(${t.id})" title="${t.payment_method_name || 'Done'}">`
-            : `<input type="checkbox" class="form-check-input" onchange="showPaymentMethodModal(${t.id})">`;
 
         // Store transaction data
         row.dataset.transaction = JSON.stringify(t);
@@ -1302,10 +1329,9 @@ function displayTransactions(transactions) {
         const paidAtDisplay = t.paid_at ? formatDate(t.paid_at) : '-';
 
         row.innerHTML = `
-            <td class="drag-handle text-center" title="Drag to reorder">
-                <i class="fas fa-grip-vertical"></i>
+            <td class="text-center drag-handle" style="padding: 0.5rem; width: 40px; cursor: move;" title="Drag to reorder">
+                <i class="fas fa-grip-vertical" style="font-size: 0.9rem; color: #999;"></i>
             </td>
-            <td class="text-center">${checkboxHtml}</td>
             <td class="description-cell" style="cursor: pointer;" data-transaction-id="${t.id}">${t.description}</td>
             <td><span class="badge bg-secondary">${t.category_name || 'Uncategorized'}</span></td>
             <td class="text-success">${t.debit ? parseFloat(t.debit).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,') : '-'}</td>
@@ -1313,30 +1339,29 @@ function displayTransactions(transactions) {
             <td class="fw-bold">${parseFloat(t.calculatedBalance).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}</td>
             <td class="small">${paidAtDisplay}</td>
             <td>${t.notes || '-'}</td>
-            <td class="p-1" style="white-space: nowrap;">
-                <button class="btn btn-sm btn-primary p-1 me-1" style="font-size: 0.7rem; line-height: 1; background-color: #0d6efd !important; border-color: #0d6efd !important; color: white !important;" onclick="editTransaction(${t.id})" title="Edit">
-                    <i class="fas fa-edit"></i>
-                </button>
-                <button class="btn btn-sm btn-danger p-1 me-1" style="font-size: 0.7rem; line-height: 1; background-color: #dc3545 !important; border-color: #dc3545 !important; color: white !important;" onclick="deleteTransaction(${t.id})" title="Delete">
-                    <i class="fas fa-trash"></i>
-                </button>
-                <button class="btn btn-sm btn-warning p-1 me-1" style="font-size: 0.7rem; line-height: 1; background-color: #ffc107 !important; border-color: #ffc107 !important; color: #000 !important;" onclick="showMoveCopyModal(${t.id}, 'move')" title="Move to Month">
-                    <i class="fas fa-arrow-right"></i>
-                </button>
-                <button class="btn btn-sm btn-success p-1 me-1" style="font-size: 0.7rem; line-height: 1; background-color: #198754 !important; border-color: #198754 !important; color: white !important;" onclick="showMoveCopyModal(${t.id}, 'copy')" title="Copy to Month">
-                    <i class="fas fa-copy"></i>
-                </button>
-                <button class="btn btn-sm btn-secondary p-1 me-1" style="font-size: 0.7rem; line-height: 1; background-color: #6c757d !important; border-color: #6c757d !important; color: white !important;" onclick="showBillContent(${t.id})" title="${t.bill_content ? 'View Bill' : 'No Bill Available'}" ${t.bill_content ? '' : 'disabled'}>
-                    <i class="fas fa-receipt"></i>
-                </button>
-                <button class="btn btn-sm btn-info p-1" style="font-size: 0.7rem; line-height: 1; background-color: #0dcaf0 !important; border-color: #0dcaf0 !important; color: #000 !important;" onclick="showAuditModal(${t.id})" title="Audit Log">
-                    <i class="fas fa-history"></i>
-                </button>
+            <td class="p-1">
+                <div class="action-btn-group">
+                    <button class="btn btn-sm btn-primary action-btn" onclick="editTransaction(${t.id})" title="Edit">
+                        <i class="fas fa-edit" style="color: white;"></i>
+                    </button>
+                    <button class="btn btn-sm btn-danger action-btn" onclick="deleteTransaction(${t.id})" title="Delete">
+                        <i class="fas fa-trash" style="color: white;"></i>
+                    </button>
+                    <button class="btn btn-sm btn-warning action-btn" onclick="showMoveCopyModal(${t.id}, 'move')" title="Move to Month">
+                        <i class="fas fa-arrow-right" style="color: #000;"></i>
+                    </button>
+                    <button class="btn btn-sm btn-success action-btn" onclick="showMoveCopyModal(${t.id}, 'copy')" title="Copy to Month">
+                        <i class="fas fa-copy" style="color: white;"></i>
+                    </button>
+                    <button class="btn btn-sm btn-secondary action-btn" onclick="showBillContent(${t.id})" title="${t.bill_content ? 'View Bill' : 'No Bill Available'}" ${t.bill_content ? '' : 'disabled'}>
+                        <i class="fas fa-receipt" style="color: white;"></i>
+                    </button>
+                    <button class="btn btn-sm btn-info action-btn" onclick="showAuditModal(${t.id})" title="Audit Log">
+                        <i class="fas fa-history" style="color: #000;"></i>
+                    </button>
+                </div>
             </td>
         `;
-
-        // Get the description cell
-        const descCell = row.querySelector('.description-cell');
 
         // Check if transaction is paid (handle both boolean and numeric values)
         const isPaid = t.is_paid === true || t.is_paid === 1;
@@ -1346,10 +1371,10 @@ function displayTransactions(transactions) {
             row.classList.add('transaction-highlighted');
             const cells = row.querySelectorAll('td');
             cells.forEach((cell, index) => {
-                // Apply to all cells except drag handle (index 0) and description (index 2)
-                if (index !== 0 && index !== 2) {
+                // Apply to all cells except drag handle (index 0) and description (index 1)
+                if (index !== 0 && index !== 1) {
                     cell.style.backgroundColor = t.payment_method_color;
-                } else if (index === 2) {
+                } else if (index === 1) {
                     // Apply to description cell only if is_paid is true
                     if (isPaid) {
                         cell.style.backgroundColor = t.payment_method_color;
@@ -1358,20 +1383,18 @@ function displayTransactions(transactions) {
             });
         }
 
-        // Add click handler to description cell
+        // Add click handler on description cell to toggle paid status
+        const descCell = row.querySelector('.description-cell');
         if (descCell) {
-            // Store isPaid status in the cell
             descCell.dataset.isPaid = isPaid ? '1' : '0';
-
             descCell.addEventListener('click', function() {
                 const transId = parseInt(this.dataset.transactionId);
                 const cellIsPaid = this.dataset.isPaid === '1';
 
-                // If already paid, unpay it. Otherwise, show payment modal
                 if (cellIsPaid) {
                     markTransactionAsUnpaid(transId);
                 } else {
-                    showPaymentMethodModal(transId, true); // true = isPaidClick
+                    showPaymentMethodModal(transId, true);
                 }
             });
         }
@@ -1578,8 +1601,13 @@ function editTransaction(id) {
     document.getElementById('transCategory').value = transaction.category_id || '';
     document.getElementById('transDebit').value = transaction.debit || '';
     document.getElementById('transCredit').value = transaction.credit || '';
-    document.getElementById('transDate').value = transaction.transaction_date ? transaction.transaction_date.split('T')[0] : '';
     document.getElementById('transNotes').value = transaction.notes || '';
+
+    // Set payment method (use payment_method_id if available)
+    const paymentMethodSelect = document.getElementById('transPaymentMethod');
+    if (paymentMethodSelect) {
+        paymentMethodSelect.value = transaction.payment_method_id || '';
+    }
 
     // Update modal title
     document.querySelector('#transactionModal .modal-title').textContent = 'Edit Transaction';
@@ -1642,8 +1670,8 @@ async function saveTransaction() {
         category_id: document.getElementById('transCategory')?.value || null,
         debit: debit,
         credit: credit,
-        transaction_date: document.getElementById('transDate')?.value,
         notes: document.getElementById('transNotes')?.value,
+        payment_method_id: document.getElementById('transPaymentMethod')?.value || null,
         year: parseInt(year),
         month: parseInt(month)
     };
@@ -1716,12 +1744,6 @@ async function saveTransaction() {
             document.getElementById('transactionForm')?.reset();
             document.getElementById('editTransactionId').value = '';
             document.querySelector('#transactionModal .modal-title').textContent = 'Add Transaction';
-
-            // Reset date to today after form reset
-            const transDate = document.getElementById('transDate');
-            if (transDate) {
-                transDate.value = new Date().toISOString().split('T')[0];
-            }
 
             // Clear bill content and captured image
             scannedBillContent = null;
@@ -4118,6 +4140,17 @@ function loadPaymentMethods() {
                 paymentMethods.forEach(method => {
                     filterDropdown.innerHTML += `<option value="${method.id}">${method.name}</option>`;
                 });
+            }
+
+            // Populate transaction modal dropdown
+            const transPaymentMethodSelect = document.getElementById('transPaymentMethod');
+            if (transPaymentMethodSelect) {
+                // Keep the "None" option and add payment methods
+                let optionsHtml = '<option value="">None (Not Paid)</option>';
+                paymentMethods.forEach(method => {
+                    optionsHtml += `<option value="${method.id}">${method.name}</option>`;
+                });
+                transPaymentMethodSelect.innerHTML = optionsHtml;
             }
         })
         .catch(error => {
