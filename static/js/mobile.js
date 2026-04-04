@@ -52,6 +52,7 @@ bootstrapModal.show();
 
 // Global variables
 let paymentMethods = [];
+let categories = [];
 let selectedTransactionIdForPayment = null;
 let scannedBillContent = null; // Store scanned bill content temporarily
 let capturedBillImage = null; // Store the actual file (image or PDF) for upload
@@ -264,6 +265,159 @@ actionLabel,
 listContainer.appendChild(item);
 });
 }
+}
+
+// Open transaction payment method selection modal
+function openTransPaymentMethodModal() {
+const listContainer = document.getElementById('transPaymentMethodList');
+listContainer.innerHTML = '';
+
+// Add "None" option
+const noneItem = document.createElement('button');
+noneItem.className = 'list-group-item list-group-item-action d-flex align-items-center';
+noneItem.style.cssText = 'background: #1a1a1a; color: #fff; border-color: #333; padding: 15px;';
+noneItem.innerHTML = `
+<i class="fas fa-ban me-3" style="color: #888; width: 30px; text-align: center;"></i>
+<span style="flex: 1;">None (Not Paid)</span>
+`;
+noneItem.onclick = () => {
+selectTransPaymentMethod('', 'None (Not Paid)');
+};
+listContainer.appendChild(noneItem);
+
+if (paymentMethods && paymentMethods.length > 0) {
+paymentMethods.forEach(method => {
+const item = document.createElement('button');
+item.className = 'list-group-item list-group-item-action d-flex align-items-center';
+item.style.cssText = 'background: #1a1a1a; color: #fff; border-color: #333; padding: 15px;';
+item.innerHTML = `
+<span class="payment-method-color-indicator me-3" style="background-color: ${method.color}; width: 30px; height: 30px; border-radius: 8px; display: inline-block;"></span>
+<span style="flex: 1;">${method.name}</span>
+<i class="fas fa-check" style="color: #28a745; display: ${document.getElementById('transPaymentMethod').value == method.id ? 'block' : 'none'};"></i>
+`;
+item.onclick = () => {
+selectTransPaymentMethod(method.id, method.name);
+};
+listContainer.appendChild(item);
+});
+}
+
+// Show the modal
+const modal = new bootstrap.Modal(document.getElementById('transPaymentMethodModal'));
+modal.show();
+}
+
+// Select payment method for transaction form
+function selectTransPaymentMethod(methodId, methodName) {
+document.getElementById('transPaymentMethod').value = methodId;
+document.getElementById('transPaymentMethodText').textContent = methodName;
+
+// Update button color based on selection
+const btn = document.getElementById('transPaymentMethodBtn');
+if (methodId) {
+btn.style.color = '#fff';
+} else {
+btn.style.color = '#aaa';
+}
+
+// Close the modal
+const modal = bootstrap.Modal.getInstance(document.getElementById('transPaymentMethodModal'));
+if (modal) modal.hide();
+}
+
+// Open transaction category selection modal
+function openTransCategoryModal() {
+const listContainer = document.getElementById('transCategoryList');
+listContainer.innerHTML = '';
+
+// Add "None" option
+const noneItem = document.createElement('button');
+noneItem.className = 'list-group-item list-group-item-action d-flex align-items-center';
+noneItem.style.cssText = 'background: #1a1a1a; color: #fff; border-color: #333; padding: 15px;';
+noneItem.innerHTML = `
+<i class="fas fa-ban me-3" style="color: #888; width: 30px; text-align: center;"></i>
+<span style="flex: 1;">Select Category</span>
+`;
+noneItem.onclick = () => {
+selectTransCategory('', 'Select Category');
+};
+listContainer.appendChild(noneItem);
+
+if (categories && categories.length > 0) {
+// Group by type
+const incomeCategories = categories.filter(cat => cat.type === 'income');
+const expenseCategories = categories.filter(cat => cat.type === 'expense');
+
+// Add income categories
+if (incomeCategories.length > 0) {
+const incomeHeader = document.createElement('div');
+incomeHeader.className = 'list-group-item';
+incomeHeader.style.cssText = 'background: #0d4f1f; color: #fff; border-color: #333; padding: 8px 15px; font-weight: bold; font-size: 0.85rem;';
+incomeHeader.innerHTML = '<i class="fas fa-arrow-down me-2"></i>INCOME';
+listContainer.appendChild(incomeHeader);
+
+incomeCategories.forEach(cat => {
+const item = document.createElement('button');
+item.className = 'list-group-item list-group-item-action d-flex align-items-center';
+item.style.cssText = 'background: #1a1a1a; color: #fff; border-color: #333; padding: 15px; padding-left: 30px;';
+item.innerHTML = `
+<i class="fas fa-tag me-3" style="color: #28a745; width: 30px; text-align: center;"></i>
+<span style="flex: 1;">${cat.name}</span>
+<i class="fas fa-check" style="color: #28a745; display: ${document.getElementById('transCategory').value == cat.id ? 'block' : 'none'};"></i>
+`;
+item.onclick = () => {
+selectTransCategory(cat.id, `${cat.name} (income)`);
+};
+listContainer.appendChild(item);
+});
+}
+
+// Add expense categories
+if (expenseCategories.length > 0) {
+const expenseHeader = document.createElement('div');
+expenseHeader.className = 'list-group-item';
+expenseHeader.style.cssText = 'background: #4f0d0d; color: #fff; border-color: #333; padding: 8px 15px; font-weight: bold; font-size: 0.85rem; margin-top: 5px;';
+expenseHeader.innerHTML = '<i class="fas fa-arrow-up me-2"></i>EXPENSE';
+listContainer.appendChild(expenseHeader);
+
+expenseCategories.forEach(cat => {
+const item = document.createElement('button');
+item.className = 'list-group-item list-group-item-action d-flex align-items-center';
+item.style.cssText = 'background: #1a1a1a; color: #fff; border-color: #333; padding: 15px; padding-left: 30px;';
+item.innerHTML = `
+<i class="fas fa-tag me-3" style="color: #dc3545; width: 30px; text-align: center;"></i>
+<span style="flex: 1;">${cat.name}</span>
+<i class="fas fa-check" style="color: #28a745; display: ${document.getElementById('transCategory').value == cat.id ? 'block' : 'none'};"></i>
+`;
+item.onclick = () => {
+selectTransCategory(cat.id, `${cat.name} (expense)`);
+};
+listContainer.appendChild(item);
+});
+}
+}
+
+// Show the modal
+const modal = new bootstrap.Modal(document.getElementById('transCategoryModal'));
+modal.show();
+}
+
+// Select category for transaction form
+function selectTransCategory(categoryId, categoryText) {
+document.getElementById('transCategory').value = categoryId;
+document.getElementById('transCategoryText').textContent = categoryText;
+
+// Update button color based on selection
+const btn = document.getElementById('transCategoryBtn');
+if (categoryId) {
+btn.style.color = '#fff';
+} else {
+btn.style.color = '#aaa';
+}
+
+// Close the modal
+const modal = bootstrap.Modal.getInstance(document.getElementById('transCategoryModal'));
+if (modal) modal.hide();
 }
 
 // Store current transaction for bill items viewing
@@ -679,11 +833,7 @@ function loadCategories() {
 return fetch('/api/categories')
 .then(response => response.json())
 .then(data => {
-const select = document.getElementById('transCategory');
-select.innerHTML = '<option value="">Select Category</option>';
-data.forEach(cat => {
-select.innerHTML += `<option value="${cat.id}">${cat.name} (${cat.type})</option>`;
-});
+categories = data || [];
 return data;
 })
 .catch(error => {
@@ -914,11 +1064,6 @@ if (hasPaymentMethod && t.payment_method_color) {
 row.classList.add('transaction-highlighted');
 }
 
-// Determine done/undone button
-const doneBtnClass = isDone ? 'swipe-action-undone' : 'swipe-action-done';
-const doneBtnIcon = isDone ? 'fa-times-circle' : 'fa-check-circle';
-const doneBtnAction = isDone ? 'undone' : 'done';
-
 // Build the row with swipe-to-reveal structure
 row.innerHTML = `
 <td colspan="4" style="padding: 0;">
@@ -929,9 +1074,6 @@ row.innerHTML = `
 </button>
 </div>
 <div class="swipe-actions">
-<button class="swipe-action-btn ${doneBtnClass}" data-action="${doneBtnAction}" data-id="${t.id}" data-is-done="${isDone}">
-<i class="fas ${doneBtnIcon}"></i>
-</button>
 <button class="swipe-action-btn swipe-action-edit" data-action="edit" data-id="${t.id}">
 <i class="fas fa-edit"></i>
 </button>
@@ -955,90 +1097,67 @@ row.innerHTML = `
 row.dataset.transaction = JSON.stringify(t);
 
 // Apply background color (desktop behavior: description cell only gets color if is_paid)
-if (isDone && t.payment_method_color) {
-const swipeContent = row.querySelector('.swipe-content');
-const cells = swipeContent.querySelectorAll('td');
-cells.forEach((cell, index) => {
-// Apply to all cells except description (index 0)
-if (index !== 0) {
-cell.style.backgroundColor = t.payment_method_color;
-} else {
-// Apply to description cell only if is_paid is true
-if (isPaid) {
-cell.style.backgroundColor = t.payment_method_color;
-}
-}
-});
-}
+        if (hasPaymentMethod && t.payment_method_color) {
+            const swipeContent = row.querySelector('.swipe-content');
+            const cells = swipeContent.querySelectorAll('td');
+            cells.forEach((cell, index) => {
+                // Apply to all cells except description (index 0)
+                if (index !== 0) {
+                    cell.style.backgroundColor = t.payment_method_color;
+                } else {
+                    // Apply to description cell only if is_paid is true
+                    if (isPaid) {
+                        cell.style.backgroundColor = t.payment_method_color;
+                    }
+                }
+            });
+        }
 
-// Initialize swipe functionality
-initializeSwipe(row);
+        // Initialize swipe functionality
+        initializeSwipe(row);
 
-// Add click handler to description cell (same as desktop behavior)
-const descCell = row.querySelector('.col-desc');
-if (descCell) {
-descCell.style.cursor = 'pointer';
+        // Add click handler to description cell (same as desktop behavior)
+        const descCell = row.querySelector('.col-desc');
+        if (descCell) {
+            descCell.style.cursor = 'pointer';
 
-// Set description text color based on payment status
-// White for unpaid (is_paid = 0), current color for paid (is_paid = 1)
-if (!isPaid) {
-descCell.style.setProperty('color', '#ffffff', 'important');
-}
+            // Set description text color based on payment status
+            // White for unpaid (is_paid = 0), current color for paid (is_paid = 1)
+            if (!isPaid) {
+                descCell.style.setProperty('color', '#ffffff', 'important');
+            }
 
-descCell.addEventListener('click', function(e) {
-// Prevent click during swipe
-if (row.classList.contains('swiped')) return;
+            descCell.addEventListener('click', function(e) {
+                // Prevent click during swipe
+                if (row.classList.contains('swiped')) return;
 
-if (isPaid) {
-// If already paid, mark as unpaid
-showConfirmModal(
-'Mark as Unpaid',
-'Remove payment method from this transaction?',
-function() {
-markTransactionAsUnpaid(t.id);
-},
-'Mark Unpaid',
-'btn-warning'
-);
-} else {
-// If not paid, show payment method modal to mark as paid
-// Pass true to indicate this is a "paid" click (sets is_paid=TRUE)
-showPaymentMethodModal(t.id, true);
-}
-});
-}
+                if (isPaid) {
+                    // If already paid, mark as unpaid
+                    showConfirmModal(
+                        'Mark as Unpaid',
+                        'Remove payment method from this transaction?',
+                        function() {
+                            markTransactionAsUnpaid(t.id);
+                        },
+                        'Mark Unpaid',
+                        'btn-warning'
+                    );
+                } else {
+                    // If not paid, show payment method modal to mark as paid
+                    // Pass true to indicate this is a "paid" click (sets is_paid=TRUE)
+                    showPaymentMethodModal(t.id, true);
+                }
+            });
+        }
 
 // Add action button handlers
 const editBtn = row.querySelector('[data-action="edit"]');
-const doneBtn = row.querySelector('[data-action="done"]');
-const undoneBtn = row.querySelector('[data-action="undone"]');
 const deleteBtn = row.querySelector('[data-action="delete"]');
 const infoBtn = row.querySelector('[data-action="info"]');
 
 if (editBtn) {
 editBtn.addEventListener('click', function() {
 editTransaction(t.id);
-});
-}
-
-if (doneBtn) {
-doneBtn.addEventListener('click', function() {
-// Show payment method modal to mark as done (same as desktop checkbox behavior)
-showPaymentMethodModal(t.id, false);
-});
-}
-
-if (undoneBtn) {
-undoneBtn.addEventListener('click', function() {
-showConfirmModal(
-'Mark as Undone',
-'Remove the done status from this transaction?',
-function() {
-markTransactionAsUndone(t.id);
-},
-'Mark Undone',
-'btn-warning'
-);
 });
 }
 
@@ -1064,30 +1183,6 @@ mobileContent.scrollTop = 0;
 }
 }
 
-// Mark transaction as undone
-function markTransactionAsUndone(transactionId) {
-showLoading();
-
-fetch(`/api/transactions/${transactionId}/mark-undone`, {
-method: 'POST'
-})
-.then(response => response.json())
-.then(result => {
-hideLoading();
-if (result.error) {
-showToast(result.error, 'danger');
-} else {
-showToast('Transaction marked as undone', 'success');
-loadTransactions();
-}
-})
-.catch(error => {
-hideLoading();
-console.error('Error marking transaction as undone:', error);
-showToast('Error marking transaction as undone', 'danger');
-});
-}
-
 // ===== REVAMPED SWIPE MANAGER =====
 // Modern, event-delegation-based swipe system
 // Fixes: memory leaks, mouse support, touch conflicts, better architecture
@@ -1096,7 +1191,7 @@ const SwipeManager = {
 // Configuration
 config: {
 buttonWidth: 70,
-buttonCount: 3,
+buttonCount: 2,
 infoButtonWidth: 70,
 snapThreshold: 60,
 velocityThreshold: 0.3,
@@ -1362,8 +1457,8 @@ description: description,
 category_id: document.getElementById('transCategory').value || null,
 debit: debit,
 credit: credit,
-transaction_date: document.getElementById('transDate').value,
 notes: document.getElementById('transNotes').value,
+payment_method_id: document.getElementById('transPaymentMethod')?.value || null,
 year: parseInt(currentYear),
 month: parseInt(currentMonth)
 };
@@ -1449,7 +1544,6 @@ month: parseInt(currentMonth)
             document.getElementById('transactionForm').reset();
             document.getElementById('transactionForm').dataset.editId = '';
             document.querySelector('#transactionModal .modal-title').textContent = 'Add Transaction';
-            document.getElementById('transDate').value = new Date().toISOString().split('T')[0];
 
             // Clear scanned bill content and captured image after saving
             scannedBillContent = null;
@@ -1490,11 +1584,47 @@ function editTransaction(id) {
 
     // Populate form
     document.getElementById('transDescription').value = transaction.description || '';
-    document.getElementById('transCategory').value = transaction.category_id || '';
     document.getElementById('transDebit').value = transaction.debit || '';
     document.getElementById('transCredit').value = transaction.credit || '';
-    document.getElementById('transDate').value = transaction.transaction_date ? transaction.transaction_date.split('T')[0] : '';
     document.getElementById('transNotes').value = transaction.notes || '';
+
+    // Set category
+    const categoryId = transaction.category_id || '';
+    document.getElementById('transCategory').value = categoryId;
+
+    // Update category button text
+    if (categoryId && categories && categories.length > 0) {
+        const selectedCategory = categories.find(cat => cat.id == categoryId);
+        if (selectedCategory) {
+            document.getElementById('transCategoryText').textContent = `${selectedCategory.name} (${selectedCategory.type})`;
+            document.getElementById('transCategoryBtn').style.color = '#fff';
+        } else {
+            document.getElementById('transCategoryText').textContent = 'Select Category';
+            document.getElementById('transCategoryBtn').style.color = '#aaa';
+        }
+    } else {
+        document.getElementById('transCategoryText').textContent = 'Select Category';
+        document.getElementById('transCategoryBtn').style.color = '#aaa';
+    }
+
+    // Set payment method
+    const paymentMethodId = transaction.payment_method_id || '';
+    document.getElementById('transPaymentMethod').value = paymentMethodId;
+
+    // Update button text
+    if (paymentMethodId && paymentMethods && paymentMethods.length > 0) {
+        const selectedMethod = paymentMethods.find(pm => pm.id == paymentMethodId);
+        if (selectedMethod) {
+            document.getElementById('transPaymentMethodText').textContent = selectedMethod.name;
+            document.getElementById('transPaymentMethodBtn').style.color = '#fff';
+        } else {
+            document.getElementById('transPaymentMethodText').textContent = 'None (Not Paid)';
+            document.getElementById('transPaymentMethodBtn').style.color = '#aaa';
+        }
+    } else {
+        document.getElementById('transPaymentMethodText').textContent = 'None (Not Paid)';
+        document.getElementById('transPaymentMethodBtn').style.color = '#aaa';
+    }
 
     // Store edit ID
     document.getElementById('transactionForm').dataset.editId = id;
@@ -1552,8 +1682,16 @@ container.innerHTML = '<div class="alert alert-warning" style="background: #2d2d
 return;
 }
 
+// Filter out payment methods with zero net amount
+const filteredData = data.filter(item => (item.net_amount || 0) !== 0);
+
+if (filteredData.length === 0) {
+container.innerHTML = '<div class="alert alert-info" style="background: #2d2d2d; border-color: #444; color: #17a2b8;">All payment methods have zero net amounts.</div>';
+return;
+}
+
 let html = '<table class="payment-totals-table"><tbody>';
-data.forEach(item => {
+filteredData.forEach(item => {
 html += `
 <tr>
 <td>
@@ -1738,9 +1876,6 @@ function hideMobileInfoAttachment() {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
-// Set today's date
-document.getElementById('transDate').value = new Date().toISOString().split('T')[0];
-
 // Update month display
 updateMonthDisplay();
 
@@ -1840,7 +1975,32 @@ transactionModal.addEventListener('hidden.bs.modal', function() {
 document.getElementById('transactionForm').reset();
 document.getElementById('transactionForm').dataset.editId = '';
 document.querySelector('#transactionModal .modal-title').textContent = 'Add Transaction';
-document.getElementById('transDate').value = new Date().toISOString().split('T')[0];
+// Reset category button
+document.getElementById('transCategoryText').textContent = 'Select Category';
+document.getElementById('transCategory').value = '';
+document.getElementById('transCategoryBtn').style.color = '#aaa';
+// Reset payment method button
+document.getElementById('transPaymentMethodText').textContent = 'None (Not Paid)';
+document.getElementById('transPaymentMethod').value = '';
+document.getElementById('transPaymentMethodBtn').style.color = '#aaa';
+});
+}
+
+// Category button click handler
+const transCategoryBtn = document.getElementById('transCategoryBtn');
+if (transCategoryBtn) {
+transCategoryBtn.addEventListener('click', function(e) {
+e.preventDefault();
+openTransCategoryModal();
+});
+}
+
+// Payment method button click handler
+const transPaymentMethodBtn = document.getElementById('transPaymentMethodBtn');
+if (transPaymentMethodBtn) {
+transPaymentMethodBtn.addEventListener('click', function(e) {
+e.preventDefault();
+openTransPaymentMethodModal();
 });
 }
 

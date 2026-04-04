@@ -464,22 +464,6 @@ background: #dc3545;
 background: #bb2d3b;
 }
 
-.swipe-action-done {
-background: #198754;
-}
-
-.swipe-action-done:active {
-background: #146c43;
-}
-
-.swipe-action-undone {
-background: #6c757d;
-}
-
-.swipe-action-undone:active {
-background: #5a6268;
-}
-
 /* Info button on left side (for right swipe) */
 .swipe-info-actions {
 position: absolute;
@@ -669,11 +653,21 @@ color: #cccccc;
 }
 
 /* Modal styles - Dark theme */
+.modal {
+    z-index: 1055;
+}
+
+.modal-backdrop {
+    z-index: 1050;
+}
+
 .modal-content {
 background-color: #2d2d2d;
 color: #ffffff;
 border: 1px solid #555555;
 border-radius: 12px;
+transform: none;
+will-change: auto;
 }
 
 .modal-header {
@@ -719,6 +713,25 @@ color: #ffffff;
 .form-select {
 font-size: 0.875rem;
 line-height: 1.5;
+transform: none;
+position: relative;
+}
+
+/* Fix select dropdown positioning in modals on mobile */
+.modal {
+    overflow-x: hidden;
+    overflow-y: auto !important;
+    -webkit-transform: translate3d(0, 0, 0);
+    transform: translate3d(0, 0, 0);
+}
+
+.modal-dialog {
+    margin: 1.75rem auto;
+    transform: none;
+}
+
+.modal-body {
+    position: relative;
 }
 
 .form-control:focus, .form-select:focus {
@@ -727,6 +740,56 @@ border-color: #007acc;
 color: #ffffff;
 box-shadow: 0 0 0 3px rgba(0, 122, 204, 0.2);
 }
+
+/* Custom payment method button for mobile */
+#transPaymentMethodBtn,
+#transCategoryBtn {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-weight: normal;
+    text-align: left;
+}
+
+#transPaymentMethodBtn:hover,
+#transPaymentMethodBtn:active,
+#transCategoryBtn:hover,
+#transCategoryBtn:active {
+    background-color: #3d3d3d !important;
+    border-color: #555 !important;
+}
+
+#transPaymentMethodBtn:focus,
+#transCategoryBtn:focus {
+    background-color: #3d3d3d !important;
+    border-color: #007acc !important;
+    box-shadow: 0 0 0 3px rgba(0, 122, 204, 0.2) !important;
+    outline: none;
+}
+
+/* Transaction payment method modal */
+#transPaymentMethodModal .list-group-item,
+#transCategoryModal .list-group-item {
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+#transPaymentMethodModal .list-group-item:hover,
+#transCategoryModal .list-group-item:hover {
+    background-color: #2d2d2d !important;
+    transform: translateX(5px);
+}
+
+#transPaymentMethodModal .list-group-item:active,
+#transCategoryModal .list-group-item:active {
+    background-color: #3d3d3d !important;
+}
+
+#transPaymentMethodModal .modal-body,
+#transCategoryModal .modal-body {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
 
 .btn-secondary {
 background-color: #3d3d3d;

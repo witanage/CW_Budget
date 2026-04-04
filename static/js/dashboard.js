@@ -1314,13 +1314,14 @@ function displayTransactions(transactions) {
 
         // Check if transaction has payment method (handle both boolean and numeric values)
         const isDone = t.is_done === true || t.is_done === 1;
+        const hasPaymentMethod = t.payment_method_id && t.payment_method_id !== null;
 
         // Store transaction data
         row.dataset.transaction = JSON.stringify(t);
 
-        // Apply highlighting class if done
+        // Apply highlighting class if has payment method
         let rowClass = '';
-        if (isDone && t.payment_method_color) {
+        if (hasPaymentMethod && t.payment_method_color) {
             rowClass = `class="transaction-highlighted"`;
             row.dataset.paymentColor = t.payment_method_color;
         }
@@ -1367,7 +1368,7 @@ function displayTransactions(transactions) {
         const isPaid = t.is_paid === true || t.is_paid === 1;
 
         // Apply background color to all cells for proper highlighting
-        if (isDone && t.payment_method_color) {
+        if (hasPaymentMethod && t.payment_method_color) {
             row.classList.add('transaction-highlighted');
             const cells = row.querySelectorAll('td');
             cells.forEach((cell, index) => {
@@ -1509,6 +1510,14 @@ function displayPaymentTotals(totals) {
         return;
     }
 
+    // Filter out payment methods with zero net amount
+    const filteredTotals = totals.filter(t => (t.net_amount || 0) !== 0);
+
+    if (filteredTotals.length === 0) {
+        container.innerHTML = '<div class="alert alert-info">All payment methods have zero net amounts.</div>';
+        return;
+    }
+
     let totalDebit = 0;
     let totalCredit = 0;
 
@@ -1517,16 +1526,16 @@ function displayPaymentTotals(totals) {
             <table class="table table-hover">
                 <thead>
                     <tr>
-                        <th>Payment Method</th>
-                        <th>Type</th>
-                        <th>Transactions</th>
+                        <th class="text-start" style="padding-left: 40px;">Payment Method</th>
+                        <th class="text-start">Type</th>
+                        <th class="text-center">Transactions</th>
                         <th class="text-end">Total Debit</th>
                         <th class="text-end">Total Credit</th>
                         <th class="text-end">Net Amount</th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${totals.map(t => {
+                    ${filteredTotals.map(t => {
                         const debit = t.total_debit || 0;
                         const credit = t.total_credit || 0;
                         const net = t.net_amount || 0;
@@ -1535,19 +1544,19 @@ function displayPaymentTotals(totals) {
 
                         return `
                             <tr>
-                                <td>
-                                    <span class="payment-method-color-indicator" style="background-color: ${t.color}"></span>
+                                <td class="text-start" style="vertical-align: middle;">
+                                    <span class="payment-method-color-indicator" style="background-color: ${t.color}; vertical-align: middle;"></span>
                                     <strong>${t.name}</strong>
                                 </td>
-                                <td>
+                                <td class="text-start" style="vertical-align: middle;">
                                     <span class="badge ${t.type === 'cash' ? 'bg-success' : 'bg-info'}">
                                         ${t.type === 'cash' ? 'Cash' : 'Credit Card'}
                                     </span>
                                 </td>
-                                <td>${t.transaction_count || 0}</td>
-                                <td class="text-end text-success">${parseFloat(debit).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}</td>
-                                <td class="text-end text-danger">${parseFloat(credit).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}</td>
-                                <td class="text-end fw-bold ${net >= 0 ? 'text-success' : 'text-danger'}">
+                                <td class="text-center" style="vertical-align: middle;">${t.transaction_count || 0}</td>
+                                <td class="text-end text-success" style="vertical-align: middle;">${parseFloat(debit).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}</td>
+                                <td class="text-end text-danger" style="vertical-align: middle;">${parseFloat(credit).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}</td>
+                                <td class="text-end fw-bold ${net >= 0 ? 'text-success' : 'text-danger'}" style="vertical-align: middle;">
                                     ${parseFloat(net).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}
                                 </td>
                             </tr>
@@ -1556,7 +1565,7 @@ function displayPaymentTotals(totals) {
                 </tbody>
                 <tfoot>
                     <tr class="table-active fw-bold">
-                        <td colspan="3">TOTAL</td>
+                        <td class="text-start" colspan="3">TOTAL</td>
                         <td class="text-end text-success">${parseFloat(totalDebit).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}</td>
                         <td class="text-end text-danger">${parseFloat(totalCredit).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}</td>
                         <td class="text-end ${(totalDebit - totalCredit) >= 0 ? 'text-success' : 'text-danger'}">
