@@ -369,6 +369,49 @@ def optimize_file_for_upload(file_data, file_ext, original_filename):
     return (file_data, False, original_size, original_size)
 
 
+def apply_category_percentage_markup(amount, category_id, connection):
+    """
+    Apply percentage markup to an amount based on category settings.
+
+    For example, if Fuel category has 1% markup and amount is 1000:
+    - Result will be 1000 + (1000 * 1%) = 1010
+
+    Args:
+        amount: Decimal - The base amount
+        category_id: int or None - Category ID to check for markup
+        connection: MySQL connection object
+
+    Returns:
+        Decimal - Amount with markup applied (or original amount if no markup)
+    """
+    if not category_id or not amount or amount == 0:
+        return amount
+
+    try:
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute(
+            "SELECT percentage_markup FROM categories WHERE id = %s",
+            (category_id,)
+        )
+        result = cursor.fetchone()
+        cursor.close()
+
+        if result and result.get('percentage_markup'):
+            markup_percentage = Decimal(str(result['percentage_markup']))
+            if markup_percentage > 0:
+                markup_amount = (amount * markup_percentage) / Decimal('100')
+                final_amount = amount + markup_amount
+                logger.info(
+                    f"Applied {markup_percentage}% markup to category {category_id}: "
+                    f"{amount} + {markup_amount} = {final_amount}"
+                )
+                return final_amount
+    except Exception as e:
+        logger.error(f"Error applying category markup: {str(e)}")
+
+    return amount
+
+
 def get_setting(key, default=None):
     """Read a single value from the app_settings table. Returns *default* when
     the table does not exist yet, the key is missing, or the DB is unreachable."""
@@ -3145,6 +3188,18 @@ def transactions():
             debit = Decimal(str(debit_value)) if debit_value else Decimal('0')
             credit = Decimal(str(credit_value)) if credit_value else Decimal('0')
 
+            # Auto-categorize if no category provided (same logic as token endpoint)
+            category_id = data.get('category_id') or None
+            if not category_id:
+                category_id = auto_categorize_transaction(data.get('description'))
+
+            # Apply category percentage markup if applicable
+            if category_id:
+                if credit > 0:
+                    credit = apply_category_percentage_markup(credit, category_id, connection)
+                elif debit > 0:
+                    debit = apply_category_percentage_markup(debit, category_id, connection)
+
             print(f"[DEBUG] Debit: {debit}, Credit: {credit}")
 
             # Use current date if no transaction_date provided
@@ -3411,6 +3466,16 @@ def manage_transaction(transaction_id):
 
             debit = Decimal(str(debit_value)) if debit_value else Decimal('0')
             credit = Decimal(str(credit_value)) if credit_value else Decimal('0')
+
+            # Get category_id
+            category_id = data.get('category_id')
+
+            # Apply category percentage markup if applicable
+            if category_id:
+                if credit > 0:
+                    credit = apply_category_percentage_markup(credit, category_id, connection)
+                elif debit > 0:
+                    debit = apply_category_percentage_markup(debit, category_id, connection)
 
             print(f"[DEBUG] Debit: {debit}, Credit: {credit}")
 
@@ -4421,12 +4486,21 @@ def add_category():
 
     name = data['name'].strip()
     category_type = data['type'].strip().lower()
+    percentage_markup = data.get('percentage_markup', 0.00)
 
     if not name:
         return jsonify({'error': 'Category name cannot be empty'}), 400
 
     if category_type not in ['income', 'expense']:
         return jsonify({'error': 'Category type must be either "income" or "expense"'}), 400
+
+    # Validate percentage_markup
+    try:
+        percentage_markup = float(percentage_markup)
+        if percentage_markup < 0 or percentage_markup > 100:
+            return jsonify({'error': 'Percentage markup must be between 0 and 100'}), 400
+    except (ValueError, TypeError):
+        percentage_markup = 0.00
 
     connection = get_db_connection()
     if connection:
@@ -4444,8 +4518,8 @@ def add_category():
 
             # Insert new category
             cursor.execute(
-                "INSERT INTO categories (name, type) VALUES (%s, %s)",
-                (name, category_type)
+                "INSERT INTO categories (name, type, percentage_markup) VALUES (%s, %s, %s)",
+                (name, category_type, percentage_markup)
             )
             connection.commit()
 
@@ -4477,12 +4551,21 @@ def update_category(category_id):
 
     name = data['name'].strip()
     category_type = data['type'].strip().lower()
+    percentage_markup = data.get('percentage_markup', 0.00)
 
     if not name:
         return jsonify({'error': 'Category name cannot be empty'}), 400
 
     if category_type not in ['income', 'expense']:
         return jsonify({'error': 'Category type must be either "income" or "expense"'}), 400
+
+    # Validate percentage_markup
+    try:
+        percentage_markup = float(percentage_markup)
+        if percentage_markup < 0 or percentage_markup > 100:
+            return jsonify({'error': 'Percentage markup must be between 0 and 100'}), 400
+    except (ValueError, TypeError):
+        percentage_markup = 0.00
 
     connection = get_db_connection()
     if connection:
@@ -4507,8 +4590,8 @@ def update_category(category_id):
 
             # Update the category
             cursor.execute(
-                "UPDATE categories SET name = %s, type = %s WHERE id = %s",
-                (name, category_type, category_id)
+                "UPDATE categories SET name = %s, type = %s, percentage_markup = %s WHERE id = %s",
+                (name, category_type, percentage_markup, category_id)
             )
             connection.commit()
 
@@ -6428,6 +6511,10 @@ def create_transaction():
 
             # New transaction gets display_order = 1 (appears at top)
             next_display_order = 1
+
+            # Apply category percentage markup if applicable
+            if category_id:
+                credit = apply_category_percentage_markup(credit, category_id, connection)
 
             # Insert the transaction with auto-categorized category
             cursor.execute("""
