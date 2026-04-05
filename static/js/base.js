@@ -35,8 +35,8 @@ toastElement.remove();
 
 // Format currency (Sri Lankan Rupees)
 function formatCurrency(amount) {
-if (amount == null || isNaN(amount)) return 'LKR 0.00';
-return 'LKR ' + parseFloat(amount).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
+if (amount == null || isNaN(amount)) return 'රු 0.00';
+return 'රු ' + parseFloat(amount).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
 }
 
 // Format date

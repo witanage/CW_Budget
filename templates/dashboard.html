@@ -300,7 +300,7 @@
                                                         <tfoot class="fw-bold">
                                                             <tr>
                                                                 <td>Total Income</td>
-                                                                <td class="text-end" id="totalIncome">LKR 0.00</td>
+                                                                <td class="text-end" id="totalIncome">රු 0.00</td>
                                                                 <td class="text-end">100%</td>
                                                             </tr>
                                                         </tfoot>
@@ -324,7 +324,7 @@
                                                         <tfoot class="fw-bold">
                                                             <tr>
                                                                 <td>Total Expenses</td>
-                                                                <td class="text-end" id="totalExpenses">LKR 0.00</td>
+                                                                <td class="text-end" id="totalExpenses">රු 0.00</td>
                                                                 <td class="text-end">100%</td>
                                                             </tr>
                                                         </tfoot>
@@ -339,7 +339,7 @@
                                                 <div class="card" id="netSavingsCard">
                                                     <div class="card-body text-center">
                                                         <h5 class="mb-2">Net Savings</h5>
-                                                        <h3 class="mb-0" id="netSavings">LKR 0.00</h3>
+                                                        <h3 class="mb-0" id="netSavings">රු 0.00</h3>
                                                         <small class="text-muted" id="savingsPercentage">0% savings rate</small>
                                                     </div>
                                                 </div>
@@ -501,7 +501,7 @@
                                     <div class="mb-3">
                                         <label for="taxFreeThreshold" class="form-label">Tax-Free Threshold (Annual)</label>
                                         <div class="input-group">
-                                            <span class="input-group-text">LKR</span>
+                                            <span class="input-group-text">රු</span>
                                             <input type="number" class="form-control" id="taxFreeThreshold" value="1800000" step="1000" min="0">
                                         </div>
                                     </div>
@@ -554,7 +554,7 @@
                                             <tr>
                                                 <th>Month</th>
                                                 <th class="text-end">Receipts</th>
-                                                <th class="text-end">LKR</th>
+                                                <th class="text-end">රු</th>
                                                 <th class="text-end">Cumulative</th>
                                                 <th class="text-end">Tax Due</th>
                                                 <th class="text-end">Payment</th>
@@ -571,11 +571,11 @@
                                         <tfoot style="display: none;">
                                             <tr class="fw-bold">
                                                 <td>Total</td>
-                                                <td class="text-end" id="totalUSD">$0</td>
-                                                <td class="text-end" id="totalConverted">LKR 0</td>
+                                                <td class="text-end" id="totalUSD">රු 0</td>
+                                                <td class="text-end" id="totalConverted">රු 0</td>
                                                 <td class="text-end">-</td>
-                                                <td class="text-end" id="totalTaxLiability">LKR 0</td>
-                                                <td class="text-end" id="totalMonthlyPayments">LKR 0</td>
+                                                <td class="text-end" id="totalTaxLiability">රු 0</td>
+                                                <td class="text-end" id="totalMonthlyPayments">රු 0</td>
                                             </tr>
                                         </tfoot>
                                     </table>
@@ -633,7 +633,7 @@
                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
                         <div>
                             <h4 class="mb-1"><i class="fas fa-chart-line me-2"></i>Exchange Rate Trends</h4>
-                            <p class="text-muted mb-0 small">USD to LKR &mdash; Past, Present &amp; Forecast</p>
+                            <p class="text-muted mb-0 small">USD to රු &mdash; Past, Present &amp; Forecast</p>
                         </div>
                         <button class="btn btn-sm btn-outline-primary" id="ertRefreshBtn">
                             <i class="fas fa-sync-alt me-1"></i>Refresh
@@ -818,7 +818,7 @@
                                     <div class="card-body">
                                         <div class="ert-chart-container"><canvas id="ertForecastChart"></canvas></div>
                                         <div id="ertModelInfo" class="mt-2 small text-muted" style="display:none;">
-                                            <span><strong>Slope:</strong> <span id="ertSlope">--</span> LKR/day</span> &middot;
+                                            <span><strong>Slope:</strong> <span id="ertSlope">--</span> රු/day</span> &middot;
                                             <span><strong>R&sup2;:</strong> <span id="ertR2">--</span></span> &middot;
                                             <span><strong>Data:</strong> <span id="ertDataPts">--</span> points</span> &middot;
                                             <span>95% Confidence Band</span>
@@ -844,8 +844,8 @@
     </div>
 </div>
 
-<!-- Hidden file input for bill upload -->
-<input type="file" id="billUploadInput" accept="image/*,application/pdf" style="display: none;">
+<!-- Hidden file input for bill upload (supports multiple images for long receipts) -->
+<input type="file" id="billUploadInput" accept="image/*,application/pdf" multiple style="display: none;">
 
 <!-- AI Insights Modal -->
 <div class="modal fade" id="aiInsightsModal" tabindex="-1" aria-labelledby="aiInsightsModalLabel" aria-hidden="true">
@@ -1008,6 +1008,17 @@
                     <div id="scanStatus" class="mb-3 text-center" style="display: none; color: #ffc107;">
                         <i class="fas fa-spinner fa-spin me-1"></i>
                         <span id="scanStatusText">Scanning bill...</span>
+                    </div>
+                    <!-- Bill Breakdown Display -->
+                    <div id="billBreakdown" class="mb-3" style="display: none;">
+                        <div class="card">
+                            <div class="card-body p-2">
+                                <h6 class="card-title mb-2" style="font-size: 0.875rem;">
+                                    <i class="fas fa-receipt me-1"></i>Bill Breakdown
+                                </h6>
+                                <div id="billBreakdownContent" class="small"></div>
+                            </div>
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label for="transDescription" class="form-label">Description</label>
@@ -1770,14 +1781,14 @@
                                     <div class="col-md-6">
                                         <label class="form-label small text-muted">Minimum Amount</label>
                                         <div class="input-group">
-                                            <span class="input-group-text">$</span>
+                                            <span class="input-group-text">රු</span>
                                             <input type="number" class="form-control" id="filterMinAmount" placeholder="0.00" step="0.01" min="0">
                                         </div>
                                     </div>
                                     <div class="col-md-6">
                                         <label class="form-label small text-muted">Maximum Amount</label>
                                         <div class="input-group">
-                                            <span class="input-group-text">$</span>
+                                            <span class="input-group-text">රු</span>
                                             <input type="number" class="form-control" id="filterMaxAmount" placeholder="No limit" step="0.01" min="0">
                                         </div>
                                     </div>
@@ -3071,8 +3082,7 @@ tr[draggable="true"] {
         pdfjsLib.GlobalWorkerOptions.workerSrc = "{{ url_for('static', filename='js/vendor/pdf.worker.min.js') }}";
     }
 </script>
-<!-- Ensure base.js is loaded first -->
-<script src="{{ url_for('static', filename='js/base.js') }}?v=3.0"></script>
+<!-- base.js is already loaded in base.html, no need to load it again -->
 <script src="{{ url_for('static', filename='js/dashboard.js') }}?v=3.0"></script>
 <script src="{{ url_for('static', filename='js/exchange_rate_trends.js') }}?v=3.0"></script>
 {% endblock %}

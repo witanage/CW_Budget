@@ -1353,6 +1353,33 @@ def delete_user(user_id):
         if not user:
             return jsonify({'error': 'User not found'}), 404
 
+        # Get all attachments from user's transactions before deletion
+        cursor.execute("""
+            SELECT t.attachments 
+            FROM transactions t
+            INNER JOIN monthly_records mr ON t.monthly_record_id = mr.id
+            WHERE mr.user_id = %s AND t.attachments IS NOT NULL
+        """, (user_id,))
+        transactions_with_attachments = cursor.fetchall()
+
+        # Delete all attachments from Appwrite before deleting user
+        if appwrite_storage and APPWRITE_BUCKET_ID and transactions_with_attachments:
+            deleted_count = 0
+            for txn in transactions_with_attachments:
+                attachments_value = txn['attachments']
+                # Split comma-separated GUIDs
+                attachment_guids = [guid.strip() for guid in attachments_value.split(',') if guid.strip()]
+
+                for attachment_guid in attachment_guids:
+                    try:
+                        appwrite_storage.delete_file(APPWRITE_BUCKET_ID, attachment_guid)
+                        deleted_count += 1
+                    except Exception as e:
+                        logger.warning(f"Failed to delete attachment {attachment_guid} from Appwrite: {str(e)}")
+
+            if deleted_count > 0:
+                logger.info(f"Deleted {deleted_count} attachment(s) from Appwrite for user {user_id}")
+
         # Delete user (cascading will handle related records)
         cursor.execute("DELETE FROM users WHERE id = %s", (user_id,))
         connection.commit()
@@ -2736,6 +2763,28 @@ def admin_delete_monthly_record(user_id, record_id):
         cursor.execute("SELECT COUNT(*) AS cnt FROM transactions WHERE monthly_record_id = %s", (record_id,))
         txn_count = cursor.fetchone()['cnt']
 
+        # Get all attachments from transactions in this monthly record before deletion
+        cursor.execute("""
+            SELECT attachments 
+            FROM transactions 
+            WHERE monthly_record_id = %s AND attachments IS NOT NULL
+        """, (record_id,))
+        transactions_with_attachments = cursor.fetchall()
+
+        # Delete all attachments from Appwrite before deleting transactions
+        if appwrite_storage and APPWRITE_BUCKET_ID and transactions_with_attachments:
+            for txn in transactions_with_attachments:
+                attachments_value = txn['attachments']
+                # Split comma-separated GUIDs
+                attachment_guids = [guid.strip() for guid in attachments_value.split(',') if guid.strip()]
+
+                for attachment_guid in attachment_guids:
+                    try:
+                        appwrite_storage.delete_file(APPWRITE_BUCKET_ID, attachment_guid)
+                        logger.info(f"Deleted attachment {attachment_guid} from Appwrite (monthly record cleanup)")
+                    except Exception as e:
+                        logger.warning(f"Failed to delete attachment {attachment_guid} from Appwrite: {str(e)}")
+
         # Delete the monthly record (CASCADE will remove transactions)
         cursor.execute("DELETE FROM monthly_records WHERE id = %s", (record_id,))
         connection.commit()
@@ -3082,91 +3131,115 @@ def transactions():
 
             print(f"[DEBUG] Received transaction data: {data}")
 
-            # Handle bill image upload to Appwrite (if provided)
-            attachment_guid = None
-            if is_multipart and 'bill_image' in request.files:
-                bill_image = request.files['bill_image']
+            # Handle bill image(s) upload to Appwrite (if provided)
+            attachment_guids = []
 
-                if bill_image and bill_image.filename:
-                    # Validate file type
-                    allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf'}
-                    file_ext = bill_image.filename.rsplit('.', 1)[-1].lower() if '.' in bill_image.filename else ''
+            # Check for multiple images first, then fall back to single image (backward compatible)
+            bill_images = []
+            if is_multipart:
+                if 'bill_images' in request.files:
+                    bill_images = request.files.getlist('bill_images')
+                elif 'bill_image' in request.files:
+                    bill_images = [request.files['bill_image']]
 
-                    if file_ext in allowed_extensions:
-                        # Read file data
-                        file_data = bill_image.read()
+            # Process each image
+            for idx, bill_image in enumerate(bill_images):
+                if not bill_image or not bill_image.filename:
+                    continue
 
-                        if len(file_data) > 0 and appwrite_storage and APPWRITE_BUCKET_ID:
-                            try:
-                                # Optimize file if needed (resize images, compress PDFs)
-                                optimized_data, was_optimized, original_size, final_size = optimize_file_for_upload(
-                                    file_data,
-                                    file_ext,
-                                    bill_image.filename
-                                )
+                # Validate file type
+                allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf'}
+                file_ext = bill_image.filename.rsplit('.', 1)[-1].lower() if '.' in bill_image.filename else ''
 
-                                # Use optimized data for upload
-                                image_data = optimized_data
+                if file_ext not in allowed_extensions:
+                    logger.warning(f"Skipping file {idx + 1} with invalid extension: {file_ext}")
+                    continue
 
-                                # Log optimization results
-                                if was_optimized:
-                                    reduction_pct = ((original_size - final_size) / original_size) * 100
-                                    logger.info(
-                                        f"✓ File optimized: {original_size / (1024 * 1024):.2f}MB → {final_size / (1024 * 1024):.2f}MB ({reduction_pct:.1f}% smaller)")
-                                else:
-                                    logger.info(
-                                        f"File size OK, no optimization needed: {original_size / (1024 * 1024):.2f}MB")
+                # Read file data
+                file_data = bill_image.read()
 
-                                # Generate pure GUID for filename
-                                attachment_guid = str(uuid.uuid4())
-                                filename = f"{attachment_guid}.{file_ext}"
+                if len(file_data) == 0:
+                    logger.warning(f"Skipping empty file {idx + 1}")
+                    continue
 
-                                # Check file size
-                                file_size_mb = len(image_data) / (1024 * 1024)
-                                logger.info(
-                                    f"Uploading file to Appwrite: {filename}, type: {file_ext}, size: {len(image_data)} bytes ({file_size_mb:.2f}MB)")
+                if appwrite_storage and APPWRITE_BUCKET_ID:
+                    try:
+                        # Optimize file if needed (resize images, compress PDFs)
+                        optimized_data, was_optimized, original_size, final_size = optimize_file_for_upload(
+                            file_data,
+                            file_ext,
+                            bill_image.filename
+                        )
 
-                                # Check first bytes for validation
-                                first_bytes = image_data[:8] if len(image_data) >= 8 else image_data
-                                logger.info(f"First 8 bytes: {first_bytes} (hex: {first_bytes.hex()})")
+                        # Use optimized data for upload
+                        image_data = optimized_data
 
-                                # Validate PDF header if uploading PDF
-                                if file_ext == 'pdf':
-                                    if not first_bytes.startswith(b'%PDF'):
-                                        logger.error(
-                                            f"WARNING: PDF file does NOT start with %PDF header before upload!")
-                                        logger.error(f"First 20 bytes: {image_data[:20]}")
-                                    else:
-                                        logger.info(f"✓ PDF header valid before upload")
-
-                                # Warn if file is still unusually large after optimization
-                                if file_size_mb > 10:
-                                    logger.warning(
-                                        f"Large file upload: {file_size_mb:.2f}MB - may take time to process")
-
-                                # Upload to Appwrite with GUID as file ID
-                                # Use from_path with a temp file to avoid SDK chunked upload bug
-                                # (from_bytes calculates wrong byte range for last chunk on files >= 5MB)
-                                with tempfile.TemporaryDirectory() as tmp_dir:
-                                    tmp_path = os.path.join(tmp_dir, filename)
-                                    with open(tmp_path, 'wb') as f:
-                                        f.write(image_data)
-
-                                    result = appwrite_storage.create_file(
-                                        APPWRITE_BUCKET_ID,
-                                        attachment_guid,  # Use GUID as file ID
-                                        InputFile.from_path(tmp_path)
-                                    )
-
-                                logger.info(
-                                    f"File uploaded successfully: {attachment_guid}, stored size: {result.get('sizeOriginal', 'N/A')}")
-
-                            except Exception as e:
-                                logger.error(f"Failed to upload bill image to Appwrite: {str(e)}")
-                                # Continue with transaction creation even if upload fails
-                                attachment_guid = None
+                        # Log optimization results
+                        if was_optimized:
+                            reduction_pct = ((original_size - final_size) / original_size) * 100
+                            logger.info(
+                                f"✓ Image {idx + 1}/{len(bill_images)} optimized: {original_size / (1024 * 1024):.2f}MB → {final_size / (1024 * 1024):.2f}MB ({reduction_pct:.1f}% smaller)")
                         else:
-                            logger.warning("Appwrite storage not configured or image is empty")
+                            logger.info(
+                                f"Image {idx + 1}/{len(bill_images)} size OK, no optimization needed: {original_size / (1024 * 1024):.2f}MB")
+
+                        # Generate pure GUID for filename
+                        attachment_guid = str(uuid.uuid4())
+                        filename = f"{attachment_guid}.{file_ext}"
+
+                        # Check file size
+                        file_size_mb = len(image_data) / (1024 * 1024)
+                        logger.info(
+                            f"Uploading image {idx + 1}/{len(bill_images)} to Appwrite: {filename}, type: {file_ext}, size: {len(image_data)} bytes ({file_size_mb:.2f}MB)")
+
+                        # Check first bytes for validation
+                        first_bytes = image_data[:8] if len(image_data) >= 8 else image_data
+                        logger.info(f"First 8 bytes: {first_bytes} (hex: {first_bytes.hex()})")
+
+                        # Validate PDF header if uploading PDF
+                        if file_ext == 'pdf':
+                            if not first_bytes.startswith(b'%PDF'):
+                                logger.error(
+                                    f"WARNING: PDF file does NOT start with %PDF header before upload!")
+                                logger.error(f"First 20 bytes: {image_data[:20]}")
+                            else:
+                                logger.info(f"✓ PDF header valid before upload")
+
+                        # Warn if file is still unusually large after optimization
+                        if file_size_mb > 10:
+                            logger.warning(
+                                f"Large file upload: {file_size_mb:.2f}MB - may take time to process")
+
+                        # Upload to Appwrite with GUID as file ID
+                        # Use from_path with a temp file to avoid SDK chunked upload bug
+                        # (from_bytes calculates wrong byte range for last chunk on files >= 5MB)
+                        with tempfile.TemporaryDirectory() as tmp_dir:
+                            tmp_path = os.path.join(tmp_dir, filename)
+                            with open(tmp_path, 'wb') as f:
+                                f.write(image_data)
+
+                            result = appwrite_storage.create_file(
+                                APPWRITE_BUCKET_ID,
+                                attachment_guid,  # Use GUID as file ID
+                                InputFile.from_path(tmp_path)
+                            )
+
+                        logger.info(
+                            f"✓ Image {idx + 1}/{len(bill_images)} uploaded successfully: {attachment_guid}, stored size: {result.get('sizeOriginal', 'N/A')}")
+
+                        # Add to list of uploaded GUIDs
+                        attachment_guids.append(attachment_guid)
+
+                    except Exception as e:
+                        logger.error(f"Failed to upload bill image {idx + 1} to Appwrite: {str(e)}")
+                        # Continue with other images even if one fails
+                else:
+                    logger.warning(f"Appwrite storage not configured for image {idx + 1}")
+
+            # Store comma-separated GUIDs in attachments field (or None if no uploads succeeded)
+            attachments_value = ','.join(attachment_guids) if attachment_guids else None
+            if attachments_value:
+                logger.info(f"Stored {len(attachment_guids)} attachment(s): {attachments_value}")
 
             # Get or create monthly record
             year = data.get('year', datetime.now().year)
@@ -3237,7 +3310,7 @@ def transactions():
                 data.get('notes'),
                 next_display_order,
                 bill_content,
-                attachment_guid,  # Store GUID in attachments column
+                attachments_value,  # Store comma-separated GUIDs in attachments column
                 data.get('payment_method_id')  # Add payment method
             )
             print(f"[DEBUG] Inserting transaction with values: {insert_values}")
@@ -3603,19 +3676,23 @@ def manage_transaction(transaction_id):
             dict_cursor.close()
 
             if transaction and transaction['attachments']:
-                attachment_guid = transaction['attachments']
-                # Delete attachment from Appwrite bucket
+                attachments_value = transaction['attachments']
+                # Split comma-separated GUIDs (supports both single and multiple attachments)
+                attachment_guids = [guid.strip() for guid in attachments_value.split(',') if guid.strip()]
+
+                # Delete all attachments from Appwrite bucket
                 if appwrite_storage and APPWRITE_BUCKET_ID:
-                    try:
-                        appwrite_storage.delete_file(
-                            APPWRITE_BUCKET_ID,
-                            attachment_guid
-                        )
-                        logger.info(
-                            f"Deleted attachment {attachment_guid} from Appwrite for transaction {transaction_id}")
-                    except Exception as e:
-                        logger.warning(f"Failed to delete attachment {attachment_guid} from Appwrite: {str(e)}")
-                        # Continue with transaction deletion even if Appwrite deletion fails
+                    for attachment_guid in attachment_guids:
+                        try:
+                            appwrite_storage.delete_file(
+                                APPWRITE_BUCKET_ID,
+                                attachment_guid
+                            )
+                            logger.info(
+                                f"Deleted attachment {attachment_guid} from Appwrite for transaction {transaction_id}")
+                        except Exception as e:
+                            logger.warning(f"Failed to delete attachment {attachment_guid} from Appwrite: {str(e)}")
+                            # Continue with other deletions even if one fails
 
             log_transaction_audit(cursor, transaction_id, user_id, 'DELETE')
 
@@ -3892,88 +3969,115 @@ def manage_transaction_attachment(transaction_id):
         if not transaction:
             return jsonify({'error': 'Transaction not found'}), 404
 
-        attachment_guid = transaction['attachments']
+        attachments_value = transaction['attachments']
 
-        if not attachment_guid:
+        if not attachments_value:
             return jsonify({'error': 'No attachment found for this transaction'}), 404
 
+        # Split comma-separated GUIDs (supports both single and multiple attachments)
+        attachment_guids = [guid.strip() for guid in attachments_value.split(',') if guid.strip()]
+
         if request.method == 'GET':
-            # Return attachment info with proxy URL (not direct Appwrite URL)
+            # Return attachment info(s) with proxy URLs (not direct Appwrite URLs)
             # Direct Appwrite URLs require authentication and won't work in img tags
             if appwrite_storage and APPWRITE_BUCKET_ID:
-                # Get file metadata to determine file type
-                try:
-                    file_info = appwrite_storage.get_file(
-                        APPWRITE_BUCKET_ID,
-                        attachment_guid
-                    )
-                    file_name = file_info.get('name', attachment_guid)
-                    mime_type = file_info.get('mimeType', 'application/octet-stream')
-                except Exception as e:
-                    logger.warning(f"SDK get_file failed: {str(e)}, trying HTTP API")
-                    # Fallback to HTTP API for metadata
-                    try:
-                        appwrite_endpoint = os.environ.get('APPWRITE_ENDPOINT')
-                        appwrite_project_id = os.environ.get('APPWRITE_PROJECT_ID')
-                        appwrite_api_key = os.environ.get('APPWRITE_API_KEY')
+                attachments_list = []
 
-                        metadata_url = f"{appwrite_endpoint}/storage/buckets/{APPWRITE_BUCKET_ID}/files/{attachment_guid}"
-                        headers = {
-                            'X-Appwrite-Project': appwrite_project_id,
-                            'X-Appwrite-Key': appwrite_api_key
-                        }
-                        metadata_response = requests.get(metadata_url, headers=headers)
-                        if metadata_response.status_code == 200:
-                            file_info = metadata_response.json()
-                            file_name = file_info.get('name', attachment_guid)
-                            mime_type = file_info.get('mimeType', 'application/octet-stream')
-                        else:
+                for attachment_guid in attachment_guids:
+                    # Get file metadata to determine file type
+                    try:
+                        file_info = appwrite_storage.get_file(
+                            APPWRITE_BUCKET_ID,
+                            attachment_guid
+                        )
+                        file_name = file_info.get('name', attachment_guid)
+                        mime_type = file_info.get('mimeType', 'application/octet-stream')
+                    except Exception as e:
+                        logger.warning(f"SDK get_file failed for {attachment_guid}: {str(e)}, trying HTTP API")
+                        # Fallback to HTTP API for metadata
+                        try:
+                            appwrite_endpoint = os.environ.get('APPWRITE_ENDPOINT')
+                            appwrite_project_id = os.environ.get('APPWRITE_PROJECT_ID')
+                            appwrite_api_key = os.environ.get('APPWRITE_API_KEY')
+
+                            metadata_url = f"{appwrite_endpoint}/storage/buckets/{APPWRITE_BUCKET_ID}/files/{attachment_guid}"
+                            headers = {
+                                'X-Appwrite-Project': appwrite_project_id,
+                                'X-Appwrite-Key': appwrite_api_key
+                            }
+                            metadata_response = requests.get(metadata_url, headers=headers)
+                            if metadata_response.status_code == 200:
+                                file_info = metadata_response.json()
+                                file_name = file_info.get('name', attachment_guid)
+                                mime_type = file_info.get('mimeType', 'application/octet-stream')
+                            else:
+                                file_name = attachment_guid
+                                mime_type = 'application/octet-stream'
+                        except Exception as e2:
+                            logger.error(f"HTTP metadata fetch also failed for {attachment_guid}: {str(e2)}")
                             file_name = attachment_guid
                             mime_type = 'application/octet-stream'
-                    except Exception as e2:
-                        logger.error(f"HTTP metadata fetch also failed: {str(e2)}")
-                        file_name = attachment_guid
-                        mime_type = 'application/octet-stream'
 
-                # Return proxy URL that will fetch the file server-side
-                proxy_url = url_for('serve_attachment', transaction_id=transaction_id, _external=True)
+                    # Return proxy URL that will fetch the file server-side (with GUID param for multi-attachment support)
+                    proxy_url = url_for('serve_attachment', transaction_id=transaction_id,
+                                        attachment_guid=attachment_guid, _external=True)
 
+                    attachments_list.append({
+                        'attachment_guid': attachment_guid,
+                        'file_url': proxy_url,
+                        'download_url': proxy_url + '?download=1',
+                        'file_name': file_name,
+                        'mime_type': mime_type
+                    })
+
+                # Return list of attachments (backward compatible: single item list for single attachment)
                 return jsonify({
-                    'attachment_guid': attachment_guid,
-                    'file_url': proxy_url,
-                    'download_url': proxy_url + '?download=1',
-                    'file_name': file_name,
-                    'mime_type': mime_type
+                    'attachments': attachments_list,
+                    'count': len(attachments_list)
                 }), 200
             else:
                 return jsonify({'error': 'Appwrite storage not available'}), 500
 
         elif request.method == 'DELETE':
-            # Delete attachment from Appwrite and update transaction
-            if appwrite_storage and APPWRITE_BUCKET_ID:
-                try:
-                    # Delete file from Appwrite
-                    appwrite_storage.delete_file(
-                        APPWRITE_BUCKET_ID,
-                        attachment_guid
-                    )
-                    logger.info(f"Deleted attachment {attachment_guid} from Appwrite")
-                except Exception as e:
-                    logger.error(f"Failed to delete attachment from Appwrite: {str(e)}")
-                    # Continue with database update even if Appwrite deletion fails
+            # Delete attachment(s) from Appwrite and update transaction
+            # If specific_guid is provided in request, delete only that one; otherwise delete all
+            specific_guid = request.args.get('guid')
 
-            # Remove attachment from transaction
+            if appwrite_storage and APPWRITE_BUCKET_ID:
+                guids_to_delete = [specific_guid] if specific_guid else attachment_guids
+
+                for guid in guids_to_delete:
+                    try:
+                        # Delete file from Appwrite
+                        appwrite_storage.delete_file(
+                            APPWRITE_BUCKET_ID,
+                            guid
+                        )
+                        logger.info(f"Deleted attachment {guid} from Appwrite")
+                    except Exception as e:
+                        logger.error(f"Failed to delete attachment {guid} from Appwrite: {str(e)}")
+                        # Continue with other deletions even if one fails
+
+            # Update database: remove deleted GUID(s) from attachments field
+            if specific_guid and specific_guid in attachment_guids:
+                # Remove only the specific GUID
+                remaining_guids = [g for g in attachment_guids if g != specific_guid]
+                new_attachments_value = ','.join(remaining_guids) if remaining_guids else None
+            else:
+                # Delete all attachments
+                new_attachments_value = None
+
             cursor.execute("""
                 UPDATE transactions
-                SET attachments = NULL
+                SET attachments = %s
                 WHERE id = %s
-            """, (transaction_id,))
+            """, (new_attachments_value, transaction_id))
 
             connection.commit()
 
-            logger.info(f"Removed attachment from transaction {transaction_id}")
+            logger.info(f"Updated attachments for transaction {transaction_id}")
 
-            return jsonify({'message': 'Attachment deleted successfully'}), 200
+            return jsonify({'message': 'Attachment(s) deleted successfully'}), 200
 
     except Error as e:
         logger.error(f"Error managing attachment: {str(e)}")
@@ -3996,7 +4100,7 @@ def serve_attachment(transaction_id):
         cursor = connection.cursor(dictionary=True)
         user_id = session['user_id']
 
-        # Verify transaction belongs to user and get attachment GUID
+        # Verify transaction belongs to user and get attachment GUID(s)
         cursor.execute("""
             SELECT t.attachments
             FROM transactions t
@@ -4009,10 +4113,23 @@ def serve_attachment(transaction_id):
         if not transaction:
             return "Transaction not found", 404
 
-        attachment_guid = transaction['attachments']
+        attachments_value = transaction['attachments']
 
-        if not attachment_guid:
+        if not attachments_value:
             return "No attachment found", 404
+
+        # Get specific GUID from query parameter, or default to first one
+        requested_guid = request.args.get('attachment_guid')
+        attachment_guids = [guid.strip() for guid in attachments_value.split(',') if guid.strip()]
+
+        if requested_guid:
+            # Validate requested GUID is in the list
+            if requested_guid not in attachment_guids:
+                return "Attachment not found", 404
+            attachment_guid = requested_guid
+        else:
+            # Default to first attachment
+            attachment_guid = attachment_guids[0]
 
         if not appwrite_storage or not APPWRITE_BUCKET_ID:
             return "Storage not available", 500
@@ -6575,20 +6692,26 @@ def create_transaction():
 @login_required
 def scan_bill():
     """
-    Scan a bill image or PDF using Gemini AI to extract shop name, amount, and line items.
+    Scan a bill image or PDF using Gemini AI to extract shop name, amount, discounts, and line items.
+    Supports both single and multiple images for long receipts.
 
     NOTE: This endpoint ONLY extracts data - it does NOT upload to Appwrite.
     The file will be uploaded when the user saves the transaction.
 
     Request:
         - Content-Type: multipart/form-data
-        - Field: 'bill_image' (image or PDF file)
+        - Field: 'bill_images' (one or more image/PDF files) or 'bill_image' (single file, backward compatible)
 
     Returns:
-        JSON with extracted shop_name, amount, and items
+        JSON with extracted shop_name, amount, subtotal, discounts, and items
         {
             "shop_name": "Store Name",
             "amount": "15.50",
+            "subtotal": "20.00",
+            "discounts": [
+                {"description": "10% off", "amount": "2.00"},
+                {"description": "Coupon", "amount": "2.50"}
+            ],
             "items": [
                 {"name": "Item 1", "quantity": "1", "price": "5.50"},
                 {"name": "Item 2", "quantity": "2", "price": "10.00"}
@@ -6598,54 +6721,90 @@ def scan_bill():
 
     Example Usage:
         POST /api/scan-bill
-        Body: FormData with 'bill_image' file
+        Body: FormData with 'bill_images' file(s) or 'bill_image' file
     """
     try:
-        # Check if file is present
-        if 'bill_image' not in request.files:
-            return jsonify({'error': 'No bill file provided'}), 400
+        # Check for multiple images first, then fall back to single image (backward compatible)
+        bill_images = request.files.getlist('bill_images')
 
-        bill_image = request.files['bill_image']
+        # Backward compatibility: check for single 'bill_image' if no 'bill_images'
+        if not bill_images:
+            if 'bill_image' in request.files:
+                bill_images = [request.files['bill_image']]
+            else:
+                return jsonify({'error': 'No bill file provided'}), 400
 
-        # Check if file is empty
-        if bill_image.filename == '':
+        # Validate we have at least one file
+        if not bill_images or all(img.filename == '' for img in bill_images):
             return jsonify({'error': 'No file selected'}), 400
 
-        # Validate file type
+        # Validate maximum number of images (5 images max for API performance)
+        MAX_IMAGES = 5
+        if len(bill_images) > MAX_IMAGES:
+            return jsonify({'error': f'Maximum {MAX_IMAGES} images allowed per scan'}), 400
+
+        # Process and validate each image
         allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf'}
-        file_ext = bill_image.filename.rsplit('.', 1)[-1].lower() if '.' in bill_image.filename else ''
+        processed_images = []
+        total_size = 0
 
-        if file_ext not in allowed_extensions:
-            return jsonify({'error': f'Invalid file type. Allowed: {", ".join(allowed_extensions)}'}), 400
+        for idx, bill_image in enumerate(bill_images):
+            # Check if file is empty
+            if bill_image.filename == '':
+                continue
 
-        # Read file data
-        image_data = bill_image.read()
+            # Validate file type
+            file_ext = bill_image.filename.rsplit('.', 1)[-1].lower() if '.' in bill_image.filename else ''
 
-        if len(image_data) == 0:
-            return jsonify({'error': 'Empty file'}), 400
+            if file_ext not in allowed_extensions:
+                return jsonify({
+                    'error': f'Invalid file type for image {idx + 1}: "{bill_image.filename}". Allowed: {", ".join(allowed_extensions)}'
+                }), 400
 
-        # Fix image orientation if it's an image file (not PDF)
-        # This ensures mobile photos are correctly oriented for scanning
-        if file_ext in ['jpg', 'jpeg', 'png', 'gif', 'webp'] and PIL_AVAILABLE:
-            try:
-                img = Image.open(io.BytesIO(image_data))
-                img = fix_image_orientation(img)
+            # Read file data
+            image_data = bill_image.read()
 
-                # Convert back to bytes
-                output = io.BytesIO()
-                if file_ext in ['jpg', 'jpeg']:
-                    img.save(output, format='JPEG', quality=95)
-                elif file_ext == 'png':
-                    img.save(output, format='PNG')
-                elif file_ext == 'webp':
-                    img.save(output, format='WEBP', quality=95)
-                else:
-                    img.save(output, format=img.format or 'JPEG', quality=95)
+            if len(image_data) == 0:
+                return jsonify({'error': f'Empty file: "{bill_image.filename}"'}), 400
 
-                image_data = output.getvalue()
-                logger.info(f"Image orientation corrected for scanning")
-            except Exception as e:
-                logger.warning(f"Failed to fix orientation, using original: {str(e)}")
+            total_size += len(image_data)
+
+            # Check combined file size (16MB Flask limit)
+            if total_size > 16 * 1024 * 1024:
+                return jsonify({'error': 'Combined file size exceeds 16MB limit'}), 413
+
+            # Fix image orientation if it's an image file (not PDF)
+            # This ensures mobile photos are correctly oriented for scanning
+            if file_ext in ['jpg', 'jpeg', 'png', 'gif', 'webp'] and PIL_AVAILABLE:
+                try:
+                    img = Image.open(io.BytesIO(image_data))
+                    img = fix_image_orientation(img)
+
+                    # Convert back to bytes
+                    output = io.BytesIO()
+                    if file_ext in ['jpg', 'jpeg']:
+                        img.save(output, format='JPEG', quality=95)
+                    elif file_ext == 'png':
+                        img.save(output, format='PNG')
+                    elif file_ext == 'webp':
+                        img.save(output, format='WEBP', quality=95)
+                    else:
+                        img.save(output, format=img.format or 'JPEG', quality=95)
+
+                    image_data = output.getvalue()
+                    logger.info(f"Image {idx + 1} orientation corrected for scanning")
+                except Exception as e:
+                    logger.warning(f"Failed to fix orientation for image {idx + 1}, using original: {str(e)}")
+
+            processed_images.append(image_data)
+
+        # Validate we have at least one valid image
+        if not processed_images:
+            return jsonify({'error': 'No valid images to process'}), 400
+
+        # Validate we have at least one valid image
+        if not processed_images:
+            return jsonify({'error': 'No valid images to process'}), 400
 
         # Get Gemini scanner instance
         scanner = get_gemini_bill_scanner()
@@ -6656,8 +6815,10 @@ def scan_bill():
             }), 503
 
         # Scan the bill with Gemini AI (no Appwrite upload yet)
-        logger.info(f"Scanning bill file for user {session['user_id']}")
-        result = scanner.scan_bill(image_data)
+        # Pass single image or list depending on count
+        image_input = processed_images[0] if len(processed_images) == 1 else processed_images
+        logger.info(f"Scanning {len(processed_images)} bill image(s) for user {session['user_id']}")
+        result = scanner.scan_bill(image_input)
 
         # Check if there was an error
         if 'error' in result:
@@ -6666,6 +6827,8 @@ def scan_bill():
                 'success': False,
                 'shop_name': result.get('shop_name', 'Unknown Store'),
                 'amount': result.get('amount', '0'),
+                'subtotal': result.get('subtotal', '0'),
+                'discounts': result.get('discounts', []),
                 'items': result.get('items', []),
                 'error': result['error'],
                 'raw_response': result.get('raw_response', '')
@@ -6673,12 +6836,14 @@ def scan_bill():
 
         # Return successful result (no file_id/file_url since we didn't upload yet)
         logger.info(
-            f"Bill scanned successfully: {result['shop_name']} - {result['amount']} - {len(result.get('items', []))} items")
+            f"Bill scanned successfully ({len(processed_images)} image(s)): {result['shop_name']} - {result['amount']} - {len(result.get('items', []))} items")
 
         return jsonify({
             'success': True,
             'shop_name': result['shop_name'],
             'amount': result['amount'],
+            'subtotal': result.get('subtotal', '0'),
+            'discounts': result.get('discounts', []),
             'items': result.get('items', []),
             'raw_response': result.get('raw_response', '')
         }), 200
@@ -6690,6 +6855,8 @@ def scan_bill():
             'error': f'Failed to scan bill: {str(e)}',
             'shop_name': 'Unknown Store',
             'amount': '0',
+            'subtotal': '0',
+            'discounts': [],
             'items': []
         }), 500
 
