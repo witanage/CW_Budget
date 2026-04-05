@@ -40,7 +40,7 @@ let filterSearchListenersInitialized = false; // Track if filter search listener
 let loadedReportTabs = new Set(); // Track which report tabs have been loaded
 let reportTabsInitialized = false; // Track if tab listeners are initialized
 let scannedBillContent = null; // Store scanned bill content temporarily
-let capturedBillImage = null; // Store the actual file (image or PDF) for upload
+let capturedBillImages = []; // Store all captured bill images for upload
 
 // --- Client-side file compression for Vercel's 4.5 MB body limit ---
 const UPLOAD_MAX_BYTES = 4 * 1024 * 1024; // 4 MB target (leaves headroom for form overhead)
@@ -113,11 +113,22 @@ async function compressPdfFile(file, targetBytes = UPLOAD_MAX_BYTES) {
  * Returns { fileToSend, wasCompressed }.
  */
 async function compressFileForUpload(file) {
-    if (file.size <= UPLOAD_MAX_BYTES) {
-        return { fileToSend: file, wasCompressed: false };
-    }
+    // For PDFs, only compress if > 10MB (Gemini handles multi-page PDFs well)
+    const PDF_THRESHOLD = 10 * 1024 * 1024; // 10 MB
 
-    console.log(`File ${file.name} is ${(file.size / (1024*1024)).toFixed(1)} MB – compressing…`);
+    if (file.type === 'application/pdf') {
+        if (file.size <= PDF_THRESHOLD) {
+            return { fileToSend: file, wasCompressed: false };
+        }
+        // For very large PDFs (>10MB), convert to JPEG as last resort
+        console.log(`Large PDF ${file.name} is ${(file.size / (1024*1024)).toFixed(1)} MB – converting to image…`);
+    } else {
+        // For images, compress if > 4MB
+        if (file.size <= UPLOAD_MAX_BYTES) {
+            return { fileToSend: file, wasCompressed: false };
+        }
+        console.log(`Image ${file.name} is ${(file.size / (1024*1024)).toFixed(1)} MB – compressing…`);
+    }
 
     try {
         let blob;
@@ -141,6 +152,54 @@ async function compressFileForUpload(file) {
         console.error('Compression failed, sending original:', err);
         return { fileToSend: file, wasCompressed: false };
     }
+}
+
+// Display bill breakdown with discounts
+function displayBillBreakdown(result) {
+    const billBreakdown = document.getElementById('billBreakdown');
+    const billBreakdownContent = document.getElementById('billBreakdownContent');
+
+    if (!billBreakdown || !billBreakdownContent) return;
+
+    // Only show if there are discounts or items with subtotal
+    const hasDiscounts = result.discounts && result.discounts.length > 0;
+    const hasSubtotal = parseFloat(result.subtotal || 0) > 0;
+
+    if (!hasDiscounts && !hasSubtotal) {
+        billBreakdown.style.display = 'none';
+        return;
+    }
+
+    let breakdownHtml = '';
+
+    // Show subtotal if available and different from total
+    if (hasSubtotal && parseFloat(result.subtotal) !== parseFloat(result.amount)) {
+        breakdownHtml += `<div class="d-flex justify-content-between mb-1">
+            <span>Subtotal:</span>
+            <span>රු ${parseFloat(result.subtotal).toFixed(2)}</span>
+        </div>`;
+    }
+
+    // Show discounts
+    if (hasDiscounts) {
+        result.discounts.forEach((discount, index) => {
+            const description = discount.description || `Discount ${index + 1}`;
+            const amount = parseFloat(discount.amount || 0);
+            breakdownHtml += `<div class="d-flex justify-content-between mb-1" style="color: #28a745;">
+                <span><i class="fas fa-tag me-1"></i>${description}:</span>
+                <span>-රු ${amount.toFixed(2)}</span>
+            </div>`;
+        });
+    }
+
+    // Show final total
+    breakdownHtml += `<div class="d-flex justify-content-between mt-2 pt-2" style="border-top: 1px solid #dee2e6; font-weight: bold;">
+        <span>Final Total:</span>
+        <span>රු ${parseFloat(result.amount).toFixed(2)}</span>
+    </div>`;
+
+    billBreakdownContent.innerHTML = breakdownHtml;
+    billBreakdown.style.display = 'block';
 }
 
 // Global variable for Vanta effect
@@ -520,13 +579,19 @@ function setupFormButtons() {
         transactionModal.addEventListener('hidden.bs.modal', function() {
             // Clear captured bill data when modal is dismissed
             scannedBillContent = null;
-            capturedBillImage = null;
+            capturedBillImages = [];
 
             // Hide scan status if visible
             const scanStatus = document.getElementById('scanStatus');
             if (scanStatus) {
                 scanStatus.style.display = 'none';
                 scanStatus.style.color = '#ffc107';
+            }
+
+            // Hide bill breakdown if visible
+            const billBreakdown = document.getElementById('billBreakdown');
+            if (billBreakdown) {
+                billBreakdown.style.display = 'none';
             }
 
             // Reset the form and modal title for next use
@@ -1695,13 +1760,10 @@ async function saveTransaction() {
 
     showLoading();
 
-    // Check if we have a captured bill file to upload
+    // Check if we have captured bill files to upload
     let requestBody, requestHeaders;
-    if (capturedBillImage && !isEdit) {
-        // Compress file if needed (Vercel has a ~4.5 MB body limit)
-        const { fileToSend } = await compressFileForUpload(capturedBillImage);
-
-        // Send as multipart/form-data with file
+    if (capturedBillImages && capturedBillImages.length > 0 && !isEdit) {
+        // Send as multipart/form-data with files (already compressed from scan)
         const formData = new FormData();
 
         // Add all form fields
@@ -1711,8 +1773,11 @@ async function saveTransaction() {
             }
         }
 
-        // Add the bill image
-        formData.append('bill_image', fileToSend);
+        // Add ALL bill images
+        console.log(`Uploading ${capturedBillImages.length} bill image(s) to Appwrite`);
+        for (let i = 0; i < capturedBillImages.length; i++) {
+            formData.append('bill_images', capturedBillImages[i], capturedBillImages[i].name || `image_${i + 1}.jpg`);
+        }
 
         requestBody = formData;
         requestHeaders = {}; // Let browser set Content-Type with boundary
@@ -1754,9 +1819,9 @@ async function saveTransaction() {
             document.getElementById('editTransactionId').value = '';
             document.querySelector('#transactionModal .modal-title').textContent = 'Add Transaction';
 
-            // Clear bill content and captured image
+            // Clear bill content and captured images
             scannedBillContent = null;
-            capturedBillImage = null;
+            capturedBillImages = [];
 
             loadTransactions();
         }
@@ -2121,15 +2186,90 @@ async function loadAndDisplayAttachment() {
 
         const data = await response.json();
 
-        if (data.file_url) {
-            // Check if it's a PDF based on MIME type or file extension
+        // Handle new multi-attachment format
+        if (data.attachments && Array.isArray(data.attachments) && data.attachments.length > 0) {
+            const attachments = data.attachments; // Display in capture order (first captured first)
+            const attachmentCount = attachments.length;
+
+            // Build HTML for all attachments
+            let allAttachmentsHtml = '';
+
+            for (let i = 0; i < attachments.length; i++) {
+                const attachment = attachments[i];
+                const isPdf = attachment.mime_type === 'application/pdf' ||
+                             (attachment.file_name && attachment.file_name.toLowerCase().endsWith('.pdf'));
+
+                const attachmentNumber = attachmentCount > 1 ? ` ${i + 1}/${attachmentCount}` : '';
+
+                let attachmentContent;
+                if (isPdf) {
+                    // For PDFs, provide download and new tab options
+                    attachmentContent = `
+                        <div class="attachment-item ${i > 0 ? 'mt-4' : ''}">
+                            ${attachmentCount > 1 ? `<div class="badge bg-secondary mb-2">Image ${i + 1}</div>` : ''}
+                            <div class="alert alert-info mb-3">
+                                <i class="fas fa-file-pdf me-2"></i>
+                                <strong>PDF Attachment${attachmentNumber}</strong>
+                                <div class="small mt-1">${attachment.file_name || 'document.pdf'}</div>
+                            </div>
+                            <div class="d-flex gap-2 mb-3">
+                                <a href="${attachment.download_url}" class="btn btn-primary" download>
+                                    <i class="fas fa-download me-1"></i>Download PDF
+                                </a>
+                                <a href="${attachment.file_url}" class="btn btn-outline-secondary" target="_blank">
+                                    <i class="fas fa-external-link-alt me-1"></i>Open in New Tab
+                                </a>
+                            </div>
+                            <div id="pdfLoadingSpinner_${i}" class="text-center py-3">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading PDF...</span>
+                                </div>
+                                <p class="text-muted mt-2">Loading PDF preview...</p>
+                            </div>
+                            <div style="width: 100%; height: 600px; overflow: auto; border: 1px solid #ddd; border-radius: 5px; background: #f5f5f5; display: none;" id="pdfIframeContainer_${i}">
+                                <iframe src="${attachment.file_url}" width="100%" height="100%" frameborder="0" style="background: white;" onload="document.getElementById('pdfLoadingSpinner_${i}').style.display='none'; document.getElementById('pdfIframeContainer_${i}').style.display='block';">
+                                    <p>PDF preview not available. <a href="${attachment.download_url}" download>Download PDF</a></p>
+                                </iframe>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    // Display image with loading state
+                    attachmentContent = `
+                        <div class="attachment-item ${i > 0 ? 'mt-4' : ''}">
+                            ${attachmentCount > 1 ? `<div class="badge bg-secondary mb-2">Image ${i + 1}</div>` : ''}
+                            <div id="imageLoadingSpinner_${i}" class="text-center py-3">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading image...</span>
+                                </div>
+                                <p class="text-muted mt-2">Loading image${attachmentNumber}...</p>
+                            </div>
+                            <img src="${attachment.file_url}" alt="Bill Attachment${attachmentNumber}" class="img-fluid rounded shadow-sm" style="max-width: 100%; height: auto; display: none;" onload="this.style.display='block'; document.getElementById('imageLoadingSpinner_${i}').style.display='none';" onerror="this.style.display='none'; document.getElementById('imageLoadingSpinner_${i}').innerHTML='&lt;div class=&quot;alert alert-danger&quot;&gt;&lt;i class=&quot;fas fa-exclamation-triangle me-2&quot;&gt;&lt;/i&gt;Failed to load image&lt;/div&gt;';">
+                        </div>
+                    `;
+                }
+
+                allAttachmentsHtml += attachmentContent;
+            }
+
+            billAttachmentContainer.innerHTML = `
+                <div class="attachment-display">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0">Bill Attachment${attachmentCount > 1 ? 's' : ''} ${attachmentCount > 1 ? `(${attachmentCount})` : ''}</h6>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="hideAttachment()">
+                            <i class="fas fa-times"></i> Hide
+                        </button>
+                    </div>
+                    ${allAttachmentsHtml}
+                </div>
+            `;
+        } else if (data.file_url) {
+            // Backward compatibility: handle old single-attachment format
             const isPdf = data.mime_type === 'application/pdf' ||
                          (data.file_name && data.file_name.toLowerCase().endsWith('.pdf'));
 
-            // Display the attachment (image or PDF)
             let attachmentContent;
             if (isPdf) {
-                // For PDFs, provide download and new tab options
                 attachmentContent = `
                     <div class="alert alert-info mb-3">
                         <i class="fas fa-file-pdf me-2"></i>
@@ -2157,7 +2297,6 @@ async function loadAndDisplayAttachment() {
                     </div>
                 `;
             } else {
-                // Display image with loading state
                 attachmentContent = `
                     <div id="imageLoadingSpinner" class="text-center py-3">
                         <div class="spinner-border text-primary" role="status">
@@ -2181,7 +2320,7 @@ async function loadAndDisplayAttachment() {
                 </div>
             `;
         } else {
-            throw new Error('No file URL returned from server');
+            throw new Error('No attachments returned from server');
         }
     } catch (error) {
         console.error('Error loading attachment:', error);
@@ -3598,7 +3737,7 @@ function updateMonthlyReportChart(data) {
                 y: {
                     beginAtZero: true,
                     ticks: {
-                        callback: value => 'LKR ' + value.toLocaleString()
+                        callback: value => 'රු ' + value.toLocaleString()
                     }
                 }
             }
@@ -3686,7 +3825,7 @@ function updateCategoryReportChart(data, rangeType) {
                         callbacks: {
                             label: ctx => {
                                 const percentage = ((ctx.parsed / totalIncome) * 100).toFixed(1);
-                                return ctx.label + ': LKR ' + ctx.parsed.toLocaleString() + ' (' + percentage + '%)';
+                                return ctx.label + ': රු ' + ctx.parsed.toLocaleString() + ' (' + percentage + '%)';
                             }
                         }
                     }
@@ -3734,7 +3873,7 @@ function updateCategoryReportChart(data, rangeType) {
                         callbacks: {
                             label: ctx => {
                                 const percentage = ((ctx.parsed / totalExpense) * 100).toFixed(1);
-                                return ctx.label + ': LKR ' + ctx.parsed.toLocaleString() + ' (' + percentage + '%)';
+                                return ctx.label + ': රු ' + ctx.parsed.toLocaleString() + ' (' + percentage + '%)';
                             }
                         }
                     }
@@ -3803,7 +3942,7 @@ function updateCategorySummaryTables(categoryTotals, totalIncome, totalExpense) 
         return `
             <tr>
                 <td>${row.category}</td>
-                <td class="text-end">LKR ${row.amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td class="text-end">රු ${row.amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td class="text-end">${percentage}%</td>
             </tr>
         `;
@@ -3815,15 +3954,15 @@ function updateCategorySummaryTables(categoryTotals, totalIncome, totalExpense) 
         return `
             <tr>
                 <td>${row.category}</td>
-                <td class="text-end">LKR ${row.amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td class="text-end">රු ${row.amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td class="text-end">${percentage}%</td>
             </tr>
         `;
     }).join('');
 
     // Update totals
-    totalIncomeElement.textContent = `LKR ${totalIncome.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-    totalExpensesElement.textContent = `LKR ${totalExpense.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    totalIncomeElement.textContent = `රු ${totalIncome.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    totalExpensesElement.textContent = `රු ${totalExpense.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
 }
 
 // Update net savings display
@@ -3838,7 +3977,7 @@ function updateNetSavings(totalIncome, totalExpense) {
     const savingsRate = totalIncome > 0 ? ((netSavings / totalIncome) * 100).toFixed(1) : 0;
 
     // Update text
-    netSavingsElement.textContent = `LKR ${netSavings.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    netSavingsElement.textContent = `රු ${netSavings.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
     savingsPercentageElement.textContent = `${savingsRate}% savings rate`;
 
     // Update card styling based on savings
@@ -3916,14 +4055,14 @@ function updateCashFlowChart(data, rangeType) {
                 y: {
                     beginAtZero: true,
                     ticks: {
-                        callback: value => 'LKR ' + value.toLocaleString()
+                        callback: value => 'රු ' + value.toLocaleString()
                     }
                 }
             },
             plugins: {
                 tooltip: {
                     callbacks: {
-                        label: ctx => ctx.dataset.label + ': LKR ' + ctx.parsed.y.toLocaleString()
+                        label: ctx => ctx.dataset.label + ': රු ' + ctx.parsed.y.toLocaleString()
                     }
                 }
             }
@@ -3963,7 +4102,7 @@ function updateTopSpendingChart(data) {
                 x: {
                     beginAtZero: true,
                     ticks: {
-                        callback: value => 'LKR ' + value.toLocaleString()
+                        callback: value => 'රු ' + value.toLocaleString()
                     }
                 }
             },
@@ -4044,14 +4183,14 @@ function updateForecastChart(data) {
                 y: {
                     beginAtZero: true,
                     ticks: {
-                        callback: value => 'LKR ' + value.toLocaleString()
+                        callback: value => 'රු ' + value.toLocaleString()
                     }
                 }
             },
             plugins: {
                 tooltip: {
                     callbacks: {
-                        label: ctx => ctx.dataset.label + ': LKR ' + ctx.parsed.y.toLocaleString()
+                        label: ctx => ctx.dataset.label + ': රු ' + ctx.parsed.y.toLocaleString()
                     }
                 }
             }
@@ -4064,10 +4203,10 @@ function updateForecastChart(data) {
         tbody.innerHTML = data.category_forecast.map(d => `
             <tr>
                 <td>${d.category || 'Uncategorized'}</td>
-                <td>LKR ${(d.avg_monthly_spending || 0).toLocaleString()}</td>
-                <td>LKR ${(d.min_spending || 0).toLocaleString()}</td>
-                <td>LKR ${(d.max_spending || 0).toLocaleString()}</td>
-                <td>LKR ${(d.std_deviation || 0).toLocaleString()}</td>
+                <td>රු ${(d.avg_monthly_spending || 0).toLocaleString()}</td>
+                <td>රු ${(d.min_spending || 0).toLocaleString()}</td>
+                <td>රු ${(d.max_spending || 0).toLocaleString()}</td>
+                <td>රු ${(d.std_deviation || 0).toLocaleString()}</td>
             </tr>
         `).join('');
     }
@@ -4601,7 +4740,7 @@ function populateMonthlyDataTable() {
                                                        value="${defaultSalaryRate}"
                                                        step="0.01"
                                                        min="0">
-                                                <span class="input-group-text">LKR</span>
+                                                <span class="input-group-text">රු</span>
                                             </div>
                                             <div class="input-group input-group-sm mb-2">
                                                 <input type="date" class="form-control month-salary-rate-date"
@@ -4981,7 +5120,7 @@ function calculateMonthlyTax() {
     updateTaxScheduleTable(monthlyData);
 
     // Update totals
-    document.getElementById('totalUSD').textContent = `$${totalUSD.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+    document.getElementById('totalUSD').textContent = `රු ${totalUSD.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
     document.getElementById('totalConverted').textContent = formatCurrency(totalConverted);
     document.getElementById('totalTaxLiability').textContent = formatCurrency(previousTaxLiability);
     document.getElementById('totalMonthlyPayments').textContent = formatCurrency(previousTaxLiability);
@@ -5141,15 +5280,15 @@ function resetTaxCalculator() {
     }
 
     // Reset totals
-    document.getElementById('totalUSD').textContent = '$0';
-    document.getElementById('totalConverted').textContent = 'LKR 0';
-    document.getElementById('totalTaxLiability').textContent = 'LKR 0';
-    document.getElementById('totalMonthlyPayments').textContent = 'LKR 0';
+    document.getElementById('totalUSD').textContent = 'රු 0';
+    document.getElementById('totalConverted').textContent = 'රු 0';
+    document.getElementById('totalTaxLiability').textContent = 'රු 0';
+    document.getElementById('totalMonthlyPayments').textContent = 'රු 0';
 
     // Reset summary cards
-    document.getElementById('annualIncomeSummary').textContent = 'LKR 0';
-    document.getElementById('taxFreeAmountSummary').textContent = 'LKR 360,000';
-    document.getElementById('totalTaxSummary').textContent = 'LKR 0';
+    document.getElementById('annualIncomeSummary').textContent = 'රු 0';
+    document.getElementById('taxFreeAmountSummary').textContent = 'රු 360,000';
+    document.getElementById('totalTaxSummary').textContent = 'රු 0';
     document.getElementById('effectiveTaxRateSummary').textContent = '0%';
 
     // Update displays
@@ -5588,28 +5727,41 @@ document.addEventListener('DOMContentLoaded', function() {
     // Handle file selection
     if (billUploadInput) {
         billUploadInput.addEventListener('change', async function(event) {
-            const file = event.target.files[0];
-            if (!file) {
+            const files = Array.from(event.target.files);
+            if (!files || files.length === 0) {
                 console.log('No file selected');
                 return;
             }
 
-            console.log('File selected:', file.name, file.type, file.size);
+            console.log(`${files.length} file(s) selected`);
 
-            // Validate file type
-            const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp', 'application/pdf'];
-            if (!allowedTypes.includes(file.type)) {
-                showToast('Please select a valid file (PNG, JPEG, GIF, WebP, or PDF)', 'danger');
+            // Validate maximum number of files (5 max)
+            const MAX_FILES = 5;
+            if (files.length > MAX_FILES) {
+                showToast(`Maximum ${MAX_FILES} images allowed per scan`, 'danger');
                 billUploadInput.value = '';
                 return;
             }
 
-            // Validate file size (max 50MB before compression)
+            // Validate each file
+            const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp', 'application/pdf'];
             const maxSize = 50 * 1024 * 1024;
-            if (file.size > maxSize) {
-                showToast('File is too large. Please select a file under 50MB', 'danger');
-                billUploadInput.value = '';
-                return;
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                console.log(`File ${i + 1}/${files.length}:`, file.name, file.type, file.size);
+
+                if (!allowedTypes.includes(file.type)) {
+                    showToast(`Invalid file type for "${file.name}". Allowed: PNG, JPEG, GIF, WebP, or PDF`, 'danger');
+                    billUploadInput.value = '';
+                    return;
+                }
+
+                if (file.size > maxSize) {
+                    showToast(`File "${file.name}" is too large. Please select files under 50MB`, 'danger');
+                    billUploadInput.value = '';
+                    return;
+                }
             }
 
             // Open the transaction modal immediately
@@ -5617,9 +5769,16 @@ document.addEventListener('DOMContentLoaded', function() {
             transactionModal.show();
 
             // Show scanning status inside the modal
+            const fileCountText = files.length > 1 ? ` (${files.length} images)` : '';
             if (scanStatus && scanStatusText) {
                 scanStatus.style.display = 'block';
-                scanStatusText.textContent = 'Compressing & scanning bill...';
+                scanStatusText.textContent = `Compressing & scanning bill${fileCountText}...`;
+            }
+
+            // Hide any previous bill breakdown
+            const billBreakdown = document.getElementById('billBreakdown');
+            if (billBreakdown) {
+                billBreakdown.style.display = 'none';
             }
 
             // Disable upload button during processing
@@ -5629,25 +5788,43 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             try {
-                // Compress file if needed (Vercel has a ~4.5 MB body limit)
-                const { fileToSend, wasCompressed } = await compressFileForUpload(file);
-                if (wasCompressed && scanStatusText) {
-                    scanStatusText.textContent = 'Scanning bill...';
+                // Create FormData to send the files
+                const formData = new FormData();
+                let totalCompressedSize = 0;
+
+                // Compress each file if needed
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+
+                    if (scanStatusText && files.length > 1) {
+                        scanStatusText.textContent = `Processing image ${i + 1}/${files.length}...`;
+                    }
+
+                    const { fileToSend, wasCompressed } = await compressFileForUpload(file);
+                    totalCompressedSize += fileToSend.size;
+
+                    // Append to FormData with 'bill_images' key for multiple files
+                    formData.append('bill_images', fileToSend, fileToSend.name || `image_${i + 1}.jpg`);
                 }
 
-                // Create FormData to send the file
-                const formData = new FormData();
-                formData.append('bill_image', fileToSend);
+                // Check total size (16MB Flask limit)
+                if (totalCompressedSize > 16 * 1024 * 1024) {
+                    throw new Error('Combined file size exceeds 16MB limit. Please use fewer or smaller images.');
+                }
+
+                if (scanStatusText) {
+                    scanStatusText.textContent = `Scanning ${files.length} image${files.length > 1 ? 's' : ''}...`;
+                }
 
                 // Send to API
-                console.log('Sending file to API...', (fileToSend.size / (1024*1024)).toFixed(1), 'MB');
+                console.log(`Sending ${files.length} file(s) to API...`, (totalCompressedSize / (1024*1024)).toFixed(1), 'MB total');
                 const response = await fetch('/api/scan-bill', {
                     method: 'POST',
                     body: formData
                 });
 
                 if (response.status === 413) {
-                    throw new Error('File is too large even after compression. Please use a smaller file.');
+                    throw new Error('File is too large even after compression. Please use fewer or smaller files.');
                 }
 
                 const result = await response.json();
@@ -5658,15 +5835,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 if (result.success) {
-                    // Store the scanned bill content including items
+                    // Store the scanned bill content including items and discounts
                     scannedBillContent = {
                         shop_name: result.shop_name,
                         amount: result.amount,
+                        subtotal: result.subtotal || '0',
+                        discounts: result.discounts || [],
                         items: result.items || []
                     };
 
-                    // Store the compressed file for upload when transaction is saved
-                    capturedBillImage = fileToSend;
+                    // Store ALL compressed files for upload when transaction is saved
+                    capturedBillImages = formData.getAll('bill_images').filter(f => f instanceof File || f instanceof Blob);
+                    console.log(`Stored ${capturedBillImages.length} bill image(s) for upload`);
 
                     // Populate the form with extracted data
                     const transDescription = document.getElementById('transDescription');
@@ -5680,12 +5860,17 @@ document.addEventListener('DOMContentLoaded', function() {
                         transCredit.value = result.amount;
                     }
 
+                    // Display bill breakdown if there are discounts
+                    displayBillBreakdown(result);
+
                     // Show success message
                     const itemCount = result.items ? result.items.length : 0;
+                    const discountCount = result.discounts ? result.discounts.length : 0;
                     const itemText = itemCount > 0 ? ` (${itemCount} items)` : '';
+                    const discountText = discountCount > 0 ? ` with ${discountCount} discount${discountCount > 1 ? 's' : ''}` : '';
 
                     if (scanStatusText) {
-                        scanStatusText.textContent = `✓ Bill scanned successfully!${itemText}`;
+                        scanStatusText.textContent = `✓ Bill scanned successfully!${itemText}${discountText}`;
                     }
                     if (scanStatus) {
                         scanStatus.style.color = '#28a745';
@@ -5698,7 +5883,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     }, 3000);
 
-                    showToast(`Bill scanned: ${result.shop_name} - $${result.amount}${itemText}`, 'success');
+                    showToast(`Bill scanned: ${result.shop_name} - රු ${result.amount}${itemText}${discountText}`, 'success');
                 } else {
                     // Handle scanning error but still allow manual entry
                     const errorMsg = result.error || 'Failed to extract bill information';

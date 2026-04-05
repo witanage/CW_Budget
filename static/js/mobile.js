@@ -55,7 +55,9 @@ let paymentMethods = [];
 let categories = [];
 let selectedTransactionIdForPayment = null;
 let scannedBillContent = null; // Store scanned bill content temporarily
-let capturedBillImage = null; // Store the actual file (image or PDF) for upload
+let capturedBillImages = []; // Store all captured bill images for upload
+let captureModeActive = false;
+let capturedPhotos = []; // Photos captured in multi-shot capture mode
 
 // --- Client-side file compression for Vercel's 4.5 MB body limit ---
 const UPLOAD_MAX_BYTES = 4 * 1024 * 1024;
@@ -117,9 +119,12 @@ async function convertPdfToImage(file, targetBytes = UPLOAD_MAX_BYTES) {
 }
 
 async function compressFileForUpload(file) {
-    // Handle PDFs - convert to image if large, send as-is if small
+    // For PDFs, only compress if > 10MB (Gemini handles multi-page PDFs well)
+    const PDF_THRESHOLD = 10 * 1024 * 1024; // 10 MB
+
+    // Handle PDFs - convert to image only if very large
     if (file.type === 'application/pdf') {
-        if (file.size > UPLOAD_MAX_BYTES) {
+        if (file.size > PDF_THRESHOLD) {
             console.log(`PDF is too large (${(file.size / (1024*1024)).toFixed(1)} MB), converting to image...`);
             try {
                 const blob = await convertPdfToImage(file);
@@ -133,7 +138,7 @@ async function compressFileForUpload(file) {
                 throw new Error(`PDF is too large and conversion failed: ${err.message}`);
             }
         } else {
-            console.log(`PDF is small enough (${(file.size / (1024*1024)).toFixed(1)} MB), sending as-is`);
+            console.log(`PDF is ${(file.size / (1024*1024)).toFixed(1)} MB, sending as-is (multi-page support)`);
             return { fileToSend: file, wasCompressed: false };
         }
     }
@@ -155,6 +160,54 @@ async function compressFileForUpload(file) {
         console.error('Compression failed, sending original:', err);
         return { fileToSend: file, wasCompressed: false };
     }
+}
+
+// Display bill breakdown with discounts
+function displayBillBreakdown(result) {
+    const billBreakdown = document.getElementById('billBreakdown');
+    const billBreakdownContent = document.getElementById('billBreakdownContent');
+
+    if (!billBreakdown || !billBreakdownContent) return;
+
+    // Only show if there are discounts or items with subtotal
+    const hasDiscounts = result.discounts && result.discounts.length > 0;
+    const hasSubtotal = parseFloat(result.subtotal || 0) > 0;
+
+    if (!hasDiscounts && !hasSubtotal) {
+        billBreakdown.style.display = 'none';
+        return;
+    }
+
+    let breakdownHtml = '';
+
+    // Show subtotal if available and different from total
+    if (hasSubtotal && parseFloat(result.subtotal) !== parseFloat(result.amount)) {
+        breakdownHtml += `<div class="d-flex justify-content-between mb-1">
+            <span>Subtotal:</span>
+            <span>රු ${parseFloat(result.subtotal).toFixed(2)}</span>
+        </div>`;
+    }
+
+    // Show discounts
+    if (hasDiscounts) {
+        result.discounts.forEach((discount, index) => {
+            const description = discount.description || `Discount ${index + 1}`;
+            const amount = parseFloat(discount.amount || 0);
+            breakdownHtml += `<div class="d-flex justify-content-between mb-1" style="color: #28a745;">
+                <span><i class="fas fa-tag me-1"></i>${description}:</span>
+                <span>-රු ${amount.toFixed(2)}</span>
+            </div>`;
+        });
+    }
+
+    // Show final total
+    breakdownHtml += `<div class="d-flex justify-content-between mt-2 pt-2" style="border-top: 1px solid #333; font-weight: bold;">
+        <span>Final Total:</span>
+        <span>රු ${parseFloat(result.amount).toFixed(2)}</span>
+    </div>`;
+
+    billBreakdownContent.innerHTML = breakdownHtml;
+    billBreakdown.style.display = 'block';
 }
 
 // Load payment methods
@@ -674,15 +727,79 @@ try {
 
     const data = await response.json();
 
-    if (data.file_url) {
-        // Check if it's a PDF
+    // Handle new multi-attachment format
+    if (data.attachments && Array.isArray(data.attachments) && data.attachments.length > 0) {
+        const attachments = data.attachments; // Display in capture order (first captured first)
+        const attachmentCount = attachments.length;
+
+        // Build HTML for all attachments
+        let allAttachmentsHtml = '';
+
+        for (let i = 0; i < attachments.length; i++) {
+            const attachment = attachments[i];
+            const isPdf = attachment.mime_type === 'application/pdf' ||
+                         (attachment.file_name && attachment.file_name.toLowerCase().endsWith('.pdf'));
+
+            const attachmentNumber = attachmentCount > 1 ? ` ${i + 1}/${attachmentCount}` : '';
+
+            let attachmentContent;
+            if (isPdf) {
+                // For PDFs, show download and open options
+                attachmentContent = `
+                    <div class="attachment-item ${i > 0 ? 'mt-4' : ''}">
+                        ${attachmentCount > 1 ? `<div class="badge bg-secondary mb-2">Image ${i + 1}</div>` : ''}
+                        <div class="alert alert-info mb-3">
+                            <i class="fas fa-file-pdf me-2"></i>
+                            <strong>PDF Document${attachmentNumber}</strong>
+                            <div class="small mt-1">${attachment.file_name || 'document.pdf'}</div>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <a href="${attachment.download_url}" class="btn btn-primary" download>
+                                <i class="fas fa-download me-2"></i>Download PDF
+                            </a>
+                            <a href="${attachment.file_url}" class="btn btn-outline-secondary" target="_blank">
+                                <i class="fas fa-external-link-alt me-2"></i>Open in New Tab
+                            </a>
+                        </div>
+                    </div>
+                `;
+            } else {
+                // Display image with loading state
+                attachmentContent = `
+                    <div class="attachment-item ${i > 0 ? 'mt-4' : ''}">
+                        ${attachmentCount > 1 ? `<div class="badge bg-secondary mb-2">Image ${i + 1}</div>` : ''}
+                        <div id="mobileImageLoadingSpinner_${i}" class="text-center py-3">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading image...</span>
+                            </div>
+                            <p class="text-muted mt-2">Loading image${attachmentNumber}...</p>
+                        </div>
+                        <img src="${attachment.file_url}" alt="Bill Attachment${attachmentNumber}" class="img-fluid rounded shadow-sm" style="display: none;" onload="this.style.display='block'; document.getElementById('mobileImageLoadingSpinner_${i}').style.display='none';" onerror="this.style.display='none'; document.getElementById('mobileImageLoadingSpinner_${i}').innerHTML='&lt;div class=&quot;alert alert-danger&quot;&gt;&lt;i class=&quot;fas fa-exclamation-triangle me-2&quot;&gt;&lt;/i&gt;Failed to load image&lt;/div&gt;';">
+                    </div>
+                `;
+            }
+
+            allAttachmentsHtml += attachmentContent;
+        }
+
+        mobileBillAttachmentContainer.innerHTML = `
+            <div class="attachment-display">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0">Bill Attachment${attachmentCount > 1 ? 's' : ''} ${attachmentCount > 1 ? `(${attachmentCount})` : ''}</h6>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="hideMobileBillAttachment()">
+                        <i class="fas fa-times"></i> Hide
+                    </button>
+                </div>
+                ${allAttachmentsHtml}
+            </div>
+        `;
+    } else if (data.file_url) {
+        // Backward compatibility: handle old single-attachment format
         const isPdf = data.mime_type === 'application/pdf' ||
                      (data.file_name && data.file_name.toLowerCase().endsWith('.pdf'));
 
-        // Display based on file type
         let attachmentContent;
         if (isPdf) {
-            // For PDFs, show download and open options (no loading spinner needed for non-preview)
             attachmentContent = `
                 <div class="alert alert-info mb-3">
                     <i class="fas fa-file-pdf me-2"></i>
@@ -699,7 +816,6 @@ try {
                 </div>
             `;
         } else {
-            // Display image with loading state
             attachmentContent = `
                 <div id="mobileImageLoadingSpinner" class="text-center py-3">
                     <div class="spinner-border text-primary" role="status">
@@ -723,7 +839,7 @@ try {
             </div>
         `;
     } else {
-        throw new Error('No file URL returned from server');
+        throw new Error('No attachments returned from server');
     }
 } catch (error) {
     console.error('Error loading attachment:', error);
@@ -1473,13 +1589,10 @@ month: parseInt(currentMonth)
 
     showLoading();
 
-    // Check if we have a captured bill file to upload
+    // Check if we have captured bill files to upload
     let requestBody, requestHeaders;
-    if (capturedBillImage && !isEdit) {
-        // Compress file if needed (Vercel has a ~4.5 MB body limit)
-        const { fileToSend } = await compressFileForUpload(capturedBillImage);
-
-        // Send as multipart/form-data with file
+    if (capturedBillImages && capturedBillImages.length > 0 && !isEdit) {
+        // Send as multipart/form-data with files (already compressed from scan)
         const formData = new FormData();
 
         // Add all form fields
@@ -1489,8 +1602,11 @@ month: parseInt(currentMonth)
             }
         }
 
-        // Add the bill image
-        formData.append('bill_image', fileToSend);
+        // Add ALL bill images
+        console.log(`Uploading ${capturedBillImages.length} bill image(s) to Appwrite`);
+        for (let i = 0; i < capturedBillImages.length; i++) {
+            formData.append('bill_images', capturedBillImages[i], capturedBillImages[i].name || `image_${i + 1}.jpg`);
+        }
 
         requestBody = formData;
         requestHeaders = {}; // Let browser set Content-Type with boundary
@@ -1545,9 +1661,9 @@ month: parseInt(currentMonth)
             document.getElementById('transactionForm').dataset.editId = '';
             document.querySelector('#transactionModal .modal-title').textContent = 'Add Transaction';
 
-            // Clear scanned bill content and captured image after saving
+            // Clear scanned bill content and captured images after saving
             scannedBillContent = null;
-            capturedBillImage = null;
+            capturedBillImages = [];
         }
     })
     .catch(error => {
@@ -1789,15 +1905,90 @@ async function showMobileAttachmentFromInfo() {
 
         const data = await response.json();
 
-        if (data.file_url) {
-            // Check if it's a PDF based on MIME type or file extension
+        // Handle new multi-attachment format
+        if (data.attachments && Array.isArray(data.attachments) && data.attachments.length > 0) {
+            const attachments = data.attachments; // Display in capture order (first captured first)
+            const attachmentCount = attachments.length;
+
+            // Build HTML for all attachments
+            let allAttachmentsHtml = '';
+
+            for (let i = 0; i < attachments.length; i++) {
+                const attachment = attachments[i];
+                const isPdf = attachment.mime_type === 'application/pdf' ||
+                             (attachment.file_name && attachment.file_name.toLowerCase().endsWith('.pdf'));
+
+                const attachmentNumber = attachmentCount > 1 ? ` ${i + 1}/${attachmentCount}` : '';
+
+                let attachmentContent;
+                if (isPdf) {
+                    // For PDFs, provide download and new tab options with loading state
+                    attachmentContent = `
+                        <div class="attachment-item ${i > 0 ? 'mt-4' : ''}">
+                            ${attachmentCount > 1 ? `<div class="badge bg-secondary mb-2">Image ${i + 1}</div>` : ''}
+                            <div class="alert alert-info mb-3">
+                                <i class="fas fa-file-pdf me-2"></i>
+                                <strong>PDF Attachment${attachmentNumber}</strong>
+                                <div class="small mt-1">${attachment.file_name || 'document.pdf'}</div>
+                            </div>
+                            <div class="d-grid gap-2 mb-3">
+                                <a href="${attachment.download_url}" class="btn btn-primary" download>
+                                    <i class="fas fa-download me-1"></i>Download PDF
+                                </a>
+                                <a href="${attachment.file_url}" class="btn btn-outline-secondary" target="_blank">
+                                    <i class="fas fa-external-link-alt me-1"></i>Open in New Tab
+                                </a>
+                            </div>
+                            <div id="mobileInfoPdfLoadingSpinner_${i}" class="text-center py-3">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading PDF...</span>
+                                </div>
+                                <p class="text-muted mt-2">Loading PDF preview...</p>
+                            </div>
+                            <div style="width: 100%; height: 500px; overflow: auto; border: 1px solid #ddd; border-radius: 5px; background: #f5f5f5; display: none;" id="mobileInfoPdfIframeContainer_${i}">
+                                <iframe src="${attachment.file_url}" width="100%" height="100%" frameborder="0" style="background: white;" onload="document.getElementById('mobileInfoPdfLoadingSpinner_${i}').style.display='none'; document.getElementById('mobileInfoPdfIframeContainer_${i}').style.display='block';">
+                                    <p>PDF preview not available. <a href="${attachment.download_url}" download>Download PDF</a></p>
+                                </iframe>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    // Display image with loading state
+                    attachmentContent = `
+                        <div class="attachment-item ${i > 0 ? 'mt-4' : ''}">
+                            ${attachmentCount > 1 ? `<div class="badge bg-secondary mb-2">Image ${i + 1}</div>` : ''}
+                            <div id="mobileInfoImageLoadingSpinner_${i}" class="text-center py-3">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading image...</span>
+                                </div>
+                                <p class="text-muted mt-2">Loading image${attachmentNumber}...</p>
+                            </div>
+                            <img src="${attachment.file_url}" alt="Bill Attachment${attachmentNumber}" class="img-fluid rounded shadow-sm" style="display: none;" onload="this.style.display='block'; document.getElementById('mobileInfoImageLoadingSpinner_${i}').style.display='none';" onerror="this.style.display='none'; document.getElementById('mobileInfoImageLoadingSpinner_${i}').innerHTML='&lt;div class=&quot;alert alert-danger&quot;&gt;&lt;i class=&quot;fas fa-exclamation-triangle me-2&quot;&gt;&lt;/i&gt;Failed to load image&lt;/div&gt;';">
+                        </div>
+                    `;
+                }
+
+                allAttachmentsHtml += attachmentContent;
+            }
+
+            mobileInfoAttachmentContainer.innerHTML = `
+                <div class="attachment-display">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0">Bill Attachment${attachmentCount > 1 ? 's' : ''} ${attachmentCount > 1 ? `(${attachmentCount})` : ''}</h6>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="hideMobileInfoAttachment()">
+                            <i class="fas fa-times"></i> Hide
+                        </button>
+                    </div>
+                    ${allAttachmentsHtml}
+                </div>
+            `;
+        } else if (data.file_url) {
+            // Backward compatibility: handle old single-attachment format
             const isPdf = data.mime_type === 'application/pdf' ||
                          (data.file_name && data.file_name.toLowerCase().endsWith('.pdf'));
 
-            // Display the attachment (image or PDF)
             let attachmentContent;
             if (isPdf) {
-                // For PDFs, provide download and new tab options with loading state
                 attachmentContent = `
                     <div class="alert alert-info mb-3">
                         <i class="fas fa-file-pdf me-2"></i>
@@ -1825,7 +2016,6 @@ async function showMobileAttachmentFromInfo() {
                     </div>
                 `;
             } else {
-                // Display image with loading state
                 attachmentContent = `
                     <div id="mobileInfoImageLoadingSpinner" class="text-center py-3">
                         <div class="spinner-border text-primary" role="status">
@@ -1849,7 +2039,7 @@ async function showMobileAttachmentFromInfo() {
                 </div>
             `;
         } else {
-            throw new Error('No file URL returned from server');
+            throw new Error('No attachments returned from server');
         }
     } catch (error) {
         console.error('Error loading attachment:', error);
@@ -1983,6 +2173,14 @@ document.getElementById('transCategoryBtn').style.color = '#aaa';
 document.getElementById('transPaymentMethodText').textContent = 'None (Not Paid)';
 document.getElementById('transPaymentMethod').value = '';
 document.getElementById('transPaymentMethodBtn').style.color = '#aaa';
+// Hide bill breakdown if visible
+const billBreakdown = document.getElementById('billBreakdown');
+if (billBreakdown) {
+    billBreakdown.style.display = 'none';
+}
+// Clear captured bill data
+scannedBillContent = null;
+capturedBillImages = [];
 });
 }
 
@@ -2239,7 +2437,7 @@ function renderMobileBankComparisonChart(sources) {
                 y: {
                     title: {
                         display: true,
-                        text: 'Buy Rate (LKR)',
+                        text: 'Buy Rate (රු)',
                         color: '#ccc',
                         font: { size: 10 }
                     },
@@ -2362,10 +2560,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const transCredit = document.getElementById('transCredit');
 
     if (scanBillBtnFloat && billImageInput) {
-        // Handle scan bill button click (opens camera)
+        // Handle scan bill button click - enter multi-shot capture mode
         scanBillBtnFloat.addEventListener('click', function() {
-            console.log('Scan bill button clicked');
-            billImageInput.click();
+            console.log('Scan bill button clicked - entering capture mode');
+            enterCaptureMode();
         });
     }
 
@@ -2382,7 +2580,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Handle camera scan file selection
         billImageInput.addEventListener('change', async function(event) {
-            await processImageScan(event.target.files[0], billImageInput);
+            const files = Array.from(event.target.files);
+            if (captureModeActive) {
+                // In capture mode: add photo to collection
+                for (const file of files) {
+                    addPhotoToCapture(file);
+                }
+                billImageInput.value = '';
+                // Auto re-open camera for next shot after brief delay
+                if (capturedPhotos.length < 5) {
+                    setTimeout(() => {
+                        if (captureModeActive) billImageInput.click();
+                    }, 400);
+                }
+            } else {
+                await processImageScan(files, billImageInput);
+            }
         });
     }
 
@@ -2390,33 +2603,164 @@ document.addEventListener('DOMContentLoaded', function() {
     if (uploadImageInput) {
         // Handle upload file selection
         uploadImageInput.addEventListener('change', async function(event) {
-            await processImageScan(event.target.files[0], uploadImageInput);
+            await processImageScan(Array.from(event.target.files), uploadImageInput);
         });
     }
 
-    // Shared function to process image scanning
-    async function processImageScan(file, inputElement) {
-        if (!file) {
+    // ================================
+    // MULTI-SHOT CAPTURE MODE
+    // ================================
+
+    const MAX_CAPTURE_PHOTOS = 5;
+    const captureModeOverlay = document.getElementById('captureMode');
+    const captureModeCancel = document.getElementById('captureModeCancel');
+    const captureModeBadge = document.getElementById('captureModeBadge');
+    const captureModeEmpty = document.getElementById('captureModeEmpty');
+    const captureModeThumbnails = document.getElementById('captureModeThumbnails');
+    const captureModeAddBtn = document.getElementById('captureModeAddBtn');
+    const captureModeDoneBtn = document.getElementById('captureModeDoneBtn');
+
+    function enterCaptureMode() {
+        captureModeActive = true;
+        capturedPhotos = [];
+        updateCaptureModeUI();
+        captureModeOverlay.style.display = 'flex';
+        captureModeOverlay.classList.remove('exiting');
+        // Open camera immediately
+        setTimeout(() => billImageInput.click(), 300);
+    }
+
+    function exitCaptureMode(submit) {
+        captureModeActive = false;
+        captureModeOverlay.classList.add('exiting');
+        setTimeout(() => {
+            captureModeOverlay.style.display = 'none';
+            captureModeOverlay.classList.remove('exiting');
+            if (submit && capturedPhotos.length > 0) {
+                processImageScan([...capturedPhotos], billImageInput);
+            }
+            capturedPhotos = [];
+            captureModeEmpty.style.display = '';
+            captureModeThumbnails.style.display = 'none';
+            captureModeThumbnails.innerHTML = '';
+        }, 250);
+    }
+
+    function addPhotoToCapture(file) {
+        if (capturedPhotos.length >= MAX_CAPTURE_PHOTOS) {
+            showToast(`Maximum ${MAX_CAPTURE_PHOTOS} photos allowed`, 'warning');
+            return;
+        }
+        capturedPhotos.push(file);
+        if (navigator.vibrate) navigator.vibrate(50);
+        updateCaptureModeUI();
+        addThumbnail(file, capturedPhotos.length - 1);
+    }
+
+    function removePhotoFromCapture(index) {
+        capturedPhotos.splice(index, 1);
+        updateCaptureModeUI();
+        rebuildThumbnails();
+    }
+
+    function updateCaptureModeUI() {
+        const count = capturedPhotos.length;
+        captureModeBadge.textContent = `${count} photo${count !== 1 ? 's' : ''}`;
+        captureModeBadge.classList.remove('pulse');
+        void captureModeBadge.offsetWidth; // force reflow
+        captureModeBadge.classList.add('pulse');
+
+        captureModeEmpty.style.display = count === 0 ? '' : 'none';
+        captureModeThumbnails.style.display = count > 0 ? 'flex' : 'none';
+
+        captureModeAddBtn.disabled = count >= MAX_CAPTURE_PHOTOS;
+        captureModeDoneBtn.disabled = count === 0;
+
+        if (count >= MAX_CAPTURE_PHOTOS) {
+            captureModeAddBtn.innerHTML = '<i class="fas fa-ban me-2"></i>Max Reached';
+        } else {
+            captureModeAddBtn.innerHTML = '<i class="fas fa-camera me-2"></i>Take Another';
+        }
+    }
+
+    function addThumbnail(file, index) {
+        const thumb = document.createElement('div');
+        thumb.className = 'capture-mode-thumb';
+        thumb.dataset.index = index;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            thumb.innerHTML = `
+                <img src="${e.target.result}" alt="Photo ${index + 1}">
+                <span class="capture-mode-thumb-number">${index + 1}</span>
+                <button class="capture-mode-thumb-remove" data-idx="${index}">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            thumb.querySelector('.capture-mode-thumb-remove').addEventListener('click', function() {
+                removePhotoFromCapture(parseInt(this.dataset.idx));
+            });
+        };
+        reader.readAsDataURL(file);
+        captureModeThumbnails.appendChild(thumb);
+    }
+
+    function rebuildThumbnails() {
+        captureModeThumbnails.innerHTML = '';
+        capturedPhotos.forEach((file, i) => addThumbnail(file, i));
+    }
+
+    // Capture mode button event listeners
+    if (captureModeCancel) {
+        captureModeCancel.addEventListener('click', () => exitCaptureMode(false));
+    }
+    if (captureModeAddBtn) {
+        captureModeAddBtn.addEventListener('click', () => {
+            if (capturedPhotos.length < MAX_CAPTURE_PHOTOS) {
+                billImageInput.click();
+            }
+        });
+    }
+    if (captureModeDoneBtn) {
+        captureModeDoneBtn.addEventListener('click', () => exitCaptureMode(true));
+    }
+
+    // Shared function to process image scanning (supports multiple images)
+    async function processImageScan(files, inputElement) {
+        if (!files || files.length === 0) {
             console.log('No file selected');
             return;
         }
 
-        console.log('File selected:', file.name, file.type, file.size);
+        console.log(`${files.length} file(s) selected`);
 
-        // Validate file type
-        const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp', 'application/pdf'];
-        if (!allowedTypes.includes(file.type)) {
-            showToast('Please select a valid file (PNG, JPEG, GIF, WebP, or PDF)', 'danger');
+        // Validate maximum number of files (5 max)
+        const MAX_FILES = 5;
+        if (files.length > MAX_FILES) {
+            showToast(`Maximum ${MAX_FILES} images allowed per scan`, 'danger');
             inputElement.value = '';
             return;
         }
 
-        // Validate file size (max 50MB before compression)
+        // Validate each file
+        const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp', 'application/pdf'];
         const maxSize = 50 * 1024 * 1024;
-        if (file.size > maxSize) {
-            showToast('File is too large. Please select a file under 50MB', 'danger');
-            inputElement.value = '';
-            return;
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            console.log(`File ${i + 1}/${files.length}:`, file.name, file.type, file.size);
+
+            if (!allowedTypes.includes(file.type)) {
+                showToast(`Invalid file type for "${file.name}". Allowed: PNG, JPEG, GIF, WebP, or PDF`, 'danger');
+                inputElement.value = '';
+                return;
+            }
+
+            if (file.size > maxSize) {
+                showToast(`File "${file.name}" is too large. Please select files under 50MB`, 'danger');
+                inputElement.value = '';
+                return;
+            }
         }
 
         // Open the transaction modal immediately
@@ -2424,8 +2768,16 @@ document.addEventListener('DOMContentLoaded', function() {
         transactionModal.show();
 
         // Show scanning status inside the modal
+        const fileCountText = files.length > 1 ? ` (${files.length} images)` : '';
         scanStatus.style.display = 'block';
-        scanStatusText.textContent = 'Compressing & scanning bill...';
+        scanStatusText.textContent = `Compressing & scanning bill${fileCountText}...`;
+
+        // Hide any previous bill breakdown
+        const billBreakdown = document.getElementById('billBreakdown');
+        if (billBreakdown) {
+            billBreakdown.style.display = 'none';
+        }
+
         if (scanBillBtnFloat) {
             scanBillBtnFloat.disabled = true;
             scanBillBtnFloat.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
@@ -2436,25 +2788,41 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         try {
-            // Compress file if needed (Vercel has a ~4.5 MB body limit)
-            const { fileToSend, wasCompressed } = await compressFileForUpload(file);
-            if (wasCompressed) {
-                scanStatusText.textContent = 'Scanning bill...';
+            // Create FormData to send the files
+            const formData = new FormData();
+            let totalCompressedSize = 0;
+
+            // Compress each file if needed
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+
+                if (files.length > 1) {
+                    scanStatusText.textContent = `Processing image ${i + 1}/${files.length}...`;
+                }
+
+                const { fileToSend, wasCompressed } = await compressFileForUpload(file);
+                totalCompressedSize += fileToSend.size;
+
+                // Append to FormData with 'bill_images' key for multiple files
+                formData.append('bill_images', fileToSend, fileToSend.name || `image_${i + 1}.jpg`);
             }
 
-            // Create FormData to send the file
-            const formData = new FormData();
-            formData.append('bill_image', fileToSend);
+            // Check total size (16MB Flask limit)
+            if (totalCompressedSize > 16 * 1024 * 1024) {
+                throw new Error('Combined file size exceeds 16MB limit. Please use fewer or smaller images.');
+            }
+
+            scanStatusText.textContent = `Scanning ${files.length} image${files.length > 1 ? 's' : ''}...`;
 
             // Send to API
-            console.log('Sending file to API...', (fileToSend.size / (1024*1024)).toFixed(1), 'MB');
+            console.log(`Sending ${files.length} file(s) to API...`, (totalCompressedSize / (1024*1024)).toFixed(1), 'MB total');
             const response = await fetch('/api/scan-bill', {
                 method: 'POST',
                 body: formData
             });
 
             if (response.status === 413) {
-                throw new Error('File is too large even after compression. Please use a smaller file.');
+                throw new Error('File is too large even after compression. Please use fewer or smaller files.');
             }
 
             const result = await response.json();
@@ -2465,15 +2833,18 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             if (result.success) {
-                // Store the scanned bill content including items
+                // Store the scanned bill content including items and discounts
                 scannedBillContent = {
                     shop_name: result.shop_name,
                     amount: result.amount,
+                    subtotal: result.subtotal || '0',
+                    discounts: result.discounts || [],
                     items: result.items || []
                 };
 
-                // Store the compressed file for upload when transaction is saved
-                capturedBillImage = fileToSend;
+                // Store ALL compressed files for upload when transaction is saved
+                capturedBillImages = formData.getAll('bill_images').filter(f => f instanceof File || f instanceof Blob);
+                console.log(`Stored ${capturedBillImages.length} bill image(s) for upload`);
 
                 // Populate the form with extracted data
                 if (result.shop_name && result.shop_name !== 'Unknown Store') {
@@ -2484,10 +2855,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     transCredit.value = result.amount;
                 }
 
-                // Show success message with item count
+                // Display bill breakdown if there are discounts
+                displayBillBreakdown(result);
+
+                // Show success message with item count and discounts
                 const itemCount = result.items ? result.items.length : 0;
+                const discountCount = result.discounts ? result.discounts.length : 0;
                 const itemText = itemCount > 0 ? ` (${itemCount} items)` : '';
-                scanStatusText.textContent = `✓ Bill scanned successfully!${itemText}`;
+                const discountText = discountCount > 0 ? ` with ${discountCount} discount${discountCount > 1 ? 's' : ''}` : '';
+                scanStatusText.textContent = `✓ Bill scanned successfully!${itemText}${discountText}`;
                 scanStatus.style.color = '#28a745';
 
                 setTimeout(() => {
@@ -2495,7 +2871,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     scanStatus.style.color = '#ffc107';
                 }, 3000);
 
-                showToast(`Bill scanned: ${result.shop_name} - $${result.amount}${itemText}`, 'success');
+                showToast(`Bill scanned: ${result.shop_name} - රු ${result.amount}${itemText}${discountText}`, 'success');
             } else {
                 // Handle scanning error but still allow manual entry
                 const errorMsg = result.error || 'Failed to extract bill information';

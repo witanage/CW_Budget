@@ -138,18 +138,49 @@
     <button class="scan-btn-float" id="scanBillBtnFloat" title="Scan Bill">
         <i class="fas fa-camera"></i>
     </button>
-    <input type="file" id="billImageInput" accept="image/*,application/pdf" capture="environment" style="display: none;">
+    <input type="file" id="billImageInput" accept="image/*" capture="environment" style="display: none;">
 
     <!-- Floating Upload Bill Button -->
     <button class="upload-btn-float" id="uploadBillBtnFloat" title="Upload Bill">
         <i class="fas fa-file-upload"></i>
     </button>
-    <input type="file" id="uploadImageInput" accept="image/*,application/pdf" style="display: none;">
+    <input type="file" id="uploadImageInput" accept="image/*,application/pdf" multiple style="display: none;">
 
     <!-- Floating Add Button -->
     <button class="add-btn-float" id="addBtnFloat">
         <i class="fas fa-plus"></i>
     </button>
+
+    <!-- Multi-Shot Camera Capture Mode Overlay -->
+    <div id="captureMode" class="capture-mode-overlay" style="display: none;">
+        <div class="capture-mode-header">
+            <button id="captureModeCancel" class="capture-mode-cancel-btn">
+                <i class="fas fa-times"></i> Cancel
+            </button>
+            <div class="capture-mode-title">
+                <i class="fas fa-camera me-2"></i>Capture Bill
+            </div>
+            <div id="captureModeBadge" class="capture-mode-badge">0 photos</div>
+        </div>
+
+        <div class="capture-mode-body">
+            <div id="captureModeEmpty" class="capture-mode-empty">
+                <i class="fas fa-camera fa-3x mb-3" style="opacity: 0.3;"></i>
+                <p>Take photos of your bill</p>
+                <p class="small text-muted">Camera will open automatically.<br>Take up to 5 photos for long receipts.</p>
+            </div>
+            <div id="captureModeThumbnails" class="capture-mode-thumbnails" style="display: none;"></div>
+        </div>
+
+        <div class="capture-mode-footer">
+            <button id="captureModeAddBtn" class="capture-mode-add-btn">
+                <i class="fas fa-camera me-1"></i> Take Another
+            </button>
+            <button id="captureModeDoneBtn" class="capture-mode-done-btn" disabled>
+                <i class="fas fa-check-circle me-1"></i> Scan All
+            </button>
+        </div>
+    </div>
 
     <!-- Loading Overlay -->
     <div class="loading-overlay" id="loadingOverlay">
@@ -172,6 +203,17 @@
                         <div id="scanStatus" class="mb-3 text-center" style="display: none; color: #ffc107;">
                             <i class="fas fa-spinner fa-spin me-1"></i>
                             <span id="scanStatusText">Scanning bill...</span>
+                        </div>
+                        <!-- Bill Breakdown Display -->
+                        <div id="billBreakdown" class="mb-3" style="display: none;">
+                            <div class="card border-primary">
+                                <div class="card-body p-2" style="background: #0d0d0d;">
+                                    <h6 class="card-title mb-2" style="font-size: 0.875rem; color: #fff;">
+                                        <i class="fas fa-receipt me-1"></i>Bill Breakdown
+                                    </h6>
+                                    <div id="billBreakdownContent" class="small" style="color: #ddd;"></div>
+                                </div>
+                            </div>
                         </div>
                         <div class="mb-3">
                             <label for="transDescription" class="form-label" style="color: #aaa;">Description</label>
