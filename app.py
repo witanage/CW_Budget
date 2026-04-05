@@ -3329,8 +3329,8 @@ def transactions():
             print(f"[DEBUG] Transaction committed successfully")
 
             response = {'message': 'Transaction created successfully', 'id': transaction_id}
-            if attachment_guid:
-                response['attachment_guid'] = attachment_guid
+            if attachments_value:
+                response['attachments'] = attachments_value
 
             return jsonify(response), 201
 
