@@ -579,6 +579,14 @@
     <script src="{{ url_for('static', filename='js/mobile.js') }}?v=3.0\"></script>
 
     <style>
+        /* Prevent amount wrapping in table cells */
+        .excel-table td.text-end,
+        .excel-table .col-debit,
+        .excel-table .col-credit,
+        .excel-table .col-balance {
+            white-space: nowrap;
+        }
+
         /* Bill Items Modal - Responsive Scrolling */
         #billItemsModal .modal-body::-webkit-scrollbar {
             width: 14px;
@@ -729,7 +737,7 @@
             /* Adjust column widths for mobile */
             #billItemsContent table th:first-child,
             #billItemsContent table td:first-child {
-                width: 45%;
+                width: 43%;
             }
 
             #billItemsContent table th:nth-child(2),
@@ -744,7 +752,7 @@
 
             #billItemsContent table th:nth-child(4),
             #billItemsContent table td:nth-child(4) {
-                width: 18.5%;
+                width: 20.5%;
             }
         }
 
