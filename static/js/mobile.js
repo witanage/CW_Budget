@@ -651,8 +651,44 @@ html += `
 html += `
 </tbody>
 <tfoot>
+`;
+
+// Display subtotal if available
+if (billContent.subtotal && parseFloat(billContent.subtotal) > 0) {
+    html += `
 <tr>
-<td colspan="3" class="text-end">Total:</td>
+<td colspan="3" class="text-end">Subtotal:</td>
+<td class="text-end">${parseFloat(billContent.subtotal).toFixed(2)}</td>
+</tr>
+    `;
+} else if (subtotal > 0) {
+    html += `
+<tr>
+<td colspan="3" class="text-end">Subtotal:</td>
+<td class="text-end">${subtotal.toFixed(2)}</td>
+</tr>
+    `;
+}
+
+// Display discounts if available
+if (billContent.discounts && Array.isArray(billContent.discounts) && billContent.discounts.length > 0) {
+    billContent.discounts.forEach(discount => {
+        const discountAmount = parseFloat(discount.amount || 0);
+        html += `
+<tr class="table-success">
+<td colspan="3" class="text-end">
+<i class="fas fa-tag me-2"></i>${discount.description || 'Discount'}:
+</td>
+<td class="text-end text-success">-${discountAmount.toFixed(2)}</td>
+</tr>
+        `;
+    });
+}
+
+// Display final total
+html += `
+<tr>
+<td colspan="3" class="text-end"><strong>Final Total:</strong></td>
 <td class="text-end">${billContent.amount || subtotal.toFixed(2)}</td>
 </tr>
 </tfoot>
