@@ -492,7 +492,9 @@ COMMENT='Runtime application settings (key-value store)';
 -- Seed defaults (INSERT IGNORE preserves any previously customised value)
 INSERT IGNORE INTO app_settings (setting_key, value, description) VALUES
 ('exchange_rate_refresh_mode', 'background',
- 'How exchange rates are refreshed: background = automatic scheduler, manual = on-demand via admin only');
+ 'How exchange rates are refreshed: background = automatic scheduler, manual = on-demand via admin only'),
+('bill_upload_mode', 'sequential',
+ 'Bill image upload strategy: sequential = one-by-one (Vercel-friendly), batch = all at once (non-Vercel)');
 
 -- ============================================================
 -- Exchange-Rate Refresh Logs Table

@@ -16,7 +16,7 @@ from decimal import Decimal
 from functools import wraps
 
 from dotenv import load_dotenv
-from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash, make_response
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash, make_response, Response
 from flask.json.provider import DefaultJSONProvider
 from flask_cors import CORS
 from flask_limiter import Limiter
@@ -1520,6 +1520,15 @@ def get_admin_settings():
         connection.close()
 
 
+@app.route('/api/settings/upload-mode', methods=['GET'])
+def get_upload_mode():
+    """Public endpoint to get bill upload mode (sequential vs batch).
+    No authentication required - used by client-side to determine upload strategy."""
+    mode = get_setting('bill_upload_mode', 'sequential')
+    logger.info(f"Upload mode requested: returning '{mode}'")
+    return jsonify({'upload_mode': mode}), 200
+
+
 @app.route('/api/admin/settings/<string:key>', methods=['PUT'])
 @admin_required
 @limiter.limit(RATE_LIMIT_ADMIN)
@@ -1536,6 +1545,9 @@ def update_admin_setting(key):
     if key == 'exchange_rate_refresh_mode':
         if new_value not in ('background', 'manual'):
             return jsonify({'error': "Value must be 'background' or 'manual'"}), 400
+    elif key == 'bill_upload_mode':
+        if new_value not in ('sequential', 'batch'):
+            return jsonify({'error': "Value must be 'sequential' or 'batch'"}), 400
 
     connection = get_db_connection()
     if not connection:
@@ -3133,113 +3145,121 @@ def transactions():
 
             # Handle bill image(s) upload to Appwrite (if provided)
             attachment_guids = []
+            attachments_value = None
 
-            # Check for multiple images first, then fall back to single image (backward compatible)
-            bill_images = []
-            if is_multipart:
-                if 'bill_images' in request.files:
-                    bill_images = request.files.getlist('bill_images')
-                elif 'bill_image' in request.files:
-                    bill_images = [request.files['bill_image']]
+            # Check if attachments were already uploaded (new sequential upload flow)
+            if 'attachments' in data and data['attachments']:
+                # Images already uploaded sequentially, use provided GUIDs
+                logger.info(f"Using pre-uploaded attachments: {data['attachments']}")
+                attachments_value = data['attachments']
+            else:
+                # Legacy flow: handle multipart file uploads
+                # Check for multiple images first, then fall back to single image (backward compatible)
+                bill_images = []
+                if is_multipart:
+                    if 'bill_images' in request.files:
+                        bill_images = request.files.getlist('bill_images')
+                    elif 'bill_image' in request.files:
+                        bill_images = [request.files['bill_image']]
 
-            # Process each image
-            for idx, bill_image in enumerate(bill_images):
-                if not bill_image or not bill_image.filename:
-                    continue
+                # Process each image
+                for idx, bill_image in enumerate(bill_images):
+                    if not bill_image or not bill_image.filename:
+                        continue
 
-                # Validate file type
-                allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf'}
-                file_ext = bill_image.filename.rsplit('.', 1)[-1].lower() if '.' in bill_image.filename else ''
+                    # Validate file type
+                    allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf'}
+                    file_ext = bill_image.filename.rsplit('.', 1)[-1].lower() if '.' in bill_image.filename else ''
 
-                if file_ext not in allowed_extensions:
-                    logger.warning(f"Skipping file {idx + 1} with invalid extension: {file_ext}")
-                    continue
+                    if file_ext not in allowed_extensions:
+                        logger.warning(f"Skipping file {idx + 1} with invalid extension: {file_ext}")
+                        continue
 
-                # Read file data
-                file_data = bill_image.read()
+                    # Read file data
+                    file_data = bill_image.read()
 
-                if len(file_data) == 0:
-                    logger.warning(f"Skipping empty file {idx + 1}")
-                    continue
+                    if len(file_data) == 0:
+                        logger.warning(f"Skipping empty file {idx + 1}")
+                        continue
 
-                if appwrite_storage and APPWRITE_BUCKET_ID:
-                    try:
-                        # Optimize file if needed (resize images, compress PDFs)
-                        optimized_data, was_optimized, original_size, final_size = optimize_file_for_upload(
-                            file_data,
-                            file_ext,
-                            bill_image.filename
-                        )
-
-                        # Use optimized data for upload
-                        image_data = optimized_data
-
-                        # Log optimization results
-                        if was_optimized:
-                            reduction_pct = ((original_size - final_size) / original_size) * 100
-                            logger.info(
-                                f"✓ Image {idx + 1}/{len(bill_images)} optimized: {original_size / (1024 * 1024):.2f}MB → {final_size / (1024 * 1024):.2f}MB ({reduction_pct:.1f}% smaller)")
-                        else:
-                            logger.info(
-                                f"Image {idx + 1}/{len(bill_images)} size OK, no optimization needed: {original_size / (1024 * 1024):.2f}MB")
-
-                        # Generate pure GUID for filename
-                        attachment_guid = str(uuid.uuid4())
-                        filename = f"{attachment_guid}.{file_ext}"
-
-                        # Check file size
-                        file_size_mb = len(image_data) / (1024 * 1024)
-                        logger.info(
-                            f"Uploading image {idx + 1}/{len(bill_images)} to Appwrite: {filename}, type: {file_ext}, size: {len(image_data)} bytes ({file_size_mb:.2f}MB)")
-
-                        # Check first bytes for validation
-                        first_bytes = image_data[:8] if len(image_data) >= 8 else image_data
-                        logger.info(f"First 8 bytes: {first_bytes} (hex: {first_bytes.hex()})")
-
-                        # Validate PDF header if uploading PDF
-                        if file_ext == 'pdf':
-                            if not first_bytes.startswith(b'%PDF'):
-                                logger.error(
-                                    f"WARNING: PDF file does NOT start with %PDF header before upload!")
-                                logger.error(f"First 20 bytes: {image_data[:20]}")
-                            else:
-                                logger.info(f"✓ PDF header valid before upload")
-
-                        # Warn if file is still unusually large after optimization
-                        if file_size_mb > 10:
-                            logger.warning(
-                                f"Large file upload: {file_size_mb:.2f}MB - may take time to process")
-
-                        # Upload to Appwrite with GUID as file ID
-                        # Use from_path with a temp file to avoid SDK chunked upload bug
-                        # (from_bytes calculates wrong byte range for last chunk on files >= 5MB)
-                        with tempfile.TemporaryDirectory() as tmp_dir:
-                            tmp_path = os.path.join(tmp_dir, filename)
-                            with open(tmp_path, 'wb') as f:
-                                f.write(image_data)
-
-                            result = appwrite_storage.create_file(
-                                APPWRITE_BUCKET_ID,
-                                attachment_guid,  # Use GUID as file ID
-                                InputFile.from_path(tmp_path)
+                    if appwrite_storage and APPWRITE_BUCKET_ID:
+                        try:
+                            # Optimize file if needed (resize images, compress PDFs)
+                            optimized_data, was_optimized, original_size, final_size = optimize_file_for_upload(
+                                file_data,
+                                file_ext,
+                                bill_image.filename
                             )
 
-                        logger.info(
-                            f"✓ Image {idx + 1}/{len(bill_images)} uploaded successfully: {attachment_guid}, stored size: {result.get('sizeOriginal', 'N/A')}")
+                            # Use optimized data for upload
+                            image_data = optimized_data
 
-                        # Add to list of uploaded GUIDs
-                        attachment_guids.append(attachment_guid)
+                            # Log optimization results
+                            if was_optimized:
+                                reduction_pct = ((original_size - final_size) / original_size) * 100
+                                logger.info(
+                                    f"✓ Image {idx + 1}/{len(bill_images)} optimized: {original_size / (1024 * 1024):.2f}MB → {final_size / (1024 * 1024):.2f}MB ({reduction_pct:.1f}% smaller)")
+                            else:
+                                logger.info(
+                                    f"Image {idx + 1}/{len(bill_images)} size OK, no optimization needed: {original_size / (1024 * 1024):.2f}MB")
 
-                    except Exception as e:
-                        logger.error(f"Failed to upload bill image {idx + 1} to Appwrite: {str(e)}")
-                        # Continue with other images even if one fails
-                else:
-                    logger.warning(f"Appwrite storage not configured for image {idx + 1}")
+                            # Generate pure GUID for filename
+                            attachment_guid = str(uuid.uuid4())
+                            filename = f"{attachment_guid}.{file_ext}"
 
-            # Store comma-separated GUIDs in attachments field (or None if no uploads succeeded)
-            attachments_value = ','.join(attachment_guids) if attachment_guids else None
-            if attachments_value:
-                logger.info(f"Stored {len(attachment_guids)} attachment(s): {attachments_value}")
+                            # Check file size
+                            file_size_mb = len(image_data) / (1024 * 1024)
+                            logger.info(
+                                f"Uploading image {idx + 1}/{len(bill_images)} to Appwrite: {filename}, type: {file_ext}, size: {len(image_data)} bytes ({file_size_mb:.2f}MB)")
+
+                            # Check first bytes for validation
+                            first_bytes = image_data[:8] if len(image_data) >= 8 else image_data
+                            logger.info(f"First 8 bytes: {first_bytes} (hex: {first_bytes.hex()})")
+
+                            # Validate PDF header if uploading PDF
+                            if file_ext == 'pdf':
+                                if not first_bytes.startswith(b'%PDF'):
+                                    logger.error(
+                                        f"WARNING: PDF file does NOT start with %PDF header before upload!")
+                                    logger.error(f"First 20 bytes: {image_data[:20]}")
+                                else:
+                                    logger.info(f"✓ PDF header valid before upload")
+
+                            # Warn if file is still unusually large after optimization
+                            if file_size_mb > 10:
+                                logger.warning(
+                                    f"Large file upload: {file_size_mb:.2f}MB - may take time to process")
+
+                            # Upload to Appwrite with GUID as file ID
+                            # Use from_path with a temp file to avoid SDK chunked upload bug
+                            # (from_bytes calculates wrong byte range for last chunk on files >= 5MB)
+                            with tempfile.TemporaryDirectory() as tmp_dir:
+                                tmp_path = os.path.join(tmp_dir, filename)
+                                with open(tmp_path, 'wb') as f:
+                                    f.write(image_data)
+
+                                result = appwrite_storage.create_file(
+                                    APPWRITE_BUCKET_ID,
+                                    attachment_guid,  # Use GUID as file ID
+                                    InputFile.from_path(tmp_path)
+                                )
+
+                            logger.info(
+                                f"✓ Image {idx + 1}/{len(bill_images)} uploaded successfully: {attachment_guid}, stored size: {result.get('sizeOriginal', 'N/A')}")
+
+                            # Add to list of uploaded GUIDs
+                            attachment_guids.append(attachment_guid)
+
+                        except Exception as e:
+                            logger.error(f"Failed to upload bill image {idx + 1} to Appwrite: {str(e)}")
+                            # Continue with other images even if one fails
+                    else:
+                        logger.warning(f"Appwrite storage not configured for image {idx + 1}")
+
+                # Store comma-separated GUIDs in attachments field (or None if no uploads succeeded)
+                attachments_value = ','.join(attachment_guids) if attachment_guids else None
+                if attachments_value:
+                    logger.info(f"Stored {len(attachment_guids)} attachment(s): {attachments_value}")
 
             # Get or create monthly record
             year = data.get('year', datetime.now().year)
@@ -3978,9 +3998,15 @@ def manage_transaction_attachment(transaction_id):
         attachment_guids = [guid.strip() for guid in attachments_value.split(',') if guid.strip()]
 
         if request.method == 'GET':
-            # Return attachment info(s) with proxy URLs (not direct Appwrite URLs)
-            # Direct Appwrite URLs require authentication and won't work in img tags
+            # Return attachment info(s) with DIRECT Appwrite URLs (no proxy)
+            # This avoids Vercel's 4.5MB response body limit
             if appwrite_storage and APPWRITE_BUCKET_ID:
+                appwrite_endpoint = os.environ.get('APPWRITE_ENDPOINT')
+                appwrite_project_id = os.environ.get('APPWRITE_PROJECT_ID')
+
+                if not appwrite_endpoint or not appwrite_project_id:
+                    return jsonify({'error': 'Appwrite configuration incomplete'}), 500
+
                 attachments_list = []
 
                 for attachment_guid in attachment_guids:
@@ -3996,14 +4022,10 @@ def manage_transaction_attachment(transaction_id):
                         logger.warning(f"SDK get_file failed for {attachment_guid}: {str(e)}, trying HTTP API")
                         # Fallback to HTTP API for metadata
                         try:
-                            appwrite_endpoint = os.environ.get('APPWRITE_ENDPOINT')
-                            appwrite_project_id = os.environ.get('APPWRITE_PROJECT_ID')
-                            appwrite_api_key = os.environ.get('APPWRITE_API_KEY')
-
                             metadata_url = f"{appwrite_endpoint}/storage/buckets/{APPWRITE_BUCKET_ID}/files/{attachment_guid}"
                             headers = {
                                 'X-Appwrite-Project': appwrite_project_id,
-                                'X-Appwrite-Key': appwrite_api_key
+                                'X-Appwrite-Key': os.environ.get('APPWRITE_API_KEY')
                             }
                             metadata_response = requests.get(metadata_url, headers=headers)
                             if metadata_response.status_code == 200:
@@ -4018,7 +4040,8 @@ def manage_transaction_attachment(transaction_id):
                             file_name = attachment_guid
                             mime_type = 'application/octet-stream'
 
-                    # Return proxy URL that will fetch the file server-side (with GUID param for multi-attachment support)
+                    # Return proxy URLs that stream files (avoids loading into memory)
+                    # Proxy handles Appwrite authentication and streams response
                     proxy_url = url_for('serve_attachment', transaction_id=transaction_id,
                                         attachment_guid=attachment_guid, _external=True)
 
@@ -4029,6 +4052,8 @@ def manage_transaction_attachment(transaction_id):
                         'file_name': file_name,
                         'mime_type': mime_type
                     })
+
+                    logger.info(f"Generated proxy URL for {attachment_guid}: {proxy_url}")
 
                 # Return list of attachments (backward compatible: single item list for single attachment)
                 return jsonify({
@@ -4192,41 +4217,27 @@ def serve_attachment(transaction_id):
                 'X-Appwrite-Key': appwrite_api_key
             }
 
-            logger.info(f"Fetching file from Appwrite: {download_url}")
+            logger.info(f"Streaming file from Appwrite: {download_url}")
 
-            response = requests.get(download_url, headers=headers, params={'project': appwrite_project_id})
+            # Stream the response to avoid loading large files into memory
+            response = requests.get(download_url, headers=headers, params={'project': appwrite_project_id}, stream=True)
 
             if response.status_code != 200:
                 logger.error(f"Appwrite returned status {response.status_code}: {response.text}")
                 return f"Error loading attachment from storage (status {response.status_code})", 500
 
-            downloaded_size = len(response.content)
-            logger.info(
-                f"Downloaded file: {downloaded_size} bytes, Content-Type from Appwrite: {response.headers.get('Content-Type')}")
-
-            # Check first bytes to verify file integrity
-            first_bytes = response.content[:8] if len(response.content) >= 8 else response.content
-            logger.info(f"First 8 bytes: {first_bytes} (hex: {first_bytes.hex()})")
-
-            # Validate PDF header if it's supposed to be a PDF
-            if mime_type == 'application/pdf' or file_name.lower().endswith('.pdf'):
-                if not first_bytes.startswith(b'%PDF'):
-                    logger.error(f"PDF file {attachment_guid} does NOT start with %PDF header! File may be corrupted.")
-                    logger.error(f"First 20 bytes: {response.content[:20]}")
-                else:
-                    logger.info(f"✓ PDF header verified: {first_bytes[:8]}")
-
-            # Warn if file is unusually large (>10MB)
-            if downloaded_size > 10 * 1024 * 1024:
-                logger.warning(
-                    f"Large file detected: {downloaded_size / (1024 * 1024):.2f}MB - this may indicate corruption or a very large scan")
-
             # Get content type from response or use detected mime type
             content_type = response.headers.get('Content-Type', mime_type)
 
-            # Create Flask response with file content
-            flask_response = make_response(response.content)
-            flask_response.headers['Content-Type'] = content_type
+            logger.info(f"Streaming file: Content-Type={content_type}, File={file_name}")
+
+            # Stream response to avoid memory limits (no buffering)
+            def generate():
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        yield chunk
+
+            flask_response = Response(generate(), content_type=content_type)
             flask_response.headers['Cache-Control'] = 'public, max-age=31536000'  # Cache for 1 year
 
             # Check if download parameter is present
@@ -4236,7 +4247,7 @@ def serve_attachment(transaction_id):
                 flask_response.headers['Content-Disposition'] = 'inline'
 
             logger.info(
-                f"Successfully served attachment {attachment_guid}: {len(response.content)} bytes, Content-Type: {content_type}, Disposition: {'attachment' if request.args.get('download') == '1' else 'inline'}")
+                f"Streaming attachment {attachment_guid}: Content-Type={content_type}, Mode={'download' if request.args.get('download') == '1' else 'inline'}")
             return flask_response
 
         except Exception as e:
@@ -6858,6 +6869,95 @@ def scan_bill():
             'subtotal': '0',
             'discounts': [],
             'items': []
+        }), 500
+
+
+@app.route('/api/upload-bill-attachment', methods=['POST'])
+@login_required
+def upload_bill_attachment():
+    """
+    Upload a single bill image/PDF to Appwrite and return its GUID.
+    Designed to handle sequential uploads to avoid Vercel body size limits.
+
+    Request:
+        - Content-Type: multipart/form-data
+        - Field: 'bill_image' (single file)
+
+    Returns:
+        JSON with attachment_guid
+        {
+            "success": true,
+            "attachment_guid": "uuid-string"
+        }
+    """
+    try:
+        if 'bill_image' not in request.files:
+            return jsonify({'success': False, 'error': 'No file provided'}), 400
+
+        bill_image = request.files['bill_image']
+
+        if not bill_image or not bill_image.filename:
+            return jsonify({'success': False, 'error': 'Empty file'}), 400
+
+        # Validate file type
+        allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf'}
+        file_ext = bill_image.filename.rsplit('.', 1)[-1].lower() if '.' in bill_image.filename else ''
+
+        if file_ext not in allowed_extensions:
+            return jsonify({'success': False, 'error': f'Invalid file type: {file_ext}'}), 400
+
+        # Read file data
+        file_data = bill_image.read()
+
+        if len(file_data) == 0:
+            return jsonify({'success': False, 'error': 'Empty file data'}), 400
+
+        if not appwrite_storage or not APPWRITE_BUCKET_ID:
+            return jsonify({'success': False, 'error': 'Appwrite storage not configured'}), 503
+
+        # Optimize file if needed
+        optimized_data, was_optimized, original_size, final_size = optimize_file_for_upload(
+            file_data,
+            file_ext,
+            bill_image.filename
+        )
+
+        # Log optimization
+        if was_optimized:
+            reduction_pct = ((original_size - final_size) / original_size) * 100
+            logger.info(
+                f"✓ Image optimized: {original_size / (1024 * 1024):.2f}MB → {final_size / (1024 * 1024):.2f}MB ({reduction_pct:.1f}% smaller)")
+
+        # Generate GUID for filename
+        attachment_guid = str(uuid.uuid4())
+        filename = f"{attachment_guid}.{file_ext}"
+
+        logger.info(f"Uploading to Appwrite: {filename}, size: {final_size / (1024 * 1024):.2f}MB")
+
+        # Upload to Appwrite
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = os.path.join(tmp_dir, filename)
+            with open(tmp_path, 'wb') as f:
+                f.write(optimized_data)
+
+            result = appwrite_storage.create_file(
+                APPWRITE_BUCKET_ID,
+                attachment_guid,
+                InputFile.from_path(tmp_path)
+            )
+
+        logger.info(f"✓ Uploaded successfully: {attachment_guid}")
+
+        return jsonify({
+            'success': True,
+            'attachment_guid': attachment_guid
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error uploading bill attachment: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f'Upload failed: {str(e)}'
         }), 500
 
 

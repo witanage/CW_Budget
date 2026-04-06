@@ -56,6 +56,7 @@ let categories = [];
 let selectedTransactionIdForPayment = null;
 let scannedBillContent = null; // Store scanned bill content temporarily
 let capturedBillImages = []; // Store all captured bill images for upload
+let uploadMode = 'sequential'; // Upload mode: 'sequential' (one-by-one) or 'batch' (all at once)
 let captureModeActive = false;
 let capturedPhotos = []; // Photos captured in multi-shot capture mode
 
@@ -1654,29 +1655,76 @@ month: parseInt(currentMonth)
 
     showLoading();
 
-    // Check if we have captured bill files to upload
+    // Handle bill image uploads based on configured mode
     let requestBody, requestHeaders;
-    if (capturedBillImages && capturedBillImages.length > 0 && !isEdit) {
-        // Send as multipart/form-data with files (already compressed from scan)
+
+    console.log(`[Upload Mode Check] Current uploadMode: '${uploadMode}', Has images: ${!!(capturedBillImages && capturedBillImages.length)}, Is edit: ${isEdit}`);
+
+    if (uploadMode === 'sequential' && capturedBillImages && capturedBillImages.length > 0 && !isEdit) {
+        // SEQUENTIAL MODE: Upload images one-by-one, then send transaction with GUIDs
+        let attachmentGuids = [];
+        try {
+            console.log(`[Sequential Mode] Uploading ${capturedBillImages.length} image(s)...`);
+
+            for (let i = 0; i < capturedBillImages.length; i++) {
+                const formData = new FormData();
+                formData.append('bill_image', capturedBillImages[i], capturedBillImages[i].name || `image_${i + 1}.jpg`);
+
+                console.log(`Uploading image ${i + 1}/${capturedBillImages.length}...`);
+                const uploadResponse = await fetch('/api/upload-bill-attachment', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (uploadResponse.status === 413) {
+                    throw new Error(`Image ${i + 1} is too large. Please use a smaller image.`);
+                }
+
+                const uploadResult = await uploadResponse.json();
+
+                if (!uploadResponse.ok || !uploadResult.success) {
+                    throw new Error(uploadResult.error || `Failed to upload image ${i + 1}`);
+                }
+
+                console.log(`✓ Image ${i + 1} uploaded:`, uploadResult.attachment_guid);
+                attachmentGuids.push(uploadResult.attachment_guid);
+            }
+
+            console.log(`All ${attachmentGuids.length} images uploaded successfully`);
+            data.attachments = attachmentGuids.join(',');
+        } catch (error) {
+            hideLoading();
+            console.error('Error uploading images:', error);
+            showToast(error.message || 'Failed to upload images', 'danger');
+            return;
+        }
+
+        // Send transaction with just the GUIDs (JSON)
+        requestBody = JSON.stringify(data);
+        requestHeaders = { 'Content-Type': 'application/json' };
+
+    } else if (uploadMode === 'batch' && capturedBillImages && capturedBillImages.length > 0 && !isEdit) {
+        // BATCH MODE: Send all images with transaction in one multipart request (legacy)
+        console.log(`[Batch Mode] Uploading ${capturedBillImages.length} image(s) with transaction...`);
         const formData = new FormData();
 
-        // Add all form fields
-        for (const key in data) {
-            if (data[key] !== null && data[key] !== undefined) {
+        // Add all data fields
+        Object.keys(data).forEach(key => {
+            if (data[key] !== null && data[key] !== undefined && data[key] !== '') {
                 formData.append(key, data[key]);
             }
-        }
+        });
 
-        // Add ALL bill images
-        console.log(`Uploading ${capturedBillImages.length} bill image(s) to Appwrite`);
-        for (let i = 0; i < capturedBillImages.length; i++) {
-            formData.append('bill_images', capturedBillImages[i], capturedBillImages[i].name || `image_${i + 1}.jpg`);
-        }
+        // Add all bill images
+        capturedBillImages.forEach((img, idx) => {
+            formData.append('bill_images', img, img.name || `image_${idx + 1}.jpg`);
+        });
 
         requestBody = formData;
         requestHeaders = {}; // Let browser set Content-Type with boundary
+
     } else {
-        // Send as JSON (existing behavior for updates and non-scan transactions)
+        // No images or editing mode - send as JSON
         requestBody = JSON.stringify(data);
         requestHeaders = { 'Content-Type': 'application/json' };
     }
@@ -2129,8 +2177,29 @@ function hideMobileInfoAttachment() {
     }
 }
 
+// Fetch upload mode setting from server
+async function loadUploadMode() {
+    try {
+        const response = await fetch('/api/settings/upload-mode');
+        if (response.ok) {
+            const data = await response.json();
+            uploadMode = data.upload_mode || 'sequential';
+            console.log(`✓ Upload mode set to: ${uploadMode}`);
+        } else {
+            console.warn('Failed to fetch upload mode, defaulting to sequential');
+            uploadMode = 'sequential';
+        }
+    } catch (error) {
+        console.error('Error fetching upload mode:', error);
+        uploadMode = 'sequential'; // Safe fallback
+    }
+}
+
 // Initialize
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
+// Load upload mode configuration (MUST complete first)
+await loadUploadMode();
+
 // Update month display
 updateMonthDisplay();
 
@@ -2853,49 +2922,88 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         try {
-            // Process images sequentially to avoid Vercel 4.5MB body limit
+            // Compress all images first
             const compressedFiles = [];
-            const scanResults = [];
 
-            // Compress and scan each file one at a time
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
 
                 if (files.length > 1) {
-                    scanStatusText.textContent = `Processing image ${i + 1}/${files.length}...`;
+                    scanStatusText.textContent = `Compressing image ${i + 1}/${files.length}...`;
                 }
 
-                // Compress file
                 const { fileToSend, wasCompressed } = await compressFileForUpload(file);
                 compressedFiles.push(fileToSend);
+            }
 
-                // Send each image individually to avoid body size limits
-                scanStatusText.textContent = `Scanning image ${i + 1}/${files.length}...`;
+            // Scan based on upload mode configuration
+            let scanResults = [];
+
+            console.log(`[Bill Scan Mode Check] uploadMode: '${uploadMode}', Images: ${compressedFiles.length}`);
+
+            if (uploadMode === 'batch') {
+                // BATCH MODE: Send all images in one request
+                scanStatusText.textContent = `Scanning ${compressedFiles.length} image(s)...`;
 
                 const formData = new FormData();
-                formData.append('bill_images', fileToSend, fileToSend.name || `image_${i + 1}.jpg`);
+                compressedFiles.forEach((file, idx) => {
+                    formData.append('bill_images', file, file.name || `image_${idx + 1}.jpg`);
+                });
 
-                console.log(`Sending image ${i + 1}/${files.length} to API (${(fileToSend.size / (1024*1024)).toFixed(1)} MB)...`);
+                console.log(`[Batch Mode] Sending ${compressedFiles.length} image(s) to API in one request...`);
                 const response = await fetch('/api/scan-bill', {
                     method: 'POST',
                     body: formData
                 });
 
                 if (response.status === 413) {
-                    throw new Error(`Image ${i + 1} is too large. Please use a smaller image.`);
+                    throw new Error('Images are too large. Please use smaller images or switch to Sequential mode.');
                 }
 
                 const result = await response.json();
-                console.log(`API response for image ${i + 1}:`, result);
+                console.log('Batch scan API response:', result);
 
                 if (!response.ok) {
-                    throw new Error(result.error || `Failed to scan image ${i + 1}`);
+                    throw new Error(result.error || 'Failed to scan images');
                 }
 
                 if (result.success) {
-                    scanResults.push(result);
+                    // Server already merged results for us
+                    scanResults = [result];
                 } else {
-                    throw new Error(result.error || `Failed to extract data from image ${i + 1}`);
+                    throw new Error(result.error || 'Failed to extract data from images');
+                }
+
+            } else {
+                // SEQUENTIAL MODE: Send each image separately
+                for (let i = 0; i < compressedFiles.length; i++) {
+                    scanStatusText.textContent = `Scanning image ${i + 1}/${compressedFiles.length}...`;
+
+                    const formData = new FormData();
+                    formData.append('bill_images', compressedFiles[i], compressedFiles[i].name || `image_${i + 1}.jpg`);
+
+                    console.log(`[Sequential Mode] Sending image ${i + 1}/${compressedFiles.length} to API (${(compressedFiles[i].size / (1024*1024)).toFixed(1)} MB)...`);
+                    const response = await fetch('/api/scan-bill', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (response.status === 413) {
+                        throw new Error(`Image ${i + 1} is too large. Please use a smaller image.`);
+                    }
+
+                    const result = await response.json();
+                    console.log(`API response for image ${i + 1}:`, result);
+
+                    if (!response.ok) {
+                        throw new Error(result.error || `Failed to scan image ${i + 1}`);
+                    }
+
+                    if (result.success) {
+                        scanResults.push(result);
+                    } else {
+                        throw new Error(result.error || `Failed to extract data from image ${i + 1}`);
+                    }
                 }
             }
 

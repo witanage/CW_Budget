@@ -388,7 +388,36 @@
                     </h2>
                 </div>
                 <div class="section-body">
+                    <!-- Application Settings Table -->
+                    <div style="margin-bottom: 30px;">
+                        <h4 style="margin: 0 0 15px 0; color: var(--text-primary); font-size: 1.1rem;">
+                            <i class="fas fa-sliders-h"></i> Application Settings
+                        </h4>
+                        <div style="overflow-x: auto;">
+                            <table class="user-table" id="settingsTable">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 25%;">Setting</th>
+                                        <th style="width: 20%;">Value</th>
+                                        <th style="width: 45%;">Description</th>
+                                        <th style="width: 10%;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="settingsTableBody">
+                                    <tr>
+                                        <td colspan="4" class="text-center" style="padding: 20px; color: var(--text-secondary);">
+                                            <i class="fas fa-spinner fa-spin"></i> Loading settings...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
                     <!-- Manual "Refresh All" button -->
+                    <h4 style="margin: 0 0 15px 0; color: var(--text-primary); font-size: 1.1rem;">
+                        <i class="fas fa-sync-alt"></i> Quick Actions
+                    </h4>
                     <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
                         <button class="btn-sm btn-primary" id="refreshAllBtn" onclick="refreshAllRates()">
                             <i class="fas fa-sync-alt"></i> Refresh All Rates Now
@@ -865,6 +894,9 @@
         document.body.style.overflow = '';
         document.body.style.paddingRight = '';
 
+        // Load settings when settings tab becomes active
+        loadSettings();
+
         console.log('Admin page initialized and cleared of overlays');
     });
 
@@ -1085,6 +1117,104 @@
     }, 2000);
 
     console.log('Admin Dashboard fully initialized - All overlays cleared');
+
+    // ── Settings Management ──────────────────────────────────────
+    async function loadSettings() {
+        const tbody = document.getElementById('settingsTableBody');
+
+        try {
+            const response = await fetch('/api/admin/settings');
+            const settings = await response.json();
+
+            if (!response.ok) {
+                throw new Error('Failed to load settings');
+            }
+
+            if (settings.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center" style="color: var(--text-secondary);">No settings found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = settings.map(setting => {
+                const settingKey = setting.setting_key;
+                const settingValue = setting.value;
+                const description = setting.description || 'No description';
+
+                // Create appropriate input based on setting type
+                let inputHtml = '';
+                if (settingKey === 'exchange_rate_refresh_mode') {
+                    inputHtml = `
+                        <select id="setting_${settingKey}" class="form-select form-select-sm" style="background: var(--bg-tertiary); color: var(--text-primary); border-color: var(--border-color);">
+                            <option value="background" ${settingValue === 'background' ? 'selected' : ''}>Background</option>
+                            <option value="manual" ${settingValue === 'manual' ? 'selected' : ''}>Manual</option>
+                        </select>
+                    `;
+                } else if (settingKey === 'bill_upload_mode') {
+                    inputHtml = `
+                        <select id="setting_${settingKey}" class="form-select form-select-sm" style="background: var(--bg-tertiary); color: var(--text-primary); border-color: var(--border-color);">
+                            <option value="sequential" ${settingValue === 'sequential' ? 'selected' : ''}>Sequential</option>
+                            <option value="batch" ${settingValue === 'batch' ? 'selected' : ''}>Batch</option>
+                        </select>
+                    `;
+                } else {
+                    inputHtml = `
+                        <input type="text" id="setting_${settingKey}" class="form-control form-control-sm" value="${settingValue}"
+                               style="background: var(--bg-tertiary); color: var(--text-primary); border-color: var(--border-color);">
+                    `;
+                }
+
+                return `
+                    <tr>
+                        <td style="font-weight: 500; color: var(--text-primary);">${settingKey}</td>
+                        <td>${inputHtml}</td>
+                        <td style="color: var(--text-secondary); font-size: 0.9rem;">${description}</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" onclick="updateSetting('${settingKey}')" title="Save">
+                                <i class="fas fa-save"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+        } catch (error) {
+            console.error('Error loading settings:', error);
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Failed to load settings</td></tr>';
+        }
+    }
+
+    async function updateSetting(key) {
+        const input = document.getElementById(`setting_${key}`);
+        const newValue = input.value;
+
+        try {
+            const response = await fetch(`/api/admin/settings/${key}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ value: newValue })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                showAlert(`Setting '${key}' updated successfully`, 'success');
+
+                // If upload mode changed, notify user that clients will use new mode
+                if (key === 'bill_upload_mode') {
+                    setTimeout(() => {
+                        showAlert(`Upload mode changed to '${newValue}'. Client apps will use this mode on next page load.`, 'info');
+                    }, 1500);
+                }
+            } else {
+                showAlert(data.error || 'Failed to update setting', 'danger');
+                loadSettings(); // Reload to reset value
+            }
+        } catch (error) {
+            console.error('Error updating setting:', error);
+            showAlert('Network error: ' + error.message, 'danger');
+            loadSettings(); // Reload to reset value
+        }
+    }
 
     // ── System Settings: on-demand refresh ───────────────────────
     async function refreshAllRates() {
