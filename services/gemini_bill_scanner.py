@@ -55,6 +55,47 @@ class GeminiBillScanner:
             logger.warning(f"Could not load AI config from database: {e}. Will use environment variables.")
         return None
 
+    def _are_items_similar(self, name1: str, name2: str) -> bool:
+        """
+        Check if two item names are similar enough to be considered duplicates.
+        Handles OCR errors where some words might be missing.
+
+        Args:
+            name1: First item name
+            name2: Second item name
+
+        Returns:
+            True if items are likely duplicates, False otherwise
+        """
+        # Normalize names
+        n1 = name1.lower().strip()
+        n2 = name2.lower().strip()
+
+        # Exact match
+        if n1 == n2:
+            return True
+
+        # One name is substring of another (e.g., "Cola 330ml" vs "Coca Cola 330ml")
+        if n1 in n2 or n2 in n1:
+            return True
+
+        # Word-based similarity for OCR errors
+        words1 = set(n1.split())
+        words2 = set(n2.split())
+
+        # If either name has only 1-2 words, require higher overlap
+        min_words = min(len(words1), len(words2))
+
+        if min_words <= 2:
+            # For short names, require all words to overlap
+            overlap = len(words1.intersection(words2))
+            return overlap >= min_words
+        else:
+            # For longer names, require 70% word overlap
+            overlap = len(words1.intersection(words2))
+            similarity = overlap / max(len(words1), len(words2))
+            return similarity >= 0.7
+
     def scan_bill(self, image_data: Union[bytes, List[bytes]]) -> Dict[str, Optional[str]]:
         """
         Scan a bill image or PDF and extract shop name, amount, discounts, and line items.
@@ -87,9 +128,9 @@ class GeminiBillScanner:
 You are a bill/receipt analyzer. Extract the following information from this bill/receipt:
 
 1. Shop/Store Name: The name of the business or store
-2. Subtotal: The subtotal before discounts (if shown)
-3. Discounts: Any discounts applied (percentage or fixed amount)
-4. Total Amount: The final total amount to be paid (after all discounts)
+2. Subtotal: The amount BEFORE summary discounts are applied (if shown on receipt)
+3. Discounts: Extract ONLY the summary/total discount lines (usually near the bottom of the receipt)
+4. Total Amount: The EXACT final total shown on the receipt (this is the most important field)
 5. Line Items: Extract each item purchased with its details
 
 """
@@ -103,21 +144,73 @@ Respond in this exact JSON format:
     "subtotal": "numeric subtotal or '0'",
     "discounts": [
         {
-            "description": "discount description",
-            "amount": "discount amount"
+            "description": "exact discount label from bill",
+            "amount": "total discount amount"
         }
     ],
     "amount": "final total numeric amount or '0'",
     "items": [
         {
             "name": "item name",
+            "code": "item code/SKU (optional, only if visible on receipt)",
             "quantity": "quantity or '1'",
-            "price": "unit price"
+            "price": "unit price (before any item discount)",
+            "discount": "item discount amount (optional, only if this specific item has a discount)"
         }
     ]
 }
 
-Note: The 'amount' field should always be the FINAL total after all discounts are applied.
+CRITICAL RULES:
+1. AMOUNT FIELD (MOST IMPORTANT):
+   - The 'amount' field MUST be the EXACT final total shown on the receipt
+   - Look for labels like: "TOTAL", "AMOUNT PAYABLE", "TOTAL AMOUNT", "AMOUNT TO PAY", "NET TOTAL", "GRAND TOTAL", "BALANCE", "TO PAY"
+   - Copy this number precisely - do not calculate or modify it
+   - This is what the customer actually paid
+
+2. SUBTOTAL FIELD (IMPORTANT - Avoid Double-Deduction):
+   - The subtotal should be the amount BEFORE summary discounts are applied
+   - If the receipt shows "Subtotal" AFTER item discounts but BEFORE total/summary discounts, use that value
+   - If the receipt's subtotal already includes all discounts, set subtotal to '0' or omit it
+   - DO NOT use a subtotal that would cause discounts to be deducted twice
+   - Example: If receipt shows "Total Items: 1000", then "Your Savings: -100", then "Amount to Pay: 900"
+     → subtotal should be "1000", not "900"
+
+3. DISCOUNTS ARRAY (summary only):
+   - Extract ONLY the final summary discount line(s) that appear at the BOTTOM of the receipt near the total
+   - Look for discount labels like: "YOUR DISCOUNT", "TOTAL DISCOUNT", "TOTAL SAVINGS", "MEMBER DISCOUNT", "LOYALTY SAVINGS"
+   - DO NOT extract individual "DISCOUNT" lines that appear throughout the receipt next to items
+   - IGNORE any discount that appears in the items section - those go in the items array
+   - Only include discounts from the summary/totals section (usually after subtotal, before final total)
+   - Copy the exact label text as shown on the bill
+   - If no summary discount line exists at the bottom, return empty array []
+   - Typically there is only ONE summary discount line (e.g., "YOUR DISCOUNT: 1120.00")
+
+4. ITEMS ARRAY (per-item discounts and codes):
+   - Extract EACH UNIQUE item from the receipt ONLY ONCE - do not duplicate items
+   - If item codes/SKUs are visible on the receipt, include them in the "code" field
+   - IMPORTANT: Items with the SAME name but DIFFERENT codes are DIFFERENT items (e.g., "Milk" code "123" vs "Milk" code "456")
+   - If the same item (same name AND same code) appears multiple times, combine them into a single entry with the total quantity
+   - For each item, if there's a discount shown next to or below that specific item, include it in the "discount" field
+   - The "price" should be the original price PER UNIT before discount
+   - The "discount" field is the discount amount PER UNIT (optional - only include if that item has a discount)
+   - Extract per-item discount amounts accurately
+
+5. AVOID DUPLICATES (but respect item codes):
+   - Read through the entire receipt carefully before extracting items
+   - If you see the same product name AND same code multiple times, extract it only once with combined quantity
+   - If you see the same product name but DIFFERENT codes, extract them as SEPARATE items
+   - If no codes are visible, deduplicate by name only
+   - Do not extract the same information twice
+   - Do not extract the same information twice
+
+EXAMPLE:
+If a receipt shows:
+- Many items with individual discounts throughout
+- At bottom: "Subtotal: 1000", then "YOUR DISCOUNT: 100", then "Total: 900"
+- The discounts array should contain ONLY [{"description": "YOUR DISCOUNT", "amount": "100"}]
+- The subtotal should be "1000" and amount should be "900"
+
+IMPORTANT: The 'amount' field should ALWAYS be the EXACT final total shown on the receipt - never calculate it yourself.
 """
 
             # Prepare content parts
@@ -159,6 +252,61 @@ Note: The 'amount' field should always be the FINAL total after all discounts ar
             subtotal = result.get('subtotal', '0').strip()
             items = result.get('items', [])
             discounts = result.get('discounts', [])
+
+            # Filter out generic "DISCOUNT" entries if there are more specific discount labels
+            if isinstance(discounts, list) and len(discounts) > 1:
+                specific_discounts = [d for d in discounts if d.get('description', '').strip().upper() not in ['DISCOUNT', 'DISCOUNT:']]
+                # If we found specific discount labels, use only those
+                if specific_discounts:
+                    discounts = specific_discounts
+                    logger.info(f"Filtered out generic 'DISCOUNT' entries, keeping {len(discounts)} specific discount(s)")
+
+            # Deduplicate items by name with fuzzy matching to handle OCR errors
+            # But respect item codes - items with different codes are different items
+            # Only apply deduplication when scanning multiple images (for single images, trust Gemini's extraction)
+            if is_multiple and isinstance(items, list) and len(items) > 0:
+                deduplicated_items = []
+
+                for item in items:
+                    item_name = item.get('name', '').strip()
+                    item_code = item.get('code', '').strip()
+                    if not item_name:
+                        continue
+
+                    # Check if this item is similar to any existing item
+                    is_duplicate = False
+                    for idx, existing_item in enumerate(deduplicated_items):
+                        existing_name = existing_item.get('name', '').strip()
+                        existing_code = existing_item.get('code', '').strip()
+
+                        # If both have codes, they must match for it to be a duplicate
+                        if item_code and existing_code:
+                            if item_code == existing_code and self._are_items_similar(item_name, existing_name):
+                                is_duplicate = True
+                                # Keep the longer/more complete name
+                                if len(item_name) > len(existing_name):
+                                    deduplicated_items[idx] = item
+                                    logger.info(f"Replaced '{existing_name}' (code: {existing_code}) with more complete name '{item_name}'")
+                                break
+                        # If only one has a code, not a duplicate (different items)
+                        elif item_code or existing_code:
+                            continue
+                        # If neither has a code, check name similarity only
+                        else:
+                            if self._are_items_similar(item_name, existing_name):
+                                is_duplicate = True
+                                # Keep the longer/more complete name
+                                if len(item_name) > len(existing_name):
+                                    deduplicated_items[idx] = item
+                                    logger.info(f"Replaced '{existing_name}' with more complete name '{item_name}'")
+                                break
+
+                    if not is_duplicate:
+                        deduplicated_items.append(item)
+
+                if len(deduplicated_items) < len(items):
+                    logger.info(f"Removed {len(items) - len(deduplicated_items)} duplicate/similar item(s) from multi-image scan")
+                    items = deduplicated_items
 
             cleaned_amount = ''.join(c for c in amount if c.isdigit() or c == '.')
             cleaned_subtotal = ''.join(c for c in subtotal if c.isdigit() or c == '.')

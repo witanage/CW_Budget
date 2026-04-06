@@ -154,6 +154,35 @@ async function compressFileForUpload(file) {
     }
 }
 
+// Helper function to check if two item names are similar (handles OCR errors)
+function areItemsSimilar(name1, name2) {
+    const n1 = name1.toLowerCase().trim();
+    const n2 = name2.toLowerCase().trim();
+
+    // Exact match
+    if (n1 === n2) return true;
+
+    // One name is substring of another
+    if (n1.includes(n2) || n2.includes(n1)) return true;
+
+    // Word-based similarity
+    const words1 = new Set(n1.split(/\s+/));
+    const words2 = new Set(n2.split(/\s+/));
+
+    const minWords = Math.min(words1.size, words2.size);
+
+    if (minWords <= 2) {
+        // For short names, require all words to overlap
+        const overlap = [...words1].filter(w => words2.has(w)).length;
+        return overlap >= minWords;
+    } else {
+        // For longer names, require 70% word overlap
+        const overlap = [...words1].filter(w => words2.has(w)).length;
+        const similarity = overlap / Math.max(words1.size, words2.size);
+        return similarity >= 0.7;
+    }
+}
+
 // Display bill breakdown with discounts
 function displayBillBreakdown(result) {
     const billBreakdown = document.getElementById('billBreakdown');
@@ -161,7 +190,7 @@ function displayBillBreakdown(result) {
 
     if (!billBreakdown || !billBreakdownContent) return;
 
-    // Only show if there are discounts or items with subtotal
+    // Only show if there are discounts or subtotal
     const hasDiscounts = result.discounts && result.discounts.length > 0;
     const hasSubtotal = parseFloat(result.subtotal || 0) > 0;
 
@@ -180,7 +209,7 @@ function displayBillBreakdown(result) {
         </div>`;
     }
 
-    // Show discounts
+    // Show summary discounts
     if (hasDiscounts) {
         result.discounts.forEach((discount, index) => {
             const description = discount.description || `Discount ${index + 1}`;
@@ -2073,10 +2102,14 @@ function showBillContent(transactionId) {
         `;
     } else {
         // Create a nice bill display
+        const itemCount = billContent.items.length;
         let html = `
             <div class="bill-content-wrapper">
                 <div class="text-center mb-4 pb-3 border-bottom">
                     <h4 class="mb-0">${billContent.shop_name || transaction.description}</h4>
+                    <div class="text-muted mt-2">
+                        <i class="fas fa-shopping-basket me-1"></i>${itemCount} item${itemCount !== 1 ? 's' : ''}
+                    </div>
                 </div>
 
                 <div class="table-responsive">
@@ -2086,6 +2119,7 @@ function showBillContent(transactionId) {
                                 <th>Item</th>
                                 <th class="text-center">Qty</th>
                                 <th class="text-end">Price</th>
+                                <th class="text-end">Discount</th>
                                 <th class="text-end">Total</th>
                             </tr>
                         </thead>
@@ -2096,7 +2130,8 @@ function showBillContent(transactionId) {
         billContent.items.forEach(item => {
             const qty = parseFloat(item.quantity || 1);
             const price = parseFloat(item.price || 0);
-            const total = qty * price;
+            const discount = parseFloat(item.discount || 0);
+            const total = (qty * price) - (qty * discount);
             subtotal += total;
 
             html += `
@@ -2104,6 +2139,7 @@ function showBillContent(transactionId) {
                     <td><strong>${item.name}</strong></td>
                     <td class="text-center">${qty}</td>
                     <td class="text-end">${price.toFixed(2)}</td>
+                    <td class="text-end" style="color: ${discount > 0 ? '#28a745' : '#6c757d'};">${discount > 0 ? '-' + discount.toFixed(2) : '-'}</td>
                     <td class="text-end">${total.toFixed(2)}</td>
                 </tr>
             `;
@@ -2118,14 +2154,14 @@ function showBillContent(transactionId) {
         if (billContent.subtotal && parseFloat(billContent.subtotal) > 0) {
             html += `
                             <tr>
-                                <td colspan="3" class="text-end">Subtotal:</td>
+                                <td colspan="4" class="text-end">Subtotal:</td>
                                 <td class="text-end">${parseFloat(billContent.subtotal).toFixed(2)}</td>
                             </tr>
             `;
         } else if (subtotal > 0) {
             html += `
                             <tr>
-                                <td colspan="3" class="text-end">Subtotal:</td>
+                                <td colspan="4" class="text-end">Subtotal:</td>
                                 <td class="text-end">${subtotal.toFixed(2)}</td>
                             </tr>
             `;
@@ -2137,7 +2173,7 @@ function showBillContent(transactionId) {
                 const discountAmount = parseFloat(discount.amount || 0);
                 html += `
                             <tr class="table-success">
-                                <td colspan="3" class="text-end">
+                                <td colspan="4" class="text-end">
                                     <i class="fas fa-tag me-2"></i>${discount.description || 'Discount'}:
                                 </td>
                                 <td class="text-end text-success">-${discountAmount.toFixed(2)}</td>
@@ -2146,11 +2182,12 @@ function showBillContent(transactionId) {
             });
         }
 
-        // Display final total
+        // Display final total (use exact amount from bill, not calculated)
+        const finalTotal = parseFloat(billContent.amount) || 0;
         html += `
                             <tr>
-                                <td colspan="3" class="text-end"><strong>Final Total:</strong></td>
-                                <td class="text-end"><strong>${billContent.amount || subtotal.toFixed(2)}</strong></td>
+                                <td colspan="4" class="text-end"><strong>Final Total:</strong></td>
+                                <td class="text-end"><strong>${finalTotal.toFixed(2)}</strong></td>
                             </tr>
                         </tfoot>
                     </table>
@@ -5824,11 +5861,11 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             try {
-                // Create FormData to send the files
-                const formData = new FormData();
-                let totalCompressedSize = 0;
+                // Process images sequentially to avoid Vercel 4.5MB body limit
+                const compressedFiles = [];
+                const scanResults = [];
 
-                // Compress each file if needed
+                // Compress and scan each file one at a time
                 for (let i = 0; i < files.length; i++) {
                     const file = files[i];
 
@@ -5836,110 +5873,185 @@ document.addEventListener('DOMContentLoaded', function() {
                         scanStatusText.textContent = `Processing image ${i + 1}/${files.length}...`;
                     }
 
+                    // Compress file
                     const { fileToSend, wasCompressed } = await compressFileForUpload(file);
-                    totalCompressedSize += fileToSend.size;
+                    compressedFiles.push(fileToSend);
 
-                    // Append to FormData with 'bill_images' key for multiple files
+                    // Send each image individually to avoid body size limits
+                    if (scanStatusText) {
+                        scanStatusText.textContent = `Scanning image ${i + 1}/${files.length}...`;
+                    }
+
+                    const formData = new FormData();
                     formData.append('bill_images', fileToSend, fileToSend.name || `image_${i + 1}.jpg`);
+
+                    console.log(`Sending image ${i + 1}/${files.length} to API (${(fileToSend.size / (1024*1024)).toFixed(1)} MB)...`);
+                    const response = await fetch('/api/scan-bill', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (response.status === 413) {
+                        throw new Error(`Image ${i + 1} is too large. Please use a smaller image.`);
+                    }
+
+                    const result = await response.json();
+                    console.log(`API response for image ${i + 1}:`, result);
+
+                    if (!response.ok) {
+                        throw new Error(result.error || `Failed to scan image ${i + 1}`);
+                    }
+
+                    if (result.success) {
+                        scanResults.push(result);
+                    } else {
+                        throw new Error(result.error || `Failed to extract data from image ${i + 1}`);
+                    }
                 }
 
-                // Check total size (16MB Flask limit)
-                if (totalCompressedSize > 16 * 1024 * 1024) {
-                    throw new Error('Combined file size exceeds 16MB limit. Please use fewer or smaller images.');
-                }
+                // Handle results based on number of images scanned
+                let mergedResult;
 
-                if (scanStatusText) {
-                    scanStatusText.textContent = `Scanning ${files.length} image${files.length > 1 ? 's' : ''}...`;
-                }
-
-                // Send to API
-                console.log(`Sending ${files.length} file(s) to API...`, (totalCompressedSize / (1024*1024)).toFixed(1), 'MB total');
-                const response = await fetch('/api/scan-bill', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (response.status === 413) {
-                    throw new Error('File is too large even after compression. Please use fewer or smaller files.');
-                }
-
-                const result = await response.json();
-                console.log('API response:', result);
-
-                if (!response.ok) {
-                    throw new Error(result.error || 'Failed to scan bill');
-                }
-
-                if (result.success) {
-                    // Store the scanned bill content including items and discounts
-                    scannedBillContent = {
-                        shop_name: result.shop_name,
-                        amount: result.amount,
-                        subtotal: result.subtotal || '0',
-                        discounts: result.discounts || [],
-                        items: result.items || []
+                if (scanResults.length === 1) {
+                    // Single image - use result directly without deduplication
+                    mergedResult = scanResults[0];
+                    console.log('Single image scan:', mergedResult);
+                } else {
+                    // Multiple images - merge and deduplicate results
+                    mergedResult = {
+                        shop_name: scanResults[0]?.shop_name || 'Unknown Store',
+                        amount: '0',
+                        subtotal: '0',
+                        discounts: [],
+                        items: []
                     };
 
-                    // Store ALL compressed files for upload when transaction is saved
-                    capturedBillImages = formData.getAll('bill_images').filter(f => f instanceof File || f instanceof Blob);
-                    console.log(`Stored ${capturedBillImages.length} bill image(s) for upload`);
+                    let totalAmount = 0;
+                    let totalSubtotal = 0;
+                    const seenDiscounts = {}; // Track unique discounts by description
 
-                    // Populate the form with extracted data
-                    const transDescription = document.getElementById('transDescription');
-                    const transCredit = document.getElementById('transCredit');
+                    for (const result of scanResults) {
+                        // For multi-image scans of the SAME receipt, take the highest amount/subtotal
+                        // (not sum, since all images are of the same receipt)
+                        const amount = parseFloat(result.amount) || 0;
+                        const subtotal = parseFloat(result.subtotal) || 0;
+                        totalAmount = Math.max(totalAmount, amount);
+                        totalSubtotal = Math.max(totalSubtotal, subtotal);
 
-                    if (result.shop_name && result.shop_name !== 'Unknown Store' && transDescription) {
-                        transDescription.value = result.shop_name;
-                    }
+                        // Merge items arrays - fuzzy deduplicate to handle OCR errors
+                        // But respect item codes - same name + different code = different items
+                        if (result.items && result.items.length > 0) {
+                            result.items.forEach(item => {
+                                const itemCode = (item.code || '').trim();
 
-                    if (result.amount && parseFloat(result.amount) > 0 && transCredit) {
-                        transCredit.value = result.amount;
-                    }
+                                // Check if this item is similar to any existing item
+                                let isDuplicate = false;
+                                for (let i = 0; i < mergedResult.items.length; i++) {
+                                    const existingCode = (mergedResult.items[i].code || '').trim();
 
-                    // Display bill breakdown if there are discounts
-                    displayBillBreakdown(result);
+                                    // If both have codes, they must match
+                                    if (itemCode && existingCode) {
+                                        if (itemCode === existingCode && areItemsSimilar(item.name, mergedResult.items[i].name)) {
+                                            isDuplicate = true;
+                                            // Keep the longer/more complete name
+                                            if (item.name.length > mergedResult.items[i].name.length) {
+                                                mergedResult.items[i] = item;
+                                            }
+                                            break;
+                                        }
+                                    }
+                                    // If only one has a code, treat as different items
+                                    else if (itemCode || existingCode) {
+                                        continue;
+                                    }
+                                    // If neither has a code, check name similarity only
+                                    else {
+                                        if (areItemsSimilar(item.name, mergedResult.items[i].name)) {
+                                            isDuplicate = true;
+                                            // Keep the longer/more complete name
+                                            if (item.name.length > mergedResult.items[i].name.length) {
+                                                mergedResult.items[i] = item;
+                                            }
+                                            break;
+                                        }
+                                    }
+                                }
 
-                    // Show success message
-                    const itemCount = result.items ? result.items.length : 0;
-                    const discountCount = result.discounts ? result.discounts.length : 0;
-                    const itemText = itemCount > 0 ? ` (${itemCount} items)` : '';
-                    const discountText = discountCount > 0 ? ` with ${discountCount} discount${discountCount > 1 ? 's' : ''}` : '';
-
-                    if (scanStatusText) {
-                        scanStatusText.textContent = `✓ Bill scanned successfully!${itemText}${discountText}`;
-                    }
-                    if (scanStatus) {
-                        scanStatus.style.color = '#28a745';
-                    }
-
-                    setTimeout(() => {
-                        if (scanStatus) {
-                            scanStatus.style.display = 'none';
-                            scanStatus.style.color = '#ffc107';
+                                if (!isDuplicate) {
+                                    mergedResult.items.push(item);
+                                }
+                            });
                         }
-                    }, 3000);
 
-                    showToast(`Bill scanned: ${result.shop_name} - රු ${result.amount}${itemText}${discountText}`, 'success');
-                } else {
-                    // Handle scanning error but still allow manual entry
-                    const errorMsg = result.error || 'Failed to extract bill information';
-
-                    if (scanStatusText) {
-                        scanStatusText.textContent = '✗ ' + errorMsg;
-                    }
-                    if (scanStatus) {
-                        scanStatus.style.color = '#dc3545';
-                    }
-
-                    setTimeout(() => {
-                        if (scanStatus) {
-                            scanStatus.style.display = 'none';
-                            scanStatus.style.color = '#ffc107';
+                        // Merge discounts arrays - deduplicate by description
+                        if (result.discounts && result.discounts.length > 0) {
+                            result.discounts.forEach(discount => {
+                                const discountKey = (discount.description || '').toLowerCase().trim();
+                                if (discountKey && !seenDiscounts[discountKey]) {
+                                    seenDiscounts[discountKey] = true;
+                                    mergedResult.discounts.push(discount);
+                                }
+                            });
                         }
-                    }, 5000);
+                    }
 
-                    showToast('Could not scan bill automatically. Please enter details manually.', 'warning');
+                    mergedResult.amount = totalAmount.toFixed(2);
+                    mergedResult.subtotal = totalSubtotal.toFixed(2);
+
+                    console.log('Merged result from', scanResults.length, 'images:', mergedResult);
+                    console.log(`Deduplicated to ${mergedResult.items.length} unique items and ${mergedResult.discounts.length} unique discounts`);
                 }
+
+                // Store the merged scanned bill content
+                scannedBillContent = {
+                    shop_name: mergedResult.shop_name,
+                    amount: mergedResult.amount,
+                    subtotal: mergedResult.subtotal,
+                    discounts: mergedResult.discounts,
+                    items: mergedResult.items
+                };
+
+                // Store ALL compressed files for upload when transaction is saved
+                capturedBillImages = compressedFiles;
+                console.log(`Stored ${capturedBillImages.length} bill image(s) for upload`);
+
+                // Populate the form with extracted data
+                const transDescription = document.getElementById('transDescription');
+                const transCredit = document.getElementById('transCredit');
+
+                if (mergedResult.shop_name && mergedResult.shop_name !== 'Unknown Store' && transDescription) {
+                    transDescription.value = mergedResult.shop_name;
+                }
+
+                if (mergedResult.amount && parseFloat(mergedResult.amount) > 0 && transCredit) {
+                    transCredit.value = mergedResult.amount;
+                }
+
+                // Display bill breakdown
+                displayBillBreakdown(mergedResult);
+
+                // Show success message
+                const itemCount = mergedResult.items.length;
+                const discountCount = mergedResult.discounts.length;
+                const itemText = itemCount > 0 ? ` (${itemCount} items)` : '';
+                const discountText = discountCount > 0 ? ` with ${discountCount} discount${discountCount > 1 ? 's' : ''}` : '';
+                const multiImageText = files.length > 1 ? ` from ${files.length} images` : '';
+
+                if (scanStatusText) {
+                    scanStatusText.textContent = `✓ Bill scanned successfully!${itemText}${discountText}${multiImageText}`;
+                }
+                if (scanStatus) {
+                    scanStatus.style.color = '#28a745';
+                }
+
+                setTimeout(() => {
+                    if (scanStatus) {
+                        scanStatus.style.display = 'none';
+                        scanStatus.style.color = '#ffc107';
+                    }
+                }, 3000);
+
+                showToast(`Bill scanned: ${mergedResult.shop_name} - රු ${mergedResult.amount}${itemText}${discountText}`, 'success');
 
             } catch (error) {
                 console.error('Error scanning bill:', error);
