@@ -152,7 +152,8 @@ class GeminiExchangeAnalyzer:
     def analyze_multi_bank_patterns(self, bank_data: dict, current_rates: dict,
                                      user_bank: str = "HNB",
                                      currency_from: str = "USD",
-                                     currency_to: str = "LKR") -> Dict:
+                                     currency_to: str = "LKR",
+                                     transaction_type: str = "salary_exchange") -> Dict:
         """
         Analyze exchange rate patterns across multiple banks (CBSL, PB, HNB).
         Focus on user's bank (HNB) and identifying the best times to exchange.
@@ -164,6 +165,7 @@ class GeminiExchangeAnalyzer:
             user_bank: User's preferred bank (default: HNB)
             currency_from: Source currency (default: USD)
             currency_to: Target currency (default: LKR)
+            transaction_type: Type of transaction - 'salary_exchange', 'investment', 'general' (default: salary_exchange)
 
         Returns:
             Dictionary with AI analysis including bank comparisons and patterns
@@ -246,8 +248,30 @@ BANK STATISTICS COMPARISON:
             data_summary += f"\nHNB RECENT HISTORY (Last {len(hnb_recent)} days):\n"
             data_summary += chr(10).join([f"- {item['date']}: {item['rate']:.4f} LKR" for item in hnb_recent])
 
+            # Build transaction context for prompt
+            transaction_context = ""
+            if transaction_type == "salary_exchange":
+                transaction_context = f"""
+
+USER PROFILE: The user receives their monthly/regular SALARY in {currency_from} to their {user_bank} account.
+They need to convert {currency_from} to {currency_to} for living expenses.
+
+KEY CONSIDERATIONS FOR SALARY EXCHANGE:
+- The user has flexibility in timing (can wait days/weeks after receiving salary)
+- They want to maximize {currency_to} received per {currency_from}
+- They care about the BUY rate (bank buys {currency_from} from them, gives {currency_to})
+- Pattern: Does the rate improve on certain days of the week/month?
+- Timing: Should they exchange immediately or wait for better rates?
+"""
+            elif transaction_type == "investment":
+                transaction_context = f"""
+
+USER PROFILE: The user is making an investment or large one-time exchange.
+They may have more flexibility in timing and want to optimize the exchange rate.
+"""
+
             # Create AI prompt focused on HNB patterns
-            prompt = f"""{data_summary}
+            prompt = f"""{data_summary}{transaction_context}
 
 You are a currency exchange specialist analyzing rates across CBSL (Central Bank), PB (People's Bank), 
 and HNB (Hatton National Bank). The user banks with HNB.
@@ -258,6 +282,7 @@ exchange currency at HNB. Consider:
 2. HNB's historical patterns and trends
 3. Whether HNB rates are currently favorable vs average
 4. Patterns in how HNB rates move relative to other banks
+5. For salary exchange: Timing advice based on when rates tend to be most favorable
 
 Provide analysis in JSON format:
 

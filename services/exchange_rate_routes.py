@@ -1035,6 +1035,7 @@ def get_exchange_rate_ai_insights():
         months: Number of months of history to analyze (default: 3, max: 12)
         currency_from: Source currency (default: USD)
         currency_to: Target currency (default: LKR)
+        transaction_type: Type of transaction - 'salary_exchange', 'investment', 'general' (default: salary_exchange)
 
     Returns:
         JSON with AI analysis including:
@@ -1048,6 +1049,7 @@ def get_exchange_rate_ai_insights():
         months = min(int(request.args.get('months', 3)), 12)
         currency_from = request.args.get('currency_from', 'USD')
         currency_to = request.args.get('currency_to', 'LKR')
+        transaction_type = request.args.get('transaction_type', 'salary_exchange')
 
         # Get Gemini Exchange Analyzer instance
         analyzer = get_gemini_exchange_analyzer()
@@ -1115,17 +1117,25 @@ def get_exchange_rate_ai_insights():
 
             # Call AI analysis with multi-bank data
             logger.info(f"🤖 Sending YOUR database data to AI for analysis...")
+            logger.info(f"📋 Transaction type: {transaction_type}")
             analysis = analyzer.analyze_multi_bank_patterns(
                 bank_data=bank_data,
                 current_rates=current_rates,
                 user_bank='HNB',
                 currency_from=currency_from,
-                currency_to=currency_to
+                currency_to=currency_to,
+                transaction_type=transaction_type
             )
 
-            # Add timestamp
+            # Add timestamp and transaction context
             analysis['generated_at'] = datetime.now().isoformat()
             analysis['data_period_months'] = months
+            analysis['transaction_type'] = transaction_type
+            analysis['user_context'] = {
+                'bank': 'HNB',
+                'transaction_type': transaction_type,
+                'currency_direction': f'{currency_from} → {currency_to}'
+            }
 
             return jsonify(analysis), 200
 

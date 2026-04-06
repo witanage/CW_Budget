@@ -254,11 +254,11 @@
 <div class="modal fade" id="aiInsightsModal" tabindex="-1" aria-labelledby="aiInsightsModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
+            <div class="modal-header">
                 <h5 class="modal-title" id="aiInsightsModalLabel">
                     <i class="fas fa-brain me-2"></i>AI Currency Exchange Insights
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body" id="aiInsightsContent">
                 <!-- Loading state -->
@@ -290,6 +290,93 @@
                             <div class="d-flex gap-2 flex-wrap mb-2">
                                 <span class="badge" id="aiConfidenceBadge"></span>
                                 <span class="badge" id="aiRiskBadge"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Help Guide (Collapsible) -->
+                    <div class="accordion mb-3" id="aiHelpAccordion">
+                        <div class="accordion-item" style="background-color: #2B2B2B; border-color: #3C3F41;">
+                            <h2 class="accordion-header" id="aiHelpHeader">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#aiHelpCollapse" aria-expanded="false" aria-controls="aiHelpCollapse" style="background-color: #2B2B2B; color: #BBB; border-color: #3C3F41;">
+                                    <i class="fas fa-question-circle me-2"></i>What do these mean?
+                                </button>
+                            </h2>
+                            <div id="aiHelpCollapse" class="accordion-collapse collapse" aria-labelledby="aiHelpHeader" data-bs-parent="#aiHelpAccordion">
+                                <div class="accordion-body" style="background-color: #313335; color: #BBB;">
+                                    <div class="row g-3">
+                                        <!-- Recommendation Statuses -->
+                                        <div class="col-12">
+                                            <h6 class="mb-2" style="color: #6897BB;"><i class="fas fa-directions me-1"></i> Recommendation</h6>
+                                            <table class="table table-sm table-bordered" style="background-color: #3C3F41; border-color: #555; color: #BBB;">
+                                                <tbody>
+                                                    <tr style="background-color: #3C3F41;">
+                                                        <td class="fw-bold" style="width: 20%; border-color: #555;">NOW</td>
+                                                        <td style="border-color: #555;">Exchange your USD salary immediately. HNB rates are currently favorable.</td>
+                                                    </tr>
+                                                    <tr style="background-color: #3C3F41;">
+                                                        <td class="fw-bold" style="border-color: #555;">WAIT</td>
+                                                        <td style="border-color: #555;">Hold your USD. Rates are unfavorable - better rates expected soon.</td>
+                                                    </tr>
+                                                    <tr style="background-color: #3C3F41;">
+                                                        <td class="fw-bold" style="border-color: #555;">MONITOR</td>
+                                                        <td style="border-color: #555;">Watch the rates closely. No urgent action needed, consider your cash flow.</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <!-- Confidence Levels -->
+                                        <div class="col-md-6">
+                                            <h6 class="mb-2" style="color: #6897BB;"><i class="fas fa-chart-bar me-1"></i> Confidence</h6>
+                                            <table class="table table-sm table-bordered mb-0" style="background-color: #3C3F41; border-color: #555; color: white;">
+                                                <tbody>
+                                                    <tr>
+                                                        <td class="fw-bold bg-success text-white" style="width: 30%; border-color: #555;">HIGH</td>
+                                                        <td style="background-color: #3C3F41; border-color: #555; color: white;">Strong data support</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="fw-bold bg-warning text-dark" style="border-color: #555;">MEDIUM</td>
+                                                        <td style="background-color: #3C3F41; border-color: #555; color: white;">Mixed signals</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="fw-bold bg-secondary text-white" style="border-color: #555;">LOW</td>
+                                                        <td style="background-color: #3C3F41; border-color: #555; color: white;">Uncertain</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <!-- Risk Levels -->
+                                        <div class="col-md-6">
+                                            <h6 class="mb-2" style="color: #6897BB;"><i class="fas fa-exclamation-triangle me-1"></i> Risk (of exchanging now)</h6>
+                                            <table class="table table-sm table-bordered mb-0" style="background-color: #3C3F41; border-color: #555; color: white;">
+                                                <tbody>
+                                                    <tr>
+                                                        <td class="fw-bold bg-success text-white" style="width: 30%; border-color: #555;">LOW</td>
+                                                        <td style="background-color: #3C3F41; border-color: #555; color: white;">Safe to exchange</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="fw-bold bg-warning text-dark" style="border-color: #555;">MEDIUM</td>
+                                                        <td style="background-color: #3C3F41; border-color: #555; color: white;">Might improve</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="fw-bold bg-danger text-white" style="border-color: #555;">HIGH</td>
+                                                        <td style="background-color: #3C3F41; border-color: #555; color: white;">Wait for better rates</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <!-- Best Scenarios -->
+                                        <div class="col-12">
+                                            <div class="alert mb-0" style="background-color: #3C3F41; border-color: #6897BB; color: #BBB; border-left: 4px solid #6897BB;">
+                                                <strong><i class="fas fa-info-circle me-1"></i> Best Scenario:</strong>
+                                                NOW + HIGH Confidence + LOW Risk = Exchange your salary now!
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
