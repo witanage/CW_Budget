@@ -30,6 +30,7 @@ from services.sampath_exchange_rate_service import get_sampath_exchange_rate_ser
 from services.gemini_bill_scanner import get_gemini_bill_scanner
 from services.gemini_exchange_analyzer import get_gemini_exchange_analyzer
 from services.backup_service import get_backup_service
+from services.appwrite_file_service import get_appwrite_file_service
 
 # Load environment variables from .env file
 load_dotenv()
@@ -90,6 +91,9 @@ logger.info("Environment variables loaded")
 appwrite_client = None
 appwrite_storage = None
 APPWRITE_BUCKET_ID = None
+
+# Initialize Appwrite file service
+appwrite_file_service = get_appwrite_file_service()
 
 
 # Custom JSON provider to handle Decimal objects
@@ -1355,7 +1359,7 @@ def delete_user(user_id):
         transactions_with_attachments = cursor.fetchall()
 
         # Delete all attachments from Appwrite before deleting user
-        if appwrite_storage and APPWRITE_BUCKET_ID and transactions_with_attachments:
+        if appwrite_file_service.is_available() and transactions_with_attachments:
             deleted_count = 0
             for txn in transactions_with_attachments:
                 attachments_value = txn['attachments']
@@ -1363,11 +1367,11 @@ def delete_user(user_id):
                 attachment_guids = [guid.strip() for guid in attachments_value.split(',') if guid.strip()]
 
                 for attachment_guid in attachment_guids:
-                    try:
-                        appwrite_storage.delete_file(APPWRITE_BUCKET_ID, attachment_guid)
+                    success, error = appwrite_file_service.delete_file(attachment_guid)
+                    if success:
                         deleted_count += 1
-                    except Exception as e:
-                        logger.warning(f"Failed to delete attachment {attachment_guid} from Appwrite: {str(e)}")
+                    else:
+                        logger.warning(f"Failed to delete attachment {attachment_guid}: {error}")
 
             if deleted_count > 0:
                 logger.info(f"Deleted {deleted_count} attachment(s) from Appwrite for user {user_id}")
@@ -2418,18 +2422,18 @@ def admin_delete_monthly_record(user_id, record_id):
         transactions_with_attachments = cursor.fetchall()
 
         # Delete all attachments from Appwrite before deleting transactions
-        if appwrite_storage and APPWRITE_BUCKET_ID and transactions_with_attachments:
+        if appwrite_file_service.is_available() and transactions_with_attachments:
             for txn in transactions_with_attachments:
                 attachments_value = txn['attachments']
                 # Split comma-separated GUIDs
                 attachment_guids = [guid.strip() for guid in attachments_value.split(',') if guid.strip()]
 
                 for attachment_guid in attachment_guids:
-                    try:
-                        appwrite_storage.delete_file(APPWRITE_BUCKET_ID, attachment_guid)
+                    success, error = appwrite_file_service.delete_file(attachment_guid)
+                    if success:
                         logger.info(f"Deleted attachment {attachment_guid} from Appwrite (monthly record cleanup)")
-                    except Exception as e:
-                        logger.warning(f"Failed to delete attachment {attachment_guid} from Appwrite: {str(e)}")
+                    else:
+                        logger.warning(f"Failed to delete attachment {attachment_guid}: {error}")
 
         # Delete the monthly record (CASCADE will remove transactions)
         cursor.execute("DELETE FROM monthly_records WHERE id = %s", (record_id,))
@@ -2816,7 +2820,7 @@ def transactions():
                         logger.warning(f"Skipping empty file {idx + 1}")
                         continue
 
-                    if appwrite_storage and APPWRITE_BUCKET_ID:
+                    if appwrite_file_service.is_available():
                         try:
                             # Optimize file if needed (resize images, compress PDFs)
                             optimized_data, was_optimized, original_size, final_size = optimize_file_for_upload(
@@ -2864,28 +2868,24 @@ def transactions():
                                 logger.warning(
                                     f"Large file upload: {file_size_mb:.2f}MB - may take time to process")
 
-                            # Upload to Appwrite with GUID as file ID
-                            # Use from_path with a temp file to avoid SDK chunked upload bug
-                            # (from_bytes calculates wrong byte range for last chunk on files >= 5MB)
-                            with tempfile.TemporaryDirectory() as tmp_dir:
-                                tmp_path = os.path.join(tmp_dir, filename)
-                                with open(tmp_path, 'wb') as f:
-                                    f.write(image_data)
+                            # Upload to Appwrite using the file service
+                            success, error, result = appwrite_file_service.upload_file(
+                                image_data,
+                                attachment_guid,
+                                filename
+                            )
 
-                                result = appwrite_storage.create_file(
-                                    APPWRITE_BUCKET_ID,
-                                    attachment_guid,  # Use GUID as file ID
-                                    InputFile.from_path(tmp_path)
-                                )
-
-                            logger.info(
-                                f"✓ Image {idx + 1}/{len(bill_images)} uploaded successfully: {attachment_guid}, stored size: {result.get('sizeOriginal', 'N/A')}")
-
-                            # Add to list of uploaded GUIDs
-                            attachment_guids.append(attachment_guid)
-
+                            if success:
+                                stored_size = result.get('sizeOriginal', 'N/A') if result else 'N/A'
+                                logger.info(
+                                    f"✓ Image {idx + 1}/{len(bill_images)} uploaded successfully: {attachment_guid}, stored size: {stored_size}")
+                                # Add to list of uploaded GUIDs
+                                attachment_guids.append(attachment_guid)
+                            else:
+                                logger.error(f"Failed to upload bill image {idx + 1} to Appwrite: {error}")
+                                # Continue with other images even if one fails
                         except Exception as e:
-                            logger.error(f"Failed to upload bill image {idx + 1} to Appwrite: {str(e)}")
+                            logger.error(f"Failed to process and upload bill image {idx + 1}: {str(e)}")
                             # Continue with other images even if one fails
                     else:
                         logger.warning(f"Appwrite storage not configured for image {idx + 1}")
@@ -3335,17 +3335,14 @@ def manage_transaction(transaction_id):
                 attachment_guids = [guid.strip() for guid in attachments_value.split(',') if guid.strip()]
 
                 # Delete all attachments from Appwrite bucket
-                if appwrite_storage and APPWRITE_BUCKET_ID:
+                if appwrite_file_service.is_available():
                     for attachment_guid in attachment_guids:
-                        try:
-                            appwrite_storage.delete_file(
-                                APPWRITE_BUCKET_ID,
-                                attachment_guid
-                            )
+                        success, error = appwrite_file_service.delete_file(attachment_guid)
+                        if success:
                             logger.info(
                                 f"Deleted attachment {attachment_guid} from Appwrite for transaction {transaction_id}")
-                        except Exception as e:
-                            logger.warning(f"Failed to delete attachment {attachment_guid} from Appwrite: {str(e)}")
+                        else:
+                            logger.warning(f"Failed to delete attachment {attachment_guid}: {error}")
                             # Continue with other deletions even if one fails
 
             log_transaction_audit(cursor, transaction_id, user_id, 'DELETE')
@@ -3634,7 +3631,7 @@ def manage_transaction_attachment(transaction_id):
         if request.method == 'GET':
             # Return attachment info(s) with DIRECT Appwrite URLs (no proxy)
             # This avoids Vercel's 4.5MB response body limit
-            if appwrite_storage and APPWRITE_BUCKET_ID:
+            if appwrite_file_service.is_available():
                 appwrite_endpoint = os.environ.get('APPWRITE_ENDPOINT')
                 appwrite_project_id = os.environ.get('APPWRITE_PROJECT_ID')
 
@@ -3644,35 +3641,8 @@ def manage_transaction_attachment(transaction_id):
                 attachments_list = []
 
                 for attachment_guid in attachment_guids:
-                    # Get file metadata to determine file type
-                    try:
-                        file_info = appwrite_storage.get_file(
-                            APPWRITE_BUCKET_ID,
-                            attachment_guid
-                        )
-                        file_name = file_info.get('name', attachment_guid)
-                        mime_type = file_info.get('mimeType', 'application/octet-stream')
-                    except Exception as e:
-                        logger.warning(f"SDK get_file failed for {attachment_guid}: {str(e)}, trying HTTP API")
-                        # Fallback to HTTP API for metadata
-                        try:
-                            metadata_url = f"{appwrite_endpoint}/storage/buckets/{APPWRITE_BUCKET_ID}/files/{attachment_guid}"
-                            headers = {
-                                'X-Appwrite-Project': appwrite_project_id,
-                                'X-Appwrite-Key': os.environ.get('APPWRITE_API_KEY')
-                            }
-                            metadata_response = requests.get(metadata_url, headers=headers)
-                            if metadata_response.status_code == 200:
-                                file_info = metadata_response.json()
-                                file_name = file_info.get('name', attachment_guid)
-                                mime_type = file_info.get('mimeType', 'application/octet-stream')
-                            else:
-                                file_name = attachment_guid
-                                mime_type = 'application/octet-stream'
-                        except Exception as e2:
-                            logger.error(f"HTTP metadata fetch also failed for {attachment_guid}: {str(e2)}")
-                            file_name = attachment_guid
-                            mime_type = 'application/octet-stream'
+                    # Get file metadata using the service
+                    file_name, mime_type = appwrite_file_service.get_file_metadata(attachment_guid)
 
                     # Return proxy URLs that stream files (avoids loading into memory)
                     # Proxy handles Appwrite authentication and streams response
@@ -3702,19 +3672,15 @@ def manage_transaction_attachment(transaction_id):
             # If specific_guid is provided in request, delete only that one; otherwise delete all
             specific_guid = request.args.get('guid')
 
-            if appwrite_storage and APPWRITE_BUCKET_ID:
+            if appwrite_file_service.is_available():
                 guids_to_delete = [specific_guid] if specific_guid else attachment_guids
 
                 for guid in guids_to_delete:
-                    try:
-                        # Delete file from Appwrite
-                        appwrite_storage.delete_file(
-                            APPWRITE_BUCKET_ID,
-                            guid
-                        )
+                    success, error = appwrite_file_service.delete_file(guid)
+                    if success:
                         logger.info(f"Deleted attachment {guid} from Appwrite")
-                    except Exception as e:
-                        logger.error(f"Failed to delete attachment {guid} from Appwrite: {str(e)}")
+                    else:
+                        logger.error(f"Failed to delete attachment {guid}: {error}")
                         # Continue with other deletions even if one fails
 
             # Update database: remove deleted GUID(s) from attachments field
@@ -3790,104 +3756,32 @@ def serve_attachment(transaction_id):
             # Default to first attachment
             attachment_guid = attachment_guids[0]
 
-        if not appwrite_storage or not APPWRITE_BUCKET_ID:
+        if not appwrite_file_service.is_available():
             return "Storage not available", 500
 
-        # Get file metadata first
-        try:
-            file_info = appwrite_storage.get_file(
-                APPWRITE_BUCKET_ID,
-                attachment_guid
-            )
-            mime_type = file_info.get('mimeType', 'application/octet-stream')
-            file_name = file_info.get('name', attachment_guid)
+        # Get file metadata using the service
+        file_name, mime_type = appwrite_file_service.get_file_metadata(attachment_guid)
+        logger.info(f"Fetching attachment {attachment_guid}, mime: {mime_type}")
 
-            logger.info(f"Fetching attachment {attachment_guid}, mime: {mime_type}")
+        # Download the file content using the service
+        file_content, status_code, error = appwrite_file_service.download_file(attachment_guid)
 
-        except Exception as e:
-            logger.warning(f"SDK get_file failed: {str(e)}, trying HTTP API for metadata")
-            # Fallback to HTTP API
-            try:
-                appwrite_endpoint = os.environ.get('APPWRITE_ENDPOINT')
-                appwrite_project_id = os.environ.get('APPWRITE_PROJECT_ID')
-                appwrite_api_key = os.environ.get('APPWRITE_API_KEY')
+        if not file_content:
+            return error or "Failed to download file", status_code
 
-                metadata_url = f"{appwrite_endpoint}/storage/buckets/{APPWRITE_BUCKET_ID}/files/{attachment_guid}"
-                headers = {
-                    'X-Appwrite-Project': appwrite_project_id,
-                    'X-Appwrite-Key': appwrite_api_key
-                }
-                metadata_response = requests.get(metadata_url, headers=headers)
-                if metadata_response.status_code == 200:
-                    file_info = metadata_response.json()
-                    mime_type = file_info.get('mimeType', 'application/octet-stream')
-                    file_name = file_info.get('name', attachment_guid)
-                    logger.info(f"Got metadata via HTTP: {file_name}, mime: {mime_type}")
-                else:
-                    logger.error(f"HTTP metadata fetch failed with status {metadata_response.status_code}")
-                    mime_type = 'application/octet-stream'
-                    file_name = attachment_guid
-            except Exception as e2:
-                logger.error(f"HTTP metadata fetch also failed: {str(e2)}")
-                mime_type = 'application/octet-stream'
-                file_name = attachment_guid
+        # Create response with the file content
+        flask_response = Response(file_content, content_type=mime_type)
+        flask_response.headers['Cache-Control'] = 'public, max-age=31536000'  # Cache for 1 year
 
-        # Fetch the actual file content using direct HTTP request
-        try:
-            # Get Appwrite credentials
-            appwrite_endpoint = os.environ.get('APPWRITE_ENDPOINT')
-            appwrite_project_id = os.environ.get('APPWRITE_PROJECT_ID')
-            appwrite_api_key = os.environ.get('APPWRITE_API_KEY')
+        # Check if download parameter is present
+        if request.args.get('download') == '1':
+            flask_response.headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
+        else:
+            flask_response.headers['Content-Disposition'] = 'inline'
 
-            if not all([appwrite_endpoint, appwrite_project_id, appwrite_api_key]):
-                return "Appwrite configuration incomplete", 500
-
-            # Construct the download URL
-            download_url = f"{appwrite_endpoint}/storage/buckets/{APPWRITE_BUCKET_ID}/files/{attachment_guid}/download"
-
-            # Make authenticated request to Appwrite
-            headers = {
-                'X-Appwrite-Project': appwrite_project_id,
-                'X-Appwrite-Key': appwrite_api_key
-            }
-
-            logger.info(f"Streaming file from Appwrite: {download_url}")
-
-            # Stream the response to avoid loading large files into memory
-            response = requests.get(download_url, headers=headers, params={'project': appwrite_project_id}, stream=True)
-
-            if response.status_code != 200:
-                logger.error(f"Appwrite returned status {response.status_code}: {response.text}")
-                return f"Error loading attachment from storage (status {response.status_code})", 500
-
-            # Get content type from response or use detected mime type
-            content_type = response.headers.get('Content-Type', mime_type)
-
-            logger.info(f"Streaming file: Content-Type={content_type}, File={file_name}")
-
-            # Stream response to avoid memory limits (no buffering)
-            def generate():
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        yield chunk
-
-            flask_response = Response(generate(), content_type=content_type)
-            flask_response.headers['Cache-Control'] = 'public, max-age=31536000'  # Cache for 1 year
-
-            # Check if download parameter is present
-            if request.args.get('download') == '1':
-                flask_response.headers['Content-Disposition'] = f'attachment; filename="{file_name}"'
-            else:
-                flask_response.headers['Content-Disposition'] = 'inline'
-
-            logger.info(
-                f"Streaming attachment {attachment_guid}: Content-Type={content_type}, Mode={'download' if request.args.get('download') == '1' else 'inline'}")
-            return flask_response
-
-        except Exception as e:
-            logger.error(f"Error fetching file content from Appwrite: {str(e)}")
-            logger.error(f"Bucket: {APPWRITE_BUCKET_ID}, File: {attachment_guid}")
-            return f"Error loading attachment: {str(e)}", 500
+        logger.info(
+            f"Serving attachment {attachment_guid}: Content-Type={mime_type}, Mode={'download' if request.args.get('download') == '1' else 'inline'}, Size={len(file_content)} bytes")
+        return flask_response
 
 
     except Error as e:
@@ -6546,7 +6440,7 @@ def upload_bill_attachment():
         if len(file_data) == 0:
             return jsonify({'success': False, 'error': 'Empty file data'}), 400
 
-        if not appwrite_storage or not APPWRITE_BUCKET_ID:
+        if not appwrite_file_service.is_available():
             return jsonify({'success': False, 'error': 'Appwrite storage not configured'}), 503
 
         # Optimize file if needed
@@ -6568,17 +6462,15 @@ def upload_bill_attachment():
 
         logger.info(f"Uploading to Appwrite: {filename}, size: {final_size / (1024 * 1024):.2f}MB")
 
-        # Upload to Appwrite
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            tmp_path = os.path.join(tmp_dir, filename)
-            with open(tmp_path, 'wb') as f:
-                f.write(optimized_data)
+        # Upload to Appwrite using the file service
+        success, error, result = appwrite_file_service.upload_file(
+            optimized_data,
+            attachment_guid,
+            filename
+        )
 
-            result = appwrite_storage.create_file(
-                APPWRITE_BUCKET_ID,
-                attachment_guid,
-                InputFile.from_path(tmp_path)
-            )
+        if not success:
+            raise Exception(error or "Upload failed")
 
         logger.info(f"✓ Uploaded successfully: {attachment_guid}")
 

@@ -7,6 +7,7 @@ Configuration is loaded from the ai_configs database table.
 import os
 import json
 import logging
+import time
 from typing import Dict, Optional, Union, List
 from google import genai
 from google.genai.types import Part
@@ -54,6 +55,101 @@ class GeminiBillScanner:
         except Exception as e:
             logger.warning(f"Could not load AI config from database: {e}. Will use environment variables.")
         return None
+
+    def _should_retry_error(self, error: Exception) -> bool:
+        """
+        Determine if an error is transient and should be retried.
+
+        Args:
+            error: The exception that occurred
+
+        Returns:
+            True if the error should be retried, False otherwise
+        """
+        error_str = str(error).lower()
+
+        # Retry on these conditions:
+        # - 503 Service Unavailable (high demand)
+        # - 429 Too Many Requests (rate limiting)
+        # - 500 Internal Server Error (temporary server issues)
+        # - Connection errors, timeouts
+        retry_indicators = [
+            '503',
+            '429',
+            '500',
+            'unavailable',
+            'high demand',
+            'try again',
+            'timeout',
+            'connection',
+            'temporarily',
+            'rate limit'
+        ]
+
+        return any(indicator in error_str for indicator in retry_indicators)
+
+    def _call_gemini_with_retry(self, content_parts: List, max_retries: int = 3,
+                                 initial_delay: float = 2.0, max_delay: float = 30.0):
+        """
+        Call Gemini API with exponential backoff retry logic.
+
+        Args:
+            content_parts: The content to send to Gemini
+            max_retries: Maximum number of retry attempts (default: 3)
+            initial_delay: Initial delay in seconds before first retry (default: 2.0)
+            max_delay: Maximum delay between retries in seconds (default: 30.0)
+
+        Returns:
+            The Gemini API response
+
+        Raises:
+            Exception: If all retry attempts fail
+        """
+        last_error = None
+        delay = initial_delay
+
+        for attempt in range(max_retries + 1):
+            try:
+                if attempt > 0:
+                    logger.info(f"Retry attempt {attempt}/{max_retries} for Gemini API call...")
+
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=content_parts
+                )
+
+                # Success!
+                if attempt > 0:
+                    logger.info(f"✅ Gemini API call succeeded on retry attempt {attempt}")
+
+                return response
+
+            except Exception as e:
+                last_error = e
+                error_msg = str(e)
+
+                # Check if we should retry
+                if not self._should_retry_error(e):
+                    logger.error(f"Non-retryable error from Gemini API: {error_msg}")
+                    raise
+
+                # Check if we have retries left
+                if attempt >= max_retries:
+                    logger.error(f"All {max_retries} retry attempts exhausted for Gemini API")
+                    raise
+
+                # Log and wait before retry
+                logger.warning(
+                    f"⚠️ Gemini API error (attempt {attempt + 1}/{max_retries + 1}): {error_msg}"
+                )
+                logger.info(f"Waiting {delay:.1f}s before retry...")
+                time.sleep(delay)
+
+                # Exponential backoff with jitter
+                delay = min(delay * 2, max_delay)
+
+        # Should not reach here, but just in case
+        raise last_error if last_error else Exception("Unknown error during Gemini API retry")
 
     def _are_items_similar(self, name1: str, name2: str) -> bool:
         """
@@ -229,9 +325,9 @@ IMPORTANT: The 'amount' field should ALWAYS be the EXACT final total shown on th
                     image = Image.open(io.BytesIO(img_data))
                     content_parts.append(image)
 
-            # Send all images in one request to Gemini
+            # Send all images in one request to Gemini with retry logic
             logger.info(f"Sending {len(images_list)} image(s) to Gemini for analysis")
-            response = self.client.models.generate_content(model=self.model_name, contents=content_parts)
+            response = self._call_gemini_with_retry(content_parts, max_retries=3, initial_delay=2.0)
 
             # Extract text from response
             response_text = response.text.strip()
