@@ -1142,14 +1142,7 @@
 
                 // Create appropriate input based on setting type
                 let inputHtml = '';
-                if (settingKey === 'exchange_rate_refresh_mode') {
-                    inputHtml = `
-                        <select id="setting_${settingKey}" class="form-select form-select-sm" style="background: var(--bg-tertiary); color: var(--text-primary); border-color: var(--border-color);">
-                            <option value="background" ${settingValue === 'background' ? 'selected' : ''}>Background</option>
-                            <option value="manual" ${settingValue === 'manual' ? 'selected' : ''}>Manual</option>
-                        </select>
-                    `;
-                } else if (settingKey === 'bill_upload_mode') {
+                if (settingKey === 'bill_upload_mode') {
                     inputHtml = `
                         <select id="setting_${settingKey}" class="form-select form-select-sm" style="background: var(--bg-tertiary); color: var(--text-primary); border-color: var(--border-color);">
                             <option value="sequential" ${settingValue === 'sequential' ? 'selected' : ''}>Sequential</option>

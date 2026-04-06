@@ -491,8 +491,6 @@ COMMENT='Runtime application settings (key-value store)';
 
 -- Seed defaults (INSERT IGNORE preserves any previously customised value)
 INSERT IGNORE INTO app_settings (setting_key, value, description) VALUES
-('exchange_rate_refresh_mode', 'background',
- 'How exchange rates are refreshed: background = automatic scheduler, manual = on-demand via admin only'),
 ('bill_upload_mode', 'sequential',
  'Bill image upload strategy: sequential = one-by-one (Vercel-friendly), batch = all at once (non-Vercel)');
 
@@ -519,7 +517,7 @@ CREATE TABLE IF NOT EXISTS exchange_rate_refresh_logs (
     INDEX idx_status     (status),
     INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-COMMENT='Logs every exchange-rate refresh attempt made by the background scheduler';
+COMMENT='Logs every exchange-rate refresh attempt made by the API endpoint';
 
 -- ============================================================
 -- Category Keywords Table

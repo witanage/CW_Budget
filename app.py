@@ -695,19 +695,10 @@ def register():
 def refresh_all_exchange_rates(force=False):
     """Fetch today's exchange rates from all banks and cache in the database.
 
-    Called by the Vercel cron job every 15 minutes.  When the admin sets the
-    mode to ``manual`` the function returns ``None`` immediately — unless
-    *force* is ``True`` (used by the admin "Refresh All" endpoint).
-
+    Called by external cron job via the /api/exchange-rate/refresh-all endpoint.
     Fetches from all banks in parallel to minimize total execution time.
     """
-    if not force:
-        mode = get_setting('exchange_rate_refresh_mode', 'background')
-        if mode != 'background':
-            logger.info("Scheduler: refresh mode is '%s' — skipping automatic refresh.", mode)
-            return
-
-    logger.info("Scheduler: Starting parallel exchange rate refresh (force=%s)...", force)
+    logger.info("Starting parallel exchange rate refresh (force=%s)...", force)
 
     # Generate a unique run key for this refresh batch
     run_key = str(uuid.uuid4())
@@ -1542,10 +1533,7 @@ def update_admin_setting(key):
     new_value = str(data['value'])
 
     # Key-specific validation
-    if key == 'exchange_rate_refresh_mode':
-        if new_value not in ('background', 'manual'):
-            return jsonify({'error': "Value must be 'background' or 'manual'"}), 400
-    elif key == 'bill_upload_mode':
+    if key == 'bill_upload_mode':
         if new_value not in ('sequential', 'batch'):
             return jsonify({'error': "Value must be 'sequential' or 'batch'"}), 400
 
@@ -7136,7 +7124,7 @@ def get_pb_rate_for_date():
     """
     Get People's Bank exchange rate for a specific date from cache.
 
-    Rates are refreshed automatically every hour by the background scheduler.
+    Rates are refreshed by external cron job calling the /api/exchange-rate/refresh-all endpoint.
 
     Query Parameters:
         date: Date in ddmmyyyy format (optional, defaults to today)
