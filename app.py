@@ -419,6 +419,56 @@ def apply_category_percentage_markup(amount, category_id, connection):
     return amount
 
 
+def auto_categorize_transaction(description, connection):
+    """
+    Auto-categorize a transaction based on keyword matching.
+
+    Searches the category_keywords table for keywords that match the description.
+    Returns the first matching category_id, or None if no match found.
+
+    Args:
+        description: str - The transaction description
+        connection: MySQL connection object
+
+    Returns:
+        int or None - Category ID if match found, None otherwise
+    """
+    if not description:
+        return None
+
+    try:
+        cursor = connection.cursor(dictionary=True)
+
+        # Get all keywords and their categories
+        cursor.execute("""
+            SELECT category_id, keyword 
+            FROM category_keywords
+            ORDER BY LENGTH(keyword) DESC
+        """)
+
+        keywords = cursor.fetchall()
+        cursor.close()
+
+        # Convert description to lowercase for case-insensitive matching
+        description_lower = description.lower()
+
+        # Check each keyword for a match
+        for row in keywords:
+            keyword = row['keyword'].lower()
+            if keyword in description_lower:
+                category_id = row['category_id']
+                logger.info(
+                    f"Auto-categorized '{description}' to category {category_id} (matched keyword: '{keyword}')")
+                return category_id
+
+        logger.debug(f"No category match found for description: '{description}'")
+        return None
+
+    except Exception as e:
+        logger.error(f"Error in auto-categorization: {str(e)}")
+        return None
+
+
 def get_setting(key, default=None):
     """Read a single value from the app_settings table. Returns *default* when
     the table does not exist yet, the key is missing, or the DB is unreachable."""
@@ -2736,10 +2786,10 @@ def transactions():
             debit = Decimal(str(debit_value)) if debit_value else Decimal('0')
             credit = Decimal(str(credit_value)) if credit_value else Decimal('0')
 
-            # Auto-categorize if no category provided (same logic as token endpoint)
+            # Get category_id from data, or auto-categorize if not provided
             category_id = data.get('category_id') or None
             if not category_id:
-                category_id = auto_categorize_transaction(data.get('description'))
+                category_id = auto_categorize_transaction(data.get('description'), connection)
 
             # Apply category percentage markup if applicable
             if category_id:
@@ -2765,11 +2815,6 @@ def transactions():
 
             # New transaction gets display_order = 1 (appears at top)
             next_display_order = 1
-
-            # Auto-categorize if no category provided (same logic as token endpoint)
-            category_id = data.get('category_id') or None
-            if not category_id:
-                category_id = auto_categorize_transaction(data.get('description'))
 
             # Get bill content if provided (from scanned bills)
             bill_content = data.get('bill_content')
