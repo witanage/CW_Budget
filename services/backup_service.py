@@ -4,7 +4,7 @@ Database Backup Service
 Handles automated database backups with password-protected encryption.
 - Creates MySQL-compatible SQL dumps
 - Compresses and encrypts backups with AES-256
-- Uploads to Appwrite Cloud Storage
+- Uploads to Google Drive
 """
 
 import io
@@ -16,23 +16,13 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 from db import get_db_connection, DB_CONFIG
+from services.google_drive_backup_service import get_google_drive_backup_service
 
 logger = logging.getLogger(__name__)
 
 # Try importing optional dependencies
 try:
-    from appwrite.client import Client
-    from appwrite.services.storage import Storage
-    from appwrite.input_file import InputFile
-
-    APPWRITE_AVAILABLE = True
-except ImportError:
-    APPWRITE_AVAILABLE = False
-    logger.warning("appwrite not installed. Backup upload will be disabled.")
-
-try:
     import pyzipper
-
     PYZIPPER_AVAILABLE = True
 except ImportError:
     PYZIPPER_AVAILABLE = False
@@ -43,37 +33,10 @@ class BackupService:
     """Service for creating and uploading encrypted database backups."""
 
     def __init__(self):
-        """Initialize the backup service with Appwrite credentials."""
-        self.backup_endpoint = os.environ.get('APPWRITE_BACKUP_ENDPOINT', os.environ.get('APPWRITE_ENDPOINT'))
-        self.backup_project = os.environ.get('APPWRITE_BACKUP_PROJECT_ID')
-        self.backup_key = os.environ.get('APPWRITE_BACKUP_API_KEY')
-        self.backup_bucket = os.environ.get('APPWRITE_BACKUP_BUCKET_ID')
+        """Initialize the backup service."""
         self.backup_timeout = int(os.environ.get('BACKUP_TIMEOUT_SECONDS', '50'))
         self.backup_password = os.environ.get('BACKUP_ENCRYPTION_PASSWORD')
-
-        self.backup_client = None
-        self.backup_storage = None
-
-    def _initialize_appwrite_client(self):
-        """Initialize Appwrite client for backup storage."""
-        if not APPWRITE_AVAILABLE:
-            raise RuntimeError("Appwrite SDK not installed")
-
-        if not all([self.backup_endpoint, self.backup_project, self.backup_key, self.backup_bucket]):
-            raise ValueError(
-                "Missing Appwrite backup credentials. Set APPWRITE_BACKUP_PROJECT_ID, "
-                "APPWRITE_BACKUP_API_KEY, and APPWRITE_BACKUP_BUCKET_ID in .env"
-            )
-
-        try:
-            self.backup_client = Client()
-            self.backup_client.set_endpoint(self.backup_endpoint)
-            self.backup_client.set_project(self.backup_project)
-            self.backup_client.set_key(self.backup_key)
-            self.backup_storage = Storage(self.backup_client)
-            logger.info("Appwrite backup client initialized successfully")
-        except Exception as e:
-            raise RuntimeError(f"Failed to initialize Appwrite client: {e}")
+        self.drive_service = get_google_drive_backup_service()
 
     def _timeout_handler(self, signum, frame):
         """Signal handler for backup timeout."""
@@ -131,8 +94,7 @@ class BackupService:
         output.write("/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;\n")
         output.write("/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;\n")
         output.write("/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;\n")
-        output.write(
-            "/*!80000 SET @OLD_SQL_REQUIRE_PRIMARY_KEY=@@SQL_REQUIRE_PRIMARY_KEY, SQL_REQUIRE_PRIMARY_KEY=0 */;\n\n")
+        output.write("/*!80000 SET @OLD_SQL_REQUIRE_PRIMARY_KEY=@@SQL_REQUIRE_PRIMARY_KEY, SQL_REQUIRE_PRIMARY_KEY=0 */;\n\n")
 
         # Get database objects
         cursor.execute("SHOW FULL TABLES WHERE Table_type = 'BASE TABLE'")
@@ -268,8 +230,7 @@ class BackupService:
             output.write("/*!50003 SET character_set_results = utf8mb4 */ ;\n")
             output.write("/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;\n")
             output.write("/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;\n")
-            output.write(
-                "/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;\n")
+            output.write("/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;\n")
             output.write("DELIMITER ;;\n")
             try:
                 cursor.execute(f"SHOW CREATE PROCEDURE `{proc}`")
@@ -296,8 +257,7 @@ class BackupService:
             output.write("/*!50003 SET character_set_results = utf8mb4 */ ;\n")
             output.write("/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;\n")
             output.write("/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;\n")
-            output.write(
-                "/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;\n")
+            output.write("/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;\n")
             output.write("DELIMITER ;;\n")
             try:
                 cursor.execute(f"SHOW CREATE FUNCTION `{func}`")
@@ -323,8 +283,7 @@ class BackupService:
             output.write("/*!50003 SET character_set_results = utf8mb4 */ ;\n")
             output.write("/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;\n")
             output.write("/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;\n")
-            output.write(
-                "/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;\n")
+            output.write("/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;\n")
             output.write("DELIMITER ;;\n")
             try:
                 cursor.execute(f"SHOW CREATE TRIGGER `{trigger}`")
@@ -355,8 +314,7 @@ class BackupService:
             output.write("/*!50106 SET character_set_results = utf8mb4 */ ;;\n")
             output.write("/*!50106 SET collation_connection  = utf8mb4_0900_ai_ci */ ;;\n")
             output.write("/*!50106 SET @saved_sql_mode       = @@sql_mode */ ;;\n")
-            output.write(
-                "/*!50106 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;;\n")
+            output.write("/*!50106 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;;\n")
             try:
                 cursor.execute(f"SHOW CREATE EVENT `{event}`")
                 result = cursor.fetchone()
@@ -394,10 +352,10 @@ class BackupService:
                 # Create password-protected zip with AES-256 encryption
                 zip_path = os.path.join(tmp_dir, zip_filename)
                 with pyzipper.AESZipFile(
-                        zip_path,
-                        'w',
-                        compression=pyzipper.ZIP_DEFLATED,
-                        encryption=pyzipper.WZ_AES
+                    zip_path,
+                    'w',
+                    compression=pyzipper.ZIP_DEFLATED,
+                    encryption=pyzipper.WZ_AES
                 ) as zf:
                     zf.setpassword(self.backup_password.encode('utf-8'))
                     zf.write(sql_path, filename)
@@ -413,17 +371,17 @@ class BackupService:
 
     def create_and_upload_backup(self):
         """
-        Create a database backup, compress and encrypt it, then upload to Appwrite.
+        Create a database backup, compress and encrypt it, then upload to Google Drive.
 
         Returns:
             tuple: (success: bool, message: str)
         """
-        # Initialize Appwrite client
-        try:
-            self._initialize_appwrite_client()
-        except (RuntimeError, ValueError) as e:
-            logger.error("Backup aborted: %s", e)
-            return False, str(e)
+        # Check Google Drive availability
+        if not self.drive_service.is_available():
+            msg = ("Google Drive backup not configured. Set GOOGLE_DRIVE_BACKUP_FOLDER_ID "
+                   "and GOOGLE_DRIVE_SA_KEY_PATH (or GOOGLE_DRIVE_SA_KEY_JSON) in .env")
+            logger.error("Backup aborted: %s", msg)
+            return False, msg
 
         # Database connection
         connection = get_db_connection()
@@ -478,7 +436,7 @@ class BackupService:
         # Compress and encrypt
         encrypted_bytes, upload_filename = self._compress_and_encrypt(sql_bytes, filename, timestamp)
 
-        # Upload to Appwrite
+        # Upload to Google Drive
         try:
             with tempfile.TemporaryDirectory() as tmp_dir:
                 if encrypted_bytes:
@@ -487,19 +445,15 @@ class BackupService:
                     with open(tmp_path, 'wb') as f:
                         f.write(encrypted_bytes)
 
-                    file_id = f"{db_name}_{timestamp}"
-                    self.backup_storage.create_file(
-                        self.backup_bucket,
-                        file_id,
-                        InputFile.from_path(tmp_path),
-                    )
+                    success, error_msg, file_id = self.drive_service.upload_file(tmp_path, upload_filename)
+                    if not success:
+                        return False, f"Google Drive upload failed: {error_msg}"
 
                     original_mb = len(sql_bytes) / (1024 * 1024)
                     zip_mb = len(encrypted_bytes) / (1024 * 1024)
                     compression_ratio = (1 - len(encrypted_bytes) / len(sql_bytes)) * 100
 
-                    logger.info("✅ Encrypted backup uploaded to Appwrite bucket %s — file_id=%s",
-                                self.backup_bucket, file_id)
+                    logger.info("✅ Encrypted backup uploaded to Google Drive — file_id=%s", file_id)
                     logger.info("   Original: %.2f MB | Compressed: %.2f MB | Saved: %.1f%%",
                                 original_mb, zip_mb, compression_ratio)
                     return True, f"Encrypted backup uploaded: {file_id} (Compressed: {zip_mb:.2f} MB, Saved: {compression_ratio:.1f}%)"
@@ -509,20 +463,17 @@ class BackupService:
                     with open(tmp_path, 'wb') as f:
                         f.write(sql_bytes)
 
-                    file_id = f"{db_name}_{timestamp}"
-                    self.backup_storage.create_file(
-                        self.backup_bucket,
-                        file_id,
-                        InputFile.from_path(tmp_path),
-                    )
+                    success, error_msg, file_id = self.drive_service.upload_file(tmp_path, upload_filename)
+                    if not success:
+                        return False, f"Google Drive upload failed: {error_msg}"
 
                     size_mb = len(sql_bytes) / (1024 * 1024)
-                    logger.info("✅ Backup uploaded to Appwrite bucket %s — file_id=%s (%.2f MB) [UNENCRYPTED]",
-                                self.backup_bucket, file_id, size_mb)
+                    logger.info("✅ Backup uploaded to Google Drive — file_id=%s (%.2f MB) [UNENCRYPTED]",
+                                file_id, size_mb)
                     return True, f"Backup uploaded successfully: {file_id} ({size_mb:.2f} MB) [UNENCRYPTED]"
 
         except Exception as e:
-            logger.error("Appwrite upload failed: %s", e, exc_info=True)
+            logger.error("Google Drive upload failed: %s", e, exc_info=True)
             return False, f"Upload failed: {e}"
 
 
