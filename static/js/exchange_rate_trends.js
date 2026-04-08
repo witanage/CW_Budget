@@ -117,6 +117,7 @@
         _on('ertIntradayLimit',      'change', function () { _s.intradayLimit    = +this.value; _fetchIntraday(); });
         _on('ertIntradayTimezone',   'change', function () { _s.intradayTimezone = this.value; _fetchIntraday(); });
         _on('ertAiInsightsBtn',      'click',  function () { _showAiInsights(); });
+        _on('aiUserBankSelect',      'change', function () { _showAiInsights(); });
     }
 
     function _on(id, evt, fn) {
@@ -763,7 +764,7 @@
             return;
         }
 
-        var bsModal = new bootstrap.Modal(modal);
+        var bsModal = bootstrap.Modal.getOrCreateInstance(modal);
         bsModal.show();
 
         // Show loading state
@@ -774,18 +775,23 @@
         // Use comparison months setting for analysis (default 3 months)
         var analysisMonths = _s.compMonths || 3;
 
+        var bankSelect = document.getElementById('aiUserBankSelect');
+        var userBank = bankSelect ? bankSelect.value : 'HNB';
+
         var params = new URLSearchParams({
             months: analysisMonths,
             currency_from: 'USD',
-            currency_to: 'LKR'
+            currency_to: 'LKR',
+            user_bank: userBank
         });
 
         console.log('🔍 Requesting AI insights with params:', {
             months: analysisMonths,
             currency_from: 'USD',
-            currency_to: 'LKR'
+            currency_to: 'LKR',
+            user_bank: userBank
         });
-        console.log('ℹ️  Backend will fetch CBSL, PB, and HNB data from YOUR database');
+        console.log('ℹ️  Backend will fetch CBSL, PB, HNB, SAMPATH data from YOUR database');
 
         fetch('/api/exchange-rate/ai-insights?' + params)
             .then(function (res) {
@@ -801,10 +807,12 @@
 
                 // Log bank data if available
                 if (data.statistics && data.statistics.banks) {
+                    var ub = data.statistics.user_bank || userBank;
                     console.log('📊 Bank data from YOUR database:');
-                    console.log('  - HNB (your bank):', data.statistics.banks.HNB);
-                    console.log('  - CBSL:', data.statistics.banks.CBSL);
-                    console.log('  - PB:', data.statistics.banks.PB);
+                    console.log('  - ' + ub + ' (your bank):', data.statistics.banks[ub]);
+                    Object.keys(data.statistics.banks).forEach(function (b) {
+                        if (b !== ub) console.log('  - ' + b + ':', data.statistics.banks[b]);
+                    });
                 }
 
                 _renderAiInsights(data);
@@ -855,25 +863,30 @@
         var banks = stats.banks || {};
         var userBank = stats.user_bank || 'HNB';
 
-        // Show HNB (user's bank) statistics
+        // Update all dynamic bank name labels
+        document.querySelectorAll('.aiFcBankLabel').forEach(function (el) {
+            el.textContent = userBank;
+        });
+
+        // Show user's bank statistics
         if (banks[userBank]) {
-            var hnbStats = banks[userBank];
-            _txt('aiCurrentRate', hnbStats.current ? hnbStats.current.toFixed(4) + ' LKR (HNB)' : '--');
-            _txt('aiAvgRate', hnbStats.avg ? hnbStats.avg.toFixed(4) + ' LKR' : '--');
-            _txt('aiRateRange', (hnbStats.min && hnbStats.max) ?
-                hnbStats.min.toFixed(4) + ' - ' + hnbStats.max.toFixed(4) : '--');
+            var ubStats = banks[userBank];
+            _txt('aiCurrentRate', ubStats.current ? ubStats.current.toFixed(4) + ' LKR (' + userBank + ')' : '--');
+            _txt('aiAvgRate', ubStats.avg ? ubStats.avg.toFixed(4) + ' LKR' : '--');
+            _txt('aiRateRange', (ubStats.min && ubStats.max) ?
+                ubStats.min.toFixed(4) + ' - ' + ubStats.max.toFixed(4) : '--');
 
             // Calculate volatility for display
-            var volatility = hnbStats.max && hnbStats.min ?
-                ((hnbStats.max - hnbStats.min) / hnbStats.avg * 100).toFixed(2) + '%' : '--';
+            var volatility = ubStats.max && ubStats.min ?
+                ((ubStats.max - ubStats.min) / ubStats.avg * 100).toFixed(2) + '%' : '--';
             _txt('aiVolatility', volatility);
         }
 
-        // HNB Position (new field from multi-bank analysis)
+        // User bank position (from multi-bank analysis)
         if (data.hnb_position) {
             var trend = document.getElementById('aiTrend');
             if (trend) {
-                trend.innerHTML = '<strong>HNB Position:</strong> ' + data.hnb_position + '<br><br>' +
+                trend.innerHTML = '<strong>' + userBank + ' Position:</strong> ' + data.hnb_position + '<br><br>' +
                                  (data.trend || 'No trend analysis available');
             }
         } else {
@@ -1001,6 +1014,36 @@
                 li.className = 'mb-1';
                 actionsList.appendChild(li);
             });
+        }
+
+        // Global Insights
+        var globalCard = document.getElementById('aiGlobalInsightsCard');
+        var globalContent = document.getElementById('aiGlobalInsightsContent');
+        if (globalCard && globalContent && data.global_insights) {
+            globalCard.style.display = 'block';
+            var gi = data.global_insights;
+            var labels = {
+                usd_strength: { icon: '💵', title: 'USD Strength' },
+                fed_policy_impact: { icon: '🏦', title: 'Fed Policy Impact' },
+                commodity_pressure: { icon: '🛢️', title: 'Commodity Pressure' },
+                imf_program: { icon: '🌐', title: 'IMF Program' },
+                regional_context: { icon: '🌏', title: 'Regional Context' },
+                risk_sentiment: { icon: '📊', title: 'Risk Sentiment' },
+                key_global_driver: { icon: '🔑', title: 'Key Global Driver' },
+                outlook: { icon: '🔮', title: 'Global Outlook' }
+            };
+            var html = '<dl class="mb-0">';
+            Object.keys(labels).forEach(function (key) {
+                if (gi[key]) {
+                    var l = labels[key];
+                    html += '<dt class="mt-2">' + l.icon + ' ' + l.title + '</dt>';
+                    html += '<dd class="mb-1 ms-3 small">' + gi[key] + '</dd>';
+                }
+            });
+            html += '</dl>';
+            globalContent.innerHTML = html;
+        } else if (globalCard) {
+            globalCard.style.display = 'none';
         }
 
         // Metadata

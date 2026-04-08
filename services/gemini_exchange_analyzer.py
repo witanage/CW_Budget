@@ -301,9 +301,10 @@ class GeminiExchangeAnalyzer:
             hnb_current = bank_stats[user_bank]['current']
             hnb_avg = bank_stats[user_bank]['avg']
 
-            # Compare HNB with other banks (higher rate = BETTER for the user, more LKR per USD)
+            # Compare user's bank with other banks (higher rate = BETTER for the user, more LKR per USD)
             comparisons = {}
-            for bank in ['CBSL', 'PB', 'SAMPATH']:
+            other_banks = [b for b in bank_stats if b != user_bank]
+            for bank in other_banks:
                 if bank in bank_stats:
                     comparisons[bank] = {
                         'current_diff': hnb_current - bank_stats[bank]['current'],
@@ -333,24 +334,24 @@ BANK STATISTICS COMPARISON:
 """
 
             # Add comparison insights (HIGHER rate = BETTER for user, they get more LKR per USD)
-            data_summary += "\nHNB vs OTHER BANKS (Higher rate = BETTER for user):\n"
+            data_summary += f"\n{user_bank} vs OTHER BANKS (Higher rate = BETTER for user):\n"
             for bank, comp in comparisons.items():
                 if comp['current_diff'] > 0:
-                    label = "BETTER (HNB pays more LKR per USD)"
+                    label = f"BETTER ({user_bank} pays more LKR per USD)"
                 elif comp['current_diff'] < 0:
-                    label = "WORSE (HNB pays less LKR per USD)"
+                    label = f"WORSE ({user_bank} pays less LKR per USD)"
                 else:
                     label = "EQUAL"
                 diff_pct = abs(comp['current_diff'] / bank_stats[bank]['current'] * 100)
-                data_summary += f"- HNB vs {bank}: {label} by {abs(comp['current_diff']):.4f} LKR ({diff_pct:.2f}%)\n"
+                data_summary += f"- {user_bank} vs {bank}: {label} by {abs(comp['current_diff']):.4f} LKR ({diff_pct:.2f}%)\n"
 
-            # Recent 10-day history for HNB
-            hnb_recent = bank_data[user_bank][-10:] if len(bank_data[user_bank]) >= 10 else bank_data[user_bank]
-            data_summary += f"\nHNB RECENT HISTORY (Last {len(hnb_recent)} days):\n"
-            data_summary += chr(10).join([f"- {item['date']}: {item['rate']:.4f} LKR" for item in hnb_recent])
+            # Recent 10-day history for user's bank
+            user_recent = bank_data[user_bank][-10:] if len(bank_data[user_bank]) >= 10 else bank_data[user_bank]
+            data_summary += f"\n{user_bank} RECENT HISTORY (Last {len(user_recent)} days):\n"
+            data_summary += chr(10).join([f"- {item['date']}: {item['rate']:.4f} LKR" for item in user_recent])
 
-            # Add recent history for all banks (not just HNB)
-            for other_bank in ['CBSL', 'PB', 'SAMPATH']:
+            # Add recent history for all other banks
+            for other_bank in other_banks:
                 if other_bank in bank_data and bank_data[other_bank]:
                     other_recent = bank_data[other_bank][-10:] if len(bank_data[other_bank]) >= 10 else bank_data[other_bank]
                     data_summary += f"\n{other_bank} RECENT HISTORY (Last {len(other_recent)} days):\n"
@@ -377,14 +378,14 @@ BANK STATISTICS COMPARISON:
                     data_summary += f"  - Model Fit (R²): {fc['r_squared']:.4f} (1.0 = perfect fit)\n"
                     data_summary += f"  - Uncertainty (±): {fc['residual_std']:.4f} LKR\n\n"
 
-                # Add HNB-specific forecast comparison
+                # Add user bank-specific forecast comparison
                 if user_bank in bank_forecasts:
-                    hnb_fc = bank_forecasts[user_bank]
-                    data_summary += f"HNB FORECAST SUMMARY:\n"
-                    data_summary += f"  - If trend continues, HNB rate in 7 days: ~{hnb_fc['predicted_7d']:.4f} LKR "
-                    data_summary += f"(range: {hnb_fc['predicted_7d'] - 1.96 * hnb_fc['residual_std']:.4f} - {hnb_fc['predicted_7d'] + 1.96 * hnb_fc['residual_std']:.4f})\n"
-                    data_summary += f"  - If trend continues, HNB rate in 14 days: ~{hnb_fc['predicted_14d']:.4f} LKR "
-                    data_summary += f"(range: {hnb_fc['predicted_14d'] - 1.96 * hnb_fc['residual_std']:.4f} - {hnb_fc['predicted_14d'] + 1.96 * hnb_fc['residual_std']:.4f})\n"
+                    ub_fc = bank_forecasts[user_bank]
+                    data_summary += f"{user_bank} FORECAST SUMMARY:\n"
+                    data_summary += f"  - If trend continues, {user_bank} rate in 7 days: ~{ub_fc['predicted_7d']:.4f} LKR "
+                    data_summary += f"(range: {ub_fc['predicted_7d'] - 1.96 * ub_fc['residual_std']:.4f} - {ub_fc['predicted_7d'] + 1.96 * ub_fc['residual_std']:.4f})\n"
+                    data_summary += f"  - If trend continues, {user_bank} rate in 14 days: ~{ub_fc['predicted_14d']:.4f} LKR "
+                    data_summary += f"(range: {ub_fc['predicted_14d'] - 1.96 * ub_fc['residual_std']:.4f} - {ub_fc['predicted_14d'] + 1.96 * ub_fc['residual_std']:.4f})\n"
 
                     # Compare predicted rates across banks
                     predicted_7d_rates = {b: f['predicted_7d'] for b, f in bank_forecasts.items()}
@@ -392,9 +393,9 @@ BANK STATISTICS COMPARISON:
                     data_summary += f"\n  - Bank with highest predicted rate in 7 days: {best_predicted_bank} ({predicted_7d_rates[best_predicted_bank]:.4f} LKR)\n"
                     if best_predicted_bank != user_bank:
                         gap = predicted_7d_rates[best_predicted_bank] - predicted_7d_rates[user_bank]
-                        data_summary += f"  - HNB projected to be {gap:.4f} LKR LOWER than {best_predicted_bank}\n"
+                        data_summary += f"  - {user_bank} projected to be {gap:.4f} LKR LOWER than {best_predicted_bank}\n"
                     else:
-                        data_summary += f"  - HNB is projected to have the BEST rate!\n"
+                        data_summary += f"  - {user_bank} is projected to have the BEST rate!\n"
 
             # Build transaction context for prompt
             transaction_context = ""
@@ -436,17 +437,25 @@ CRITICAL PRINCIPLE — HIGHER RATE = BETTER FOR THE USER:
 - A HIGHER buy rate means MORE {currency_to} per {currency_from} — this is ALWAYS better.
 """
 
-            # Create AI prompt focused on HNB patterns
+            # Create AI prompt focused on user's bank patterns
+            bank_descriptions = {
+                'CBSL': 'CBSL (Central Bank of Sri Lanka — the benchmark/indicative rate)',
+                'PB': 'PB (People\'s Bank — state-owned commercial bank)',
+                'HNB': 'HNB (Hatton National Bank — a leading private bank)',
+                'SAMPATH': 'SAMPATH (Sampath Bank — a major private bank)',
+            }
+            bank_list = '\n'.join(
+                f"- {bank_descriptions.get(b, b)}{' ← USER\'S BANK' if b == user_bank else ''}"
+                for b in bank_stats
+            )
+
             prompt = f"""{data_summary}{transaction_context}
 
 You are a currency exchange specialist analyzing {currency_from} to {currency_to} rates in Sri Lanka.
 You are comparing rates across these banks:
-- CBSL (Central Bank of Sri Lanka — the benchmark/indicative rate)
-- PB (People's Bank — state-owned commercial bank)
-- HNB (Hatton National Bank — the user's bank, a leading private bank)
-- SAMPATH (Sampath Bank — another major private bank)
+{bank_list}
 
-The user banks with HNB and wants the HIGHEST possible buy rate (more LKR per USD is ALWAYS better).
+The user banks with {user_bank} and wants the HIGHEST possible buy rate (more LKR per USD is ALWAYS better).
 
 SRI LANKA CONTEXT:
 - Sri Lanka's exchange rate was liberalized after the 2022 economic crisis; rates can vary significantly between banks.
@@ -456,35 +465,49 @@ SRI LANKA CONTEXT:
 - Seasonal patterns: rates may shift around import-heavy periods, tourist seasons, and remittance cycles.
 - The Central Bank intervenes occasionally to stabilize excessive volatility.
 
-TASK: Analyze the data to help the user maximize LKR received when converting USD at HNB.
+GLOBAL FACTORS AFFECTING USD/LKR:
+- US Federal Reserve monetary policy: rate hikes strengthen USD (LKR weakens → higher rate numbers), rate cuts weaken USD (LKR strengthens → lower rate numbers).
+- US Dollar Index (DXY): a rising DXY generally pushes USD/LKR higher; a falling DXY benefits LKR.
+- Global oil & commodity prices: Sri Lanka is a net importer — rising oil prices increase USD demand, pressuring LKR downward.
+- IMF program: Sri Lanka's ongoing IMF Extended Fund Facility affects investor confidence and forex reserves; compliance milestones can strengthen LKR.
+- Sri Lanka's forex reserves & trade balance: higher reserves and improving exports support a stronger LKR.
+- Global risk sentiment: risk-off environments (geopolitical tensions, market crashes) cause capital flight from emerging markets, weakening LKR.
+- Regional currency movements: LKR often moves in tandem with INR and other South Asian currencies.
+- Remittance flows: worker remittances from the Middle East, Europe, and East Asia are a major forex source; seasonal peaks (holidays, year-end) boost LKR.
+- Sovereign credit rating changes and foreign debt restructuring progress directly impact LKR stability.
+- Global inflation trends: persistent US inflation delays Fed rate cuts, keeping USD strong against LKR.
+
+Based on these global dynamics, factor in whether the current USD/LKR trend is driven by local bank competition or broader macroeconomic forces.
+
+TASK: Analyze the data to help the user maximize LKR received when converting USD at {user_bank}.
 A HIGHER rate is ALWAYS better for the user. Consider:
-1. Is HNB currently offering the HIGHEST rate among all banks? If not, which bank is better and by how much?
-2. HNB's historical patterns — is the current rate above or below its own average?
+1. Is {user_bank} currently offering the HIGHEST rate among all banks? If not, which bank is better and by how much?
+2. {user_bank}'s historical patterns — is the current rate above or below its own average?
 3. Rate trends — are rates rising, falling, or stable across all banks?
-4. Spread analysis — how does HNB's markup over CBSL compare to other banks' markups?
-5. Timing advice — are there days of the week/month when HNB rates tend to peak?
+4. Spread analysis — how does {user_bank}'s markup over CBSL compare to other banks' markups?
+5. Timing advice — are there days of the week/month when {user_bank} rates tend to peak?
 6. If another bank consistently offers a higher rate, quantify the difference.
 
 Provide analysis in JSON format:
 
 {{
-    "recommendation": "NOW/WAIT/MONITOR — clear recommendation. NOW = HNB rate is high relative to history and peers. WAIT = rates are trending up, better rate expected soon. MONITOR = uncertain, check again in a few days.",
-    "hnb_position": "Is HNB currently offering the best/competitive/below-average rates? Compare to other banks with specific numbers.",
-    "trend": "Brief analysis of rate trends across all banks (2-3 sentences). Are rates rising or falling? Is HNB improving faster or slower than others?",
-    "best_time": "When is the best time to exchange at HNB? Specific timing advice based on observed patterns.",
+    "recommendation": "NOW/WAIT/MONITOR — clear recommendation factoring BOTH local bank data AND global macro conditions. NOW = {user_bank} rate is high relative to history/peers AND global factors favor exchanging now (e.g., USD expected to weaken). WAIT = rates are trending up OR global factors suggest USD will strengthen further soon. MONITOR = uncertain due to conflicting local vs global signals.",
+    "hnb_position": "Is {user_bank} currently offering the best/competitive/below-average rates? Compare to other banks with specific numbers.",
+    "trend": "Brief analysis of rate trends across all banks (2-3 sentences). Are rates rising or falling? Is {user_bank} improving faster or slower than others?",
+    "best_time": "When is the best time to exchange at {user_bank}? Specific timing advice based on observed patterns.",
     "insights": [
-        "How HNB's rate compares to the CBSL benchmark (spread analysis)",
-        "How HNB compares to Sampath and PB — with specific rate differences",
-        "Whether HNB's current rate is above or below its own historical average",
+        "How {user_bank}'s rate compares to the CBSL benchmark (spread analysis)",
+        "How {user_bank} compares to other banks — with specific rate differences",
+        "Whether {user_bank}'s current rate is above or below its own historical average",
         "Any day-of-week or monthly patterns observed in the data",
         "Which bank consistently offers the highest rate and by how much"
     ],
     "forecast": {{
-        "hnb_7_day": "Predicted HNB rate in 7 days with reasoning. State the number clearly.",
-        "hnb_14_day": "Predicted HNB rate in 14 days with reasoning. State the number clearly.",
-        "direction": "RISING/FALLING/STABLE — overall trend direction for HNB",
-        "confidence_in_forecast": "HIGH/MEDIUM/LOW — how reliable is this prediction based on R² and data consistency?",
-        "should_wait": "YES/NO — based on the forecast, should the user delay exchanging? Explain why with numbers.",
+        "hnb_7_day": "Predicted {user_bank} rate in 7 days with reasoning. State the number clearly.",
+        "hnb_14_day": "Predicted {user_bank} rate in 14 days with reasoning. State the number clearly.",
+        "direction": "RISING/FALLING/STABLE — overall trend direction for {user_bank}",
+        "confidence_in_forecast": "HIGH/MEDIUM/LOW — how reliable is this prediction based on R², data consistency, AND global macro stability? Downgrade if major global events (Fed meeting, IMF review, geopolitical risk) could disrupt the trend.",
+        "should_wait": "YES/NO — based on BOTH the statistical forecast AND global factors, should the user delay exchanging? Consider: if Fed signals rate cuts, USD may weaken and rates could drop — exchange NOW. If USD is strengthening globally, rates may rise — WAIT. Explain with numbers.",
         "optimal_window": "When in the next 14 days is the rate expected to peak at HNB? Be specific (e.g., 'around April 15-17').",
         "all_banks_7d": {{
             "CBSL": "predicted rate",
@@ -494,28 +517,42 @@ Provide analysis in JSON format:
         }},
         "best_bank_7d": "Which bank is projected to offer the highest rate in 7 days?"
     }},
-    "confidence": "HIGH/MEDIUM/LOW — confidence level in this analysis",
-    "risk_level": "HIGH/MEDIUM/LOW — risk of waiting vs exchanging now",
+    "confidence": "HIGH/MEDIUM/LOW — confidence level considering both local data quality (R², data points) AND global macro certainty. Downgrade if global factors are highly uncertain (e.g., pending Fed decision, geopolitical tensions).",
+    "risk_level": "HIGH/MEDIUM/LOW — risk of waiting vs exchanging now, factoring global risks (e.g., HIGH if global events could cause sudden LKR depreciation; LOW if macro environment is stable and rates are range-bound).",
     "action_items": [
         "Specific action item 1 — what should the user do RIGHT NOW?",
         "Specific action item 2 — what should the user watch for?"
     ],
-    "bank_comparison": "Rank all banks by current rate. State clearly which offers the best rate and the LKR difference per USD compared to HNB. If HNB is not the best, quantify how much the user loses per $1000 by staying with HNB.",
-    "rate_advantage": "Calculate: for a $1000 exchange, how much more/less LKR the user gets at HNB vs the best available bank"
+    "bank_comparison": "Rank all banks by current rate. State clearly which offers the best rate and the LKR difference per USD compared to {user_bank}. If {user_bank} is not the best, quantify how much the user loses per $1000 by staying with {user_bank}.",
+    "rate_advantage": "Calculate: for a $1000 exchange, how much more/less LKR the user gets at {user_bank} vs the best available bank",
+    "global_insights": {{
+        "usd_strength": "Is the USD currently strengthening or weakening globally? How does this affect USD/LKR?",
+        "fed_policy_impact": "How is current/expected US Federal Reserve policy influencing USD/LKR rates?",
+        "commodity_pressure": "Are global oil/commodity prices putting pressure on LKR through Sri Lanka's import bill?",
+        "imf_program": "Any recent IMF-related developments affecting LKR stability and investor confidence?",
+        "regional_context": "How is LKR performing relative to other South Asian currencies (INR, etc.)?",
+        "risk_sentiment": "Is the current global risk environment (risk-on/risk-off) favorable or unfavorable for LKR?",
+        "key_global_driver": "What is the single most important global factor driving USD/LKR right now?",
+        "outlook": "Based on global factors, is LKR likely to strengthen or weaken in the near term? 1-2 sentences."
+    }}
 }}
 
 IMPORTANT:
 - HIGHER rate = BETTER for the user (they get more LKR per USD)
 - Always rank banks from highest to lowest rate
-- If HNB is NOT the best, clearly state the gap and what the user loses
-- If HNB IS the best, celebrate it and advise to exchange now
+- If {user_bank} is NOT the best, clearly state the gap and what the user loses
+- If {user_bank} IS the best, celebrate it and advise to exchange now
 - Be specific with numbers — don't say 'slightly better', say 'better by 0.45 LKR/USD'
-- Give actionable timing advice for HNB exchanges
+- Give actionable timing advice for {user_bank} exchanges
 - Consider Sri Lanka's post-crisis market dynamics
 - USE the statistical forecast data provided above — reference the predicted rates, trend direction, and momentum
 - If the forecast shows rates RISING, recommend WAIT and estimate when the peak might occur
 - If the forecast shows rates FALLING, recommend NOW before rates drop further
 - The forecast section must include specific predicted rate numbers from the statistical model
+- In global_insights, analyze how global macroeconomic forces (Fed policy, DXY, oil prices, IMF program, risk sentiment) are currently affecting or likely to affect the USD/LKR rate
+- Connect global factors to actionable advice — e.g., if Fed is expected to cut rates, USD may weaken and LKR rates could drop, so exchange sooner
+- The recommendation, confidence, and risk_level MUST reflect global factors — not just local bank data. If local data says WAIT but global macro says exchange now (e.g., USD about to weaken), the recommendation should weigh both signals
+- If global uncertainty is high (pending Fed decision, geopolitical tensions, IMF review), downgrade confidence and raise risk_level accordingly
 - Return ONLY valid JSON, no markdown or code blocks"""
 
             # Log data being sent to AI
@@ -523,8 +560,8 @@ IMPORTANT:
             logger.info(f"  - User Bank: {user_bank}")
             logger.info(f"  - Data Period: {bank_stats[user_bank]['first_date']} to {bank_stats[user_bank]['last_date']}")
             logger.info(f"  - Banks Analyzed: {', '.join(bank_stats.keys())}")
-            logger.info(f"  - Current Rates: HNB={hnb_current:.4f}, " +
-                       ', '.join([f"{bank}={bank_stats[bank]['current']:.4f}" for bank in ['CBSL', 'PB', 'SAMPATH'] if bank in bank_stats]))
+            logger.info(f"  - Current Rates: {user_bank}={hnb_current:.4f}, " +
+                       ', '.join([f"{bank}={bank_stats[bank]['current']:.4f}" for bank in bank_stats if bank != user_bank]))
             logger.info(f"  - Total Data Points: {sum(bank_stats[b]['count'] for b in bank_stats)}")
             logger.info(f"  - Data Summary (first 500 chars): {data_summary[:500]}")
 

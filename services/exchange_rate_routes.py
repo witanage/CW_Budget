@@ -1050,6 +1050,10 @@ def get_exchange_rate_ai_insights():
         currency_from = request.args.get('currency_from', 'USD')
         currency_to = request.args.get('currency_to', 'LKR')
         transaction_type = request.args.get('transaction_type', 'salary_exchange')
+        user_bank = request.args.get('user_bank', 'HNB')
+        # Validate user_bank against known banks
+        if user_bank not in ('CBSL', 'PB', 'HNB', 'SAMPATH'):
+            user_bank = 'HNB'
 
         # Get Gemini Exchange Analyzer instance
         analyzer = get_gemini_exchange_analyzer()
@@ -1103,18 +1107,17 @@ def get_exchange_rate_ai_insights():
                     current_rates[bank] = data[-1]['rate']
 
             # Log data summary for verification
-            logger.info(f"📊 Data organized by bank:")
-            logger.info(
-                f"  - HNB: {len(bank_data['HNB'])} data points, current rate: {current_rates.get('HNB', 'N/A')}")
-            logger.info(
-                f"  - CBSL: {len(bank_data['CBSL'])} data points, current rate: {current_rates.get('CBSL', 'N/A')}")
-            logger.info(f"  - PB: {len(bank_data['PB'])} data points, current rate: {current_rates.get('PB', 'N/A')}")
-            logger.info(f"  - SAMPATH: {len(bank_data['SAMPATH'])} data points, current rate: {current_rates.get('SAMPATH', 'N/A')}")
+            logger.info(f"📊 Data organized by bank (user bank: {user_bank}):")
+            for bank in bank_data:
+                count = len(bank_data[bank])
+                rate = current_rates.get(bank, 'N/A')
+                marker = ' ← YOUR BANK' if bank == user_bank else ''
+                logger.info(f"  - {bank}{marker}: {count} data points, current rate: {rate}")
 
-            # Log sample of recent HNB data (your bank)
-            if bank_data['HNB']:
-                recent_hnb = bank_data['HNB'][-5:]
-                logger.info(f"📈 Recent HNB rates (last 5 days): {recent_hnb}")
+            # Log sample of recent data for user's bank
+            if bank_data.get(user_bank):
+                recent = bank_data[user_bank][-5:]
+                logger.info(f"📈 Recent {user_bank} rates (last 5 days): {recent}")
 
             # Call AI analysis with multi-bank data
             logger.info(f"🤖 Sending YOUR database data to AI for analysis...")
@@ -1122,7 +1125,7 @@ def get_exchange_rate_ai_insights():
             analysis = analyzer.analyze_multi_bank_patterns(
                 bank_data=bank_data,
                 current_rates=current_rates,
-                user_bank='HNB',
+                user_bank=user_bank,
                 currency_from=currency_from,
                 currency_to=currency_to,
                 transaction_type=transaction_type
@@ -1133,7 +1136,7 @@ def get_exchange_rate_ai_insights():
             analysis['data_period_months'] = months
             analysis['transaction_type'] = transaction_type
             analysis['user_context'] = {
-                'bank': 'HNB',
+                'bank': user_bank,
                 'transaction_type': transaction_type,
                 'currency_direction': f'{currency_from} → {currency_to}'
             }

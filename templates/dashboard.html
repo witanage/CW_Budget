@@ -855,6 +855,15 @@
                 <h5 class="modal-title" id="aiInsightsModalLabel">
                     <i class="fas fa-brain me-2"></i>AI Currency Exchange Insights
                 </h5>
+                <div class="ms-auto me-3 d-flex align-items-center">
+                    <label for="aiUserBankSelect" class="form-label mb-0 me-2 small text-muted">My Bank:</label>
+                    <select id="aiUserBankSelect" class="form-select form-select-sm" style="width:auto;">
+                        <option value="HNB" selected>HNB</option>
+                        <option value="SAMPATH">Sampath</option>
+                        <option value="PB">People's Bank</option>
+                        <option value="CBSL">CBSL</option>
+                    </select>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body" id="aiInsightsContent">
@@ -1050,7 +1059,36 @@
                             <h6 class="card-subtitle mb-2 text-muted">
                                 <i class="fas fa-crystal-ball me-1"></i>Short-term Forecast
                             </h6>
-                            <p id="aiForecast" class="mb-0"></p>
+                            <p id="aiForecastText" class="mb-0"></p>
+                            <div id="aiForecastDetail" style="display:none;">
+                                <div class="row mb-2">
+                                    <div class="col-6">
+                                        <small class="text-muted">7-Day Predicted (<span class="aiFcBankLabel">HNB</span>)</small>
+                                        <div id="aiFc7d" class="fw-bold">--</div>
+                                    </div>
+                                    <div class="col-6">
+                                        <small class="text-muted">14-Day Predicted (<span class="aiFcBankLabel">HNB</span>)</small>
+                                        <div id="aiFc14d" class="fw-bold">--</div>
+                                    </div>
+                                </div>
+                                <div class="mb-2">
+                                    <small class="text-muted">Direction:</small>
+                                    <span id="aiFcDirection" class="badge bg-secondary ms-1">--</span>
+                                    <span id="aiFcConfidence" class="text-muted small ms-2"></span>
+                                </div>
+                                <div id="aiFcShouldWait" style="display:none;" class="mb-2">
+                                    <small class="text-muted">Should Wait:</small>
+                                    <span id="aiFcShouldWaitText" class="small"></span>
+                                </div>
+                                <div id="aiFcOptimalWindow" style="display:none;" class="mb-2">
+                                    <small class="text-muted">Optimal Window:</small>
+                                    <span id="aiFcOptimalWindowText" class="small"></span>
+                                </div>
+                                <div id="aiFcBankRates" style="display:none;" class="mb-0">
+                                    <small class="text-muted">All Banks 7-Day Predicted:</small>
+                                    <ul id="aiFcBankRatesList" class="mb-0 small"></ul>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -1061,6 +1099,16 @@
                                 <i class="fas fa-tasks me-1"></i>Action Items
                             </h6>
                             <ul id="aiActionItemsList" class="mb-0"></ul>
+                        </div>
+                    </div>
+
+                    <!-- Global Insights -->
+                    <div class="card mb-3" id="aiGlobalInsightsCard" style="display:none;">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">
+                                <i class="fas fa-globe me-1"></i>Global Market Insights
+                            </h6>
+                            <div id="aiGlobalInsightsContent"></div>
                         </div>
                     </div>
 
