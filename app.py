@@ -14,7 +14,7 @@ from decimal import Decimal
 from functools import wraps
 
 from dotenv import load_dotenv
-from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash, make_response
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash, make_response, send_from_directory
 from flask.json.provider import DefaultJSONProvider
 from flask_cors import CORS
 from flask_limiter import Limiter
@@ -153,6 +153,15 @@ def ratelimit_handler(e):
         'message': 'Too many requests. Please try again later.',
         'retry_after': e.description
     }), 429
+
+
+# ---------------------------------------------------------------------------
+# Favicon route to suppress browser 404 warnings
+# ---------------------------------------------------------------------------
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(os.path.join(app.root_path, 'static'),
+                               'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
 
 # ---------------------------------------------------------------------------
