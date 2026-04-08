@@ -453,7 +453,42 @@
                             <h6 class="card-subtitle mb-2 text-muted">
                                 <i class="fas fa-crystal-ball me-1"></i>Short-term Forecast
                             </h6>
-                            <p id="aiForecast" class="mb-0"></p>
+                            <div id="aiForecast">
+                                <p id="aiForecastText" class="mb-2"></p>
+                                <div id="aiForecastDetail" style="display:none;">
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-6">
+                                            <div class="border rounded p-2 text-center">
+                                                <small class="text-muted d-block">HNB in 7 Days</small>
+                                                <strong id="aiFc7d" class="fs-6">--</strong>
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="border rounded p-2 text-center">
+                                                <small class="text-muted d-block">HNB in 14 Days</small>
+                                                <strong id="aiFc14d" class="fs-6">--</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="mb-2">
+                                        <small class="text-muted">Direction:</small>
+                                        <span id="aiFcDirection" class="badge bg-secondary ms-1">--</span>
+                                        <span id="aiFcConfidence" class="badge bg-info ms-1">--</span>
+                                    </div>
+                                    <div id="aiFcShouldWait" class="mb-2" style="display:none;">
+                                        <small class="text-muted">Should Wait:</small>
+                                        <span id="aiFcShouldWaitText" class="ms-1"></span>
+                                    </div>
+                                    <div id="aiFcOptimalWindow" class="mb-2" style="display:none;">
+                                        <small class="text-muted">Optimal Window:</small>
+                                        <span id="aiFcOptimalWindowText" class="ms-1"></span>
+                                    </div>
+                                    <div id="aiFcBankRates" style="display:none;">
+                                        <small class="text-muted d-block mb-1">All Banks (7-day predicted):</small>
+                                        <ul id="aiFcBankRatesList" class="mb-0 small"></ul>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 

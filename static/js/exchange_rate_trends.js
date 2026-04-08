@@ -888,8 +888,12 @@
         if (data.bank_comparison) {
             var bestTime = document.getElementById('aiBestTime');
             if (bestTime) {
-                bestTime.innerHTML = (data.best_time || 'No specific recommendation') +
-                                    '<br><br><strong>Bank Comparison:</strong> ' + data.bank_comparison;
+                var html = (data.best_time || 'No specific recommendation') +
+                           '<br><br><strong>Bank Comparison:</strong> ' + data.bank_comparison;
+                if (data.rate_advantage) {
+                    html += '<br><br><strong>💰 Rate Advantage ($1000):</strong> ' + data.rate_advantage;
+                }
+                bestTime.innerHTML = html;
             }
         } else {
             // Fallback for old format
@@ -913,9 +917,77 @@
         }
 
         // Forecast
-        var forecast = document.getElementById('aiForecast');
-        if (forecast) {
-            forecast.textContent = data.forecast || 'No forecast available';
+        var fcText = document.getElementById('aiForecastText');
+        var fcDetail = document.getElementById('aiForecastDetail');
+        if (fcText && data.forecast) {
+            if (typeof data.forecast === 'string') {
+                // Legacy string format
+                fcText.textContent = data.forecast;
+                if (fcDetail) fcDetail.style.display = 'none';
+            } else if (typeof data.forecast === 'object') {
+                // Structured forecast object
+                var fc = data.forecast;
+
+                // 7-day and 14-day predicted rates
+                var fc7d = document.getElementById('aiFc7d');
+                var fc14d = document.getElementById('aiFc14d');
+                if (fc7d) fc7d.textContent = fc.hnb_7_day || '--';
+                if (fc14d) fc14d.textContent = fc.hnb_14_day || '--';
+
+                // Direction badge
+                var dirEl = document.getElementById('aiFcDirection');
+                if (dirEl && fc.direction) {
+                    dirEl.textContent = fc.direction;
+                    dirEl.className = 'badge ms-1 ' +
+                        (fc.direction === 'RISING' ? 'bg-success' :
+                         fc.direction === 'FALLING' ? 'bg-danger' : 'bg-warning text-dark');
+                }
+
+                // Confidence
+                var confEl = document.getElementById('aiFcConfidence');
+                if (confEl && fc.confidence_in_forecast) {
+                    confEl.textContent = fc.confidence_in_forecast + ' confidence';
+                }
+
+                // Should wait
+                var swDiv = document.getElementById('aiFcShouldWait');
+                var swText = document.getElementById('aiFcShouldWaitText');
+                if (swDiv && swText && fc.should_wait) {
+                    swDiv.style.display = 'block';
+                    swText.textContent = fc.should_wait;
+                }
+
+                // Optimal window
+                var owDiv = document.getElementById('aiFcOptimalWindow');
+                var owText = document.getElementById('aiFcOptimalWindowText');
+                if (owDiv && owText && fc.optimal_window) {
+                    owDiv.style.display = 'block';
+                    owText.textContent = fc.optimal_window;
+                }
+
+                // All banks 7-day predicted
+                var brDiv = document.getElementById('aiFcBankRates');
+                var brList = document.getElementById('aiFcBankRatesList');
+                if (brDiv && brList && fc.all_banks_7d) {
+                    brDiv.style.display = 'block';
+                    brList.innerHTML = '';
+                    var bestBank = fc.best_bank_7d || '';
+                    Object.keys(fc.all_banks_7d).forEach(function (bank) {
+                        var li = document.createElement('li');
+                        var isBest = (bank === bestBank);
+                        li.innerHTML = '<strong>' + bank + ':</strong> ' + fc.all_banks_7d[bank] +
+                            (isBest ? ' <span class="badge bg-success">Best</span>' : '');
+                        brList.appendChild(li);
+                    });
+                }
+
+                // Summary text (empty if detailed view shown)
+                fcText.textContent = '';
+                if (fcDetail) fcDetail.style.display = 'block';
+            }
+        } else if (fcText) {
+            fcText.textContent = 'No forecast available';
+            if (fcDetail) fcDetail.style.display = 'none';
         }
 
         // Action items

@@ -1067,12 +1067,12 @@ def get_exchange_rate_ai_insights():
         cursor = connection.cursor(dictionary=True)
 
         try:
-            # Get daily buy rates per bank (CBSL, PB, HNB) for the specified period
+            # Get daily buy rates per bank (CBSL, PB, HNB, SAMPATH) for the specified period
             cursor.execute("""
                 SELECT date, source, buy_rate
                 FROM exchange_rates
                 WHERE date >= DATE_SUB(CURDATE(), INTERVAL %s MONTH)
-                  AND source IN ('CBSL', 'PB', 'HNB')
+                  AND source IN ('CBSL', 'PB', 'HNB', 'SAMPATH')
                 ORDER BY date, source
             """, (months,))
 
@@ -1087,7 +1087,7 @@ def get_exchange_rate_ai_insights():
                 }), 400
 
             # Organize data by bank
-            bank_data = {'CBSL': [], 'PB': [], 'HNB': []}
+            bank_data = {'CBSL': [], 'PB': [], 'HNB': [], 'SAMPATH': []}
             for row in all_data:
                 source = row['source']
                 if source in bank_data:
@@ -1109,6 +1109,7 @@ def get_exchange_rate_ai_insights():
             logger.info(
                 f"  - CBSL: {len(bank_data['CBSL'])} data points, current rate: {current_rates.get('CBSL', 'N/A')}")
             logger.info(f"  - PB: {len(bank_data['PB'])} data points, current rate: {current_rates.get('PB', 'N/A')}")
+            logger.info(f"  - SAMPATH: {len(bank_data['SAMPATH'])} data points, current rate: {current_rates.get('SAMPATH', 'N/A')}")
 
             # Log sample of recent HNB data (your bank)
             if bank_data['HNB']:
