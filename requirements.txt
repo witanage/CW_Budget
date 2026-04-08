@@ -10,6 +10,9 @@ openpyxl==3.1.2
 reportlab==4.0.7
 PyJWT==2.8.0
 google-genai==0.0.1
+google-api-python-client==2.166.0
+google-auth==2.38.0
+google-auth-oauthlib==1.2.1
 Pillow==11.3.0
 appwrite==17.0.0
 pyzipper==0.3.6
