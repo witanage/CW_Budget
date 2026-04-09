@@ -20,7 +20,7 @@ from flask import request, jsonify, session, make_response, url_for, Response
 from mysql.connector import Error
 
 from db import get_db_connection
-from services.appwrite_file_service import get_appwrite_file_service
+from services.google_drive_file_service import get_google_drive_file_service
 from services.gemini_bill_scanner import get_gemini_bill_scanner
 
 logger = logging.getLogger(__name__)
@@ -52,8 +52,8 @@ try:
 except ImportError:
     PIL_AVAILABLE = False
 
-# Initialize Appwrite file service
-appwrite_file_service = get_appwrite_file_service()
+# Initialize Google Drive file service
+file_service = get_google_drive_file_service()
 
 
 # ==================================================
@@ -293,8 +293,7 @@ def auto_categorize_transaction(description, connection):
             keyword = row['keyword'].lower()
             if keyword in description_lower:
                 category_id = row['category_id']
-                logger.info(
-                    f"Auto-categorized '{description}' to category {category_id} (matched keyword: '{keyword}')")
+                logger.info(f"Auto-categorized '{description}' to category {category_id} (matched keyword: '{keyword}')")
                 return category_id
 
         logger.debug(f"No category match found for description: '{description}'")
@@ -727,7 +726,7 @@ def transactions_handler():
 
             print(f"[DEBUG] Received transaction data: {data}")
 
-            # Handle bill image(s) upload to Appwrite (if provided)
+            # Handle bill image(s) upload to Google Drive (if provided)
             attachment_guids = []
             attachments_value = None
 
@@ -766,7 +765,7 @@ def transactions_handler():
                         logger.warning(f"Skipping empty file {idx + 1}")
                         continue
 
-                    if appwrite_file_service.is_available():
+                    if file_service.is_available():
                         try:
                             # Optimize file if needed (resize images, compress PDFs)
                             optimized_data, was_optimized, original_size, final_size = optimize_file_for_upload(
@@ -794,7 +793,7 @@ def transactions_handler():
                             # Check file size
                             file_size_mb = len(image_data) / (1024 * 1024)
                             logger.info(
-                                f"Uploading image {idx + 1}/{len(bill_images)} to Appwrite: {filename}, type: {file_ext}, size: {len(image_data)} bytes ({file_size_mb:.2f}MB)")
+                                f"Uploading image {idx + 1}/{len(bill_images)} to Google Drive: {filename}, type: {file_ext}, size: {len(image_data)} bytes ({file_size_mb:.2f}MB)")
 
                             # Check first bytes for validation
                             first_bytes = image_data[:8] if len(image_data) >= 8 else image_data
@@ -814,27 +813,28 @@ def transactions_handler():
                                 logger.warning(
                                     f"Large file upload: {file_size_mb:.2f}MB - may take time to process")
 
-                            # Upload to Appwrite using the file service
-                            success, error, result = appwrite_file_service.upload_file(
+                            # Upload to Google Drive using the file service
+                            success, error, result = file_service.upload_file(
                                 image_data,
                                 attachment_guid,
                                 filename
                             )
 
                             if success:
+                                drive_file_id = result.get('id', attachment_guid) if result else attachment_guid
                                 stored_size = result.get('sizeOriginal', 'N/A') if result else 'N/A'
                                 logger.info(
-                                    f"✓ Image {idx + 1}/{len(bill_images)} uploaded successfully: {attachment_guid}, stored size: {stored_size}")
-                                # Add to list of uploaded GUIDs
-                                attachment_guids.append(attachment_guid)
+                                    f"✓ Image {idx + 1}/{len(bill_images)} uploaded successfully: {drive_file_id}, stored size: {stored_size}")
+                                # Add to list of uploaded file IDs
+                                attachment_guids.append(drive_file_id)
                             else:
-                                logger.error(f"Failed to upload bill image {idx + 1} to Appwrite: {error}")
+                                logger.error(f"Failed to upload bill image {idx + 1} to Google Drive: {error}")
                                 # Continue with other images even if one fails
                         except Exception as e:
                             logger.error(f"Failed to process and upload bill image {idx + 1}: {str(e)}")
                             # Continue with other images even if one fails
                     else:
-                        logger.warning(f"Appwrite storage not configured for image {idx + 1}")
+                        logger.warning(f"File storage not configured for image {idx + 1}")
 
                 # Store comma-separated GUIDs in attachments field (or None if no uploads succeeded)
                 attachments_value = ','.join(attachment_guids) if attachment_guids else None
@@ -1253,7 +1253,7 @@ def manage_transaction_handler(transaction_id):
             # Log audit trail before deleting
             user_id = session['user_id']
 
-            # Check if transaction has an attachment and delete it from Appwrite
+            # Check if transaction has an attachment and delete it from Google Drive
             dict_cursor = connection.cursor(dictionary=True)
             dict_cursor.execute("""
                 SELECT t.attachments
@@ -1271,13 +1271,13 @@ def manage_transaction_handler(transaction_id):
                 # Split comma-separated GUIDs (supports both single and multiple attachments)
                 attachment_guids = [guid.strip() for guid in attachments_value.split(',') if guid.strip()]
 
-                # Delete all attachments from Appwrite bucket
-                if appwrite_file_service.is_available():
+                # Delete all attachments from storage
+                if file_service.is_available():
                     for attachment_guid in attachment_guids:
-                        success, error = appwrite_file_service.delete_file(attachment_guid)
+                        success, error = file_service.delete_file(attachment_guid)
                         if success:
                             logger.info(
-                                f"Deleted attachment {attachment_guid} from Appwrite for transaction {transaction_id}")
+                                f"Deleted attachment {attachment_guid} from Google Drive for transaction {transaction_id}")
                         else:
                             logger.warning(f"Failed to delete attachment {attachment_guid}: {error}")
                             # Continue with other deletions even if one fails
@@ -1558,23 +1558,16 @@ def manage_transaction_attachment_handler(transaction_id):
         attachment_guids = [guid.strip() for guid in attachments_value.split(',') if guid.strip()]
 
         if request.method == 'GET':
-            # Return attachment info(s) with DIRECT Appwrite URLs (no proxy)
-            # This avoids Vercel's 4.5MB response body limit
-            if appwrite_file_service.is_available():
-                appwrite_endpoint = os.environ.get('APPWRITE_ENDPOINT')
-                appwrite_project_id = os.environ.get('APPWRITE_PROJECT_ID')
-
-                if not appwrite_endpoint or not appwrite_project_id:
-                    return jsonify({'error': 'Appwrite configuration incomplete'}), 500
-
+            # Return attachment info(s) via proxy URLs
+            if file_service.is_available():
                 attachments_list = []
 
                 for attachment_guid in attachment_guids:
                     # Get file metadata using the service
-                    file_name, mime_type = appwrite_file_service.get_file_metadata(attachment_guid)
+                    file_name, mime_type = file_service.get_file_metadata(attachment_guid)
 
                     # Return proxy URLs that stream files (avoids loading into memory)
-                    # Proxy handles Appwrite authentication and streams response
+                    # Proxy handles authentication and streams response
                     proxy_url = url_for('serve_attachment', transaction_id=transaction_id,
                                         attachment_guid=attachment_guid, _external=True)
 
@@ -1594,20 +1587,20 @@ def manage_transaction_attachment_handler(transaction_id):
                     'count': len(attachments_list)
                 }), 200
             else:
-                return jsonify({'error': 'Appwrite storage not available'}), 500
+                return jsonify({'error': 'File storage not available'}), 500
 
         elif request.method == 'DELETE':
-            # Delete attachment(s) from Appwrite and update transaction
+            # Delete attachment(s) from Google Drive and update transaction
             # If specific_guid is provided in request, delete only that one; otherwise delete all
             specific_guid = request.args.get('guid')
 
-            if appwrite_file_service.is_available():
+            if file_service.is_available():
                 guids_to_delete = [specific_guid] if specific_guid else attachment_guids
 
                 for guid in guids_to_delete:
-                    success, error = appwrite_file_service.delete_file(guid)
+                    success, error = file_service.delete_file(guid)
                     if success:
-                        logger.info(f"Deleted attachment {guid} from Appwrite")
+                        logger.info(f"Deleted attachment {guid} from Google Drive")
                     else:
                         logger.error(f"Failed to delete attachment {guid}: {error}")
                         # Continue with other deletions even if one fails
@@ -1683,15 +1676,15 @@ def serve_attachment_handler(transaction_id):
             # Default to first attachment
             attachment_guid = attachment_guids[0]
 
-        if not appwrite_file_service.is_available():
+        if not file_service.is_available():
             return "Storage not available", 500
 
         # Get file metadata using the service
-        file_name, mime_type = appwrite_file_service.get_file_metadata(attachment_guid)
+        file_name, mime_type = file_service.get_file_metadata(attachment_guid)
         logger.info(f"Fetching attachment {attachment_guid}, mime: {mime_type}")
 
         # Download the file content using the service
-        file_content, status_code, error = appwrite_file_service.download_file(attachment_guid)
+        file_content, status_code, error = file_service.download_file(attachment_guid)
 
         if not file_content:
             return error or "Failed to download file", status_code
@@ -1706,8 +1699,7 @@ def serve_attachment_handler(transaction_id):
         else:
             flask_response.headers['Content-Disposition'] = 'inline'
 
-        logger.info(
-            f"Serving attachment {attachment_guid}: Content-Type={mime_type}, Mode={'download' if request.args.get('download') == '1' else 'inline'}, Size={len(file_content)} bytes")
+        logger.info(f"Serving attachment {attachment_guid}: Content-Type={mime_type}, Mode={'download' if request.args.get('download') == '1' else 'inline'}, Size={len(file_content)} bytes")
         return flask_response
 
 
@@ -2273,7 +2265,7 @@ def scan_bill_handler():
 
 
 def upload_bill_attachment_handler():
-    """Upload a single bill image/PDF to Appwrite and return its GUID."""
+    """Upload a single bill image/PDF to Google Drive and return its file ID."""
     try:
         if 'bill_image' not in request.files:
             return jsonify({'success': False, 'error': 'No file provided'}), 400
@@ -2296,8 +2288,8 @@ def upload_bill_attachment_handler():
         if len(file_data) == 0:
             return jsonify({'success': False, 'error': 'Empty file data'}), 400
 
-        if not appwrite_file_service.is_available():
-            return jsonify({'success': False, 'error': 'Appwrite storage not configured'}), 503
+        if not file_service.is_available():
+            return jsonify({'success': False, 'error': 'File storage not configured'}), 503
 
         # Optimize file if needed
         optimized_data, was_optimized, original_size, final_size = optimize_file_for_upload(
@@ -2309,17 +2301,16 @@ def upload_bill_attachment_handler():
         # Log optimization
         if was_optimized:
             reduction_pct = ((original_size - final_size) / original_size) * 100
-            logger.info(
-                f"✓ Image optimized: {original_size / (1024 * 1024):.2f}MB → {final_size / (1024 * 1024):.2f}MB ({reduction_pct:.1f}% smaller)")
+            logger.info(f"✓ Image optimized: {original_size / (1024 * 1024):.2f}MB → {final_size / (1024 * 1024):.2f}MB ({reduction_pct:.1f}% smaller)")
 
         # Generate GUID for filename
         attachment_guid = str(uuid.uuid4())
         filename = f"{attachment_guid}.{file_ext}"
 
-        logger.info(f"Uploading to Appwrite: {filename}, size: {final_size / (1024 * 1024):.2f}MB")
+        logger.info(f"Uploading to Google Drive: {filename}, size: {final_size / (1024 * 1024):.2f}MB")
 
-        # Upload to Appwrite using the file service
-        success, error, result = appwrite_file_service.upload_file(
+        # Upload to Google Drive using the file service
+        success, error, result = file_service.upload_file(
             optimized_data,
             attachment_guid,
             filename
@@ -2328,11 +2319,13 @@ def upload_bill_attachment_handler():
         if not success:
             raise Exception(error or "Upload failed")
 
-        logger.info(f"✓ Uploaded successfully: {attachment_guid}")
+        # Use Google Drive file ID as the attachment identifier
+        drive_file_id = result.get('id', attachment_guid) if result else attachment_guid
+        logger.info(f"✓ Uploaded successfully: {drive_file_id}")
 
         return jsonify({
             'success': True,
-            'attachment_guid': attachment_guid
+            'attachment_guid': drive_file_id
         }), 200
 
     except Exception as e:

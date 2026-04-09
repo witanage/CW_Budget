@@ -26,7 +26,7 @@ from services.hnb_exchange_rate_service import get_hnb_exchange_rate_service
 from services.pb_exchange_rate_service import get_pb_exchange_rate_service
 from services.sampath_exchange_rate_service import get_sampath_exchange_rate_service
 from services.backup_service import get_backup_service
-from services.appwrite_file_service import get_appwrite_file_service
+from services.google_drive_file_service import get_google_drive_file_service
 from services.exchange_rate_routes import register_exchange_rate_routes
 from services.tax_service import register_tax_routes
 from services.transaction_service import register_transaction_routes
@@ -41,29 +41,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Try importing optional dependencies
-try:
-    from appwrite.client import Client
-    from appwrite.services.storage import Storage
-    from appwrite.input_file import InputFile
-    from appwrite.id import ID
-
-    APPWRITE_AVAILABLE = True
-except ImportError:
-    APPWRITE_AVAILABLE = False
-    logger.warning("appwrite not installed. Bill image upload will be disabled.")
-
 # PyPDF2 removed - PDFs are converted to images on frontend before upload
 
 logger.info("Environment variables loaded")
 
-# Initialize Appwrite client (will be set up after helper functions are defined)
-appwrite_client = None
-appwrite_storage = None
-APPWRITE_BUCKET_ID = None
-
-# Initialize Appwrite file service
-appwrite_file_service = get_appwrite_file_service()
+# Initialize Google Drive file service for bill storage
+file_service = get_google_drive_file_service()
 
 
 # Custom JSON provider to handle Decimal objects
@@ -217,31 +200,6 @@ def get_setting(key, default=None):
         if cursor:
             cursor.close()
         connection.close()
-
-
-# Initialize Appwrite client
-if APPWRITE_AVAILABLE:
-    try:
-        # Load from environment variables
-        appwrite_endpoint = os.environ.get('APPWRITE_ENDPOINT')
-        appwrite_project_id = os.environ.get('APPWRITE_PROJECT_ID')
-        appwrite_api_key = os.environ.get('APPWRITE_API_KEY')
-        APPWRITE_BUCKET_ID = os.environ.get('APPWRITE_BUCKET_ID')
-
-        if all([appwrite_endpoint, appwrite_project_id, appwrite_api_key, APPWRITE_BUCKET_ID]):
-            appwrite_client = Client()
-            appwrite_client.set_endpoint(appwrite_endpoint)
-            appwrite_client.set_project(appwrite_project_id)
-            appwrite_client.set_key(appwrite_api_key)
-
-            appwrite_storage = Storage(appwrite_client)
-            logger.info(f"✅ Appwrite storage initialized (endpoint: {appwrite_endpoint})")
-        else:
-            logger.warning("Appwrite credentials incomplete. Set them in .env file.")
-            appwrite_storage = None
-    except Exception as e:
-        logger.error(f"Failed to initialize Appwrite client: {e}")
-        appwrite_storage = None
 
 
 def login_required(f):
@@ -917,23 +875,23 @@ def delete_user(user_id):
         """, (user_id,))
         transactions_with_attachments = cursor.fetchall()
 
-        # Delete all attachments from Appwrite before deleting user
-        if appwrite_file_service.is_available() and transactions_with_attachments:
+        # Delete all attachments from Google Drive before deleting user
+        if file_service.is_available() and transactions_with_attachments:
             deleted_count = 0
             for txn in transactions_with_attachments:
                 attachments_value = txn['attachments']
-                # Split comma-separated GUIDs
+                # Split comma-separated file IDs
                 attachment_guids = [guid.strip() for guid in attachments_value.split(',') if guid.strip()]
 
                 for attachment_guid in attachment_guids:
-                    success, error = appwrite_file_service.delete_file(attachment_guid)
+                    success, error = file_service.delete_file(attachment_guid)
                     if success:
                         deleted_count += 1
                     else:
                         logger.warning(f"Failed to delete attachment {attachment_guid}: {error}")
 
             if deleted_count > 0:
-                logger.info(f"Deleted {deleted_count} attachment(s) from Appwrite for user {user_id}")
+                logger.info(f"Deleted {deleted_count} attachment(s) from Google Drive for user {user_id}")
 
         # Delete user (cascading will handle related records)
         cursor.execute("DELETE FROM users WHERE id = %s", (user_id,))
@@ -1130,15 +1088,15 @@ def update_admin_setting(key):
 
 # NOTE: The old /api/admin/db-backup route (manual SQL download) was removed.
 # Use /api/admin/trigger-backup instead, which creates, compresses, encrypts
-# and uploads backups to Appwrite via BackupService.
+# and uploads backups to Google Drive via BackupService.
 
 
 # ---------------------------------------------------------------------------
-# Async DB backup → Appwrite upload (triggered by external cron)
+# Async DB backup → Google Drive upload (triggered by external cron)
 # ---------------------------------------------------------------------------
 
 def _run_backup_and_upload():
-    """Generate a MySQL database backup and upload it to Appwrite.
+    """Generate a MySQL database backup and upload it to Google Drive.
 
     Uses the BackupService to create, compress, encrypt and upload backups.
     """
@@ -1148,7 +1106,7 @@ def _run_backup_and_upload():
 
 @app.route('/api/admin/trigger-backup', methods=['GET'])
 def trigger_db_backup():
-    """Trigger a database backup that uploads to Appwrite.
+    """Trigger a database backup that uploads to Google Drive.
 
     Can run synchronously (for Vercel) or asynchronously (for local dev).
     Set BACKUP_MODE=sync in environment for Vercel/serverless platforms.
@@ -1223,7 +1181,7 @@ def trigger_db_backup():
 
         return jsonify({
             'status': 'triggered',
-            'message': 'Database backup started in background. It will be uploaded to Appwrite upon completion.',
+            'message': 'Database backup started in background. It will be uploaded to Google Drive upon completion.',
         }), 202
 
 
@@ -1593,17 +1551,17 @@ def admin_delete_monthly_record(user_id, record_id):
         """, (record_id,))
         transactions_with_attachments = cursor.fetchall()
 
-        # Delete all attachments from Appwrite before deleting transactions
-        if appwrite_file_service.is_available() and transactions_with_attachments:
+        # Delete all attachments from Google Drive before deleting transactions
+        if file_service.is_available() and transactions_with_attachments:
             for txn in transactions_with_attachments:
                 attachments_value = txn['attachments']
-                # Split comma-separated GUIDs
+                # Split comma-separated file IDs
                 attachment_guids = [guid.strip() for guid in attachments_value.split(',') if guid.strip()]
 
                 for attachment_guid in attachment_guids:
-                    success, error = appwrite_file_service.delete_file(attachment_guid)
+                    success, error = file_service.delete_file(attachment_guid)
                     if success:
-                        logger.info(f"Deleted attachment {attachment_guid} from Appwrite (monthly record cleanup)")
+                        logger.info(f"Deleted attachment {attachment_guid} from Google Drive (monthly record cleanup)")
                     else:
                         logger.warning(f"Failed to delete attachment {attachment_guid}: {error}")
 
