@@ -14,7 +14,8 @@ from decimal import Decimal
 from functools import wraps
 
 from dotenv import load_dotenv
-from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash, make_response, send_from_directory
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash, make_response, \
+    send_from_directory
 from flask.json.provider import DefaultJSONProvider
 from flask_cors import CORS
 from flask_limiter import Limiter
@@ -27,6 +28,7 @@ from services.pb_exchange_rate_service import get_pb_exchange_rate_service
 from services.sampath_exchange_rate_service import get_sampath_exchange_rate_service
 from services.backup_service import get_backup_service
 from services.google_drive_file_service import get_google_drive_file_service
+from services.google_drive_backup_service import get_google_drive_backup_service
 from services.exchange_rate_routes import register_exchange_rate_routes
 from services.tax_service import register_tax_routes
 from services.transaction_service import register_transaction_routes
@@ -178,7 +180,6 @@ if DB_CONFIG is None:
         "Database is NOT configured. The application will start but all "
         "database operations will fail. Copy .env.example to .env and fill "
         "in your database credentials, then restart the application.")
-
 
 
 def get_setting(key, default=None):
@@ -1185,6 +1186,76 @@ def trigger_db_backup():
         }), 202
 
 
+@app.route('/api/admin/cleanup-old-backups', methods=['GET'])
+def cleanup_old_backups():
+    """Delete backup files older than 3 months from Google Drive.
+
+    Uses the same authorization pattern as the backup endpoint.
+    Can optionally specify the age threshold with ?months=N query parameter.
+    """
+    # Get allowed origins from environment variable
+    backup_origins_env = os.environ.get('BACKUP_ALLOWED_ORIGINS', '')
+    allowed_origins = [origin.strip() for origin in backup_origins_env.split(',') if origin.strip()]
+
+    # Get local patterns from environment variable
+    local_patterns_env = os.environ.get('BACKUP_LOCAL_PATTERNS', 'localhost,127.0.0.1')
+    local_patterns = [pattern.strip() for pattern in local_patterns_env.split(',') if pattern.strip()]
+
+    origin = request.headers.get('Origin', '')
+    referer = request.headers.get('Referer', '')
+    user_agent = request.headers.get('User-Agent', '')
+    remote_addr = request.remote_addr or ''
+
+    origin_ok = any(origin.startswith(a) for a in allowed_origins)
+    referer_ok = any(referer.startswith(a) for a in allowed_origins)
+    ua_ok = 'cron-job.org' in user_agent.lower()
+    local_origin = any(p in origin for p in local_patterns) or origin.startswith(
+        'http://localhost') or origin.startswith('http://127.0.0.1')
+    local_referer = any(p in referer for p in local_patterns) or referer.startswith(
+        'http://localhost') or referer.startswith('http://127.0.0.1')
+    local_addr = any(remote_addr.startswith(p) for p in local_patterns)
+
+    if not (origin_ok or referer_ok or ua_ok or local_origin or local_referer or local_addr):
+        logger.warning("Unauthorized cleanup trigger — Origin: %s, Referer: %s, UA: %s, Remote: %s",
+                       origin, referer, user_agent, remote_addr)
+        return jsonify({'error': 'Access denied',
+                        'message': 'This endpoint is only accessible from authorized sources'}), 403
+
+    # Get months parameter (default: 3)
+    try:
+        months = int(request.args.get('months', 3))
+        if months < 1:
+            months = 3
+    except (ValueError, TypeError):
+        months = 3
+
+    logger.info("Starting cleanup of backups older than %d months", months)
+
+    try:
+        drive_service = get_google_drive_backup_service()
+
+        success, message, deleted_count, deleted_files = drive_service.cleanup_old_backups(months)
+
+        if success:
+            return jsonify({
+                'status': 'completed',
+                'message': message,
+                'deleted_count': deleted_count,
+                'deleted_files': deleted_files
+            }), 200
+        else:
+            return jsonify({
+                'status': 'failed',
+                'error': message
+            }), 500
+    except Exception as e:
+        logger.error("Cleanup failed with exception: %s", e, exc_info=True)
+        return jsonify({
+            'status': 'failed',
+            'error': str(e)
+        }), 500
+
+
 @app.route('/api/admin/users/<int:user_id>/payment-methods', methods=['GET'])
 @admin_required
 @limiter.limit(RATE_LIMIT_ADMIN)
@@ -1724,6 +1795,7 @@ def dashboard_stats():
             connection.close()
 
     return jsonify({'error': 'Database connection failed'}), 500
+
 
 # ==================================================
 # TRANSACTION ROUTES - Registered from services/transaction_service.py

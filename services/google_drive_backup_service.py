@@ -156,6 +156,89 @@ class GoogleDriveBackupService:
             logger.error("Failed to delete Google Drive file %s: %s", file_id, e, exc_info=True)
             return False, str(e)
 
+    def cleanup_old_backups(self, months=3):
+        """
+        Delete backup files older than the specified number of months.
+
+        Args:
+            months: Age threshold in months (default: 3)
+
+        Returns:
+            tuple: (success: bool, message: str, deleted_count: int, deleted_files: list)
+        """
+        if not self.is_available():
+            return False, "Google Drive backup not configured", 0, []
+
+        try:
+            from datetime import datetime, timedelta
+
+            service = self._get_service()
+            cutoff_date = datetime.now() - timedelta(days=months * 30)
+
+            # List all files in the backup folder
+            query = f"'{self.folder_id}' in parents and trashed = false"
+            results = service.files().list(
+                q=query,
+                fields="files(id, name, createdTime)",
+                orderBy="createdTime desc",
+                pageSize=1000,
+            ).execute()
+
+            files = results.get('files', [])
+            deleted_files = []
+            failed_deletions = []
+
+            for file in files:
+                file_id = file.get('id')
+                file_name = file.get('name')
+                created_time_str = file.get('createdTime')
+
+                # Parse the createdTime (format: 2024-03-15T10:30:45.123Z)
+                try:
+                    created_time = datetime.strptime(created_time_str, '%Y-%m-%dT%H:%M:%S.%fZ')
+                except ValueError:
+                    # Try without microseconds
+                    try:
+                        created_time = datetime.strptime(created_time_str, '%Y-%m-%dT%H:%M:%SZ')
+                    except ValueError:
+                        logger.warning("Cannot parse date for file %s: %s", file_name, created_time_str)
+                        continue
+
+                # Check if file is older than cutoff date
+                if created_time < cutoff_date:
+                    success, error_msg = self.delete_file(file_id)
+                    if success:
+                        deleted_files.append({
+                            'id': file_id,
+                            'name': file_name,
+                            'created': created_time_str
+                        })
+                        logger.info("Deleted old backup: %s (created: %s)", file_name, created_time_str)
+                    else:
+                        failed_deletions.append({
+                            'id': file_id,
+                            'name': file_name,
+                            'error': error_msg
+                        })
+                        logger.error("Failed to delete %s: %s", file_name, error_msg)
+
+            deleted_count = len(deleted_files)
+            failed_count = len(failed_deletions)
+
+            if failed_count > 0:
+                message = f"Deleted {deleted_count} old backups, {failed_count} failed"
+                return True, message, deleted_count, deleted_files
+            elif deleted_count > 0:
+                message = f"Successfully deleted {deleted_count} backup(s) older than {months} months"
+                return True, message, deleted_count, deleted_files
+            else:
+                message = f"No backups older than {months} months found"
+                return True, message, 0, []
+
+        except Exception as e:
+            logger.error("Failed to cleanup old backups: %s", e, exc_info=True)
+            return False, f"Cleanup failed: {str(e)}", 0, []
+
 
 # Singleton
 _google_drive_backup_service = None
