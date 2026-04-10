@@ -212,45 +212,98 @@ def optimize_file_for_upload(file_data, file_ext, original_filename):
     return (file_data, False, original_size, original_size)
 
 
-def apply_category_percentage_markup(amount, category_id, connection):
+def apply_percentage_markup(amount, category_id, payment_method_id, user_id, connection):
     """
-    Apply percentage markup to an amount based on category settings.
+    Apply percentage markup to an amount based on flexible markup rules.
 
-    For example, if Fuel category has 1% markup and amount is 1000:
-    - Result will be 1000 + (1000 * 1%) = 1010
+    Rules are checked in the following priority order:
+    1. Exact match (both category and payment method)
+    2. Payment method only
+    3. Category only
+
+    For example, if a rule has 1.5% markup and amount is 1000:
+    - Result will be 1000 + (1000 * 1.5%) = 1015
 
     Args:
         amount: Decimal - The base amount
-        category_id: int or None - Category ID to check for markup
+        category_id: int or None - Category ID
+        payment_method_id: int or None - Payment method ID
+        user_id: int - User ID to fetch user-specific rules
         connection: MySQL connection object
 
     Returns:
         Decimal - Amount with markup applied (or original amount if no markup)
     """
-    if not category_id or not amount or amount == 0:
+    if not amount or amount == 0:
         return amount
 
     try:
         cursor = connection.cursor(dictionary=True)
-        cursor.execute(
-            "SELECT percentage_markup FROM categories WHERE id = %s",
-            (category_id,)
-        )
+
+        # Try to find the best matching rule with priority:
+        # 1. Exact match (category + payment method)
+        # 2. Payment method only
+        # 3. Category only
+
+        query = """
+            SELECT 
+                id, rule_name, category_id, payment_method_id, 
+                percentage_markup, priority
+            FROM markup_rules
+            WHERE user_id = %s 
+                AND is_active = TRUE
+                AND percentage_markup > 0
+                AND (
+                    -- Exact match: both category and payment method
+                    (category_id = %s AND payment_method_id = %s)
+                    OR
+                    -- Payment method only match
+                    (category_id IS NULL AND payment_method_id = %s)
+                    OR
+                    -- Category only match
+                    (category_id = %s AND payment_method_id IS NULL)
+                )
+            ORDER BY 
+                -- Priority 1: Both category and payment method (most specific)
+                CASE WHEN category_id IS NOT NULL AND payment_method_id IS NOT NULL THEN 1 ELSE 2 END,
+                -- Priority 2: Sort by rule priority field
+                priority DESC,
+                -- Priority 3: Newer rules first
+                created_at DESC
+            LIMIT 1
+        """
+
+        cursor.execute(query, (
+            user_id,
+            category_id, payment_method_id,  # Exact match
+            payment_method_id,                # Payment method only
+            category_id                        # Category only
+        ))
+
         result = cursor.fetchone()
         cursor.close()
 
-        if result and result.get('percentage_markup'):
+        if result:
             markup_percentage = Decimal(str(result['percentage_markup']))
-            if markup_percentage > 0:
-                markup_amount = (amount * markup_percentage) / Decimal('100')
-                final_amount = amount + markup_amount
-                logger.info(
-                    f"Applied {markup_percentage}% markup to category {category_id}: "
-                    f"{amount} + {markup_amount} = {final_amount}"
-                )
-                return final_amount
+            markup_amount = (amount * markup_percentage) / Decimal('100')
+            final_amount = amount + markup_amount
+
+            rule_type = "combination"
+            if result['category_id'] and result['payment_method_id']:
+                rule_type = "category + payment method"
+            elif result['payment_method_id']:
+                rule_type = "payment method only"
+            elif result['category_id']:
+                rule_type = "category only"
+
+            logger.info(
+                f"Applied {markup_percentage}% markup ({rule_type} rule '{result['rule_name']}'): "
+                f"{amount} + {markup_amount} = {final_amount}"
+            )
+            return final_amount
+
     except Exception as e:
-        logger.error(f"Error applying category markup: {str(e)}")
+        logger.error(f"Error applying markup: {str(e)}")
 
     return amount
 
@@ -866,12 +919,15 @@ def transactions_handler():
             if not category_id:
                 category_id = auto_categorize_transaction(data.get('description'), connection)
 
-            # Apply category percentage markup if applicable
-            if category_id:
+            # Get payment_method_id
+            payment_method_id = data.get('payment_method_id')
+
+            # Apply flexible percentage markup based on category, payment method, or both
+            if category_id or payment_method_id:
                 if credit > 0:
-                    credit = apply_category_percentage_markup(credit, category_id, connection)
+                    credit = apply_percentage_markup(credit, category_id, payment_method_id, user_id, connection)
                 elif debit > 0:
-                    debit = apply_category_percentage_markup(debit, category_id, connection)
+                    debit = apply_percentage_markup(debit, category_id, payment_method_id, user_id, connection)
 
             print(f"[DEBUG] Debit: {debit}, Credit: {credit}")
 
@@ -894,6 +950,25 @@ def transactions_handler():
             # Get bill content if provided (from scanned bills)
             bill_content = data.get('bill_content')
 
+            # Get payment status from frontend (explicit is_paid flag)
+            payment_method_id = data.get('payment_method_id')
+            is_paid = data.get('is_paid', False)  # Use explicit flag from frontend
+
+            # Get paid_at timestamp if provided
+            paid_at = None
+            if is_paid:
+                paid_at_str = data.get('paid_at')
+                if paid_at_str:
+                    # Parse ISO timestamp from frontend
+                    try:
+                        paid_at = datetime.fromisoformat(paid_at_str.replace('Z', '+00:00'))
+                    except (ValueError, AttributeError):
+                        # If parsing fails, use current timestamp
+                        paid_at = datetime.now()
+                else:
+                    # No paid_at provided but marked as paid, use current timestamp
+                    paid_at = datetime.now()
+
             # Insert transaction with attachments field
             insert_values = (
                 monthly_record['id'],
@@ -906,15 +981,17 @@ def transactions_handler():
                 next_display_order,
                 bill_content,
                 attachments_value,  # Store comma-separated GUIDs in attachments column
-                data.get('payment_method_id')  # Add payment method
+                payment_method_id,  # Add payment method
+                is_paid,  # Mark as paid if payment method is selected
+                paid_at  # Timestamp when paid
             )
             print(f"[DEBUG] Inserting transaction with values: {insert_values}")
 
             cursor.execute("""
                            INSERT INTO transactions
                            (monthly_record_id, description, category_id, debit, credit, transaction_date, notes,
-                            display_order, bill_content, attachments, payment_method_id)
-                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            display_order, bill_content, attachments, payment_method_id, is_paid, paid_at)
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                            """, insert_values)
 
             transaction_id = cursor.lastrowid
@@ -1134,12 +1211,15 @@ def manage_transaction_handler(transaction_id):
             # Get category_id
             category_id = data.get('category_id')
 
-            # Apply category percentage markup if applicable
-            if category_id:
+            # Get payment_method_id
+            payment_method_id = data.get('payment_method_id')
+
+            # Apply flexible percentage markup based on category, payment method, or both
+            if category_id or payment_method_id:
                 if credit > 0:
-                    credit = apply_category_percentage_markup(credit, category_id, connection)
+                    credit = apply_percentage_markup(credit, category_id, payment_method_id, session['user_id'], connection)
                 elif debit > 0:
-                    debit = apply_category_percentage_markup(debit, category_id, connection)
+                    debit = apply_percentage_markup(debit, category_id, payment_method_id, session['user_id'], connection)
 
             print(f"[DEBUG] Debit: {debit}, Credit: {credit}")
 
@@ -1158,6 +1238,24 @@ def manage_transaction_handler(transaction_id):
                 is_done = False
                 payment_method_id = None
 
+            # Get payment status from frontend (explicit is_paid flag)
+            is_paid = data.get('is_paid', False)  # Use explicit flag from frontend
+
+            # Get paid_at timestamp if provided
+            paid_at = None
+            if is_paid:
+                paid_at_str = data.get('paid_at')
+                if paid_at_str:
+                    # Parse ISO timestamp from frontend
+                    try:
+                        paid_at = datetime.fromisoformat(paid_at_str.replace('Z', '+00:00'))
+                    except (ValueError, AttributeError):
+                        # If parsing fails, use current timestamp
+                        paid_at = datetime.now()
+                else:
+                    # No paid_at provided but marked as paid, use current timestamp
+                    paid_at = datetime.now()
+
             # Update transaction (balance will be calculated on frontend)
             cursor.execute("""
                            UPDATE transactions
@@ -1168,7 +1266,9 @@ def manage_transaction_handler(transaction_id):
                                transaction_date = %s,
                                notes            = %s,
                                payment_method_id = %s,
-                               is_done          = %s
+                               is_done          = %s,
+                               is_paid          = %s,
+                               paid_at          = %s
                            WHERE id = %s
                            """, (
                 data.get('description'),
@@ -1179,6 +1279,8 @@ def manage_transaction_handler(transaction_id):
                 data.get('notes'),
                 payment_method_id,
                 is_done,
+                is_paid,
+                paid_at,
                 transaction_id
             ))
 
@@ -1244,6 +1346,18 @@ def manage_transaction_handler(transaction_id):
             if old_is_done != new_is_done:
                 log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'is_done',
                                       old_is_done, new_is_done)
+
+            # Compare is_paid status
+            old_is_paid = old_transaction.get('is_paid', False)
+            if old_is_paid != is_paid:
+                log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'is_paid',
+                                      old_is_paid, is_paid)
+
+            # Compare paid_at timestamp
+            old_paid_at = old_transaction.get('paid_at')
+            if str(old_paid_at) != str(paid_at):
+                log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'paid_at',
+                                      old_paid_at, paid_at)
 
             connection.commit()
             print(f"[DEBUG] Transaction update committed successfully")
@@ -2428,9 +2542,9 @@ def create_transaction_handler():
             # New transaction gets display_order = 1 (appears at top)
             next_display_order = 1
 
-            # Apply category percentage markup if applicable
+            # Apply flexible percentage markup (no payment method for mobile quick add)
             if category_id:
-                credit = apply_category_percentage_markup(credit, category_id, connection)
+                credit = apply_percentage_markup(credit, category_id, None, user_id, connection)
 
             # Insert the transaction with auto-categorized category
             cursor.execute("""

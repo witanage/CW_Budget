@@ -14,9 +14,6 @@
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css') }}?v=2.2">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/loader.css') }}?v=2.2">
-
-    <!-- Chart.js for Bank Comparison (self-hosted) -->
-    <script src="{{ url_for('static', filename='js/vendor/chart.min.js') }}"></script>
 </head>
 <body>
     <!-- Header -->
@@ -104,9 +101,9 @@
                 <button class="action-btn" data-bs-toggle="modal" data-bs-target="#paymentTotalsModal" title="Payment Totals">
                     <i class="fas fa-credit-card"></i>
                 </button>
-                <button class="action-btn" data-bs-toggle="modal" data-bs-target="#bankComparisonModal" title="Bank Comparison">
+                <a href="/dashboard?page=rateTrends" class="action-btn" title="Rate Trends" style="text-decoration: none; display: inline-flex; align-items: center; justify-content: center;">
                     <i class="fas fa-chart-line"></i>
-                </button>
+                </a>
             </div>
         </div>
         <!-- Table Headers (Fixed with mobile header) -->
@@ -279,6 +276,24 @@
                             <input type="hidden" id="transPaymentMethod" value="">
                             <small class="form-text" style="color: #888;">Select payment method to mark transaction as paid</small>
                         </div>
+                        <div class="mb-3" id="paidAtGroup" style="display: none;">
+                            <label class="form-label" style="color: #aaa;">Payment Status</label>
+                            <div class="mb-2">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="paidAtOption" id="paidAtPaid" value="paid" checked>
+                                    <label class="form-check-label" for="paidAtPaid" style="color: #ddd;">
+                                        Paid
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="paidAtOption" id="paidAtNotPaid" value="not_paid">
+                                    <label class="form-check-label" for="paidAtNotPaid" style="color: #ddd;">
+                                        Not Paid
+                                    </label>
+                                </div>
+                            </div>
+                            <small class="form-text" style="color: #888;">Paid time will be set automatically (Sri Lankan Time)</small>
+                        </div>
                         <div class="mb-3">
                             <label for="transNotes" class="form-label" style="color: #aaa;">Notes</label>
                             <textarea class="form-control" id="transNotes" rows="2" style="background: #0d0d0d; border-color: #333; color: #fff;"></textarea>
@@ -351,7 +366,7 @@
 
     <!-- Universal Confirmation Modal -->
     <div class="modal fade" id="confirmModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog">
             <div class="modal-content" style="background: #1a1a1a; color: #ffffff;">
                 <div class="modal-header" style="border-bottom: 1px solid #333;">
                     <h5 class="modal-title" id="confirmModalTitle">Confirm Action</h5>
@@ -370,7 +385,7 @@
 
     <!-- Transaction Info Modal -->
     <div class="modal fade" id="transactionInfoModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog">
             <div class="modal-content" style="background: #1a1a1a; color: #ffffff;">
                 <div class="modal-header" style="border-bottom: 1px solid #333;">
                     <h5 class="modal-title">Transaction Details</h5>
@@ -408,7 +423,7 @@
 
     <!-- Bill Items Modal -->
     <div class="modal fade bill-items-modal" id="billItemsModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog">
             <div class="modal-content" style="max-height: 90vh; display: flex; flex-direction: column;">
                 <div class="modal-header" style="flex-shrink: 0;">
                     <h6 class="modal-title mb-0">
@@ -457,7 +472,7 @@
 
     <!-- Transaction Payment Method Selection Modal -->
     <div class="modal fade" id="transPaymentMethodModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog">
             <div class="modal-content" style="background: #1a1a1a; color: #ffffff; border-radius: 16px;">
                 <div class="modal-header" style="border-bottom: 1px solid #333;">
                     <h5 class="modal-title"><i class="fas fa-wallet me-2"></i>Select Payment Method</h5>
@@ -474,7 +489,7 @@
 
     <!-- Transaction Category Selection Modal -->
     <div class="modal fade" id="transCategoryModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog">
             <div class="modal-content" style="background: #1a1a1a; color: #ffffff; border-radius: 16px;">
                 <div class="modal-header" style="border-bottom: 1px solid #333;">
                     <h5 class="modal-title"><i class="fas fa-tags me-2"></i>Select Category</h5>
@@ -489,77 +504,7 @@
         </div>
     </div>
 
-    <!-- Bank Comparison Modal -->
-    <div class="modal fade" id="bankComparisonModal" tabindex="-1">
-        <div class="modal-dialog modal-fullscreen">
-            <div class="modal-content" style="background: #1a1a1a; color: #ffffff;">
-                <div class="modal-header" style="border-bottom: 1px solid #333;">
-                    <h5 class="modal-title"><i class="fas fa-chart-line me-2"></i>Bank Rate Comparison</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body" style="padding: 10px;">
-                    <!-- Chart Controls -->
-                    <div class="mb-3">
-                        <div class="row g-2">
-                            <div class="col-12">
-                                <label class="form-label small mb-1" style="color: #aaa;">History Period:</label>
-                                <select class="form-select form-select-sm" id="mobileBankComparisonMonths" style="background: #0d0d0d; border-color: #333; color: #fff;">
-                                    <option value="1" selected>1 Month</option>
-                                    <option value="3">3 Months</option>
-                                    <option value="6">6 Months</option>
-                                    <option value="12">1 Year</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
 
-                    <!-- Loading State -->
-                    <div id="mobileBankComparisonLoading" class="text-center py-5">
-                        <i class="fas fa-spinner fa-spin fa-2x mb-3" style="color: #0d6efd;"></i>
-                        <p style="color: #ccc;">Loading bank rates...</p>
-                    </div>
-
-                    <!-- Error State -->
-                    <div id="mobileBankComparisonError" class="text-center py-5" style="display: none;">
-                        <i class="fas fa-exclamation-triangle fa-2x mb-3" style="color: #dc3545;"></i>
-                        <p style="color: #ccc;" id="mobileBankComparisonErrorMsg">Failed to load bank comparison data.</p>
-                        <button class="btn btn-sm btn-outline-primary" onclick="loadMobileBankComparison()">
-                            <i class="fas fa-sync-alt me-1"></i>Retry
-                        </button>
-                    </div>
-
-                    <!-- Chart Container -->
-                    <div id="mobileBankComparisonChartContainer" style="display: none;">
-                        <div class="card" style="background: #2d2d2d; border: 1px solid #444;">
-                            <div class="card-body p-2">
-                                <h6 class="card-title mb-2 small" style="color: #fff;">
-                                    <i class="fas fa-balance-scale me-1"></i>Buy Rate Comparison
-                                </h6>
-                                <div style="position: relative; height: 300px;">
-                                    <canvas id="mobileBankComparisonChart"></canvas>
-                                </div>
-                                <!-- Legend -->
-                                <div class="mt-2 small" id="mobileBankLegend" style="color: #aaa;">
-                                    <div class="d-flex flex-wrap gap-2 justify-content-center">
-                                        <span><span style="display: inline-block; width: 12px; height: 3px; background: #0d6efd; margin-right: 4px;"></span>CBSL</span>
-                                        <span><span style="display: inline-block; width: 12px; height: 3px; background: #198754; margin-right: 4px;"></span>HNB</span>
-                                        <span><span style="display: inline-block; width: 12px; height: 3px; background: #fd7e14; margin-right: 4px;"></span>People's Bank</span>
-                                        <span><span style="display: inline-block; width: 12px; height: 3px; background: #dc3545; margin-right: 4px;"></span>Sampath</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer" style="border-top: 1px solid #333;">
-                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
-                    <button type="button" class="btn btn-primary btn-sm" onclick="loadMobileBankComparison()">
-                        <i class="fas fa-sync-alt me-1"></i>Refresh
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <!-- Bootstrap JS (self-hosted) -->
     <script src="{{ url_for('static', filename='js/vendor/bootstrap.bundle.min.js') }}"></script>

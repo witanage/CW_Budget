@@ -390,6 +390,21 @@ function showLoader() {
 // Load user's preferred default page
 async function loadUserPreferredPage() {
     try {
+        // Check for page parameter in URL first
+        const urlParams = new URLSearchParams(window.location.search);
+        const pageParam = urlParams.get('page');
+
+        if (pageParam) {
+            // Navigate to the specified page from URL parameter
+            console.log('✓ Loading page from URL parameter:', pageParam);
+            navigateToPage(pageParam);
+            // Clear the URL parameter for cleaner URL
+            window.history.replaceState({}, '', window.location.pathname);
+            setTimeout(hideLoader, 800);
+            return;
+        }
+
+        // Otherwise, load user's preferred page
         const response = await fetch('/api/user-preferences');
         if (response.ok) {
             const data = await response.json();
@@ -624,6 +639,26 @@ function setupFormButtons() {
         });
     }
 
+    // Show/hide paid_at field when payment method changes
+    const transPaymentMethod = document.getElementById('transPaymentMethod');
+    const paidAtGroup = document.getElementById('paidAtGroup');
+    const paidAtPaid = document.getElementById('paidAtPaid');
+    const paidAtNotPaid = document.getElementById('paidAtNotPaid');
+
+    if (transPaymentMethod && paidAtGroup) {
+        transPaymentMethod.addEventListener('change', function() {
+            if (this.value) {
+                // Payment method selected - show payment status options
+                paidAtGroup.style.display = 'block';
+                // Default to "Paid"
+                if (paidAtPaid) paidAtPaid.checked = true;
+            } else {
+                // No payment method - hide payment status
+                paidAtGroup.style.display = 'none';
+            }
+        });
+    }
+
     // Reset bill data when transaction modal is closed/cancelled
     const transactionModal = document.getElementById('transactionModal');
     if (transactionModal) {
@@ -654,6 +689,17 @@ function setupFormButtons() {
             const paymentMethodSelect = document.getElementById('transPaymentMethod');
             if (paymentMethodSelect) {
                 paymentMethodSelect.value = '';
+            }
+
+            // Hide and reset payment status field
+            const paidAtGroup = document.getElementById('paidAtGroup');
+            const paidAtPaid = document.getElementById('paidAtPaid');
+
+            if (paidAtGroup) {
+                paidAtGroup.style.display = 'none';
+            }
+            if (paidAtPaid) {
+                paidAtPaid.checked = true;
             }
         });
     }
@@ -1734,6 +1780,28 @@ function editTransaction(id) {
         paymentMethodSelect.value = transaction.payment_method_id || '';
     }
 
+    // Set payment status field if transaction has a payment method
+    const paidAtGroup = document.getElementById('paidAtGroup');
+    const paidAtPaid = document.getElementById('paidAtPaid');
+    const paidAtNotPaid = document.getElementById('paidAtNotPaid');
+
+    if (transaction.payment_method_id && paidAtGroup) {
+        // Show payment status options
+        paidAtGroup.style.display = 'block';
+
+        // Check if transaction was marked as paid
+        if (transaction.paid_at && paidAtPaid) {
+            // Transaction is paid
+            paidAtPaid.checked = true;
+        } else if (paidAtNotPaid) {
+            // Transaction is not paid
+            paidAtNotPaid.checked = true;
+        }
+    } else if (paidAtGroup) {
+        // No payment method, hide payment status
+        paidAtGroup.style.display = 'none';
+    }
+
     // Update modal title
     document.querySelector('#transactionModal .modal-title').textContent = 'Edit Transaction';
 
@@ -1800,6 +1868,24 @@ async function saveTransaction() {
         year: parseInt(year),
         month: parseInt(month)
     };
+
+    // Handle payment status based on radio button selection
+    if (data.payment_method_id) {
+        const paidAtPaidRadio = document.getElementById('paidAtPaid');
+        const paidAtNotPaidRadio = document.getElementById('paidAtNotPaid');
+
+        if (paidAtPaidRadio && paidAtPaidRadio.checked) {
+            // Mark as paid with current Sri Lankan time (UTC+5:30)
+            data.is_paid = true;
+            const now = new Date();
+            const sriLankaTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+            data.paid_at = sriLankaTime.toISOString();
+        } else if (paidAtNotPaidRadio && paidAtNotPaidRadio.checked) {
+            // Mark as not paid (payment method selected but not paid yet)
+            data.is_paid = false;
+            data.paid_at = null;
+        }
+    }
 
     // Include scanned bill content if available
     if (scannedBillContent && !isEdit) {

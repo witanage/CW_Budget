@@ -32,6 +32,7 @@ from services.google_drive_backup_service import get_google_drive_backup_service
 from services.exchange_rate_routes import register_exchange_rate_routes
 from services.tax_service import register_tax_routes
 from services.transaction_service import register_transaction_routes
+from services.markup_rule_service import register_markup_rule_routes
 
 # Load environment variables from .env file
 load_dotenv()
@@ -744,6 +745,7 @@ def log_audit(admin_user_id, action, target_user_id=None, details=None):
 register_exchange_rate_routes(app, login_required, admin_required, token_required, log_audit)
 register_tax_routes(app, login_required)
 register_transaction_routes(app, login_required, limiter, RATE_LIMIT_API, token_required)
+register_markup_rule_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN)
 
 
 @app.route('/api/admin/users/<int:user_id>/toggle-active', methods=['POST'])
@@ -1844,21 +1846,12 @@ def add_category():
 
     name = data['name'].strip()
     category_type = data['type'].strip().lower()
-    percentage_markup = data.get('percentage_markup', 0.00)
 
     if not name:
         return jsonify({'error': 'Category name cannot be empty'}), 400
 
     if category_type not in ['income', 'expense']:
         return jsonify({'error': 'Category type must be either "income" or "expense"'}), 400
-
-    # Validate percentage_markup
-    try:
-        percentage_markup = float(percentage_markup)
-        if percentage_markup < 0 or percentage_markup > 100:
-            return jsonify({'error': 'Percentage markup must be between 0 and 100'}), 400
-    except (ValueError, TypeError):
-        percentage_markup = 0.00
 
     connection = get_db_connection()
     if connection:
@@ -1876,8 +1869,8 @@ def add_category():
 
             # Insert new category
             cursor.execute(
-                "INSERT INTO categories (name, type, percentage_markup) VALUES (%s, %s, %s)",
-                (name, category_type, percentage_markup)
+                "INSERT INTO categories (name, type) VALUES (%s, %s)",
+                (name, category_type)
             )
             connection.commit()
 
@@ -1909,21 +1902,12 @@ def update_category(category_id):
 
     name = data['name'].strip()
     category_type = data['type'].strip().lower()
-    percentage_markup = data.get('percentage_markup', 0.00)
 
     if not name:
         return jsonify({'error': 'Category name cannot be empty'}), 400
 
     if category_type not in ['income', 'expense']:
         return jsonify({'error': 'Category type must be either "income" or "expense"'}), 400
-
-    # Validate percentage_markup
-    try:
-        percentage_markup = float(percentage_markup)
-        if percentage_markup < 0 or percentage_markup > 100:
-            return jsonify({'error': 'Percentage markup must be between 0 and 100'}), 400
-    except (ValueError, TypeError):
-        percentage_markup = 0.00
 
     connection = get_db_connection()
     if connection:
@@ -1948,8 +1932,8 @@ def update_category(category_id):
 
             # Update the category
             cursor.execute(
-                "UPDATE categories SET name = %s, type = %s, percentage_markup = %s WHERE id = %s",
-                (name, category_type, percentage_markup, category_id)
+                "UPDATE categories SET name = %s, type = %s WHERE id = %s",
+                (name, category_type, category_id)
             )
             connection.commit()
 

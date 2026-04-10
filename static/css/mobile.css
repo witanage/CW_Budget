@@ -954,8 +954,18 @@ position: relative;
 }
 
 .modal-dialog {
-    margin: 1.75rem auto;
+    margin: 0.5rem;
+    margin-top: 0;
     transform: none;
+    max-width: none;
+}
+
+@media (min-width: 576px) {
+    .modal-dialog {
+        max-width: 500px;
+        margin: 0.5rem auto;
+        margin-top: 0;
+    }
 }
 
 .modal-body {

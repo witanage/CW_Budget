@@ -73,7 +73,6 @@ CREATE TABLE IF NOT EXISTS categories (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     type ENUM('income', 'expense') NOT NULL,
-    percentage_markup DECIMAL(5, 2) DEFAULT 0.00 COMMENT 'Percentage to add to transaction amount (e.g., 1.00 for 1%)',
     INDEX idx_type (type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

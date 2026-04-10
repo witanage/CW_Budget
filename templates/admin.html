@@ -374,6 +374,12 @@
                 <i class="fas fa-history"></i> <span class="tab-label">Audit Logs</span>
             </button>
         </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="markup-tab" data-bs-toggle="tab" data-bs-target="#markup-pane"
+                    type="button" role="tab" aria-controls="markup-pane" aria-selected="false">
+                <i class="fas fa-percent"></i> <span class="tab-label">Markup Rules</span>
+            </button>
+        </li>
     </ul>
 
     <!-- Tab Content -->
@@ -741,6 +747,49 @@
             </div>
         </div>
 
+        <!-- Markup Rules Tab -->
+        <div class="tab-pane fade" id="markup-pane" role="tabpanel" aria-labelledby="markup-tab">
+            <div class="section-card">
+                <div class="section-header">
+                    <h2 style="margin: 0; font-size: 1.5rem; color: var(--text-primary);">
+                        <i class="fas fa-percent"></i> Markup / Interest Rate Rules
+                    </h2>
+                    <button class="btn-sm btn-success" onclick="openCreateMarkupModal()">
+                        <i class="fas fa-plus"></i> Add Rule
+                    </button>
+                </div>
+                <div class="section-body">
+                    <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9rem;">
+                        Configure flexible markup/interest rates based on category, payment method, or both.
+                        Rules with higher specificity (category + payment method) take precedence.
+                    </p>
+                    <div style="overflow-x: auto;">
+                        <table class="user-table" id="markupRulesTable">
+                            <thead>
+                                <tr>
+                                    <th>Rule Name</th>
+                                    <th>Type</th>
+                                    <th>Category</th>
+                                    <th>Payment Method</th>
+                                    <th>Markup %</th>
+                                    <th>Priority</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="markupRulesTableBody">
+                                <tr>
+                                    <td colspan="8" class="text-center" style="padding: 20px; color: var(--text-secondary);">
+                                        <i class="fas fa-spinner fa-spin"></i> Loading markup rules...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div><!-- /tab-content -->
 </div>
 
@@ -863,6 +912,113 @@
     <div class="alert alert-dismissible fade show" role="alert" id="alertContent" style="box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
         <span id="alertMessage"></span>
         <button type="button" class="btn-close" onclick="hideAlert()"></button>
+    </div>
+</div>
+
+<!-- Markup Rule Create/Edit Modal -->
+<div class="modal fade" id="markupRuleModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content" style="background: var(--card-bg); color: var(--text-primary);">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border-color);">
+                <h5 class="modal-title" id="markupRuleModalTitle">
+                    <i class="fas fa-percent"></i> <span id="markupModalAction">Create</span> Markup Rule
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="markupRuleId" value="">
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 5px; color: var(--text-primary);">
+                        <i class="fas fa-tag"></i> Rule Name *
+                    </label>
+                    <input type="text" id="markupRuleName" placeholder="e.g., Fuel - 1.5% credit card fee"
+                           style="width: 100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary);">
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 5px; color: var(--text-primary);">
+                        <i class="fas fa-list"></i> Category
+                    </label>
+                    <select id="markupCategoryId"
+                            style="width: 100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary);">
+                        <option value="">-- Any Category --</option>
+                    </select>
+                    <small style="color: var(--text-secondary); font-size: 0.85rem;">Leave empty for payment method-only rules</small>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 5px; color: var(--text-primary);">
+                        <i class="fas fa-credit-card"></i> Payment Method
+                    </label>
+                    <select id="markupPaymentMethodId"
+                            style="width: 100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary);">
+                        <option value="">-- Any Payment Method --</option>
+                    </select>
+                    <small style="color: var(--text-secondary); font-size: 0.85rem;">Leave empty for category-only rules</small>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 5px; color: var(--text-primary);">
+                        <i class="fas fa-percentage"></i> Markup Percentage *
+                    </label>
+                    <input type="number" id="markupPercentage" step="0.01" min="0" placeholder="e.g., 1.5"
+                           style="width: 100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary);">
+                    <small style="color: var(--text-secondary); font-size: 0.85rem;">Percentage to add to transaction amount</small>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 5px; color: var(--text-primary);">
+                        <i class="fas fa-sort-amount-up"></i> Priority
+                    </label>
+                    <input type="number" id="markupPriority" value="0" min="0"
+                           style="width: 100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary);">
+                    <small style="color: var(--text-secondary); font-size: 0.85rem;">Higher priority rules are applied first (0 = default)</small>
+                </div>
+
+                <div class="alert alert-info" style="margin-bottom: 0; font-size: 0.85rem;">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Note:</strong> At least one of Category or Payment Method must be selected.
+                </div>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid var(--border-color);">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+                <button type="button" class="btn btn-success" id="saveMarkupRuleBtn" onclick="saveMarkupRule()">
+                    <i class="fas fa-save"></i> Save Rule
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Markup Rule Confirmation Modal -->
+<div class="modal fade" id="deleteMarkupRuleModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content" style="background: var(--card-bg); color: var(--text-primary);">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border-color);">
+                <h5 class="modal-title">
+                    <i class="fas fa-exclamation-triangle text-danger"></i> Delete Markup Rule
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the rule <strong id="deleteMarkupRuleName"></strong>?</p>
+                <div class="alert alert-warning" role="alert">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <strong>Warning:</strong> This will permanently delete the markup rule. Existing transactions will not be affected.
+                </div>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid var(--border-color);">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteMarkupRuleBtn" onclick="executeDeleteMarkupRule()">
+                    <i class="fas fa-trash"></i> Delete
+                </button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -1708,7 +1864,8 @@
             '#csv-import': 'csv-tab',
             '#delete-records': 'records-tab',
             '#users': 'users-tab',
-            '#audit-logs': 'audit-tab'
+            '#audit-logs': 'audit-tab',
+            '#markup-rules': 'markup-tab'
         };
 
         // Reverse map: tab ID to hash
@@ -1717,7 +1874,8 @@
             'csv-tab': '#csv-import',
             'records-tab': '#delete-records',
             'users-tab': '#users',
-            'audit-tab': '#audit-logs'
+            'audit-tab': '#audit-logs',
+            'markup-tab': '#markup-rules'
         };
 
         // On page load, activate the tab from the URL hash
@@ -1742,5 +1900,289 @@
             });
         });
     })();
+
+    // ══════════════════════════════════════════════════════════
+    // MARKUP RULES MANAGEMENT
+    // ══════════════════════════════════════════════════════════
+
+    let markupRulesData = [];
+    let categoriesData = [];
+    let paymentMethodsData = [];
+    let markupRuleModalInstance = null;
+    let deleteMarkupRuleModalInstance = null;
+    let currentDeleteMarkupRuleId = null;
+
+    // Load markup rules when tab is shown
+    document.getElementById('markup-tab').addEventListener('shown.bs.tab', function() {
+        loadMarkupRules();
+        loadCategoriesForMarkup();
+        loadAllPaymentMethods();
+    });
+
+    async function loadMarkupRules() {
+        const tbody = document.getElementById('markupRulesTableBody');
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center" style="padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>';
+
+        try {
+            const response = await fetch('/api/admin/markup-rules');
+            if (!response.ok) throw new Error('Failed to load markup rules');
+
+            markupRulesData = await response.json();
+            renderMarkupRules();
+        } catch (error) {
+            console.error('Error loading markup rules:', error);
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger" style="padding: 20px;"><i class="fas fa-exclamation-triangle"></i> Error loading rules</td></tr>';
+        }
+    }
+
+    function renderMarkupRules() {
+        const tbody = document.getElementById('markupRulesTableBody');
+
+        if (markupRulesData.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center" style="padding: 20px; color: var(--text-secondary);"><i class="fas fa-info-circle"></i> No markup rules configured. Click "Add Rule" to create one.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = markupRulesData.map(rule => {
+            const ruleTypeClass = rule.rule_type === 'combination' ? 'badge-success' :
+                                 rule.rule_type === 'payment_method' ? 'badge-info' : 'badge-warning';
+            const ruleTypeText = rule.rule_type === 'combination' ? 'Category + Payment' :
+                                rule.rule_type === 'payment_method' ? 'Payment Method Only' : 'Category Only';
+
+            const statusBadge = rule.is_active ?
+                '<span class="badge badge-success">Active</span>' :
+                '<span class="badge badge-secondary">Inactive</span>';
+
+            return `
+                <tr>
+                    <td><strong>${escapeHtml(rule.rule_name)}</strong></td>
+                    <td><span class="badge ${ruleTypeClass}">${ruleTypeText}</span></td>
+                    <td>${rule.category_name || '<em style="color: var(--text-secondary);">Any</em>'}</td>
+                    <td>${rule.payment_method_name || '<em style="color: var(--text-secondary);">Any</em>'}</td>
+                    <td><strong>${rule.percentage_markup}%</strong></td>
+                    <td>${rule.priority}</td>
+                    <td>${statusBadge}</td>
+                    <td class="action-buttons">
+                        <button class="btn-sm btn-primary" onclick="editMarkupRule(${rule.id})" title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn-sm ${rule.is_active ? 'btn-warning' : 'btn-success'}"
+                                onclick="toggleMarkupRuleStatus(${rule.id}, ${rule.is_active})"
+                                title="${rule.is_active ? 'Deactivate' : 'Activate'}">
+                            <i class="fas fa-${rule.is_active ? 'pause' : 'play'}"></i>
+                        </button>
+                        <button class="btn-sm btn-danger" onclick="confirmDeleteMarkupRule(${rule.id}, '${escapeHtml(rule.rule_name)}')" title="Delete">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    async function loadCategoriesForMarkup() {
+        try {
+            const response = await fetch('/api/categories');
+            if (!response.ok) throw new Error('Failed to load categories');
+
+            categoriesData = await response.json();
+
+            const select = document.getElementById('markupCategoryId');
+            select.innerHTML = '<option value="">-- Any Category --</option>';
+
+            categoriesData.forEach(cat => {
+                select.innerHTML += `<option value="${cat.id}">${escapeHtml(cat.name)} (${cat.type})</option>`;
+            });
+        } catch (error) {
+            console.error('Error loading categories:', error);
+        }
+    }
+
+    async function loadAllPaymentMethods() {
+        try {
+            const response = await fetch('/api/payment-methods');
+            if (!response.ok) throw new Error('Failed to payment methods');
+
+            paymentMethodsData = await response.json();
+
+            const select = document.getElementById('markupPaymentMethodId');
+            select.innerHTML = '<option value="">-- Any Payment Method --</option>';
+
+            paymentMethodsData.forEach(pm => {
+                select.innerHTML += `<option value="${pm.id}">${escapeHtml(pm.name)}</option>`;
+            });
+        } catch (error) {
+            console.error('Error loading payment methods:', error);
+        }
+    }
+
+    function openCreateMarkupModal() {
+        document.getElementById('markupRuleId').value = '';
+        document.getElementById('markupModalAction').textContent = 'Create';
+        document.getElementById('markupRuleName').value = '';
+        document.getElementById('markupCategoryId').value = '';
+        document.getElementById('markupPaymentMethodId').value = '';
+        document.getElementById('markupPercentage').value = '';
+        document.getElementById('markupPriority').value = '0';
+
+        if (!markupRuleModalInstance) {
+            markupRuleModalInstance = new bootstrap.Modal(document.getElementById('markupRuleModal'));
+        }
+        markupRuleModalInstance.show();
+    }
+
+    function editMarkupRule(ruleId) {
+        const rule = markupRulesData.find(r => r.id === ruleId);
+        if (!rule) return;
+
+        document.getElementById('markupRuleId').value = rule.id;
+        document.getElementById('markupModalAction').textContent = 'Edit';
+        document.getElementById('markupRuleName').value = rule.rule_name;
+        document.getElementById('markupCategoryId').value = rule.category_id || '';
+        document.getElementById('markupPaymentMethodId').value = rule.payment_method_id || '';
+        document.getElementById('markupPercentage').value = rule.percentage_markup;
+        document.getElementById('markupPriority').value = rule.priority;
+
+        if (!markupRuleModalInstance) {
+            markupRuleModalInstance = new bootstrap.Modal(document.getElementById('markupRuleModal'));
+        }
+        markupRuleModalInstance.show();
+    }
+
+    async function saveMarkupRule() {
+        const ruleId = document.getElementById('markupRuleId').value;
+        const ruleName = document.getElementById('markupRuleName').value.trim();
+        const categoryId = document.getElementById('markupCategoryId').value;
+        const paymentMethodId = document.getElementById('markupPaymentMethodId').value;
+        const percentage = document.getElementById('markupPercentage').value;
+        const priority = document.getElementById('markupPriority').value;
+
+        // Validation
+        if (!ruleName) {
+            showAlert('Please enter a rule name', 'warning');
+            return;
+        }
+
+        if (!percentage || parseFloat(percentage) < 0) {
+            showAlert('Please enter a valid markup percentage', 'warning');
+            return;
+        }
+
+        if (!categoryId && !paymentMethodId) {
+            showAlert('Please select at least one of Category or Payment Method', 'warning');
+            return;
+        }
+
+        const data = {
+            rule_name: ruleName,
+            category_id: categoryId || null,
+            payment_method_id: paymentMethodId || null,
+            percentage_markup: parseFloat(percentage),
+            priority: parseInt(priority) || 0
+        };
+
+        const saveBtn = document.getElementById('saveMarkupRuleBtn');
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+        try {
+            const url = ruleId ? `/api/admin/markup-rules/${ruleId}` : '/api/admin/markup-rules';
+            const method = ruleId ? 'PUT' : 'POST';
+
+            const response = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                showAlert(result.message || 'Markup rule saved successfully', 'success');
+                markupRuleModalInstance.hide();
+                loadMarkupRules();
+            } else {
+                showAlert(result.error || 'Failed to save markup rule', 'danger');
+            }
+        } catch (error) {
+            console.error('Error saving markup rule:', error);
+            showAlert('Network error: ' + error.message, 'danger');
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="fas fa-save"></i> Save Rule';
+        }
+    }
+
+    async function toggleMarkupRuleStatus(ruleId, currentStatus) {
+        try {
+            const response = await fetch(`/api/admin/markup-rules/${ruleId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ is_active: !currentStatus })
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                showAlert(result.message || 'Status updated successfully', 'success');
+                loadMarkupRules();
+            } else {
+                showAlert(result.error || 'Failed to update status', 'danger');
+            }
+        } catch (error) {
+            console.error('Error toggling status:', error);
+            showAlert('Network error: ' + error.message, 'danger');
+        }
+    }
+
+    function confirmDeleteMarkupRule(ruleId, ruleName) {
+        currentDeleteMarkupRuleId = ruleId;
+        document.getElementById('deleteMarkupRuleName').textContent = ruleName;
+
+        if (!deleteMarkupRuleModalInstance) {
+            deleteMarkupRuleModalInstance = new bootstrap.Modal(document.getElementById('deleteMarkupRuleModal'));
+        }
+        deleteMarkupRuleModalInstance.show();
+    }
+
+    async function executeDeleteMarkupRule() {
+        if (!currentDeleteMarkupRuleId) return;
+
+        const confirmBtn = document.getElementById('confirmDeleteMarkupRuleBtn');
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+
+        try {
+            const response = await fetch(`/api/admin/markup-rules/${currentDeleteMarkupRuleId}`, {
+                method: 'DELETE'
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                showAlert(result.message || 'Markup rule deleted successfully', 'success');
+                deleteMarkupRuleModalInstance.hide();
+                loadMarkupRules();
+            } else {
+                showAlert(result.error || 'Failed to delete markup rule', 'danger');
+            }
+        } catch (error) {
+            console.error('Error deleting markup rule:', error);
+            showAlert('Network error: ' + error.message, 'danger');
+        } finally {
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = '<i class="fas fa-trash"></i> Delete';
+            currentDeleteMarkupRuleId = null;
+        }
+    }
+
+    // Helper function to escape HTML
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
 </script>
 {% endblock %}
