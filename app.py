@@ -26,6 +26,7 @@ from services.admin_service import register_admin_routes
 from services.user_service import register_user_routes
 from services.report_service import register_report_routes
 from services.category_service import register_category_routes
+from services.payment_method_service import register_payment_method_routes
 
 # Load environment variables from .env file
 load_dotenv()
@@ -381,6 +382,7 @@ register_transaction_routes(app, login_required, limiter, RATE_LIMIT_API, token_
 register_markup_rule_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN)
 register_report_routes(app, login_required)
 register_category_routes(app, login_required)
+register_payment_method_routes(app, login_required, admin_required, limiter, RATE_LIMIT_ADMIN)
 
 
 @app.route('/api/dashboard-stats')
@@ -530,80 +532,6 @@ def recalculate_balances():
         'message': 'Balance calculation now happens on frontend',
         'transactions_updated': 0
     })
-
-
-@app.route('/api/payment-methods', methods=['GET', 'POST'])
-@login_required
-def payment_methods():
-    """Get or create payment methods."""
-    connection = get_db_connection()
-    if not connection:
-        return jsonify({'error': 'Database connection failed'}), 500
-
-    cursor = connection.cursor(dictionary=True)
-    user_id = session['user_id']
-
-    try:
-        if request.method == 'GET':
-            cursor.execute("""
-                           SELECT *
-                           FROM payment_methods
-                           WHERE user_id = %s
-                             AND is_active = TRUE
-                           ORDER BY type, name
-                           """, (user_id,))
-
-            methods = cursor.fetchall()
-            return jsonify(methods)
-
-        else:  # POST
-            data = request.get_json()
-            cursor.execute("""
-                           INSERT INTO payment_methods (user_id, name, type, color)
-                           VALUES (%s, %s, %s, %s)
-                           """, (
-                user_id,
-                data.get('name'),
-                data.get('type', 'credit_card'),
-                data.get('color', '#007bff')
-            ))
-
-            connection.commit()
-            return jsonify({'message': 'Payment method added successfully', 'id': cursor.lastrowid}), 201
-
-    except Error as e:
-        return jsonify({'error': str(e)}), 500
-    finally:
-        cursor.close()
-        connection.close()
-
-
-@app.route('/api/payment-methods/<int:method_id>', methods=['DELETE'])
-@login_required
-def delete_payment_method(method_id):
-    """Delete a payment method."""
-    connection = get_db_connection()
-    if not connection:
-        return jsonify({'error': 'Database connection failed'}), 500
-
-    cursor = connection.cursor()
-
-    try:
-        cursor.execute("""
-                       UPDATE payment_methods
-                       SET is_active = FALSE
-                       WHERE id = %s
-                         AND user_id = %s
-                       """, (method_id, session['user_id']))
-
-        connection.commit()
-        return jsonify({'message': 'Payment method deleted successfully'})
-
-    except Error as e:
-        return jsonify({'error': str(e)}), 500
-    finally:
-        cursor.close()
-        connection.close()
 
 
 @app.errorhandler(500)

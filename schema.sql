@@ -79,21 +79,40 @@ CREATE TABLE IF NOT EXISTS categories (
 -- ============================================================
 -- Payment Methods Table
 -- ============================================================
--- Stores user-defined payment methods (credit cards, bank accounts, etc.)
+-- Stores globally-managed payment methods (credit cards, bank accounts, etc.)
+-- Payment methods are created by admins and assigned to users
+-- via the user_payment_methods junction table.
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS payment_methods (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
     name VARCHAR(255) NOT NULL,
     type VARCHAR(50) DEFAULT 'credit_card',
     color VARCHAR(7) DEFAULT '#007bff',
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    INDEX idx_user_id (user_id),
     INDEX idx_is_active (is_active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- User Payment Methods (Junction Table)
+-- ============================================================
+-- Many-to-many relationship between users and payment methods.
+-- Admins create payment methods globally, then assign them to users.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS user_payment_methods (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    payment_method_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (payment_method_id) REFERENCES payment_methods(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_user_payment_method (user_id, payment_method_id),
+    INDEX idx_user_id (user_id),
+    INDEX idx_payment_method_id (payment_method_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+COMMENT='Junction table - assigns payment methods to users (many-to-many)';
 
 -- ============================================================
 -- Monthly Records Table

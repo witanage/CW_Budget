@@ -380,6 +380,12 @@
                 <i class="fas fa-percent"></i> <span class="tab-label">Markup Rules</span>
             </button>
         </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="payment-methods-tab" data-bs-toggle="tab" data-bs-target="#payment-methods-pane"
+                    type="button" role="tab" aria-controls="payment-methods-pane" aria-selected="false">
+                <i class="fas fa-credit-card"></i> <span class="tab-label">Payment Methods</span>
+            </button>
+        </li>
     </ul>
 
     <!-- Tab Content -->
@@ -790,6 +796,45 @@
             </div>
         </div>
 
+        <!-- Payment Methods Management Tab -->
+        <div class="tab-pane fade" id="payment-methods-pane" role="tabpanel" aria-labelledby="payment-methods-tab">
+            <div class="section-card">
+                <div class="section-header">
+                    <h2 style="margin: 0; font-size: 1.5rem; color: var(--text-primary);">
+                        <i class="fas fa-credit-card"></i> Payment Methods
+                    </h2>
+                    <button class="btn-sm btn-success" onclick="openCreatePmModal()">
+                        <i class="fas fa-plus"></i> Add Payment Method
+                    </button>
+                </div>
+                <div class="section-body">
+                    <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9rem;">
+                        Manage global payment methods and assign them to users. Payment methods created here can be assigned to one or more users.
+                    </p>
+                    <div style="overflow-x: auto;">
+                        <table class="user-table" id="pmTable">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Color</th>
+                                    <th>Assigned Users</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pmTableBody">
+                                <tr>
+                                    <td colspan="5" class="text-center" style="padding: 20px; color: var(--text-secondary);">
+                                        <i class="fas fa-spinner fa-spin"></i> Loading payment methods...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div><!-- /tab-content -->
 </div>
 
@@ -1015,6 +1060,125 @@
                     <i class="fas fa-times"></i> Cancel
                 </button>
                 <button type="button" class="btn btn-danger" id="confirmDeleteMarkupRuleBtn" onclick="executeDeleteMarkupRule()">
+                    <i class="fas fa-trash"></i> Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Payment Method Create/Edit Modal -->
+<div class="modal fade" id="pmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content" style="background: var(--card-bg); color: var(--text-primary);">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border-color);">
+                <h5 class="modal-title">
+                    <i class="fas fa-credit-card"></i> <span id="pmModalAction">Create</span> Payment Method
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="pmEditId" value="">
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 5px; color: var(--text-primary);">
+                        <i class="fas fa-tag"></i> Name *
+                    </label>
+                    <input type="text" id="pmName" placeholder="e.g., Visa Platinum, Cash"
+                           style="width: 100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary);">
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 5px; color: var(--text-primary);">
+                        <i class="fas fa-list"></i> Type
+                    </label>
+                    <select id="pmType"
+                            style="width: 100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary);">
+                        <option value="credit_card">Credit Card</option>
+                        <option value="debit_card">Debit Card</option>
+                        <option value="bank_transfer">Bank Transfer</option>
+                        <option value="cash">Cash</option>
+                        <option value="digital_wallet">Digital Wallet</option>
+                        <option value="card">Card</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 5px; color: var(--text-primary);">
+                        <i class="fas fa-palette"></i> Color
+                    </label>
+                    <input type="color" id="pmColor" value="#007bff"
+                           style="width: 60px; height: 38px; padding: 2px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); cursor: pointer;">
+                </div>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid var(--border-color);">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+                <button type="button" class="btn btn-success" id="savePmBtn" onclick="savePaymentMethod()">
+                    <i class="fas fa-save"></i> Save
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Assign Users to Payment Method Modal -->
+<div class="modal fade" id="assignUsersModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content" style="background: var(--card-bg); color: var(--text-primary);">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border-color);">
+                <h5 class="modal-title">
+                    <i class="fas fa-users"></i> Assign Users to: <span id="assignPmName" style="color: var(--accent-color);"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="assignPmId" value="">
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 15px;">
+                    Select the users who should have access to this payment method.
+                </p>
+                <div id="assignUsersCheckboxes" style="max-height: 350px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; padding: 10px;">
+                    <div class="text-center" style="color: var(--text-secondary); padding: 15px;">
+                        <i class="fas fa-spinner fa-spin"></i> Loading users...
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid var(--border-color);">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+                <button type="button" class="btn btn-success" id="saveAssignUsersBtn" onclick="saveUserAssignments()">
+                    <i class="fas fa-save"></i> Save Assignments
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Payment Method Confirmation Modal -->
+<div class="modal fade" id="deletePmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content" style="background: var(--card-bg); color: var(--text-primary);">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border-color);">
+                <h5 class="modal-title">
+                    <i class="fas fa-exclamation-triangle text-danger"></i> Delete Payment Method
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete <strong id="deletePmName"></strong>?</p>
+                <div class="alert alert-warning" role="alert">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <strong>Warning:</strong> This will permanently delete the payment method. It cannot be deleted if it is used by any transactions.
+                </div>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid var(--border-color);">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+                <button type="button" class="btn btn-danger" id="confirmDeletePmBtn" onclick="executeDeletePm()">
                     <i class="fas fa-trash"></i> Delete
                 </button>
             </div>
@@ -1865,7 +2029,8 @@
             '#delete-records': 'records-tab',
             '#users': 'users-tab',
             '#audit-logs': 'audit-tab',
-            '#markup-rules': 'markup-tab'
+            '#markup-rules': 'markup-tab',
+            '#payment-methods': 'payment-methods-tab'
         };
 
         // Reverse map: tab ID to hash
@@ -1875,7 +2040,8 @@
             'records-tab': '#delete-records',
             'users-tab': '#users',
             'audit-tab': '#audit-logs',
-            'markup-tab': '#markup-rules'
+            'markup-tab': '#markup-rules',
+            'payment-methods-tab': '#payment-methods'
         };
 
         // On page load, activate the tab from the URL hash
@@ -2182,6 +2348,301 @@
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // PAYMENT METHODS MANAGEMENT
+    // ══════════════════════════════════════════════════════════
+
+    let pmAdminData = [];
+    let pmModalInstance = null;
+    let assignUsersModalInstance = null;
+    let deletePmModalInstance = null;
+    let currentDeletePmId = null;
+
+    // Load when tab is shown
+    document.getElementById('payment-methods-tab').addEventListener('shown.bs.tab', function() {
+        loadAdminPaymentMethods();
+    });
+
+    async function loadAdminPaymentMethods() {
+        const tbody = document.getElementById('pmTableBody');
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center" style="padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>';
+
+        try {
+            const response = await fetch('/api/admin/payment-methods');
+            if (!response.ok) throw new Error('Failed to load payment methods');
+
+            pmAdminData = await response.json();
+            renderAdminPm();
+        } catch (error) {
+            console.error('Error loading payment methods:', error);
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger" style="padding: 20px;"><i class="fas fa-exclamation-triangle"></i> Error loading payment methods</td></tr>';
+        }
+    }
+
+    function renderAdminPm() {
+        const tbody = document.getElementById('pmTableBody');
+
+        if (pmAdminData.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center" style="padding: 20px; color: var(--text-secondary);"><i class="fas fa-info-circle"></i> No payment methods yet. Click "Add Payment Method" to create one.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = pmAdminData.map(pm => {
+            const colorSwatch = `<span style="display:inline-block;width:20px;height:20px;border-radius:4px;background:${pm.color};border:1px solid var(--border-color);vertical-align:middle;"></span> <code style="font-size:0.85rem;">${escapeHtml(pm.color)}</code>`;
+            const usersBadge = pm.assigned_user_count > 0
+                ? `<span class="badge bg-success">${pm.assigned_user_count} user${pm.assigned_user_count !== 1 ? 's' : ''}</span>`
+                : '<span class="badge bg-secondary">None</span>';
+
+            return `
+                <tr>
+                    <td><strong>${escapeHtml(pm.name)}</strong></td>
+                    <td>${escapeHtml(pm.type)}</td>
+                    <td>${colorSwatch}</td>
+                    <td>${usersBadge}</td>
+                    <td class="action-buttons">
+                        <button class="btn-sm btn-primary" onclick="editPm(${pm.id})" title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn-sm btn-info" onclick="openAssignUsersModal(${pm.id})" title="Assign Users">
+                            <i class="fas fa-users"></i>
+                        </button>
+                        <button class="btn-sm btn-danger" onclick="confirmDeletePm(${pm.id}, '${escapeHtml(pm.name)}')" title="Delete">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function openCreatePmModal() {
+        document.getElementById('pmEditId').value = '';
+        document.getElementById('pmModalAction').textContent = 'Create';
+        document.getElementById('pmName').value = '';
+        document.getElementById('pmType').value = 'credit_card';
+        document.getElementById('pmColor').value = '#007bff';
+
+        if (!pmModalInstance) {
+            pmModalInstance = new bootstrap.Modal(document.getElementById('pmModal'));
+        }
+        pmModalInstance.show();
+    }
+
+    function editPm(pmId) {
+        const pm = pmAdminData.find(p => p.id === pmId);
+        if (!pm) return;
+
+        document.getElementById('pmEditId').value = pm.id;
+        document.getElementById('pmModalAction').textContent = 'Edit';
+        document.getElementById('pmName').value = pm.name;
+        document.getElementById('pmType').value = pm.type || 'credit_card';
+        document.getElementById('pmColor').value = pm.color || '#007bff';
+
+        if (!pmModalInstance) {
+            pmModalInstance = new bootstrap.Modal(document.getElementById('pmModal'));
+        }
+        pmModalInstance.show();
+    }
+
+    async function savePaymentMethod() {
+        const pmId = document.getElementById('pmEditId').value;
+        const name = document.getElementById('pmName').value.trim();
+        const type = document.getElementById('pmType').value;
+        const color = document.getElementById('pmColor').value;
+
+        if (!name) {
+            showAlert('Please enter a payment method name', 'warning');
+            return;
+        }
+
+        const data = { name, type, color };
+
+        const saveBtn = document.getElementById('savePmBtn');
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+        try {
+            const url = pmId ? `/api/admin/payment-methods/${pmId}` : '/api/admin/payment-methods';
+            const method = pmId ? 'PUT' : 'POST';
+
+            const response = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                showAlert(pmId ? 'Payment method updated' : 'Payment method created', 'success');
+                pmModalInstance.hide();
+                loadAdminPaymentMethods();
+            } else {
+                showAlert(result.error || 'Failed to save payment method', 'danger');
+            }
+        } catch (error) {
+            console.error('Error saving payment method:', error);
+            showAlert('Network error: ' + error.message, 'danger');
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="fas fa-save"></i> Save';
+        }
+    }
+
+    function confirmDeletePm(pmId, pmName) {
+        currentDeletePmId = pmId;
+        document.getElementById('deletePmName').textContent = pmName;
+
+        if (!deletePmModalInstance) {
+            deletePmModalInstance = new bootstrap.Modal(document.getElementById('deletePmModal'));
+        }
+        deletePmModalInstance.show();
+    }
+
+    async function executeDeletePm() {
+        if (!currentDeletePmId) return;
+
+        const confirmBtn = document.getElementById('confirmDeletePmBtn');
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+
+        try {
+            const response = await fetch(`/api/admin/payment-methods/${currentDeletePmId}`, {
+                method: 'DELETE'
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                showAlert(result.message || 'Payment method deleted', 'success');
+                deletePmModalInstance.hide();
+                loadAdminPaymentMethods();
+                // Refresh markup rules payment method dropdown if loaded
+                if (typeof loadAllPaymentMethods === 'function') loadAllPaymentMethods();
+            } else {
+                showAlert(result.error || 'Failed to delete', 'danger');
+            }
+        } catch (error) {
+            console.error('Error deleting payment method:', error);
+            showAlert('Network error: ' + error.message, 'danger');
+        } finally {
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = '<i class="fas fa-trash"></i> Delete';
+            currentDeletePmId = null;
+        }
+    }
+
+    async function openAssignUsersModal(pmId) {
+        const pm = pmAdminData.find(p => p.id === pmId);
+        if (!pm) return;
+
+        document.getElementById('assignPmId').value = pmId;
+        document.getElementById('assignPmName').textContent = pm.name;
+
+        const container = document.getElementById('assignUsersCheckboxes');
+        container.innerHTML = '<div class="text-center" style="padding: 15px;"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
+
+        if (!assignUsersModalInstance) {
+            assignUsersModalInstance = new bootstrap.Modal(document.getElementById('assignUsersModal'));
+        }
+        assignUsersModalInstance.show();
+
+        try {
+            // Fetch all users and assigned users in parallel
+            const [usersResp, assignedResp] = await Promise.all([
+                fetch('/api/admin/users'),
+                fetch(`/api/admin/payment-methods/${pmId}/assigned-users`)
+            ]);
+
+            if (!usersResp.ok) throw new Error('Failed to load users');
+            const allUsersArr = await usersResp.json();
+            const assignedUsers = assignedResp.ok ? await assignedResp.json() : [];
+            const assignedIds = new Set(assignedUsers.map(u => u.id));
+
+            if (allUsersArr.length === 0) {
+                container.innerHTML = '<div class="text-center" style="color: var(--text-secondary); padding: 15px;">No users found.</div>';
+                return;
+            }
+
+            container.innerHTML = '';
+            allUsersArr.forEach(user => {
+                const checked = assignedIds.has(user.id) ? 'checked' : '';
+                const activeTag = user.is_active
+                    ? '<span class="badge bg-success" style="font-size:0.7rem;margin-left:5px;">Active</span>'
+                    : '<span class="badge bg-danger" style="font-size:0.7rem;margin-left:5px;">Inactive</span>';
+                const div = document.createElement('div');
+                div.style.cssText = 'padding: 8px 10px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; gap: 10px;';
+                div.innerHTML = `
+                    <input type="checkbox" id="assignUser_${user.id}" value="${user.id}" ${checked}
+                           style="width: 18px; height: 18px; cursor: pointer;">
+                    <label for="assignUser_${user.id}" style="cursor: pointer; margin: 0; flex: 1;">
+                        <strong>${escapeHtml(user.username)}</strong>
+                        <span style="color: var(--text-secondary); font-size: 0.85rem;"> (${escapeHtml(user.email)})</span>
+                        ${activeTag}
+                    </label>
+                `;
+                container.appendChild(div);
+            });
+        } catch (error) {
+            console.error('Error loading users for assignment:', error);
+            container.innerHTML = '<div class="text-center text-danger" style="padding: 15px;"><i class="fas fa-exclamation-triangle"></i> Error loading users</div>';
+        }
+    }
+
+    async function saveUserAssignments() {
+        const pmId = document.getElementById('assignPmId').value;
+        if (!pmId) return;
+
+        const checkboxes = document.querySelectorAll('#assignUsersCheckboxes input[type="checkbox"]');
+        const selectedUserIds = [];
+        checkboxes.forEach(cb => {
+            if (cb.checked) selectedUserIds.push(parseInt(cb.value));
+        });
+
+        const saveBtn = document.getElementById('saveAssignUsersBtn');
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+        try {
+            // Get current assignments to determine adds/removes
+            const assignedResp = await fetch(`/api/admin/payment-methods/${pmId}/assigned-users`);
+            const currentAssigned = assignedResp.ok ? await assignedResp.json() : [];
+            const currentIds = new Set(currentAssigned.map(u => u.id));
+            const selectedIds = new Set(selectedUserIds);
+
+            // Determine adds and removes
+            const toAdd = selectedUserIds.filter(id => !currentIds.has(id));
+            const toRemove = currentAssigned.filter(u => !selectedIds.has(u.id)).map(u => u.id);
+
+            // Execute changes
+            const promises = [];
+            for (const userId of toAdd) {
+                promises.push(fetch(`/api/admin/payment-methods/${pmId}/assign-user`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: userId })
+                }));
+            }
+            for (const userId of toRemove) {
+                promises.push(fetch(`/api/admin/payment-methods/${pmId}/unassign-user/${userId}`, {
+                    method: 'DELETE'
+                }));
+            }
+
+            await Promise.all(promises);
+
+            showAlert(`Assignments updated: ${toAdd.length} added, ${toRemove.length} removed`, 'success');
+            assignUsersModalInstance.hide();
+            loadAdminPaymentMethods();
+        } catch (error) {
+            console.error('Error saving assignments:', error);
+            showAlert('Network error: ' + error.message, 'danger');
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="fas fa-save"></i> Save Assignments';
+        }
     }
 
 </script>

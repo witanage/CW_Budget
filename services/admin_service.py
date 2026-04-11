@@ -657,10 +657,11 @@ def register_admin_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN):
         cursor = connection.cursor(dictionary=True)
         try:
             cursor.execute("""
-                           SELECT id, name, type, color
-                           FROM payment_methods
-                           WHERE user_id = %s AND is_active = TRUE
-                           ORDER BY name
+                           SELECT pm.id, pm.name, pm.type, pm.color
+                           FROM payment_methods pm
+                                    INNER JOIN user_payment_methods upm ON pm.id = upm.payment_method_id
+                           WHERE upm.user_id = %s AND pm.is_active = TRUE
+                           ORDER BY pm.name
                            """, (user_id,))
             return jsonify(cursor.fetchall())
         except Error as e:
@@ -796,10 +797,11 @@ def register_admin_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN):
                            """, (target_user_id, year, month, month_name))
             monthly_record = {'id': cursor.lastrowid}
 
-            # Pre-load existing payment methods for the target user
+            # Pre-load payment methods assigned to the target user
             cursor.execute("""
-                           SELECT id, name FROM payment_methods
-                           WHERE user_id = %s AND is_active = TRUE
+                           SELECT pm.id, pm.name FROM payment_methods pm
+                           INNER JOIN user_payment_methods upm ON pm.id = upm.payment_method_id
+                           WHERE upm.user_id = %s AND pm.is_active = TRUE
                            """, (target_user_id,))
             existing_methods = {pm['name'].lower(): pm['id'] for pm in cursor.fetchall()}
 
@@ -816,6 +818,27 @@ def register_admin_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN):
             skipped_count = 0
             methods_created = []
 
+            def _resolve_or_create_pm(method_name):
+                """Find existing global method or create new, assign to target user."""
+                m_lower = method_name.lower()
+                cursor.execute(
+                    "SELECT id FROM payment_methods WHERE name = %s AND is_active = TRUE LIMIT 1",
+                    (method_name,))
+                _eg = cursor.fetchone()
+                if _eg:
+                    pm_id = _eg['id']
+                else:
+                    cursor.execute(
+                        "INSERT INTO payment_methods (name, type, color, is_active) VALUES (%s, 'card', '#6c757d', TRUE)",
+                        (method_name,))
+                    pm_id = cursor.lastrowid
+                    methods_created.append(method_name)
+                cursor.execute(
+                    "INSERT IGNORE INTO user_payment_methods (user_id, payment_method_id) VALUES (%s, %s)",
+                    (target_user_id, pm_id))
+                existing_methods[m_lower] = pm_id
+                return pm_id
+
             # ── Phase 1: resolve payment methods for ALL rows first ──
             # This avoids interleaving method-creation queries with
             # transaction inserts and reduces round-trips.
@@ -831,17 +854,11 @@ def register_admin_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN):
                         if directive == '__skip__':
                             payment_method_id = None
                         elif directive == '__create__':
-                            # Create new method
+                            # Create new method (or reuse existing global one)
                             if method_lower not in existing_methods:
-                                cursor.execute("""
-                                    INSERT INTO payment_methods (user_id, name, type, color, is_active)
-                                    VALUES (%s, %s, 'card', '#6c757d', TRUE)
-                                """, (target_user_id, row['method']))
-                                new_pm_id = cursor.lastrowid
-                                existing_methods[method_lower] = new_pm_id
-                                methods_created.append(row['method'])
+                                new_pm_id = _resolve_or_create_pm(row['method'])
                                 logger.info(
-                                    f"Created payment method '{row['method']}' (ID: {new_pm_id}) for user {target_user_id}")
+                                    f"Created/assigned payment method '{row['method']}' (ID: {new_pm_id}) for user {target_user_id}")
                             payment_method_id = existing_methods[method_lower]
                         elif isinstance(directive, int):
                             # Use specified payment method ID
@@ -850,30 +867,14 @@ def register_admin_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN):
                             # Invalid directive, fall back to auto-match
                             payment_method_id = existing_methods.get(method_lower)
                             if not payment_method_id:
-                                # Auto-create
-                                cursor.execute("""
-                                    INSERT INTO payment_methods (user_id, name, type, color, is_active)
-                                    VALUES (%s, %s, 'card', '#6c757d', TRUE)
-                                """, (target_user_id, row['method']))
-                                new_pm_id = cursor.lastrowid
-                                existing_methods[method_lower] = new_pm_id
-                                methods_created.append(row['method'])
-                                payment_method_id = new_pm_id
+                                payment_method_id = _resolve_or_create_pm(row['method'])
                     else:
                         # No mapping provided, auto-match or create
                         payment_method_id = existing_methods.get(method_lower)
                         if not payment_method_id:
-                            # Auto-create
-                            cursor.execute("""
-                                INSERT INTO payment_methods (user_id, name, type, color, is_active)
-                                VALUES (%s, %s, 'card', '#6c757d', TRUE)
-                            """, (target_user_id, row['method']))
-                            new_pm_id = cursor.lastrowid
-                            existing_methods[method_lower] = new_pm_id
-                            methods_created.append(row['method'])
+                            payment_method_id = _resolve_or_create_pm(row['method'])
                             logger.info(
-                                f"Auto-created payment method '{row['method']}' (ID: {new_pm_id}) for user {target_user_id}")
-                            payment_method_id = new_pm_id
+                                f"Auto-created/assigned payment method '{row['method']}' (ID: {payment_method_id}) for user {target_user_id}")
 
                 resolved_pm_ids.append(payment_method_id)
 
