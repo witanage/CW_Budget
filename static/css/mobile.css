@@ -1048,6 +1048,13 @@ font-size: 0.8rem;
 .payment-totals-table td {
 padding: 8px 4px;
 border-bottom: 1px solid #555555;
+vertical-align: middle;
+}
+
+.payment-totals-table td:first-child {
+display: flex;
+align-items: center;
+gap: 8px;
 }
 
 .payment-method-color-indicator {

@@ -2093,7 +2093,8 @@ def get_payment_method_totals_handler():
         if not monthly_record:
             return jsonify([])
 
-        # Get totals by payment method
+        # Get totals by payment method (LEFT JOIN on assignments so that
+        # unassigned methods with existing transactions still appear)
         cursor.execute("""
                        SELECT pm.id,
                               pm.name,
@@ -2104,12 +2105,13 @@ def get_payment_method_totals_handler():
                               SUM(t.credit)                                     as total_credit,
                               SUM(COALESCE(t.debit, 0) - COALESCE(t.credit, 0)) as net_amount
                        FROM payment_methods pm
-                                INNER JOIN user_payment_methods upm
+                                LEFT JOIN user_payment_methods upm
                                     ON pm.id = upm.payment_method_id AND upm.user_id = %s
                                 LEFT JOIN transactions t ON pm.id = t.payment_method_id
                            AND t.monthly_record_id = %s
                            AND t.is_done = TRUE
                        WHERE pm.is_active = TRUE
+                         AND (upm.id IS NOT NULL OR t.id IS NOT NULL)
                        GROUP BY pm.id, pm.name, pm.type, pm.color
                        ORDER BY pm.type, pm.name
                        """, (user_id, monthly_record['id']))
