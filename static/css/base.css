@@ -1383,10 +1383,17 @@ color: var(--text-primary);
 
 .payment-method-list-item {
 cursor: pointer;
+display: flex;
+align-items: center;
+gap: 10px;
 }
 
 .payment-method-list-item:hover {
 background-color: var(--table-hover);
+}
+
+.payment-method-list-item .badge {
+margin-left: auto;
 }
 
 .payment-method-color-indicator {
@@ -1394,7 +1401,7 @@ width: 30px;
 height: 30px;
 border-radius: 5px;
 display: inline-block;
-margin-right: 10px;
+flex-shrink: 0;
 }
 
 .credit-card-item {

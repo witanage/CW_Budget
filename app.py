@@ -12,12 +12,6 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from mysql.connector import Error
 
-from services.hnb_exchange_rate_service import get_hnb_exchange_rate_service
-from services.pb_exchange_rate_service import get_pb_exchange_rate_service
-from services.sampath_exchange_rate_service import get_sampath_exchange_rate_service
-from services.backup_service import get_backup_service
-from services.google_drive_file_service import get_google_drive_file_service
-from services.google_drive_backup_service import get_google_drive_backup_service
 from services.exchange_rate_routes import register_exchange_rate_routes
 from services.tax_service import register_tax_routes
 from services.transaction_service import register_transaction_routes
@@ -39,8 +33,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 logger.info("Environment variables loaded")
-
-file_service = get_google_drive_file_service()
 
 
 # Custom JSON provider to handle Decimal objects
