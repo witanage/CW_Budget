@@ -1,0 +1,210 @@
+<!-- Payment Totals Modal -->
+<div class="modal fade" id="paymentTotalsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Payment Method Totals</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Showing totals for marked transactions only (paid/done)
+                </div>
+
+                <div id="paymentTotalsContent">
+                    <!-- Totals will be loaded here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Clone Month Modal -->
+<div class="modal fade" id="cloneMonthModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Clone Month Transactions</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    This will copy all transactions from the source month to the target month.
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label">Copy From:</label>
+                    <input type="month" class="form-control" id="cloneFromMonthYear">
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label">Copy To:</label>
+                    <input type="month" class="form-control" id="cloneToMonthYear">
+                </div>
+
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="cloneWithPayments" checked>
+                    <label class="form-check-label" for="cloneWithPayments">
+                        Include payment method assignments
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="executeCloneBtn">
+                    <i class="fas fa-clone me-1"></i>Clone Transactions
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Transaction Audit Log Modal -->
+<div class="modal fade" id="auditLogModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-history me-2"></i>Transaction Audit Log
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="auditLogContent">
+                    <div class="text-center py-4">
+                        <div class="professional-spinner"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bill Content Modal -->
+<div class="modal fade" id="billContentModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content" style="max-height: 90vh; display: flex; flex-direction: column;">
+            <div class="modal-header bg-primary text-white" style="flex-shrink: 0;">
+                <h5 class="modal-title">
+                    <i class="fas fa-receipt me-2"></i>Bill Details
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" style="overflow-y: auto; flex: 1 1 auto;">
+                <div id="billContentDisplay">
+                    <div class="text-center py-4">
+                        <i class="fas fa-receipt fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">No bill content available</p>
+                    </div>
+                </div>
+                <!-- Attachment Image Container (hidden by default) -->
+                <div id="billAttachmentContainer" class="mt-4" style="display: none;">
+                    <div class="border-top pt-4">
+                        <h6 class="mb-3">
+                            <i class="fas fa-paperclip me-2"></i>Bill Attachment
+                        </h6>
+                        <div id="billAttachmentDisplay" class="text-center py-3">
+                            <div class="professional-spinner"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="flex-shrink: 0;">
+                <button type="button" class="btn btn-info" id="viewAttachmentBtn" style="display: none;">
+                    <i class="fas fa-image me-1"></i>View Attachment
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Move/Copy Transaction Modal -->
+<div class="modal fade" id="moveCopyTransactionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-exchange-alt me-2"></i><span id="moveCopyTitle">Move Transaction</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <span id="moveCopyInfoText">This will move the transaction to the selected month.</span>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Transaction:</label>
+                    <div id="moveCopyTransactionInfo" class="p-2 rounded" style="background-color: var(--bg-tertiary);"></div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="targetMonthYear" class="form-label fw-bold">Target Month:</label>
+                    <input type="month" class="form-control" id="targetMonthYear" required>
+                </div>
+
+                <input type="hidden" id="moveCopyTransactionId">
+                <input type="hidden" id="moveCopyAction">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="executeMoveCopyBtn">
+                    <i class="fas fa-check me-1"></i>Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Download Transactions Modal -->
+<div class="modal fade" id="downloadModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-download me-2"></i>Download Transactions
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Download transactions for the currently selected month and filters.
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Select Format:</label>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-success" onclick="downloadTransactions('csv')">
+                            <i class="fas fa-file-csv me-2"></i>CSV (Comma Separated Values)
+                        </button>
+                        <button class="btn btn-outline-danger" onclick="downloadTransactions('pdf')">
+                            <i class="fas fa-file-pdf me-2"></i>PDF (Portable Document)
+                        </button>
+                        <button class="btn btn-outline-primary" onclick="downloadTransactions('excel')">
+                            <i class="fas fa-file-excel me-2"></i>Excel (XLSX Spreadsheet)
+                        </button>
+                    </div>
+                </div>
+
+                <div class="small opacity-75">
+                    <i class="fas fa-lightbulb me-1"></i>
+                    <strong>Tip:</strong> CSV files can be opened in Excel, Google Sheets, or any text editor.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+

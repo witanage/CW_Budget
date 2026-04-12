@@ -1,0 +1,282 @@
+<!-- AI Insights Modal -->
+<div class="modal fade" id="aiInsightsModal" tabindex="-1" aria-labelledby="aiInsightsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="aiInsightsModalLabel">
+                    <i class="fas fa-brain me-2"></i>AI Currency Exchange Insights
+                </h5>
+                <div class="ms-auto me-3 d-flex align-items-center">
+                    <label for="aiUserBankSelect" class="form-label mb-0 me-2 small text-muted">My Bank:</label>
+                    <select id="aiUserBankSelect" class="form-select form-select-sm" style="width:auto;">
+                        <option value="HNB" selected>HNB</option>
+                        <option value="SAMPATH">Sampath</option>
+                        <option value="PB">People's Bank</option>
+                        <option value="CBSL">CBSL</option>
+                    </select>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="aiInsightsContent">
+                <!-- Loading state -->
+                <div id="aiInsightsLoading" class="text-center py-5">
+                    <div class="spinner-border text-primary mb-3" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="text-muted">Analyzing exchange rate trends with AI...</p>
+                </div>
+
+                <!-- Error state -->
+                <div id="aiInsightsError" style="display: none;">
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Analysis Failed</strong>
+                        <p class="mb-0 mt-2" id="aiInsightsErrorMsg">An error occurred while analyzing the data.</p>
+                    </div>
+                </div>
+
+                <!-- Content -->
+                <div id="aiInsightsData" style="display: none;">
+                    <!-- Recommendation Card -->
+                    <div class="card mb-3 border-0 bg-light">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-3 text-muted">
+                                <i class="fas fa-lightbulb me-1"></i>Recommendation
+                            </h6>
+                            <div id="aiRecommendation" class="h5 mb-2"></div>
+                            <div class="d-flex gap-2 flex-wrap mb-2">
+                                <span class="badge" id="aiConfidenceBadge"></span>
+                                <span class="badge" id="aiRiskBadge"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Help Guide (Collapsible) -->
+                    <div class="accordion mb-3" id="aiHelpAccordion">
+                        <div class="accordion-item" style="background-color: #2B2B2B; border-color: #3C3F41;">
+                            <h2 class="accordion-header" id="aiHelpHeader">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#aiHelpCollapse" aria-expanded="false" aria-controls="aiHelpCollapse" style="background-color: #2B2B2B; color: #BBB; border-color: #3C3F41;">
+                                    <i class="fas fa-question-circle me-2"></i>What do these mean?
+                                </button>
+                            </h2>
+                            <div id="aiHelpCollapse" class="accordion-collapse collapse" aria-labelledby="aiHelpHeader" data-bs-parent="#aiHelpAccordion">
+                                <div class="accordion-body" style="background-color: #313335; color: #BBB;">
+                                    <div class="row g-3">
+                                        <!-- Recommendation Statuses -->
+                                        <div class="col-12">
+                                            <h6 class="mb-2" style="color: #6897BB;"><i class="fas fa-directions me-1"></i> Recommendation</h6>
+                                            <table class="table table-sm table-bordered" style="background-color: #3C3F41; border-color: #555; color: #BBB;">
+                                                <tbody>
+                                                    <tr style="background-color: #3C3F41;">
+                                                        <td class="fw-bold" style="width: 20%; border-color: #555;">NOW</td>
+                                                        <td style="border-color: #555;">Exchange your USD salary immediately. HNB rates are currently favorable.</td>
+                                                    </tr>
+                                                    <tr style="background-color: #3C3F41;">
+                                                        <td class="fw-bold" style="border-color: #555;">WAIT</td>
+                                                        <td style="border-color: #555;">Hold your USD. Rates are unfavorable - better rates expected soon.</td>
+                                                    </tr>
+                                                    <tr style="background-color: #3C3F41;">
+                                                        <td class="fw-bold" style="border-color: #555;">MONITOR</td>
+                                                        <td style="border-color: #555;">Watch the rates closely. No urgent action needed, consider your cash flow.</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <!-- Confidence Levels -->
+                                        <div class="col-md-6">
+                                            <h6 class="mb-2" style="color: #6897BB;"><i class="fas fa-chart-bar me-1"></i> Confidence</h6>
+                                            <table class="table table-sm table-bordered mb-0" style="background-color: #3C3F41; border-color: #555; color: white;">
+                                                <tbody>
+                                                    <tr>
+                                                        <td class="fw-bold bg-success text-white" style="width: 30%; border-color: #555;">HIGH</td>
+                                                        <td style="background-color: #3C3F41; border-color: #555; color: white;">Strong data support</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="fw-bold bg-warning text-dark" style="border-color: #555;">MEDIUM</td>
+                                                        <td style="background-color: #3C3F41; border-color: #555; color: white;">Mixed signals</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="fw-bold bg-secondary text-white" style="border-color: #555;">LOW</td>
+                                                        <td style="background-color: #3C3F41; border-color: #555; color: white;">Uncertain</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <!-- Risk Levels -->
+                                        <div class="col-md-6">
+                                            <h6 class="mb-2" style="color: #6897BB;"><i class="fas fa-exclamation-triangle me-1"></i> Risk (of exchanging now)</h6>
+                                            <table class="table table-sm table-bordered mb-0" style="background-color: #3C3F41; border-color: #555; color: white;">
+                                                <tbody>
+                                                    <tr>
+                                                        <td class="fw-bold bg-success text-white" style="width: 30%; border-color: #555;">LOW</td>
+                                                        <td style="background-color: #3C3F41; border-color: #555; color: white;">Safe to exchange</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="fw-bold bg-warning text-dark" style="border-color: #555;">MEDIUM</td>
+                                                        <td style="background-color: #3C3F41; border-color: #555; color: white;">Might improve</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="fw-bold bg-danger text-white" style="border-color: #555;">HIGH</td>
+                                                        <td style="background-color: #3C3F41; border-color: #555; color: white;">Wait for better rates</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <!-- Best Scenarios -->
+                                        <div class="col-12">
+                                            <div class="alert mb-0" style="background-color: #3C3F41; border-color: #6897BB; color: #BBB; border-left: 4px solid #6897BB;">
+                                                <strong><i class="fas fa-info-circle me-1"></i> Best Scenario:</strong>
+                                                NOW + HIGH Confidence + LOW Risk = Exchange your salary now!
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Statistics Grid -->
+                    <div class="row g-2 mb-3">
+                        <div class="col-6 col-md-3">
+                            <div class="card border-0 bg-light">
+                                <div class="card-body p-2 text-center">
+                                    <div class="small text-muted">Current Rate</div>
+                                    <div class="fw-bold" id="aiCurrentRate">--</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="card border-0 bg-light">
+                                <div class="card-body p-2 text-center">
+                                    <div class="small text-muted">Average</div>
+                                    <div class="fw-bold" id="aiAvgRate">--</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="card border-0 bg-light">
+                                <div class="card-body p-2 text-center">
+                                    <div class="small text-muted">Range</div>
+                                    <div class="fw-bold" id="aiRateRange">--</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="card border-0 bg-light">
+                                <div class="card-body p-2 text-center">
+                                    <div class="small text-muted">Volatility</div>
+                                    <div class="fw-bold" id="aiVolatility">--</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Best Time -->
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">
+                                <i class="fas fa-clock me-1"></i>Best Time to Exchange
+                            </h6>
+                            <p id="aiBestTime" class="mb-0"></p>
+                        </div>
+                    </div>
+
+                    <!-- Trend Analysis -->
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">
+                                <i class="fas fa-chart-line me-1"></i>Trend Analysis
+                            </h6>
+                            <p id="aiTrend" class="mb-0"></p>
+                        </div>
+                    </div>
+
+                    <!-- Key Insights -->
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">
+                                <i class="fas fa-key me-1"></i>Key Insights
+                            </h6>
+                            <ul id="aiInsightsList" class="mb-0"></ul>
+                        </div>
+                    </div>
+
+                    <!-- Forecast -->
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">
+                                <i class="fas fa-crystal-ball me-1"></i>Short-term Forecast
+                            </h6>
+                            <p id="aiForecastText" class="mb-0"></p>
+                            <div id="aiForecastDetail" style="display:none;">
+                                <div class="row mb-2">
+                                    <div class="col-6">
+                                        <small class="text-muted">7-Day Predicted (<span class="aiFcBankLabel">HNB</span>)</small>
+                                        <div id="aiFc7d" class="fw-bold">--</div>
+                                    </div>
+                                    <div class="col-6">
+                                        <small class="text-muted">14-Day Predicted (<span class="aiFcBankLabel">HNB</span>)</small>
+                                        <div id="aiFc14d" class="fw-bold">--</div>
+                                    </div>
+                                </div>
+                                <div class="mb-2">
+                                    <small class="text-muted">Direction:</small>
+                                    <span id="aiFcDirection" class="badge bg-secondary ms-1">--</span>
+                                    <span id="aiFcConfidence" class="text-muted small ms-2"></span>
+                                </div>
+                                <div id="aiFcShouldWait" style="display:none;" class="mb-2">
+                                    <small class="text-muted">Should Wait:</small>
+                                    <span id="aiFcShouldWaitText" class="small"></span>
+                                </div>
+                                <div id="aiFcOptimalWindow" style="display:none;" class="mb-2">
+                                    <small class="text-muted">Optimal Window:</small>
+                                    <span id="aiFcOptimalWindowText" class="small"></span>
+                                </div>
+                                <div id="aiFcBankRates" style="display:none;" class="mb-0">
+                                    <small class="text-muted">All Banks 7-Day Predicted:</small>
+                                    <ul id="aiFcBankRatesList" class="mb-0 small"></ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Items -->
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">
+                                <i class="fas fa-tasks me-1"></i>Action Items
+                            </h6>
+                            <ul id="aiActionItemsList" class="mb-0"></ul>
+                        </div>
+                    </div>
+
+                    <!-- Global Insights -->
+                    <div class="card mb-3" id="aiGlobalInsightsCard" style="display:none;">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">
+                                <i class="fas fa-globe me-1"></i>Global Market Insights
+                            </h6>
+                            <div id="aiGlobalInsightsContent"></div>
+                        </div>
+                    </div>
+
+                    <!-- Metadata -->
+                    <div class="text-muted small">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Analysis based on <span id="aiDataPoints">--</span> data points
+                        (<span id="aiDataPeriod">--</span>)
+                        <br>
+                        Generated: <span id="aiGeneratedAt">--</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+

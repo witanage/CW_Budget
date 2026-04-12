@@ -349,6 +349,28 @@ def dashboard():
     return render_template('dashboard.html', username=session.get('username'))
 
 
+# Lazy-loaded page fragment endpoints (return HTML partials for on-demand loading)
+@app.route('/api/page/reports')
+@login_required
+def page_reports():
+    """Return reports page HTML fragment."""
+    return render_template('partials/dashboard_reports.html')
+
+
+@app.route('/api/page/tax')
+@login_required
+def page_tax():
+    """Return tax calculator page HTML fragment."""
+    return render_template('partials/dashboard_tax.html')
+
+
+@app.route('/api/page/rateTrends')
+@login_required
+def page_rate_trends():
+    """Return rate trends page HTML fragment."""
+    return render_template('partials/dashboard_rate_trends.html')
+
+
 @app.route('/api/settings/upload-mode', methods=['GET'])
 def get_upload_mode():
     """Public endpoint to get bill upload mode (sequential vs batch).

@@ -1,0 +1,1126 @@
+/* Modern Filter Modal Styles */
+#filterModal .bg-gradient {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+#filterModal .modal-content {
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+#filterModal .card {
+    border-radius: 10px;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+#filterModal .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] #filterModal .card:hover {
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+}
+
+#filterModal .form-control:focus,
+#filterModal .form-check-input:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+}
+
+.filter-checkbox-container {
+    padding: 0.5rem;
+}
+
+.filter-checkbox-container .form-check {
+    padding: 0.4rem 0.5rem;
+    border-radius: 5px;
+    transition: background-color 0.2s;
+}
+
+.filter-checkbox-container .form-check:hover {
+    background-color: rgba(102, 126, 234, 0.1);
+}
+
+.filter-quick-btn {
+    transition: all 0.2s;
+}
+
+.filter-quick-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+}
+
+.stat-item {
+    padding: 0.5rem;
+}
+
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #667eea;
+}
+
+.stat-label {
+    font-size: 0.75rem;
+    color: #6c757d;
+    text-transform: uppercase;
+}
+
+/* Preset badges */
+.preset-badge {
+    cursor: pointer;
+    transition: all 0.2s;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.875rem;
+}
+
+.preset-badge:hover {
+    transform: scale(1.05);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+}
+
+.preset-badge .btn-close {
+    font-size: 0.6rem;
+    padding: 0;
+    margin-left: 0.5rem;
+}
+
+/* Search inputs in filter sections */
+#categorySearchInput,
+#paymentSearchInput {
+    border-radius: 5px;
+}
+
+/* Animation for filter modal */
+#filterModal.show .modal-dialog {
+    animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+    from {
+        transform: translateY(-50px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.row.mb-3.align-items-center .btn-sm {
+    min-height: 31px;
+    padding: 0.25rem 0.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+}
+
+.row.mb-3.align-items-center .form-control-sm {
+    min-height: 31px;
+}
+
+/* Compact Transaction Table Rows */
+#transactionsPage .card-body {
+    padding-right: 0 !important;
+}
+
+#transactionsPage .table-responsive {
+    padding-right: 0;
+    margin-right: 0;
+}
+
+#transactionsTable tbody td {
+    padding: 0.25rem 0.5rem !important;
+    vertical-align: middle;
+}
+
+#transactionsTable tbody td:last-child {
+    padding-right: 2px !important;
+}
+
+#transactionsTable thead th {
+    padding: 0.5rem !important;
+}
+
+#transactionsTable thead th:last-child {
+    padding-right: 2px !important;
+    text-align: right;
+}
+
+/* Action Button Group - no wrap, single line */
+.action-btn-group {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 4px;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+/* iOS-style icon buttons */
+.action-btn {
+    width: 28px !important;
+    height: 28px !important;
+    padding: 0 !important;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    border-radius: 7px !important;
+    border: none !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.18), 0 0.5px 1px rgba(0,0,0,0.12);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+}
+
+.action-btn:hover {
+    transform: scale(1.12);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.22), 0 1px 3px rgba(0,0,0,0.14);
+}
+
+.action-btn:active {
+    transform: scale(0.93);
+    box-shadow: 0 0.5px 2px rgba(0,0,0,0.15);
+}
+
+.action-btn i {
+    font-size: 0.75rem !important;
+    position: relative;
+    z-index: 1;
+}
+
+/* iOS gradient backgrounds */
+.action-btn.btn-primary {
+    background: linear-gradient(180deg, #5a9cff 0%, #0a6efd 100%) !important;
+}
+.action-btn.btn-danger {
+    background: linear-gradient(180deg, #ff6b6b 0%, #dc3545 100%) !important;
+}
+.action-btn.btn-warning {
+    background: linear-gradient(180deg, #ffda6b 0%, #f0ad00 100%) !important;
+}
+.action-btn.btn-success {
+    background: linear-gradient(180deg, #5dd39e 0%, #198754 100%) !important;
+}
+.action-btn.btn-secondary {
+    background: linear-gradient(180deg, #a0a8b4 0%, #6c757d 100%) !important;
+}
+.action-btn.btn-info {
+    background: linear-gradient(180deg, #6ee7f7 0%, #0cb5d6 100%) !important;
+}
+
+/* Drag Handle Styling */
+.drag-handle {
+    cursor: grab;
+    user-select: none;
+    opacity: 0.4;
+    transition: opacity 0.2s;
+}
+
+.drag-handle:hover {
+    opacity: 0.8;
+}
+
+.drag-handle:active {
+    cursor: grabbing;
+    opacity: 1;
+}
+
+tr.dragging {
+    opacity: 0.5;
+}
+
+tr[draggable="true"] {
+    cursor: move;
+}
+
+/* Filter Modal Styling - Using Base Template Colors */
+#filterModal .modal-content {
+    background-color: var(--modal-bg);
+    color: var(--text-primary);
+}
+
+/* Ensure ALL modals are on top of navbar */
+.modal {
+    z-index: 1200 !important;
+}
+
+.modal-backdrop {
+    z-index: 1199 !important;
+}
+
+/* Prevent cards in filter modal from moving on hover */
+#filterModal .card:hover {
+    transform: none !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+}
+
+[data-theme="light"] #filterModal .card:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+}
+
+#filterModal .modal-header {
+    background: var(--card-header-bg);
+    border-bottom: 1px solid var(--border-color);
+}
+
+#filterModal .modal-footer {
+    background: var(--card-header-bg);
+    border-top: 1px solid var(--border-color);
+}
+
+#filterModal .card {
+    background-color: var(--card-bg);
+    border-color: var(--border-color);
+}
+
+#filterModal .card-title {
+    color: var(--text-primary);
+}
+
+#filterModal .input-group-text {
+    background-color: var(--bg-tertiary);
+    border-color: var(--input-border);
+    color: var(--text-primary);
+}
+
+.filter-checkbox-container {
+    max-height: 140px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    padding: 0.5rem;
+    background-color: var(--bg-secondary);
+}
+
+.filter-checkbox-container .form-check {
+    margin-bottom: 0.25rem;
+    font-size: 0.85rem;
+}
+
+.filter-checkbox-container .form-check:last-child {
+    margin-bottom: 0;
+}
+
+.filter-checkbox-container .form-check-label {
+    color: var(--text-primary);
+    font-weight: normal;
+}
+
+.filter-checkbox-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.filter-checkbox-container::-webkit-scrollbar-track {
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+}
+
+.filter-checkbox-container::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+}
+
+.filter-checkbox-container::-webkit-scrollbar-thumb:hover {
+    background: var(--text-secondary);
+}
+
+/* Make all filter labels use theme colors */
+#filterModal .form-check-label {
+    color: var(--text-primary);
+}
+
+#filterModal .text-muted {
+    color: var(--text-secondary) !important;
+}
+
+#filterModal hr {
+    border-color: var(--border-color);
+    opacity: 1;
+}
+
+/* Filter modal button styling */
+.filter-quick-btn {
+    font-size: 0.8rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 6px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.filter-quick-btn:hover {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.filter-action-btn {
+    font-size: 0.875rem;
+    padding: 0.5rem 1.25rem;
+    border-radius: 6px;
+    font-weight: 500;
+    min-width: 120px;
+}
+
+.filter-toggle-btn {
+    font-size: 0.75rem;
+    padding: 0.125rem 0.5rem;
+    white-space: nowrap;
+}
+
+/* Mobile view: Optimize Add Category section width */
+@media (max-width: 768px) {
+    #newCategoryForm {
+        max-width: 100%;
+    }
+
+    #newCategoryForm .card {
+        margin-left: 0;
+        margin-right: 0;
+    }
+
+    #newCategoryForm .card-body {
+        padding: 0.75rem !important;
+    }
+
+    #newCategoryForm .form-control-sm,
+    #newCategoryForm .form-select-sm {
+        font-size: 0.875rem;
+    }
+
+    #newCategoryForm .btn-sm {
+        font-size: 0.8rem;
+        padding: 0.4rem 0.6rem;
+    }
+}
+
+/* ===================================
+   RESPONSIVE DESKTOP VIEW
+   =================================== */
+
+/* Extra large screens (1920px and up) - Full desktop */
+@media (min-width: 1920px) {
+    #transactionsTable thead th:nth-child(3) {
+        width: 28%;
+    }  /* Extra space for description */
+
+    #transactionsTable tbody td {
+        font-size: 0.85rem !important;
+    }
+
+    #transactionsTable thead th {
+        font-size: 0.85rem !important;
+    }
+}
+
+/* Large screens (1400px - 1919px) - Standard desktop */
+@media (min-width: 1400px) and (max-width: 1919px) {
+    #transactionsTable thead th:nth-child(3) {
+        width: 25%;
+    }
+}
+
+/* Medium-large screens (1200px - 1399px) - Smaller desktop */
+@media (min-width: 1200px) and (max-width: 1399px) {
+    #transactionsTable thead th:nth-child(3) {
+        width: 22%;
+    }
+
+    /* Slightly smaller action buttons */
+    .action-btn {
+        width: 26px !important;
+        height: 26px !important;
+    }
+}
+
+/* Medium screens (992px - 1199px) - Tablet landscape / small desktop */
+@media (min-width: 992px) and (max-width: 1199px) {
+    #transactionsTable {
+        font-size: 0.75rem !important;
+    }
+
+    #transactionsTable thead th:nth-child(3) {
+        width: 20%;
+        min-width: 150px;
+    }
+
+    #transactionsTable thead th:nth-child(8) {
+        width: 11%;
+        min-width: 100px;
+    }
+
+    #transactionsTable thead th:nth-child(9) {
+        width: 11%;
+        min-width: 110px;
+    }
+
+    /* Smaller action buttons */
+    .action-btn {
+        width: 24px !important;
+        height: 24px !important;
+        border-radius: 6px !important;
+    }
+
+    .action-btn i {
+        font-size: 0.65rem !important;
+    }
+
+    .action-btn-group {
+        gap: 3px;
+    }
+
+    /* Compact control row buttons */
+    .row.mb-3.align-items-center .btn-sm {
+        padding: 0.2rem 0.6rem;
+        font-size: 0.8rem;
+        min-height: 28px;
+    }
+
+    .row.mb-3.align-items-center .form-control-sm {
+        font-size: 0.8rem;
+        min-height: 28px;
+    }
+}
+
+/* Small screens (768px - 991px) - Tablet portrait */
+@media (min-width: 768px) and (max-width: 991px) {
+    #transactionsTable {
+        min-width: 900px;
+        font-size: 0.7rem !important;
+    }
+
+    #transactionsTable thead th {
+        padding: 0.4rem 0.3rem !important;
+        font-size: 0.7rem !important;
+    }
+
+    #transactionsTable tbody td {
+        padding: 0.2rem 0.3rem !important;
+        font-size: 0.7rem !important;
+    }
+
+    /* Very compact action buttons */
+    .action-btn {
+        width: 22px !important;
+        height: 22px !important;
+        border-radius: 5px !important;
+    }
+
+    .action-btn i {
+        font-size: 0.6rem !important;
+    }
+
+    .action-btn-group {
+        gap: 2px;
+    }
+
+    /* Stack control buttons on multiple rows */
+    .row.mb-3.align-items-center {
+        row-gap: 0.3rem;
+    }
+
+    .row.mb-3.align-items-center .col-auto {
+        margin-bottom: 0.2rem;
+    }
+
+    .row.mb-3.align-items-center .btn-sm {
+        padding: 0.2rem 0.5rem;
+        font-size: 0.75rem;
+        min-height: 26px;
+    }
+
+    /* Reduce card header padding */
+    #transactionsPage .card-header {
+        padding: 8px 12px;
+    }
+
+    #transactionsPage .card-header h5 {
+        font-size: 0.9rem;
+    }
+}
+
+/* Extra small screens (below 768px) - Mobile */
+@media (max-width: 767px) {
+    #transactionsTable {
+        min-width: 800px;
+        font-size: 0.65rem !important;
+    }
+
+    #transactionsTable thead th {
+        padding: 0.3rem 0.2rem !important;
+        font-size: 0.65rem !important;
+    }
+
+    #transactionsTable tbody td {
+        padding: 0.15rem 0.2rem !important;
+        font-size: 0.65rem !important;
+    }
+
+    #transactionsTable tbody tr {
+        max-height: none;
+    }
+
+    /* Minimal action buttons */
+    .action-btn {
+        width: 20px !important;
+        height: 20px !important;
+        border-radius: 5px !important;
+    }
+
+    .action-btn i {
+        font-size: 0.55rem !important;
+    }
+
+    .action-btn-group {
+        gap: 2px;
+    }
+
+    /* Stack all controls vertically */
+    .row.mb-3.align-items-center .col-auto {
+        width: 100%;
+        margin-bottom: 0.3rem;
+    }
+
+    .row.mb-3.align-items-center .btn-sm,
+    .row.mb-3.align-items-center .form-control-sm {
+        width: 100%;
+        min-height: 32px;
+    }
+
+    /* Hide less important columns on very small screens */
+    #transactionsTable .drag-handle {
+        display: none;
+    }
+
+    #transactionsTable thead th:nth-child(1),
+    #transactionsTable tbody td:nth-child(1) {
+        display: none;
+    }
+}
+
+/* Print styles */
+@media print {
+    .sidebar,
+    .row.mb-3.align-items-center,
+    #transactionsTable .btn-sm {
+        display: none !important;
+    }
+
+    #transactionsTable {
+        font-size: 0.7rem !important;
+    }
+
+    main.col-md-9 {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+}
+
+/* Tax Calculator Page - Prevent card hover animations */
+#taxPage .card:hover {
+    transform: none !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+}
+
+[data-theme="light"] #taxPage .card:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Tax Summary Card - Improve label visibility in dark mode */
+#taxPage .text-muted.small {
+    color: var(--text-secondary) !important;
+    font-weight: 500;
+}
+
+[data-theme="dark"] #taxPage .text-muted.small {
+    color: #b0b0b0 !important;
+}
+
+/* Tax Calculator - Modern Redesign */
+
+/* Tax Stat Cards */
+.tax-stat-card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: all 0.2s ease;
+}
+
+.tax-stat-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+[data-theme="dark"] .tax-stat-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.tax-stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.bg-primary-soft {
+    background-color: rgba(8, 102, 255, 0.1);
+    color: var(--accent-color);
+}
+
+.bg-warning-soft {
+    background-color: rgba(255, 193, 7, 0.1);
+    color: #ffc107;
+}
+
+.bg-danger-soft {
+    background-color: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+}
+
+.bg-info-soft {
+    background-color: rgba(13, 202, 240, 0.1);
+    color: #0dcaf0;
+}
+
+.tax-stat-content {
+    flex: 1;
+}
+
+.tax-stat-label {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.25rem;
+    font-weight: 600;
+}
+
+.tax-stat-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+/* Tax Page General Styles */
+#taxPage .card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+#taxPage .card-header {
+    background-color: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    padding: 1rem 1.25rem;
+}
+
+#taxPage .card-header h6 {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+#taxPage .form-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+#taxPage .form-control,
+#taxPage .form-select {
+    background-color: var(--input-bg);
+    color: var(--text-primary);
+    border: 1px solid var(--input-border);
+    border-radius: 6px;
+    font-size: 0.9375rem;
+    padding: 0.625rem 0.75rem;
+    min-height: 44px;
+}
+
+#taxPage .form-select {
+    padding-right: 2.5rem;
+}
+
+#taxPage .form-control:focus,
+#taxPage .form-select:focus {
+    background-color: var(--input-bg);
+    color: var(--text-primary);
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(8, 102, 255, 0.1);
+}
+
+#taxPage .input-group-text {
+    background-color: var(--bg-tertiary);
+    border-color: var(--input-border);
+    color: var(--text-primary);
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+/* Accordion Styles */
+#taxPage .accordion-item {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+}
+
+#taxPage .accordion-button {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    font-weight: 600;
+    font-size: 0.875rem;
+    padding: 0.75rem 1rem;
+}
+
+#taxPage .accordion-button:not(.collapsed) {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+#taxPage .accordion-button:focus {
+    box-shadow: none;
+    border-color: var(--border-color);
+}
+
+#taxPage .accordion-body {
+    background-color: var(--card-bg);
+}
+
+/* Table Styles */
+#taxPage table {
+    color: var(--text-primary);
+}
+
+#taxPage table thead {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+#taxPage table tbody tr {
+    background-color: var(--table-bg);
+    border-bottom: 1px solid var(--border-color);
+}
+
+#taxPage table tbody tr:hover {
+    background-color: var(--table-hover);
+}
+
+#taxPage table tfoot {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    font-weight: 600;
+    border-top: 2px solid var(--border-color);
+}
+
+#taxPage #monthlyDataTable input {
+    font-size: 0.8125rem;
+    padding: 0.25rem 0.5rem;
+    background-color: var(--input-bg);
+    color: var(--text-primary);
+    border: 1px solid var(--input-border);
+}
+
+/* Alert Styles */
+#taxPage .alert-sm {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+}
+
+#taxPage .alert-info {
+    background-color: rgba(8, 102, 255, 0.1);
+    border-color: var(--accent-color);
+    color: var(--text-primary);
+}
+
+/* Saved Calculations */
+#taxPage .calculation-item {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-left: 3px solid var(--accent-color);
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    transition: all 0.2s ease;
+}
+
+#taxPage .calculation-item:hover {
+    background-color: var(--sidebar-hover);
+    border-left-width: 4px;
+    transform: translateX(2px);
+}
+
+/* Buttons */
+#taxPage .btn {
+    font-weight: 600;
+    border-radius: 6px;
+}
+
+#taxPage .btn-lg {
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+}
+
+/* Remove card hover transform */
+#taxPage .card:hover {
+    transform: none !important;
+}
+
+/* Reduce font size for specific tables */
+.table.table-sm.table-hover.mb-0 {
+    font-size: 0.75rem;
+}
+
+.table.table-sm.table-hover.mb-0 thead th {
+    font-size: 0.7rem;
+    padding: 0.4rem 0.5rem;
+}
+
+.table.table-sm.table-hover.mb-0 tbody td {
+    font-size: 0.75rem;
+    padding: 0.4rem 0.5rem;
+}
+
+.table.table-sm.table-hover.mb-0 tfoot td {
+    font-size: 0.75rem;
+    padding: 0.4rem 0.5rem;
+}
+
+/* Month Expandable Rows */
+.month-header-row {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.month-header-row:hover {
+    background-color: var(--table-hover);
+}
+
+.month-header {
+    padding: 0.75rem 1rem !important;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.month-chevron {
+    transition: transform 0.2s ease;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+}
+
+.month-detail-row {
+    border: none !important;
+}
+
+.month-detail-content {
+    background-color: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.month-summary {
+    font-size: 0.875rem;
+}
+
+/* Bonus Entry Styles */
+.bonuses-container {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.bonus-entry {
+    padding: 0.5rem;
+    background-color: var(--input-bg);
+    border: 1px solid var(--input-border);
+    border-radius: 6px;
+}
+
+.bonus-entry:hover {
+    background-color: var(--table-hover);
+}
+
+.add-bonus-btn {
+    font-size: 0.875rem;
+    padding: 0.25rem 0.5rem;
+}
+
+.remove-bonus-btn {
+    padding: 0.375rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 991px) {
+    .tax-stat-card {
+        padding: 1rem;
+    }
+
+    .tax-stat-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 1rem;
+    }
+
+    .tax-stat-value {
+        font-size: 1.1rem;
+    }
+}
+
+/* Bill Content Modal Styles */
+#billContentModal .modal-content {
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+}
+
+#billContentModal .modal-header {
+    flex-shrink: 0;
+}
+
+#billContentModal .modal-body {
+    overflow-y: auto !important;
+    overflow-x: hidden;
+    flex: 1 1 auto;
+    max-height: calc(90vh - 120px);
+    padding: 1rem;
+}
+
+#billContentModal .modal-footer {
+    flex-shrink: 0;
+}
+
+/* Visible scrollbar styling for modal body */
+#billContentModal .modal-body::-webkit-scrollbar {
+    width: 14px;
+}
+
+#billContentModal .modal-body::-webkit-scrollbar-track {
+    background: var(--bg-tertiary);
+    border-radius: 7px;
+}
+
+#billContentModal .modal-body::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 7px;
+    border: 3px solid var(--bg-tertiary);
+}
+
+[data-theme="dark"] #billContentModal .modal-body::-webkit-scrollbar-thumb {
+    background: #666;
+}
+
+#billContentModal .modal-body::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+[data-theme="dark"] #billContentModal .modal-body::-webkit-scrollbar-thumb:hover {
+    background: #999;
+}
+
+/* Firefox scrollbar */
+#billContentModal .modal-body {
+    scrollbar-width: auto;
+    scrollbar-color: #888 var(--bg-tertiary);
+}
+
+/* Bill content display */
+#billContentDisplay {
+    min-height: 100%;
+}
+
+/* Sticky header support if content uses these classes */
+#billContentDisplay > .bill-header,
+#billContentDisplay > .bill-summary,
+#billContentDisplay > .bill-info {
+    position: sticky;
+    top: -1rem;
+    background-color: var(--modal-bg);
+    z-index: 10;
+    padding-bottom: 1rem;
+    margin: -1rem -1rem 1rem -1rem;
+    padding: 1rem;
+    border-bottom: 2px solid var(--border-color);
+}
+
+/* Table header sticky support - Keep header fixed while scrolling */
+#billContentDisplay table thead,
+#billContentDisplay .table thead,
+#billContentDisplay .table-light {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+#billContentDisplay table thead th,
+#billContentDisplay .table thead th {
+    background-color: var(--table-header-bg, var(--bg-secondary)) !important;
+    border-bottom: 2px solid var(--border-color);
+    position: sticky;
+    top: 0;
+}
+
+/* For table-light specifically */
+#billContentDisplay .table-light,
+#billContentDisplay thead.table-light,
+#billContentDisplay thead.table-light th {
+    background-color: #f8f9fa !important;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+[data-theme="dark"] #billContentDisplay .table-light,
+[data-theme="dark"] #billContentDisplay thead.table-light,
+[data-theme="dark"] #billContentDisplay thead.table-light th {
+    background-color: var(--bg-secondary) !important;
+}
+
+@media (max-width: 768px) {
+    #billContentModal .modal-content {
+        max-height: 95vh;
+    }
+
+    #billContentModal .modal-body {
+        max-height: calc(95vh - 100px);
+        padding: 0.75rem;
+    }
+
+    #billContentModal .modal-body::-webkit-scrollbar {
+        width: 10px;
+    }
+}
+
+/* Attachment Display Styles */
+#billAttachmentContainer {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 2px solid var(--border-color);
+}
+
+#billAttachmentContainer .attachment-display {
+    background-color: var(--bg-tertiary);
+    padding: 1rem;
+    border-radius: 0.5rem;
+}
+
+#billAttachmentContainer img {
+    border: 1px solid var(--border-color);
+    transition: transform 0.2s;
+}
+
+#billAttachmentContainer img:hover {
+    transform: scale(1.02);
+    cursor: zoom-in;
+}
+

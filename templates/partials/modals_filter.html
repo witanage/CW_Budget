@@ -1,0 +1,412 @@
+<!-- Filter Modal - Revamped Design -->
+<div class="modal fade" id="filterModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-xl" style="max-width: 90%;">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-filter me-2"></i>Advanced Filters
+                    <span class="badge bg-light text-dark ms-2" id="filterPreviewCount">0 results</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" style="padding: 1.25rem; max-height: 75vh; overflow-y: auto;">
+                <!-- Filter Presets & Recent Filters -->
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="card border-primary shadow-sm">
+                            <div class="card-header bg-primary text-white py-2">
+                                <h6 class="mb-0"><i class="fas fa-bookmark me-2"></i>Saved Presets</h6>
+                            </div>
+                            <div class="card-body p-2">
+                                <div id="savedPresetsContainer" class="d-flex flex-wrap gap-2">
+                                    <!-- Saved presets will be populated here -->
+                                    <small class="text-muted">No saved presets yet</small>
+                                </div>
+                                <div class="mt-2">
+                                    <button type="button" class="btn btn-outline-primary btn-sm" id="saveCurrentPresetBtn">
+                                        <i class="fas fa-save me-1"></i>Save Current Filter
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card border-info shadow-sm">
+                            <div class="card-header bg-info text-white py-2">
+                                <h6 class="mb-0"><i class="fas fa-history me-2"></i>Recent Filters</h6>
+                            </div>
+                            <div class="card-body p-2">
+                                <div id="recentFiltersContainer" class="d-flex flex-wrap gap-2">
+                                    <!-- Recent filters will be populated here -->
+                                    <small class="text-muted">No recent filters</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Filter Presets -->
+                <div class="mb-3">
+                    <h6 class="text-muted mb-2"><i class="fas fa-bolt me-2"></i>Quick Filters</h6>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-primary filter-quick-btn" onclick="applyQuickFilter('today')">
+                            <i class="fas fa-calendar-day me-1"></i>Today
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-primary filter-quick-btn" onclick="applyQuickFilter('yesterday')">
+                            <i class="fas fa-calendar-minus me-1"></i>Yesterday
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-primary filter-quick-btn" onclick="applyQuickFilter('last7days')">
+                            <i class="fas fa-calendar-week me-1"></i>Last 7 Days
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-primary filter-quick-btn" onclick="applyQuickFilter('last30days')">
+                            <i class="fas fa-calendar me-1"></i>Last 30 Days
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-primary filter-quick-btn" onclick="applyQuickFilter('thisMonth')">
+                            <i class="fas fa-calendar-alt me-1"></i>This Month
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-primary filter-quick-btn" onclick="applyQuickFilter('lastMonth')">
+                            <i class="fas fa-calendar-check me-1"></i>Last Month
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-primary filter-quick-btn" onclick="applyQuickFilter('thisQuarter')">
+                            <i class="fas fa-calendar-plus me-1"></i>This Quarter
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-primary filter-quick-btn" onclick="applyQuickFilter('thisYear')">
+                            <i class="fas fa-calendar-days me-1"></i>This Year
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-success filter-quick-btn" onclick="applyQuickFilter('income')">
+                            <i class="fas fa-arrow-down me-1"></i>Income Only
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-danger filter-quick-btn" onclick="applyQuickFilter('expense')">
+                            <i class="fas fa-arrow-up me-1"></i>Expenses Only
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-warning filter-quick-btn" onclick="applyQuickFilter('unpaid')">
+                            <i class="fas fa-exclamation-triangle me-1"></i>Unpaid
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-success filter-quick-btn" onclick="applyQuickFilter('paid')">
+                            <i class="fas fa-check-circle me-1"></i>Paid
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-info filter-quick-btn" onclick="applyQuickFilter('highValue')">
+                            <i class="fas fa-dollar-sign me-1"></i>High Value (>500)
+                        </button>
+                    </div>
+                </div>
+
+                <hr>
+
+                <!-- Advanced Filter Options -->
+                <div class="row g-3">
+                    <!-- Search Filters -->
+                    <div class="col-12">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-body">
+                                <h6 class="card-title mb-3">
+                                    <i class="fas fa-search me-2"></i>Search & Text Filters
+                                </h6>
+                                <div class="row g-2">
+                                    <div class="col-md-6">
+                                        <label class="form-label small text-muted">Description</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="fas fa-file-alt"></i></span>
+                                            <input type="text" class="form-control" id="filterDescription" placeholder="Search in description...">
+                                            <button class="btn btn-outline-secondary" type="button" onclick="document.getElementById('filterDescription').value=''">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small text-muted">Notes</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="fas fa-sticky-note"></i></span>
+                                            <input type="text" class="form-control" id="filterNotes" placeholder="Search in notes...">
+                                            <button class="btn btn-outline-secondary" type="button" onclick="document.getElementById('filterNotes').value=''">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="filterCaseSensitive">
+                                            <label class="form-check-label" for="filterCaseSensitive">
+                                                <small>Case-sensitive search</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Categories & Payment Methods -->
+                    <div class="col-md-6">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body">
+                                <h6 class="card-title mb-3">
+                                    <i class="fas fa-tags me-2"></i>Categories
+                                </h6>
+                                <div class="mb-3">
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                        <input type="text" class="form-control" id="categorySearchInput" placeholder="Search categories...">
+                                    </div>
+                                </div>
+                                <div class="mb-2 d-flex gap-2">
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectAllCategories()">
+                                        <i class="fas fa-check-double me-1"></i>Select All
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="deselectAllCategories()">
+                                        <i class="fas fa-times me-1"></i>Clear
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-success" onclick="selectIncomeCategoriesOnly()">
+                                        <i class="fas fa-arrow-down me-1"></i>Income
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="selectExpenseCategoriesOnly()">
+                                        <i class="fas fa-arrow-up me-1"></i>Expense
+                                    </button>
+                                </div>
+                                <div id="filterCategoryCheckboxes" class="filter-checkbox-container" style="max-height: 250px; overflow-y: auto;">
+                                    <!-- Categories will be populated here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body">
+                                <h6 class="card-title mb-3">
+                                    <i class="fas fa-credit-card me-2"></i>Payment Methods
+                                </h6>
+                                <div class="mb-3">
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                        <input type="text" class="form-control" id="paymentSearchInput" placeholder="Search payment methods...">
+                                    </div>
+                                </div>
+                                <div class="mb-2 d-flex gap-2">
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectAllPaymentMethods()">
+                                        <i class="fas fa-check-double me-1"></i>Select All
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="deselectAllPaymentMethods()">
+                                        <i class="fas fa-times me-1"></i>Clear
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-success" onclick="selectCashPaymentMethodsOnly()">
+                                        <i class="fas fa-money-bill-wave me-1"></i>Cash
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-info" onclick="selectCardPaymentMethodsOnly()">
+                                        <i class="fas fa-credit-card me-1"></i>Cards
+                                    </button>
+                                </div>
+                                <div id="filterPaymentMethodCheckboxes" class="filter-checkbox-container" style="max-height: 250px; overflow-y: auto;">
+                                    <!-- Payment methods will be populated here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Transaction Type & Status -->
+                    <div class="col-md-6">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-body">
+                                <h6 class="card-title mb-3">
+                                    <i class="fas fa-exchange-alt me-2"></i>Transaction Type
+                                </h6>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input filter-type-checkbox" type="checkbox" value="income" id="filterTypeIncome">
+                                    <label class="form-check-label" for="filterTypeIncome">
+                                        <i class="fas fa-arrow-down text-success me-1"></i>Income (Debit)
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input filter-type-checkbox" type="checkbox" value="expense" id="filterTypeExpense">
+                                    <label class="form-check-label" for="filterTypeExpense">
+                                        <i class="fas fa-arrow-up text-danger me-1"></i>Expense (Credit)
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-body">
+                                <h6 class="card-title mb-3">
+                                    <i class="fas fa-check-circle me-2"></i>Status
+                                </h6>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input filter-status-checkbox" type="checkbox" value="done" id="filterStatusDone">
+                                            <label class="form-check-label" for="filterStatusDone">
+                                                <i class="fas fa-check text-success me-1"></i>Done
+                                            </label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input filter-status-checkbox" type="checkbox" value="not_done" id="filterStatusNotDone">
+                                            <label class="form-check-label" for="filterStatusNotDone">
+                                                <i class="fas fa-times text-muted me-1"></i>Not Done
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input filter-status-checkbox" type="checkbox" value="paid" id="filterStatusPaid">
+                                            <label class="form-check-label" for="filterStatusPaid">
+                                                <i class="fas fa-dollar-sign text-success me-1"></i>Paid
+                                            </label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input filter-status-checkbox" type="checkbox" value="unpaid" id="filterStatusUnpaid">
+                                            <label class="form-check-label" for="filterStatusUnpaid">
+                                                <i class="fas fa-exclamation text-warning me-1"></i>Unpaid
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Amount Range with Presets -->
+                    <div class="col-12">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-body">
+                                <h6 class="card-title mb-3">
+                                    <i class="fas fa-dollar-sign me-2"></i>Amount Range
+                                </h6>
+                                <div class="mb-3">
+                                    <label class="form-label small text-muted">Quick Amount Presets</label>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <button type="button" class="btn btn-outline-secondary" onclick="setAmountRange(0, 50)">0-50</button>
+                                        <button type="button" class="btn btn-outline-secondary" onclick="setAmountRange(50, 100)">50-100</button>
+                                        <button type="button" class="btn btn-outline-secondary" onclick="setAmountRange(100, 500)">100-500</button>
+                                        <button type="button" class="btn btn-outline-secondary" onclick="setAmountRange(500, 1000)">500-1K</button>
+                                        <button type="button" class="btn btn-outline-secondary" onclick="setAmountRange(1000, 5000)">1K-5K</button>
+                                        <button type="button" class="btn btn-outline-secondary" onclick="setAmountRange(5000, null)">5K+</button>
+                                    </div>
+                                </div>
+                                <div class="row g-2">
+                                    <div class="col-md-6">
+                                        <label class="form-label small text-muted">Minimum Amount</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">රු</span>
+                                            <input type="number" class="form-control" id="filterMinAmount" placeholder="0.00" step="0.01" min="0">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small text-muted">Maximum Amount</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">රු</span>
+                                            <input type="number" class="form-control" id="filterMaxAmount" placeholder="No limit" step="0.01" min="0">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Date Range with Advanced Options -->
+                    <div class="col-12">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-body">
+                                <h6 class="card-title mb-3">
+                                    <i class="fas fa-calendar me-2"></i>Date Range
+                                </h6>
+                                <div class="row g-2">
+                                    <div class="col-md-6">
+                                        <label class="form-label small text-muted">From Date</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="fas fa-calendar"></i></span>
+                                            <input type="date" class="form-control" id="filterStartDate">
+                                            <button class="btn btn-outline-secondary" type="button" onclick="document.getElementById('filterStartDate').value=''">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small text-muted">To Date</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="fas fa-calendar"></i></span>
+                                            <input type="date" class="form-control" id="filterEndDate">
+                                            <button class="btn btn-outline-secondary" type="button" onclick="document.getElementById('filterEndDate').value=''">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="filterExcludeWeekends">
+                                            <label class="form-check-label" for="filterExcludeWeekends">
+                                                <small>Exclude weekends</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Active Filters Preview -->
+                <div id="activeFiltersDisplay" class="mt-3">
+                    <div class="card border-info">
+                        <div class="card-header bg-info text-white py-2">
+                            <h6 class="mb-0">
+                                <i class="fas fa-filter me-2"></i>Active Filters Preview
+                            </h6>
+                        </div>
+                        <div class="card-body p-2">
+                            <div id="activeFiltersList" class="d-flex flex-wrap gap-2">
+                                <span class="badge bg-secondary">No filters applied</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filter Statistics -->
+                <div class="mt-3">
+                    <div class="card border-success">
+                        <div class="card-body p-2">
+                            <div class="row text-center">
+                                <div class="col-4">
+                                    <div class="stat-item">
+                                        <i class="fas fa-list text-primary"></i>
+                                        <div class="stat-value" id="filterStatTotal">-</div>
+                                        <div class="stat-label">Total Matching</div>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="stat-item">
+                                        <i class="fas fa-arrow-down text-success"></i>
+                                        <div class="stat-value" id="filterStatIncome">-</div>
+                                        <div class="stat-label">Income</div>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="stat-item">
+                                        <i class="fas fa-arrow-up text-danger"></i>
+                                        <div class="stat-value" id="filterStatExpense">-</div>
+                                        <div class="stat-label">Expense</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <div class="me-auto">
+                    <button type="button" class="btn btn-outline-info btn-sm" id="previewFiltersBtn">
+                        <i class="fas fa-eye me-1"></i>Preview Results
+                    </button>
+                </div>
+                <button type="button" class="btn btn-outline-secondary" id="clearFiltersBtn">
+                    <i class="fas fa-eraser me-1"></i>Clear All
+                </button>
+                <button type="button" class="btn btn-gradient" id="applyFiltersBtn">
+                    <i class="fas fa-check me-1"></i>Apply Filters
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+

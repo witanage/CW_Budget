@@ -547,7 +547,7 @@ function navigateToPage(pageName) {
     }
 
     // Small delay to ensure loader is visible before switching
-    setTimeout(() => {
+    setTimeout(async () => {
         // Hide all pages
         const allPages = document.querySelectorAll('.page-content');
         allPages.forEach(page => {
@@ -562,6 +562,26 @@ function navigateToPage(pageName) {
         // Show target page
         const targetPage = document.getElementById(pageName + 'Page');
         if (targetPage) {
+            // Lazy-load HTML if page has data-lazy-url and hasn't been loaded yet
+            const lazyUrl = targetPage.getAttribute('data-lazy-url');
+            if (lazyUrl && !targetPage.hasAttribute('data-loaded')) {
+                try {
+                    console.log('⏳ Lazy loading:', pageName);
+                    const resp = await fetch(lazyUrl);
+                    if (resp.ok) {
+                        targetPage.innerHTML = await resp.text();
+                        targetPage.setAttribute('data-loaded', 'true');
+                        console.log('✓ Lazy loaded:', pageName);
+                    } else {
+                        console.error('✗ Failed to load page:', resp.status);
+                        targetPage.innerHTML = '<div class="alert alert-danger m-3"><i class="fas fa-exclamation-triangle me-2"></i>Failed to load page content. Please refresh.</div>';
+                    }
+                } catch (err) {
+                    console.error('✗ Error loading page:', err);
+                    targetPage.innerHTML = '<div class="alert alert-danger m-3"><i class="fas fa-exclamation-triangle me-2"></i>Failed to load page content. Please refresh.</div>';
+                }
+            }
+
             targetPage.style.display = 'block';
             console.log('✓ Showing:', pageName + 'Page');
 
@@ -1539,7 +1559,15 @@ function displayTransactions(transactions) {
                 const cellIsPaid = this.dataset.isPaid === '1';
 
                 if (cellIsPaid) {
-                    markTransactionAsUnpaid(transId);
+                    showConfirmModal(
+                        'Mark as Unpaid',
+                        'Remove payment method from this transaction?',
+                        function() {
+                            markTransactionAsUnpaid(transId);
+                        },
+                        'Mark Unpaid',
+                        'btn-warning'
+                    );
                 } else {
                     showPaymentMethodModal(transId, true);
                 }

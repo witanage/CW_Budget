@@ -1,0 +1,93 @@
+                <div class="card">
+                    <div class="card-header">
+                        <div class="row align-items-center">
+                            <div class="col">
+                                <h5 class="card-title mb-0">Manage Transactions</h5>
+                            </div>
+                            <div class="col-auto">
+                                <button class="btn btn-outline-primary btn-sm me-2" id="uploadBillBtn" title="Upload Bill">
+                                    <i class="fas fa-file-upload me-1"></i>Upload Bill
+                                </button>
+                                <button class="btn btn-gradient btn-sm" data-bs-toggle="modal" data-bs-target="#transactionModal">
+                                    <i class="fas fa-plus me-1"></i>Add Transaction
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- Month/Year Selector and Control Buttons -->
+                        <div class="row mb-3 align-items-center">
+                            <div class="col-auto">
+                                <input type="month" class="form-control form-control-sm" id="monthYearPicker" style="min-width: 160px;" min="2021-02" max="2036-02">
+                            </div>
+                            <div class="col-auto">
+                                <button class="btn btn-secondary btn-sm" id="prevMonthBtn" title="Previous Month">
+                                    <i class="fas fa-chevron-left"></i>
+                                </button>
+                            </div>
+                            <div class="col-auto">
+                                <button class="btn btn-secondary btn-sm" id="nextMonthBtn" title="Next Month">
+                                    <i class="fas fa-chevron-right"></i>
+                                </button>
+                            </div>
+                            <div class="col-auto">
+                                <button class="btn btn-primary btn-sm position-relative" id="filterBtn" data-bs-toggle="modal" data-bs-target="#filterModal">
+                                    <i class="fas fa-filter me-1"></i>Filters
+                                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="filterBadge" style="display: none;">
+                                        0
+                                    </span>
+                                </button>
+                            </div>
+                            <div class="col-auto">
+                                <button class="btn btn-success btn-sm" id="refreshBtn">
+                                    <i class="fas fa-sync-alt me-1"></i>Refresh
+                                </button>
+                            </div>
+                            <div class="col-auto">
+                                <button class="btn btn-gradient btn-sm" id="viewPaymentTotalsBtn" data-bs-toggle="modal" data-bs-target="#paymentTotalsModal">
+                                    <i class="fas fa-wallet me-1"></i>Totals
+                                </button>
+                            </div>
+                            <div class="col-auto">
+                                <button class="btn btn-success btn-sm" id="downloadTransactionsBtn" data-bs-toggle="modal" data-bs-target="#downloadModal">
+                                    <i class="fas fa-download me-1"></i>Download
+                                </button>
+                            </div>
+                            <div class="col-auto">
+                                <button class="btn btn-info btn-sm" id="cloneMonthBtn" data-bs-toggle="modal" data-bs-target="#cloneMonthModal">
+                                    <i class="fas fa-clone me-1"></i>Clone
+                                </button>
+                            </div>
+                            <div class="col-auto">
+                                <button class="btn btn-outline-secondary btn-sm" id="clearFiltersPageBtn" style="display: none;">
+                                    <i class="fas fa-times me-1"></i>Clear
+                                </button>
+                            </div>
+                            <div class="col-auto">
+                                <span id="activeFiltersText" class="text-muted" style="display: none;"></span>
+                            </div>
+                        </div>
+
+                        <!-- Transactions Table -->
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm" id="transactionsTable" style="font-size: 0.875rem; table-layout: fixed; width: 100%;">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 3%;"></th>
+                                        <th style="width: 22%;">Description</th>
+                                        <th style="width: 9%;">Category</th>
+                                        <th style="width: 10%;">Debit</th>
+                                        <th style="width: 10%;">Credit</th>
+                                        <th style="width: 10%;">Balance</th>
+                                        <th style="width: 10%;">Paid At</th>
+                                        <th style="width: 16%;">Notes</th>
+                                        <th style="width: 18%;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Transactions will be loaded here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
