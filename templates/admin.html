@@ -2166,8 +2166,8 @@
 
     async function loadAllPaymentMethods() {
         try {
-            const response = await fetch('/api/payment-methods');
-            if (!response.ok) throw new Error('Failed to payment methods');
+            const response = await fetch('/api/admin/payment-methods');
+            if (!response.ok) throw new Error('Failed to load payment methods');
 
             paymentMethodsData = await response.json();
 
