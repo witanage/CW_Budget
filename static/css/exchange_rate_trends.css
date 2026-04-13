@@ -122,6 +122,13 @@
     font-size: 0.8rem;
 }
 
+.ert-container .form-select {
+    display: inline-flex;
+    align-items: center;
+    line-height: 1.5;
+    min-height: 36px;
+}
+
 .ert-container .form-check-input:checked {
     background-color: var(--accent-color);
     border-color: var(--accent-color);

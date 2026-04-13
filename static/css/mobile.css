@@ -943,6 +943,11 @@ font-size: 0.875rem;
 line-height: 1.5;
 transform: none;
 position: relative;
+display: inline-flex;
+align-items: center;
+min-height: 38px;
+padding-top: 8px;
+padding-bottom: 8px;
 }
 
 /* Fix select dropdown positioning in modals on mobile */

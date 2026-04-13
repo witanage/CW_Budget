@@ -540,6 +540,9 @@ height: 34px;
 padding: 6px 10px;
 font-size: 0.875rem;
 height: 34px;
+line-height: 1.4;
+display: inline-flex;
+align-items: center;
 }
 
 /* Ensure all controls in transaction controller bar align */
@@ -888,6 +891,12 @@ will-change: transform;
 .form-select {
 font-size: 0.875rem;
 line-height: 1.5;
+height: auto;
+min-height: 38px;
+display: flex;
+align-items: center;
+padding-top: 8px;
+padding-bottom: 8px;
 }
 
 .form-control:focus, .form-select:focus {

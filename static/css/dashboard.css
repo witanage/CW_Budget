@@ -750,6 +750,9 @@ tr[draggable="true"] {
 
 #taxPage .form-select {
     padding-right: 2.5rem;
+    display: inline-flex;
+    align-items: center;
+    line-height: 1.5;
 }
 
 #taxPage .form-control:focus,
