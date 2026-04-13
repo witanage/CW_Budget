@@ -56,6 +56,27 @@
                                     <li class="nav-item">
                                         <a class="nav-link" data-bs-toggle="tab" href="#forecastReport">Forecast</a>
                                     </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link" data-bs-toggle="tab" href="#paymentMethodReport">Payment Methods</a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link" data-bs-toggle="tab" href="#spendingHeatmapReport">Spending Heatmap</a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link" data-bs-toggle="tab" href="#yearOverYearReport">Year-over-Year</a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link" data-bs-toggle="tab" href="#incomeSourcesReport">Income Sources</a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link" data-bs-toggle="tab" href="#transactionStatusReport">Transaction Status</a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link" data-bs-toggle="tab" href="#expenseGrowthReport">Expense Growth</a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link" data-bs-toggle="tab" href="#savingsRateReport">Savings Rate</a>
+                                    </li>
                                 </ul>
 
                                 <div class="tab-content mt-3">
@@ -199,6 +220,123 @@
                                                     </table>
                                                 </div>
                                             </div>
+                                        </div>
+                                    </div>
+                                    <div class="tab-pane fade" id="paymentMethodReport">
+                                        <div style="height: 500px; position: relative;">
+                                            <canvas id="paymentMethodChart"></canvas>
+                                        </div>
+                                        <div class="row mt-3">
+                                            <div class="col-md-12">
+                                                <div class="table-responsive">
+                                                    <table class="table table-sm">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>Payment Method</th>
+                                                                <th class="text-end">Income</th>
+                                                                <th class="text-end">Expenses</th>
+                                                                <th class="text-end">Transactions</th>
+                                                                <th class="text-end">Avg Expense</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="paymentMethodTableBody">
+                                                            <!-- Populated by JS -->
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="tab-pane fade" id="spendingHeatmapReport">
+                                        <div style="height: 500px; position: relative;">
+                                            <canvas id="spendingHeatmapChart"></canvas>
+                                        </div>
+                                    </div>
+                                    <div class="tab-pane fade" id="yearOverYearReport">
+                                        <div style="height: 500px; position: relative;">
+                                            <canvas id="yearOverYearChart"></canvas>
+                                        </div>
+                                    </div>
+                                    <div class="tab-pane fade" id="incomeSourcesReport">
+                                        <div class="row mb-3">
+                                            <div class="col-md-6">
+                                                <div style="height: 400px; position: relative;">
+                                                    <canvas id="incomeSourcesPieChart"></canvas>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="table-responsive">
+                                                    <table class="table table-sm">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>Category</th>
+                                                                <th class="text-end">Amount</th>
+                                                                <th class="text-end">Transactions</th>
+                                                                <th class="text-end">Average</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="incomeSourcesTableBody">
+                                                            <!-- Populated by JS -->
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="tab-pane fade" id="transactionStatusReport">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="card">
+                                                    <div class="card-header">
+                                                        <h6 class="mb-0">Completion Status</h6>
+                                                    </div>
+                                                    <div class="card-body">
+                                                        <div style="height: 300px; position: relative;">
+                                                            <canvas id="transactionDoneChart"></canvas>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="card">
+                                                    <div class="card-header">
+                                                        <h6 class="mb-0">Payment Status</h6>
+                                                    </div>
+                                                    <div class="card-body">
+                                                        <div style="height: 300px; position: relative;">
+                                                            <canvas id="transactionPaidChart"></canvas>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="row mt-3">
+                                            <div class="col-md-6">
+                                                <div class="card bg-warning bg-opacity-10">
+                                                    <div class="card-body">
+                                                        <h6>Unpaid Expenses</h6>
+                                                        <h4 id="unpaidExpensesAmount">රු 0.00</h4>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="card bg-info bg-opacity-10">
+                                                    <div class="card-body">
+                                                        <h6>Unpaid Income</h6>
+                                                        <h4 id="unpaidIncomeAmount">රු 0.00</h4>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="tab-pane fade" id="expenseGrowthReport">
+                                        <div style="height: 500px; position: relative;">
+                                            <canvas id="expenseGrowthChart"></canvas>
+                                        </div>
+                                    </div>
+                                    <div class="tab-pane fade" id="savingsRateReport">
+                                        <div style="height: 500px; position: relative;">
+                                            <canvas id="savingsRateChart"></canvas>
                                         </div>
                                     </div>
                                 </div>

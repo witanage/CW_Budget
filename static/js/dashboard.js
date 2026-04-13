@@ -12,7 +12,15 @@ let charts = {
     yearlyReport: null,
     cashFlowReport: null,
     topSpendingReport: null,
-    forecastReport: null
+    forecastReport: null,
+    paymentMethod: null,
+    spendingHeatmap: null,
+    yearOverYear: null,
+    incomeSources: null,
+    transactionDone: null,
+    transactionPaid: null,
+    expenseGrowth: null,
+    savingsRate: null
 };
 let currentCategories = [];
 let paymentMethods = [];
@@ -3870,6 +3878,27 @@ function loadReportTab(tabId, year, month, rangeType) {
         case 'forecastReport':
             fetchPromise = loadForecastReport();
             break;
+        case 'paymentMethodReport':
+            fetchPromise = loadPaymentMethodReport(year, month, rangeType);
+            break;
+        case 'spendingHeatmapReport':
+            fetchPromise = loadSpendingHeatmapReport(year, month, rangeType);
+            break;
+        case 'yearOverYearReport':
+            fetchPromise = loadYearOverYearReport();
+            break;
+        case 'incomeSourcesReport':
+            fetchPromise = loadIncomeSourcesReport(year, month, rangeType);
+            break;
+        case 'transactionStatusReport':
+            fetchPromise = loadTransactionStatusReport(year, month, rangeType);
+            break;
+        case 'expenseGrowthReport':
+            fetchPromise = loadExpenseGrowthReport(year);
+            break;
+        case 'savingsRateReport':
+            fetchPromise = loadSavingsRateReport(year, rangeType);
+            break;
         default:
             hideLoading();
             return;
@@ -3930,6 +3959,48 @@ function loadForecastReport() {
     return fetch(`/api/reports/forecast?months=6`)
         .then(response => response.json())
         .then(data => updateForecastChart(data));
+}
+
+function loadPaymentMethodReport(year, month, rangeType) {
+    return fetch(`/api/reports/payment-method-analysis?range=${rangeType}&year=${year}&month=${month}`)
+        .then(response => response.json())
+        .then(data => updatePaymentMethodChart(data));
+}
+
+function loadSpendingHeatmapReport(year, month, rangeType) {
+    return fetch(`/api/reports/spending-heatmap?range=${rangeType}&year=${year}&month=${month}`)
+        .then(response => response.json())
+        .then(data => updateSpendingHeatmapChart(data));
+}
+
+function loadYearOverYearReport() {
+    return fetch(`/api/reports/year-over-year`)
+        .then(response => response.json())
+        .then(data => updateYearOverYearChart(data));
+}
+
+function loadIncomeSourcesReport(year, month, rangeType) {
+    return fetch(`/api/reports/income-sources?range=${rangeType}&year=${year}&month=${month}`)
+        .then(response => response.json())
+        .then(data => updateIncomeSourcesChart(data));
+}
+
+function loadTransactionStatusReport(year, month, rangeType) {
+    return fetch(`/api/reports/transaction-status?range=${rangeType}&year=${year}&month=${month}`)
+        .then(response => response.json())
+        .then(data => updateTransactionStatusChart(data));
+}
+
+function loadExpenseGrowthReport(year) {
+    return fetch(`/api/reports/expense-growth?year=${year}`)
+        .then(response => response.json())
+        .then(data => updateExpenseGrowthChart(data));
+}
+
+function loadSavingsRateReport(year, rangeType) {
+    return fetch(`/api/reports/savings-rate?range=${rangeType}&year=${year}`)
+        .then(response => response.json())
+        .then(data => updateSavingsRateChart(data));
 }
 
 // ================================
@@ -4450,6 +4521,484 @@ function updateForecastChart(data) {
             </tr>
         `).join('');
     }
+}
+
+function updatePaymentMethodChart(data) {
+    const ctx = document.getElementById('paymentMethodChart');
+    if (!ctx || !data) return;
+
+    if (charts.paymentMethod) {
+        charts.paymentMethod.destroy();
+    }
+
+    const labels = data.map(d => d.payment_method || 'No Payment Method');
+    const expenses = data.map(d => d.total_expenses || 0);
+    const colors = data.map(d => d.color || '#6c757d');
+
+    charts.paymentMethod = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: expenses,
+                backgroundColor: colors,
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => ctx.label + ': රු ' + ctx.parsed.toLocaleString()
+                    }
+                }
+            }
+        }
+    });
+
+    // Update table
+    const tbody = document.getElementById('paymentMethodTableBody');
+    if (tbody) {
+        tbody.innerHTML = data.map(d => `
+            <tr>
+                <td><span class="badge" style="background-color: ${d.color || '#6c757d'}">${d.payment_method || 'None'}</span></td>
+                <td class="text-end">රු ${(d.total_income || 0).toLocaleString()}</td>
+                <td class="text-end">රු ${(d.total_expenses || 0).toLocaleString()}</td>
+                <td class="text-end">${d.transaction_count || 0}</td>
+                <td class="text-end">රු ${(d.avg_expense || 0).toLocaleString()}</td>
+            </tr>
+        `).join('');
+    }
+}
+
+function updateSpendingHeatmapChart(data) {
+    const ctx = document.getElementById('spendingHeatmapChart');
+    if (!ctx || !data) return;
+
+    if (charts.spendingHeatmap) {
+        charts.spendingHeatmap.destroy();
+    }
+
+    const labels = data.map(d => d.day_name);
+    const amounts = data.map(d => d.total_spending || 0);
+
+    charts.spendingHeatmap = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Total Spending',
+                data: amounts,
+                backgroundColor: 'rgba(255, 99, 132, 0.8)'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: value => 'රු ' + value.toLocaleString()
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: ctx => {
+                            const item = data[ctx.dataIndex];
+                            return [
+                                'Spending: රු ' + ctx.parsed.y.toLocaleString(),
+                                'Transactions: ' + (item.transaction_count || 0),
+                                'Average: රු ' + (item.avg_amount || 0).toLocaleString()
+                            ];
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updateYearOverYearChart(data) {
+    const ctx = document.getElementById('yearOverYearChart');
+    if (!ctx || !data) return;
+
+    if (charts.yearOverYear) {
+        charts.yearOverYear.destroy();
+    }
+
+    // Group by year and month
+    const yearGroups = {};
+    data.forEach(item => {
+        if (!yearGroups[item.year]) {
+            yearGroups[item.year] = {};
+        }
+        yearGroups[item.year][item.month] = item;
+    });
+
+    const years = Object.keys(yearGroups).sort();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    const datasets = years.map((year, idx) => {
+        const colors = [
+            'rgba(75, 192, 192, 0.8)',
+            'rgba(255, 99, 132, 0.8)',
+            'rgba(54, 162, 235, 0.8)',
+            'rgba(255, 206, 86, 0.8)',
+            'rgba(153, 102, 255, 0.8)'
+        ];
+        const netSavings = months.map((_, monthIdx) => {
+            const monthData = yearGroups[year][monthIdx + 1];
+            return monthData ? monthData.net_savings : 0;
+        });
+
+        return {
+            label: year,
+            data: netSavings,
+            backgroundColor: colors[idx % colors.length],
+            borderColor: colors[idx % colors.length].replace('0.8', '1'),
+            borderWidth: 2
+        };
+    });
+
+    charts.yearOverYear = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: months,
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: value => 'රු ' + value.toLocaleString()
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: ctx => ctx.dataset.label + ': රු ' + ctx.parsed.y.toLocaleString()
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updateIncomeSourcesChart(data) {
+    const ctx = document.getElementById('incomeSourcesPieChart');
+    if (!ctx || !data) return;
+
+    if (charts.incomeSources) {
+        charts.incomeSources.destroy();
+    }
+
+    // Aggregate by category
+    const categoryTotals = {};
+    data.forEach(item => {
+        if (!categoryTotals[item.category]) {
+            categoryTotals[item.category] = {
+                total: 0,
+                count: 0
+            };
+        }
+        categoryTotals[item.category].total += parseFloat(item.total_income || 0);
+        categoryTotals[item.category].count += parseInt(item.transaction_count || 0);
+    });
+
+    const categories = Object.keys(categoryTotals);
+    const amounts = categories.map(cat => categoryTotals[cat].total);
+
+    charts.incomeSources = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: categories,
+            datasets: [{
+                data: amounts,
+                backgroundColor: [
+                    'rgba(75, 192, 192, 0.8)',
+                    'rgba(54, 162, 235, 0.8)',
+                    'rgba(153, 102, 255, 0.8)',
+                    'rgba(144, 238, 144, 0.8)',
+                    'rgba(135, 206, 250, 0.8)'
+                ],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => ctx.label + ': රු ' + ctx.parsed.toLocaleString()
+                    }
+                }
+            }
+        }
+    });
+
+    // Update table
+    const tbody = document.getElementById('incomeSourcesTableBody');
+    if (tbody) {
+        const rows = Object.entries(categoryTotals).map(([category, data]) => {
+            const avg = data.count > 0 ? data.total / data.count : 0;
+            return `
+                <tr>
+                    <td>${category}</td>
+                    <td class="text-end">රු ${data.total.toLocaleString()}</td>
+                    <td class="text-end">${data.count}</td>
+                    <td class="text-end">රු ${avg.toLocaleString()}</td>
+                </tr>
+            `;
+        });
+        tbody.innerHTML = rows.join('');
+    }
+}
+
+function updateTransactionStatusChart(data) {
+    if (!data || data.length === 0) return;
+
+    const item = data[0]; // Should be single row for the period
+
+    // Done/Pending chart
+    const doneCtx = document.getElementById('transactionDoneChart');
+    if (doneCtx) {
+        if (charts.transactionDone) {
+            charts.transactionDone.destroy();
+        }
+
+        charts.transactionDone = new Chart(doneCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Completed', 'Pending'],
+                datasets: [{
+                    data: [item.completed_count || 0, item.pending_count || 0],
+                    backgroundColor: ['rgba(75, 192, 192, 0.8)', 'rgba(255, 206, 86, 0.8)'],
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    }
+
+    // Paid/Unpaid chart
+    const paidCtx = document.getElementById('transactionPaidChart');
+    if (paidCtx) {
+        if (charts.transactionPaid) {
+            charts.transactionPaid.destroy();
+        }
+
+        charts.transactionPaid = new Chart(paidCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Paid', 'Unpaid'],
+                datasets: [{
+                    data: [item.paid_count || 0, item.unpaid_count || 0],
+                    backgroundColor: ['rgba(75, 192, 192, 0.8)', 'rgba(255, 99, 132, 0.8)'],
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    }
+
+    // Update amounts
+    const unpaidExpenses = document.getElementById('unpaidExpensesAmount');
+    if (unpaidExpenses) {
+        unpaidExpenses.textContent = 'රු ' + (item.unpaid_expenses || 0).toLocaleString();
+    }
+
+    const unpaidIncome = document.getElementById('unpaidIncomeAmount');
+    if (unpaidIncome) {
+        unpaidIncome.textContent = 'රු ' + (item.unpaid_income || 0).toLocaleString();
+    }
+}
+
+function updateExpenseGrowthChart(data) {
+    const ctx = document.getElementById('expenseGrowthChart');
+    if (!ctx || !data) return;
+
+    if (charts.expenseGrowth) {
+        charts.expenseGrowth.destroy();
+    }
+
+    // Group by category
+    const categories = [...new Set(data.map(d => d.category))];
+    const months = [...new Set(data.map(d => d.month))].sort((a, b) => a - b);
+    const monthNames = months.map(m => {
+        const item = data.find(d => d.month === m);
+        return item ? item.month_name.substring(0, 3) : '';
+    });
+
+    const datasets = categories.map((category, idx) => {
+        const categoryData = months.map(month => {
+            const item = data.find(d => d.category === category && d.month === month);
+            return item ? item.total_spent : 0;
+        });
+
+        const colors = [
+            'rgba(255, 99, 132, 0.8)',
+            'rgba(54, 162, 235, 0.8)',
+            'rgba(255, 206, 86, 0.8)',
+            'rgba(75, 192, 192, 0.8)',
+            'rgba(153, 102, 255, 0.8)',
+            'rgba(255, 159, 64, 0.8)'
+        ];
+
+        return {
+            label: category,
+            data: categoryData,
+            backgroundColor: colors[idx % colors.length],
+            borderColor: colors[idx % colors.length].replace('0.8', '1'),
+            borderWidth: 2
+        };
+    });
+
+    charts.expenseGrowth = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: monthNames,
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: value => 'රු ' + value.toLocaleString()
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: ctx => ctx.dataset.label + ': රු ' + ctx.parsed.y.toLocaleString()
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updateSavingsRateChart(data) {
+    const ctx = document.getElementById('savingsRateChart');
+    if (!ctx || !data) return;
+
+    if (charts.savingsRate) {
+        charts.savingsRate.destroy();
+    }
+
+    const labels = data.map(d => d.month_name ? `${d.month_name} ${d.year}` : d.year);
+    const income = data.map(d => d.total_income || 0);
+    const expenses = data.map(d => d.total_expenses || 0);
+    const savingsRate = data.map(d => {
+        const inc = d.total_income || 0;
+        return inc > 0 ? ((d.net_savings || 0) / inc * 100) : 0;
+    });
+
+    charts.savingsRate = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Savings Rate (%)',
+                data: savingsRate,
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 2,
+                fill: true,
+                yAxisID: 'y1'
+            }, {
+                label: 'Income',
+                data: income,
+                backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1,
+                yAxisID: 'y'
+            }, {
+                label: 'Expenses',
+                data: expenses,
+                backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                borderColor: 'rgba(255, 99, 132, 1)',
+                borderWidth: 1,
+                yAxisID: 'y'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    type: 'linear',
+                    position: 'left',
+                    beginAtZero: true,
+                    ticks: {
+                        callback: value => 'රු ' + value.toLocaleString()
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    position: 'right',
+                    beginAtZero: true,
+                    grid: {
+                        drawOnChartArea: false
+                    },
+                    ticks: {
+                        callback: value => value.toFixed(1) + '%'
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: ctx => {
+                            if (ctx.dataset.label === 'Savings Rate (%)') {
+                                return ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(1) + '%';
+                            }
+                            return ctx.dataset.label + ': රු ' + ctx.parsed.y.toLocaleString();
+                        }
+                    }
+                }
+            }
+        }
+    });
 }
 
 // ================================
