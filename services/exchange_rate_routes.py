@@ -21,6 +21,7 @@ from services.hnb_exchange_rate_service import get_hnb_exchange_rate_service
 from services.pb_exchange_rate_service import get_pb_exchange_rate_service
 from services.sampath_exchange_rate_service import get_sampath_exchange_rate_service
 from services.gemini_exchange_analyzer import get_gemini_exchange_analyzer
+from services.ntfy_service import send_rate_change_notifications
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,43 @@ def refresh_all_exchange_rates(force=False):
     run_key = str(uuid.uuid4())
     logger.info(f"Scheduler: Exchange rate refresh run_key: {run_key}")
 
+    # Query previous rates from the most recent successful refresh for each source
+    previous_rates = {}
+    try:
+        connection = get_db_connection()
+        if connection:
+            cursor = connection.cursor(dictionary=True)
+            # Get the most recent successful refresh for each source from today
+            cursor.execute("""
+                SELECT source, buy_rate, sell_rate, created_at
+                FROM exchange_rate_refresh_logs
+                WHERE status = 'success' 
+                  AND buy_rate IS NOT NULL 
+                  AND sell_rate IS NOT NULL
+                  AND DATE(created_at) = CURDATE()
+                  AND source IN ('HNB', 'PB', 'SAMPATH', 'CBSL')
+                ORDER BY created_at DESC
+            """)
+            rows = cursor.fetchall()
+
+            # Get the most recent rate for each source (first occurrence due to ORDER BY DESC)
+            seen_sources = set()
+            for row in rows:
+                source = row['source']
+                if source not in seen_sources:
+                    previous_rates[source] = {
+                        'buy_rate': float(row['buy_rate']),
+                        'sell_rate': float(row['sell_rate']),
+                        'timestamp': row['created_at']
+                    }
+                    seen_sources.add(source)
+
+            cursor.close()
+            connection.close()
+            logger.info(f"Previous rates from refresh logs: {previous_rates}")
+    except Exception as e:
+        logger.warning(f"Could not load previous rates from refresh logs: {str(e)}")
+
     results = {}
 
     # Define fetch functions for each bank
@@ -52,13 +90,35 @@ def refresh_all_exchange_rates(force=False):
             hnb_ms = int((time.time() - hnb_start) * 1000)
             if hnb_rate:
                 logger.info(f"Scheduler: HNB rate updated: Buy={hnb_rate['buy_rate']}, Sell={hnb_rate['sell_rate']}")
+
+                # Compute deltas
+                prev = previous_rates.get('HNB')
+                buy_change = None
+                sell_change = None
+                changed = False
+                is_new = prev is None
+
+                if prev:
+                    buy_change = round(float(hnb_rate['buy_rate']) - prev['buy_rate'], 4)
+                    sell_change = round(float(hnb_rate['sell_rate']) - prev['sell_rate'], 4)
+                    changed = (buy_change != 0 or sell_change != 0)
+
                 log_exchange_rate_refresh('HNB', 'success',
                                           buy_rate=hnb_rate['buy_rate'],
                                           sell_rate=hnb_rate['sell_rate'],
                                           duration_ms=hnb_ms,
                                           run_key=run_key)
-                return ('HNB',
-                        {'status': 'success', 'buy_rate': hnb_rate['buy_rate'], 'sell_rate': hnb_rate['sell_rate']})
+                return ('HNB', {
+                    'status': 'success',
+                    'buy_rate': hnb_rate['buy_rate'],
+                    'sell_rate': hnb_rate['sell_rate'],
+                    'previous_buy_rate': prev['buy_rate'] if prev else None,
+                    'previous_sell_rate': prev['sell_rate'] if prev else None,
+                    'buy_change': buy_change,
+                    'sell_change': sell_change,
+                    'changed': changed,
+                    'is_new': is_new
+                })
             else:
                 logger.warning("Scheduler: Failed to fetch HNB rate")
                 log_exchange_rate_refresh('HNB', 'failure',
@@ -82,12 +142,35 @@ def refresh_all_exchange_rates(force=False):
             pb_ms = int((time.time() - pb_start) * 1000)
             if pb_rate:
                 logger.info(f"Scheduler: PB rate updated: Buy={pb_rate['buy_rate']}, Sell={pb_rate['sell_rate']}")
+
+                # Compute deltas
+                prev = previous_rates.get('PB')
+                buy_change = None
+                sell_change = None
+                changed = False
+                is_new = prev is None
+
+                if prev:
+                    buy_change = round(float(pb_rate['buy_rate']) - prev['buy_rate'], 4)
+                    sell_change = round(float(pb_rate['sell_rate']) - prev['sell_rate'], 4)
+                    changed = (buy_change != 0 or sell_change != 0)
+
                 log_exchange_rate_refresh('PB', 'success',
                                           buy_rate=pb_rate['buy_rate'],
                                           sell_rate=pb_rate['sell_rate'],
                                           duration_ms=pb_ms,
                                           run_key=run_key)
-                return ('PB', {'status': 'success', 'buy_rate': pb_rate['buy_rate'], 'sell_rate': pb_rate['sell_rate']})
+                return ('PB', {
+                    'status': 'success',
+                    'buy_rate': pb_rate['buy_rate'],
+                    'sell_rate': pb_rate['sell_rate'],
+                    'previous_buy_rate': prev['buy_rate'] if prev else None,
+                    'previous_sell_rate': prev['sell_rate'] if prev else None,
+                    'buy_change': buy_change,
+                    'sell_change': sell_change,
+                    'changed': changed,
+                    'is_new': is_new
+                })
             else:
                 logger.warning("Scheduler: Failed to fetch PB rate")
                 log_exchange_rate_refresh('PB', 'failure',
@@ -112,13 +195,35 @@ def refresh_all_exchange_rates(force=False):
             if sampath_rate:
                 logger.info(
                     f"Scheduler: Sampath rate updated: Buy={sampath_rate['buy_rate']}, Sell={sampath_rate['sell_rate']}")
+
+                # Compute deltas
+                prev = previous_rates.get('SAMPATH')
+                buy_change = None
+                sell_change = None
+                changed = False
+                is_new = prev is None
+
+                if prev:
+                    buy_change = round(float(sampath_rate['buy_rate']) - prev['buy_rate'], 4)
+                    sell_change = round(float(sampath_rate['sell_rate']) - prev['sell_rate'], 4)
+                    changed = (buy_change != 0 or sell_change != 0)
+
                 log_exchange_rate_refresh('SAMPATH', 'success',
                                           buy_rate=sampath_rate['buy_rate'],
                                           sell_rate=sampath_rate['sell_rate'],
                                           duration_ms=sampath_ms,
                                           run_key=run_key)
-                return ('SAMPATH', {'status': 'success', 'buy_rate': sampath_rate['buy_rate'],
-                                    'sell_rate': sampath_rate['sell_rate']})
+                return ('SAMPATH', {
+                    'status': 'success',
+                    'buy_rate': sampath_rate['buy_rate'],
+                    'sell_rate': sampath_rate['sell_rate'],
+                    'previous_buy_rate': prev['buy_rate'] if prev else None,
+                    'previous_sell_rate': prev['sell_rate'] if prev else None,
+                    'buy_change': buy_change,
+                    'sell_change': sell_change,
+                    'changed': changed,
+                    'is_new': is_new
+                })
             else:
                 logger.warning("Scheduler: Failed to fetch Sampath rate")
                 log_exchange_rate_refresh('SAMPATH', 'failure',
@@ -143,13 +248,35 @@ def refresh_all_exchange_rates(force=False):
             if cbsl_rate:
                 logger.info(
                     f"Scheduler: CBSL rate for today: Buy={cbsl_rate['buy_rate']}, Sell={cbsl_rate['sell_rate']}")
+
+                # Compute deltas
+                prev = previous_rates.get('CBSL')
+                buy_change = None
+                sell_change = None
+                changed = False
+                is_new = prev is None
+
+                if prev:
+                    buy_change = round(float(cbsl_rate['buy_rate']) - prev['buy_rate'], 4)
+                    sell_change = round(float(cbsl_rate['sell_rate']) - prev['sell_rate'], 4)
+                    changed = (buy_change != 0 or sell_change != 0)
+
                 log_exchange_rate_refresh('CBSL', 'success',
                                           buy_rate=cbsl_rate['buy_rate'],
                                           sell_rate=cbsl_rate['sell_rate'],
                                           duration_ms=cbsl_ms,
                                           run_key=run_key)
-                return ('CBSL', {'status': 'success', 'buy_rate': cbsl_rate['buy_rate'],
-                                 'sell_rate': cbsl_rate['sell_rate']})
+                return ('CBSL', {
+                    'status': 'success',
+                    'buy_rate': cbsl_rate['buy_rate'],
+                    'sell_rate': cbsl_rate['sell_rate'],
+                    'previous_buy_rate': prev['buy_rate'] if prev else None,
+                    'previous_sell_rate': prev['sell_rate'] if prev else None,
+                    'buy_change': buy_change,
+                    'sell_change': sell_change,
+                    'changed': changed,
+                    'is_new': is_new
+                })
             else:
                 logger.warning("Scheduler: No CBSL rate available for today")
                 log_exchange_rate_refresh('CBSL', 'failure',
@@ -185,7 +312,20 @@ def refresh_all_exchange_rates(force=False):
                 logger.error(f"Unexpected error in {bank} fetch thread: {str(e)}")
                 results[bank] = {'status': 'failure', 'error': f'Thread error: {str(e)}'}
 
-    logger.info("Exchange rate refresh completed — results: %s", results)
+    # Determine if any changes were detected
+    changes_detected = any(
+        r.get('status') == 'success' and r.get('changed', False)
+        for r in results.values()
+    )
+
+    logger.info(f"Exchange rate refresh completed — changes_detected: {changes_detected}, results: {results}")
+
+    # Send notifications to users if any changes detected
+    try:
+        send_rate_change_notifications(results)
+    except Exception as e:
+        logger.error(f"Error sending notifications: {str(e)}")
+
     return results
 
 
@@ -619,11 +759,41 @@ def refresh_all_rates_manually(log_audit_func):
         if hasattr(request, 'current_user') and request.current_user:
             log_audit_func(request.current_user['user_id'], 'MANUAL_EXCHANGE_RATE_REFRESH')
 
+        # Determine if any changes were detected
+        changes_detected = any(
+            r.get('status') == 'success' and r.get('changed', False)
+            for r in results.values()
+        )
+
+        # Build changes summary
+        changes_summary = []
+        for bank in ['HNB', 'PB', 'SAMPATH', 'CBSL']:
+            if bank in results:
+                result = results[bank]
+                if result.get('status') == 'success':
+                    if result.get('is_new'):
+                        changes_summary.append(f"{bank}: New rate ({result['buy_rate']}/{result['sell_rate']})")
+                    elif result.get('changed'):
+                        parts = []
+                        if result.get('buy_change') and result['buy_change'] != 0:
+                            arrow = "▲" if result['buy_change'] > 0 else "▼"
+                            parts.append(f"Buy {arrow}{abs(result['buy_change']):.4f}")
+                        if result.get('sell_change') and result['sell_change'] != 0:
+                            arrow = "▲" if result['sell_change'] > 0 else "▼"
+                            parts.append(f"Sell {arrow}{abs(result['sell_change']):.4f}")
+                        changes_summary.append(f"{bank}: {', '.join(parts)}")
+                    else:
+                        changes_summary.append(f"{bank}: No change")
+                else:
+                    changes_summary.append(f"{bank}: Failed")
+
         logger.info("Exchange rate refresh completed successfully")
         return jsonify({
             'message': 'Exchange rate refresh completed successfully',
             'status': 'completed',
             'results': results,
+            'changes_detected': changes_detected,
+            'changes_summary': changes_summary,
             'timestamp': datetime.now().isoformat()
         }), 200
     except Exception as e:

@@ -434,7 +434,9 @@ COMMENT='Runtime application settings (key-value store)';
 -- Seed defaults (INSERT IGNORE preserves any previously customised value)
 INSERT IGNORE INTO app_settings (setting_key, value, description) VALUES
 ('bill_upload_mode', 'sequential',
- 'Bill image upload strategy: sequential = one-by-one (Vercel-friendly), batch = all at once (non-Vercel)');
+ 'Bill image upload strategy: sequential = one-by-one (Vercel-friendly), batch = all at once (non-Vercel)'),
+('ntfy_topic', '',
+ 'Global ntfy.sh topic name for exchange rate push notifications (leave empty to disable)');
 
 -- ============================================================
 -- Exchange-Rate Refresh Logs Table
@@ -571,5 +573,3 @@ INSERT IGNORE INTO category_keywords (category_id, keyword) VALUES
 (37,'cash out'),(37,'withdrawal'),(37,'atm withdrawal'),(37,'cash withdraw'),
 -- CEFT Fee (41)
 (41,'ceft fee'),(41,'ceft charge'),(41,'transfer fee'),(41,'ceft');
-
-

@@ -89,7 +89,7 @@
                                 <i class="fas fa-key me-2"></i>Change Password
                             </a></li>
                             <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#defaultPageModal">
-                                <i class="fas fa-home me-2"></i>Default Page
+                                <i class="fas fa-cog me-2"></i>User Preferences
                             </a></li>
                             <li><a class="dropdown-item" href="#" id="themeToggle" onclick="toggleTheme(); return false;">
                                 <i class="fas fa-moon me-2 theme-toggle-icon" id="themeIcon"></i>
@@ -164,19 +164,19 @@
         </div>
     </div>
 
-    <!-- Default Page Preference Modal -->
+    <!-- User Preferences Modal -->
     <div class="modal fade" id="defaultPageModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Set Default Landing Page</h5>
+                    <h5 class="modal-title">User Preferences</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <p class="text-muted mb-3">Choose which page you want to see when you first log in or open the app.</p>
                     <form id="defaultPageForm">
                         <div class="mb-3">
-                            <label for="defaultPageSelect" class="form-label">Default Page</label>
+                            <label for="defaultPageSelect" class="form-label">Default Landing Page</label>
                             <select class="form-select" id="defaultPageSelect" required>
                                 <option value="transactions">Transactions</option>
                                 <option value="tax">Tax Calculator</option>
