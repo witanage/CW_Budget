@@ -1417,6 +1417,437 @@ def get_intraday_refresh_logs():
         return jsonify({'error': 'Failed to fetch intraday logs', 'details': str(e)}), 500
 
 
+def create_salary_calculation():
+    """
+    Create a new salary calculation with exchange breakdown.
+
+    Request Body (JSON):
+        total_usd: Total USD salary amount
+        exchanges: Array of exchange objects with:
+            - usd_amount: USD amount for this exchange
+            - exchange_rate: LKR rate used
+            - bank_source: Bank name (optional)
+        notes: Optional notes for this calculation
+
+    Returns:
+        JSON with the created calculation ID and summary
+    """
+    try:
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'error': 'User not authenticated'}), 401
+
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'Request body is required'}), 400
+
+        total_usd = data.get('total_usd')
+        exchanges = data.get('exchanges', [])
+        notes = data.get('notes', '')
+
+        # Validation
+        if not total_usd or total_usd <= 0:
+            return jsonify({'error': 'total_usd must be greater than 0'}), 400
+
+        if not exchanges or len(exchanges) == 0:
+            return jsonify({'error': 'At least one exchange is required'}), 400
+
+        # Calculate totals
+        total_exchanged_usd = Decimal('0')
+        total_lkr = Decimal('0')
+
+        for ex in exchanges:
+            if 'usd_amount' not in ex or 'exchange_rate' not in ex:
+                return jsonify({'error': 'Each exchange must have usd_amount and exchange_rate'}), 400
+
+            usd_amt = Decimal(str(ex['usd_amount']))
+            rate = Decimal(str(ex['exchange_rate']))
+
+            if usd_amt <= 0 or rate <= 0:
+                return jsonify({'error': 'All amounts and rates must be greater than 0'}), 400
+
+            total_exchanged_usd += usd_amt
+            total_lkr += usd_amt * rate
+
+        # Validate that exchanged amount doesn't exceed total salary
+        if total_exchanged_usd > Decimal(str(total_usd)):
+            return jsonify({'error': f'Total exchanged USD ({total_exchanged_usd}) exceeds total salary ({total_usd})'}), 400
+
+        # Calculate average rate (only for exchanged amount)
+        average_rate = total_lkr / total_exchanged_usd if total_exchanged_usd > 0 else Decimal('0')
+
+        # Save to database
+        connection = get_db_connection()
+        cursor = connection.cursor()
+        try:
+            # Insert main calculation
+            cursor.execute("""
+                INSERT INTO salary_calculations 
+                (user_id, total_usd, total_lkr, average_rate, calculation_date, notes)
+                VALUES (%s, %s, %s, %s, CURDATE(), %s)
+            """, (user_id, total_usd, float(total_lkr), float(average_rate), notes))
+
+            calculation_id = cursor.lastrowid
+
+            # Insert exchange breakdown
+            for idx, ex in enumerate(exchanges, start=1):
+                usd_amt = Decimal(str(ex['usd_amount']))
+                rate = Decimal(str(ex['exchange_rate']))
+                lkr_amt = usd_amt * rate
+                bank = ex.get('bank_source')
+
+                cursor.execute("""
+                    INSERT INTO salary_calculation_exchanges
+                    (calculation_id, usd_amount, exchange_rate, lkr_amount, bank_source, exchange_order)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (calculation_id, float(usd_amt), float(rate), float(lkr_amt), bank, idx))
+
+            connection.commit()
+
+            logger.info(f"User {user_id} created salary calculation {calculation_id}: ${total_usd} (exchanged: ${total_exchanged_usd}) → රු{total_lkr:.2f} (avg rate: {average_rate:.4f})")
+
+            return jsonify({
+                'message': 'Salary calculation saved successfully',
+                'calculation_id': calculation_id,
+                'total_usd': float(total_usd),
+                'total_exchanged_usd': float(total_exchanged_usd),
+                'total_lkr': float(total_lkr),
+                'average_rate': float(average_rate),
+                'exchanges_count': len(exchanges),
+                'is_partial': total_exchanged_usd < Decimal(str(total_usd))
+            }), 201
+
+        except Exception as e:
+            connection.rollback()
+            raise e
+        finally:
+            cursor.close()
+            connection.close()
+
+    except Exception as e:
+        logger.error(f"Error creating salary calculation: {str(e)}")
+        return jsonify({'error': 'Failed to save salary calculation', 'details': str(e)}), 500
+
+
+def get_salary_calculations():
+    """
+    Get all salary calculations for the current user with exchange breakdown.
+
+    Returns:
+        JSON array of calculations with their exchange details
+    """
+    try:
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'error': 'User not authenticated'}), 401
+
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+        try:
+            # Get all calculations for this user
+            cursor.execute("""
+                SELECT 
+                    id,
+                    total_usd,
+                    total_lkr,
+                    average_rate,
+                    calculation_date,
+                    notes,
+                    created_at
+                FROM salary_calculations
+                WHERE user_id = %s
+                ORDER BY calculation_date DESC, created_at DESC
+                LIMIT 50
+            """, (user_id,))
+
+            calculations = cursor.fetchall()
+
+            # For each calculation, get the exchange breakdown
+            for calc in calculations:
+                cursor.execute("""
+                    SELECT 
+                        usd_amount,
+                        exchange_rate,
+                        lkr_amount,
+                        bank_source,
+                        exchange_order
+                    FROM salary_calculation_exchanges
+                    WHERE calculation_id = %s
+                    ORDER BY exchange_order
+                """, (calc['id'],))
+
+                calc['exchanges'] = cursor.fetchall()
+
+                # Format dates for JSON serialization
+                if calc['calculation_date']:
+                    calc['calculation_date'] = calc['calculation_date'].isoformat()
+                if calc['created_at']:
+                    calc['created_at'] = calc['created_at'].isoformat()
+
+            return jsonify({
+                'calculations': calculations,
+                'count': len(calculations)
+            }), 200
+
+        finally:
+            cursor.close()
+            connection.close()
+
+    except Exception as e:
+        logger.error(f"Error fetching salary calculations: {str(e)}")
+        return jsonify({'error': 'Failed to fetch salary calculations', 'details': str(e)}), 500
+
+
+def get_current_bank_rates():
+    """
+    Get the most recent exchange rates from all banks.
+    Used by the salary calculator to populate rate dropdowns.
+
+    Returns:
+        JSON object with current rates for each bank
+    """
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+        try:
+            # Get the most recent rate for each bank from today
+            cursor.execute("""
+                SELECT 
+                    source,
+                    buy_rate,
+                    sell_rate,
+                    date
+                FROM exchange_rates
+                WHERE date = CURDATE()
+                  AND source IN ('HNB', 'PB', 'SAMPATH')
+                ORDER BY source
+            """)
+
+            today_rates = cursor.fetchall()
+
+            # If no rates for today, get the most recent rates
+            if not today_rates:
+                cursor.execute("""
+                    SELECT 
+                        er.source,
+                        er.buy_rate,
+                        er.sell_rate,
+                        er.date
+                    FROM exchange_rates er
+                    INNER JOIN (
+                        SELECT source, MAX(date) as max_date
+                        FROM exchange_rates
+                        WHERE source IN ('HNB', 'PB', 'SAMPATH')
+                        GROUP BY source
+                    ) latest ON er.source = latest.source AND er.date = latest.max_date
+                    ORDER BY er.source
+                """)
+                today_rates = cursor.fetchall()
+
+            # Format as dictionary
+            rates_dict = {}
+            for rate in today_rates:
+                rates_dict[rate['source']] = {
+                    'buy_rate': float(rate['buy_rate']),
+                    'sell_rate': float(rate['sell_rate']),
+                    'date': rate['date'].isoformat() if rate['date'] else None
+                }
+
+            return jsonify({
+                'rates': rates_dict,
+                'fetched_at': datetime.now().isoformat()
+            }), 200
+
+        finally:
+            cursor.close()
+            connection.close()
+
+    except Exception as e:
+        logger.error(f"Error fetching current bank rates: {str(e)}")
+        return jsonify({'error': 'Failed to fetch current bank rates', 'details': str(e)}), 500
+
+
+def update_salary_calculation():
+    """
+    Update an existing salary calculation with new exchanges.
+    Can be used to add more exchanges to a partial calculation.
+
+    Request Body (JSON):
+        calculation_id: ID of the calculation to update
+        total_usd: Updated total USD salary amount (optional, keeps original if not provided)
+        exchanges: Complete array of exchange objects (replaces all existing exchanges)
+        notes: Updated notes (optional, keeps original if not provided)
+
+    Returns:
+        JSON with the updated calculation summary
+    """
+    try:
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'error': 'User not authenticated'}), 401
+
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'Request body is required'}), 400
+
+        calculation_id = data.get('calculation_id')
+        if not calculation_id:
+            return jsonify({'error': 'calculation_id is required'}), 400
+
+        # Verify ownership
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+        try:
+            cursor.execute("""
+                SELECT user_id, total_usd, notes 
+                FROM salary_calculations 
+                WHERE id = %s
+            """, (calculation_id,))
+
+            existing = cursor.fetchone()
+            if not existing:
+                return jsonify({'error': 'Calculation not found'}), 404
+
+            if existing['user_id'] != user_id:
+                return jsonify({'error': 'Unauthorized'}), 403
+
+            # Get updated values or keep existing
+            total_usd = data.get('total_usd', existing['total_usd'])
+            notes = data.get('notes', existing['notes'])
+            exchanges = data.get('exchanges', [])
+
+            if not exchanges or len(exchanges) == 0:
+                return jsonify({'error': 'At least one exchange is required'}), 400
+
+            # Calculate totals
+            total_exchanged_usd = Decimal('0')
+            total_lkr = Decimal('0')
+
+            for ex in exchanges:
+                if 'usd_amount' not in ex or 'exchange_rate' not in ex:
+                    return jsonify({'error': 'Each exchange must have usd_amount and exchange_rate'}), 400
+
+                usd_amt = Decimal(str(ex['usd_amount']))
+                rate = Decimal(str(ex['exchange_rate']))
+
+                if usd_amt <= 0 or rate <= 0:
+                    return jsonify({'error': 'All amounts and rates must be greater than 0'}), 400
+
+                total_exchanged_usd += usd_amt
+                total_lkr += usd_amt * rate
+
+            # Validate that exchanged amount doesn't exceed total salary
+            if total_exchanged_usd > Decimal(str(total_usd)):
+                return jsonify({'error': f'Total exchanged USD ({total_exchanged_usd}) exceeds total salary ({total_usd})'}), 400
+
+            # Calculate average rate
+            average_rate = total_lkr / total_exchanged_usd if total_exchanged_usd > 0 else Decimal('0')
+
+            # Update database
+            # Delete old exchanges
+            cursor.execute("DELETE FROM salary_calculation_exchanges WHERE calculation_id = %s", (calculation_id,))
+
+            # Update main calculation
+            cursor.execute("""
+                UPDATE salary_calculations 
+                SET total_usd = %s, total_lkr = %s, average_rate = %s, notes = %s
+                WHERE id = %s
+            """, (total_usd, float(total_lkr), float(average_rate), notes, calculation_id))
+
+            # Insert new exchanges
+            for idx, ex in enumerate(exchanges, start=1):
+                usd_amt = Decimal(str(ex['usd_amount']))
+                rate = Decimal(str(ex['exchange_rate']))
+                lkr_amt = usd_amt * rate
+                bank = ex.get('bank_source')
+
+                cursor.execute("""
+                    INSERT INTO salary_calculation_exchanges
+                    (calculation_id, usd_amount, exchange_rate, lkr_amount, bank_source, exchange_order)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (calculation_id, float(usd_amt), float(rate), float(lkr_amt), bank, idx))
+
+            connection.commit()
+
+            logger.info(f"User {user_id} updated salary calculation {calculation_id}: ${total_usd} (exchanged: ${total_exchanged_usd}) → රු{total_lkr:.2f}")
+
+            return jsonify({
+                'message': 'Salary calculation updated successfully',
+                'calculation_id': calculation_id,
+                'total_usd': float(total_usd),
+                'total_exchanged_usd': float(total_exchanged_usd),
+                'total_lkr': float(total_lkr),
+                'average_rate': float(average_rate),
+                'exchanges_count': len(exchanges),
+                'is_partial': total_exchanged_usd < Decimal(str(total_usd))
+            }), 200
+
+        except Exception as e:
+            connection.rollback()
+            raise e
+        finally:
+            cursor.close()
+            connection.close()
+
+    except Exception as e:
+        logger.error(f"Error updating salary calculation: {str(e)}")
+        return jsonify({'error': 'Failed to update salary calculation', 'details': str(e)}), 500
+
+
+def delete_salary_calculation():
+    """
+    Delete a salary calculation.
+
+    URL Parameter:
+        calculation_id: ID of the calculation to delete
+
+    Returns:
+        JSON with success message
+    """
+    try:
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'error': 'User not authenticated'}), 401
+
+        calculation_id = request.args.get('calculation_id')
+        if not calculation_id:
+            return jsonify({'error': 'calculation_id is required'}), 400
+
+        # Verify ownership and delete
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+        try:
+            cursor.execute("""
+                SELECT user_id FROM salary_calculations WHERE id = %s
+            """, (calculation_id,))
+
+            existing = cursor.fetchone()
+            if not existing:
+                return jsonify({'error': 'Calculation not found'}), 404
+
+            if existing['user_id'] != user_id:
+                return jsonify({'error': 'Unauthorized'}), 403
+
+            # Delete (cascade will handle exchanges)
+            cursor.execute("DELETE FROM salary_calculations WHERE id = %s", (calculation_id,))
+            connection.commit()
+
+            logger.info(f"User {user_id} deleted salary calculation {calculation_id}")
+
+            return jsonify({
+                'message': 'Salary calculation deleted successfully',
+                'calculation_id': int(calculation_id)
+            }), 200
+
+        finally:
+            cursor.close()
+            connection.close()
+
+    except Exception as e:
+        logger.error(f"Error deleting salary calculation: {str(e)}")
+        return jsonify({'error': 'Failed to delete salary calculation', 'details': str(e)}), 500
+
+
 # ==================================================
 # ROUTE REGISTRATION FUNCTION
 # ==================================================
@@ -1501,5 +1932,30 @@ def register_exchange_rate_routes(app, login_required, admin_required, token_req
     @login_required
     def intraday_refresh_logs():
         return get_intraday_refresh_logs()
+
+    @app.route('/api/salary-calc/create', methods=['POST'])
+    @login_required
+    def salary_calc_create():
+        return create_salary_calculation()
+
+    @app.route('/api/salary-calc/update', methods=['PUT'])
+    @login_required
+    def salary_calc_update():
+        return update_salary_calculation()
+
+    @app.route('/api/salary-calc/delete', methods=['DELETE'])
+    @login_required
+    def salary_calc_delete():
+        return delete_salary_calculation()
+
+    @app.route('/api/salary-calc/history', methods=['GET'])
+    @login_required
+    def salary_calc_history():
+        return get_salary_calculations()
+
+    @app.route('/api/salary-calc/current-rates', methods=['GET'])
+    @login_required
+    def salary_calc_current_rates():
+        return get_current_bank_rates()
 
     logger.info("Exchange rate routes registered successfully")
