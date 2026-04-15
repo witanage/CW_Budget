@@ -50,20 +50,20 @@ def _format_rate_change(bank: str, result: Dict) -> str:
 
 def send_rate_change_notifications(results: Dict) -> None:
     """
-    Send push notification to the configured global ntfy topic when exchange rates change.
+    Send push notification to the configured global ntfy topic when buy rates change.
 
     Args:
         results: Dict of bank results from refresh_all_exchange_rates()
                  Format: {'HNB': {...}, 'PB': {...}, 'SAMPATH': {...}, 'CBSL': {...}}
     """
-    # Check if any changes were detected
+    # Check if any buy rate changes were detected
     changes_detected = any(
         r.get('status') == 'success' and r.get('changed', False)
         for r in results.values()
     )
 
     if not changes_detected:
-        logger.info("No exchange rate changes detected, skipping notifications")
+        logger.info("No buy rate changes detected, skipping notifications")
         return
 
     # Get global ntfy topic from app_settings
@@ -127,7 +127,7 @@ def send_rate_change_notifications(results: Dict) -> None:
         # Send notification to ntfy.sh
         url = f"{NTFY_SERVER}/{ntfy_topic}"
         headers = {
-            "Title": "Exchange Rate Update - USD/LKR",
+            "Title": "Buy Rate Update - USD/LKR",
             "Priority": priority,
             "Tags": tags
         }

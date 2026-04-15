@@ -101,7 +101,7 @@ def refresh_all_exchange_rates(force=False):
                 if prev:
                     buy_change = round(float(hnb_rate['buy_rate']) - prev['buy_rate'], 4)
                     sell_change = round(float(hnb_rate['sell_rate']) - prev['sell_rate'], 4)
-                    changed = (buy_change != 0 or sell_change != 0)
+                    changed = (buy_change != 0)
 
                 log_exchange_rate_refresh('HNB', 'success',
                                           buy_rate=hnb_rate['buy_rate'],
@@ -153,7 +153,7 @@ def refresh_all_exchange_rates(force=False):
                 if prev:
                     buy_change = round(float(pb_rate['buy_rate']) - prev['buy_rate'], 4)
                     sell_change = round(float(pb_rate['sell_rate']) - prev['sell_rate'], 4)
-                    changed = (buy_change != 0 or sell_change != 0)
+                    changed = (buy_change != 0)
 
                 log_exchange_rate_refresh('PB', 'success',
                                           buy_rate=pb_rate['buy_rate'],
@@ -206,7 +206,7 @@ def refresh_all_exchange_rates(force=False):
                 if prev:
                     buy_change = round(float(sampath_rate['buy_rate']) - prev['buy_rate'], 4)
                     sell_change = round(float(sampath_rate['sell_rate']) - prev['sell_rate'], 4)
-                    changed = (buy_change != 0 or sell_change != 0)
+                    changed = (buy_change != 0)
 
                 log_exchange_rate_refresh('SAMPATH', 'success',
                                           buy_rate=sampath_rate['buy_rate'],
@@ -259,7 +259,7 @@ def refresh_all_exchange_rates(force=False):
                 if prev:
                     buy_change = round(float(cbsl_rate['buy_rate']) - prev['buy_rate'], 4)
                     sell_change = round(float(cbsl_rate['sell_rate']) - prev['sell_rate'], 4)
-                    changed = (buy_change != 0 or sell_change != 0)
+                    changed = (buy_change != 0)
 
                 log_exchange_rate_refresh('CBSL', 'success',
                                           buy_rate=cbsl_rate['buy_rate'],
