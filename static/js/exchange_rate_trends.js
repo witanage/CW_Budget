@@ -118,6 +118,7 @@
         _on('ertIntradayTimezone',   'change', function () { _s.intradayTimezone = this.value; _fetchIntraday(); });
         _on('ertAiInsightsBtn',      'click',  function () { _showAiInsights(); });
         _on('aiUserBankSelect',      'change', function () { _showAiInsights(); });
+        _on('salaryCalcBtn',         'click',  function () { _showSalaryCalculator(); });
     }
 
     function _on(id, evt, fn) {
@@ -1066,6 +1067,524 @@
             var date = new Date(data.generated_at);
             genAt.textContent = date.toLocaleString();
         }
+    }
+
+    // ===================================================================
+    // Salary Calculator Modal
+    // ===================================================================
+    var _salaryCalc = {
+        exchanges: [],
+        currentRates: null,
+        nextExchangeId: 1,
+        currentEditId: null  // Track if we're editing an existing calculation
+    };
+
+    function _showSalaryCalculator() {
+        var modal = document.getElementById('salaryCalcModal');
+        if (!modal) {
+            console.error('Salary Calculator modal not found');
+            return;
+        }
+
+        var bsModal = bootstrap.Modal.getOrCreateInstance(modal);
+        bsModal.show();
+
+        // Reset calculator state
+        _salaryCalc.exchanges = [];
+        _salaryCalc.nextExchangeId = 1;
+        _salaryCalc.currentEditId = null;
+        document.getElementById('salaryTotalUSD').value = '';
+        document.getElementById('salaryNotes').value = '';
+        document.getElementById('exchangeEntries').innerHTML = '';
+        _updateSalarySummary();
+        _updateSaveButtonText();
+
+        // Bind buttons
+        var addExchangeBtn = document.getElementById('addExchangeBtn');
+        if (addExchangeBtn) {
+            addExchangeBtn.onclick = _addExchangeEntry;
+        }
+
+        var saveCalcBtn = document.getElementById('saveCalcBtn');
+        if (saveCalcBtn) {
+            saveCalcBtn.onclick = _saveSalaryCalculation;
+        }
+
+        // Fetch current bank rates
+        _fetchCurrentBankRates();
+
+        // Load calculation history
+        _loadSalaryHistory();
+
+        // Add initial exchange entry
+        _addExchangeEntry();
+    }
+
+    function _fetchCurrentBankRates() {
+        fetch('/api/salary-calc/current-rates')
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                _salaryCalc.currentRates = data.rates || {};
+                console.log('Current bank rates loaded:', _salaryCalc.currentRates);
+            })
+            .catch(function (err) {
+                console.error('Error fetching current rates:', err);
+            });
+    }
+
+    function _addExchangeEntry() {
+        var exchangeId = _salaryCalc.nextExchangeId++;
+        var container = document.getElementById('exchangeEntries');
+
+        var entryDiv = document.createElement('div');
+        entryDiv.className = 'card mb-2';
+        entryDiv.id = 'exchange-' + exchangeId;
+        entryDiv.setAttribute('data-exchange-id', exchangeId);
+
+        var rateOptions = _buildRateOptions();
+
+        var removeBtn = exchangeId > 1
+            ? '<button type="button" class="btn btn-sm btn-outline-danger d-inline-flex align-items-center" onclick="window._removeExchange(' + exchangeId + ')">\                        <i class="fas fa-times"></i>\                    </button>'
+            : '';
+
+        entryDiv.innerHTML = '\
+            <div class="card-body p-2">\
+                <div class="d-flex justify-content-between align-items-center mb-2">\
+                    <strong class="small">Exchange #' + exchangeId + '</strong>\
+                    ' + removeBtn + '\
+                </div>\
+                <div class="row g-2">\
+                    <div class="col-6">\
+                        <label class="form-label small mb-1">USD Amount</label>\
+                        <div class="input-group input-group-sm">\
+                            <span class="input-group-text">$</span>\
+                            <input type="number" class="form-control exchange-usd" data-id="' + exchangeId + '" \
+                                   placeholder="0.00" step="0.01" min="0">\
+                        </div>\
+                    </div>\
+                    <div class="col-6">\
+                        <label class="form-label small mb-1">LKR Rate</label>\
+                        <select class="form-select form-select-sm exchange-rate-select" data-id="' + exchangeId + '">\
+                            <option value="">Select Bank or Manual</option>\
+                            <optgroup label="Current Bank Rates">\
+                                ' + rateOptions + '\
+                            </optgroup>\
+                            <option value="manual">Manual Entry</option>\
+                        </select>\
+                        <input type="number" class="form-control form-control-sm mt-1 exchange-rate-manual" \
+                               data-id="' + exchangeId + '" placeholder="Enter rate" step="0.0001" min="0" style="display:none;">\
+                    </div>\
+                </div>\
+            </div>\
+        ';
+
+        container.appendChild(entryDiv);
+
+        // Bind events
+        var usdInput = entryDiv.querySelector('.exchange-usd');
+        var rateSelect = entryDiv.querySelector('.exchange-rate-select');
+        var rateManual = entryDiv.querySelector('.exchange-rate-manual');
+
+        usdInput.addEventListener('input', _updateSalarySummary);
+        rateSelect.addEventListener('change', function () {
+            if (this.value === 'manual') {
+                rateManual.style.display = 'block';
+                rateManual.value = '';
+                rateManual.focus();
+            } else {
+                rateManual.style.display = 'none';
+            }
+            _updateSalarySummary();
+        });
+        rateManual.addEventListener('input', _updateSalarySummary);
+    }
+
+    window._removeExchange = function(exchangeId) {
+        // Prevent removing the first exchange entry
+        if (exchangeId === 1) {
+            showToast('The first exchange entry cannot be removed', 'warning');
+            return;
+        }
+        var entry = document.getElementById('exchange-' + exchangeId);
+        if (entry) {
+            entry.remove();
+            _updateSalarySummary();
+        }
+    };
+
+    function _buildRateOptions() {
+        if (!_salaryCalc.currentRates) return '';
+
+        var options = '';
+        var banks = ['HNB', 'PB', 'SAMPATH'];
+        banks.forEach(function (bank) {
+            var rate = _salaryCalc.currentRates[bank];
+            if (rate && rate.buy_rate) {
+                options += '<option value="' + bank + '|' + rate.buy_rate + '">' +
+                          bank + ': ' + rate.buy_rate.toFixed(4) + ' රු</option>';
+            }
+        });
+        return options;
+    }
+
+    function _updateSalarySummary() {
+        var totalUSD = parseFloat(document.getElementById('salaryTotalUSD').value) || 0;
+        var entries = document.querySelectorAll('[data-exchange-id]');
+
+        var totalExchangedUSD = 0;
+        var totalLKR = 0;
+
+        entries.forEach(function (entry) {
+            var id = entry.getAttribute('data-exchange-id');
+            var usdInput = entry.querySelector('.exchange-usd');
+            var rateSelect = entry.querySelector('.exchange-rate-select');
+            var rateManual = entry.querySelector('.exchange-rate-manual');
+
+            var usd = parseFloat(usdInput.value) || 0;
+            var rate = 0;
+
+            if (rateSelect.value && rateSelect.value !== 'manual') {
+                // Format: "BANK|rate"
+                var parts = rateSelect.value.split('|');
+                if (parts.length === 2) {
+                    rate = parseFloat(parts[1]);
+                }
+            } else if (rateSelect.value === 'manual' && rateManual.value) {
+                rate = parseFloat(rateManual.value) || 0;
+            }
+
+            if (usd > 0 && rate > 0) {
+                totalExchangedUSD += usd;
+                totalLKR += usd * rate;
+            }
+        });
+
+        var remainingUSD = totalUSD - totalExchangedUSD;
+        var avgRate = totalExchangedUSD > 0 ? totalLKR / totalExchangedUSD : 0;
+
+        // Update summary
+        document.getElementById('summaryTotalUSD').textContent = '$' + totalUSD.toFixed(2);
+        document.getElementById('summaryTotalLKR').textContent = 'රු ' + totalLKR.toFixed(2);
+        document.getElementById('summaryRemainingUSD').textContent = '$' + remainingUSD.toFixed(2);
+        document.getElementById('summaryAvgRate').textContent = avgRate.toFixed(4);
+
+        // Show warning if amounts don't match
+        var warningMsg = document.getElementById('warningMsg');
+        var warningText = document.getElementById('warningText');
+        if (totalUSD > 0 && Math.abs(remainingUSD) > 0.01) {
+            warningMsg.style.display = 'block';
+            if (remainingUSD > 0) {
+                warningText.textContent = 'You have $' + remainingUSD.toFixed(2) + ' USD remaining (partial save allowed)';
+                warningMsg.className = 'mt-2';
+                warningText.className = 'text-warning';
+                warningText.innerHTML = '<i class="fas fa-info-circle me-1"></i>' + warningText.textContent;
+            } else {
+                warningText.textContent = 'Total exchanges exceed salary by $' + Math.abs(remainingUSD).toFixed(2);
+                warningMsg.className = 'mt-2';
+                warningText.className = 'text-danger';
+                warningText.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i>' + warningText.textContent;
+            }
+        } else {
+            warningMsg.style.display = 'none';
+        }
+    }
+
+    function _updateSaveButtonText() {
+        var saveBtn = document.getElementById('saveCalcBtn');
+        if (saveBtn) {
+            if (_salaryCalc.currentEditId) {
+                saveBtn.innerHTML = '<i class="fas fa-edit me-1"></i>Update Calculation';
+            } else {
+                saveBtn.innerHTML = '<i class="fas fa-save me-1"></i>Save Calculation';
+            }
+        }
+    }
+
+    function _saveSalaryCalculation() {
+        var totalUSD = parseFloat(document.getElementById('salaryTotalUSD').value) || 0;
+        var notes = document.getElementById('salaryNotes').value.trim();
+
+        if (totalUSD <= 0) {
+            showToast('Please enter a valid total USD salary amount', 'warning');
+            return;
+        }
+
+        // Collect exchanges
+        var exchanges = [];
+        var entries = document.querySelectorAll('[data-exchange-id]');
+
+        entries.forEach(function (entry) {
+            var usdInput = entry.querySelector('.exchange-usd');
+            var rateSelect = entry.querySelector('.exchange-rate-select');
+            var rateManual = entry.querySelector('.exchange-rate-manual');
+
+            var usd = parseFloat(usdInput.value) || 0;
+            var rate = 0;
+            var bank = null;
+
+            if (rateSelect.value && rateSelect.value !== 'manual') {
+                var parts = rateSelect.value.split('|');
+                if (parts.length === 2) {
+                    bank = parts[0];
+                    rate = parseFloat(parts[1]);
+                }
+            } else if (rateSelect.value === 'manual' && rateManual.value) {
+                rate = parseFloat(rateManual.value) || 0;
+                bank = 'Manual';
+            }
+
+            if (usd > 0 && rate > 0) {
+                exchanges.push({
+                    usd_amount: usd,
+                    exchange_rate: rate,
+                    bank_source: bank
+                });
+            }
+        });
+
+        if (exchanges.length === 0) {
+            showToast('Please add at least one exchange entry with valid USD amount and rate', 'warning');
+            return;
+        }
+
+        // Check total doesn't exceed salary
+        var totalExchanged = exchanges.reduce(function (sum, ex) { return sum + ex.usd_amount; }, 0);
+        if (totalExchanged > totalUSD) {
+            showToast('Total exchanged USD ($' + totalExchanged.toFixed(2) + ') exceeds total salary ($' + totalUSD.toFixed(2) + ')', 'danger');
+            return;
+        }
+
+        // Save to backend
+        var saveBtn = document.getElementById('saveCalcBtn');
+        saveBtn.disabled = true;
+        var isUpdate = _salaryCalc.currentEditId !== null;
+        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>' + (isUpdate ? 'Updating...' : 'Saving...');
+
+        var requestData = {
+            total_usd: totalUSD,
+            exchanges: exchanges,
+            notes: notes
+        };
+
+        if (isUpdate) {
+            requestData.calculation_id = _salaryCalc.currentEditId;
+        }
+
+        var url = isUpdate ? '/api/salary-calc/update' : '/api/salary-calc/create';
+        var method = isUpdate ? 'PUT' : 'POST';
+
+        fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestData)
+        })
+        .then(function (res) {
+            if (!res.ok) throw new Error('Failed to save calculation');
+            return res.json();
+        })
+        .then(function (data) {
+            console.log('Salary calculation saved:', data);
+            var msg = isUpdate ? 'Calculation updated successfully!' : 'Calculation saved successfully!';
+            var details = 'Total: $' + data.total_usd + ' → රු ' + data.total_lkr.toFixed(2);
+            if (data.is_partial) {
+                details += ' (Partial - $' + data.total_exchanged_usd.toFixed(2) + ' of $' + data.total_usd.toFixed(2) + ' exchanged)';
+            }
+            details += ' • Avg Rate: ' + data.average_rate.toFixed(4);
+            showToast(msg + ' — ' + details, 'success');
+
+            // Reset form
+            document.getElementById('salaryTotalUSD').value = '';
+            document.getElementById('salaryNotes').value = '';
+            document.getElementById('exchangeEntries').innerHTML = '';
+            _salaryCalc.exchanges = [];
+            _salaryCalc.nextExchangeId = 1;
+            _salaryCalc.currentEditId = null;
+            _updateSalarySummary();
+            _updateSaveButtonText();
+            _addExchangeEntry();
+
+            // Reload history
+            _loadSalaryHistory();
+        })
+        .catch(function (err) {
+            console.error('Error saving calculation:', err);
+            showToast('Failed to save calculation: ' + err.message, 'danger');
+        })
+        .finally(function () {
+            saveBtn.disabled = false;
+            _updateSaveButtonText();
+        });
+    }
+
+    window._editSalaryCalc = function(calcId) {
+        // Load calculation into the form for editing
+        fetch('/api/salary-calc/history')
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                var calc = data.calculations.find(function (c) { return c.id === calcId; });
+                if (!calc) {
+                    showToast('Calculation not found', 'danger');
+                    return;
+                }
+
+                // Set edit mode
+                _salaryCalc.currentEditId = calcId;
+
+                // Populate form
+                document.getElementById('salaryTotalUSD').value = calc.total_usd;
+                document.getElementById('salaryNotes').value = calc.notes || '';
+                document.getElementById('exchangeEntries').innerHTML = '';
+                _salaryCalc.nextExchangeId = 1;
+
+                // Add exchanges
+                calc.exchanges.forEach(function (ex) {
+                    _addExchangeEntry();
+                    var lastEntry = document.querySelector('[data-exchange-id]:last-child');
+                    if (!lastEntry) {
+                        var entries = document.querySelectorAll('[data-exchange-id]');
+                        lastEntry = entries[entries.length - 1];
+                    }
+
+                    if (lastEntry) {
+                        var usdInput = lastEntry.querySelector('.exchange-usd');
+                        var rateSelect = lastEntry.querySelector('.exchange-rate-select');
+                        var rateManual = lastEntry.querySelector('.exchange-rate-manual');
+
+                        usdInput.value = ex.usd_amount;
+
+                        // Try to match with current bank rates
+                        var matched = false;
+                        if (ex.bank_source && ex.bank_source !== 'Manual') {
+                            var option = rateSelect.querySelector('option[value="' + ex.bank_source + '|' + ex.exchange_rate + '"]');
+                            if (option) {
+                                rateSelect.value = option.value;
+                                matched = true;
+                            }
+                        }
+
+                        if (!matched) {
+                            rateSelect.value = 'manual';
+                            rateManual.style.display = 'block';
+                            rateManual.value = ex.exchange_rate;
+                        }
+                    }
+                });
+
+                _updateSalarySummary();
+                _updateSaveButtonText();
+
+                // Scroll to top of modal
+                var modalBody = document.querySelector('#salaryCalcModal .modal-body');
+                if (modalBody) modalBody.scrollTop = 0;
+            })
+            .catch(function (err) {
+                console.error('Error loading calculation:', err);
+                showToast('Failed to load calculation', 'danger');
+            });
+    };
+
+    window._deleteSalaryCalc = function(calcId) {
+        showConfirmModal(
+            'Delete Calculation',
+            'Are you sure you want to delete this salary calculation? This action cannot be undone.',
+            function() {
+                fetch('/api/salary-calc/delete?calculation_id=' + calcId, {
+                    method: 'DELETE'
+                })
+                .then(function (res) {
+                    if (!res.ok) throw new Error('Failed to delete');
+                    return res.json();
+                })
+                .then(function () {
+                    showToast('Calculation deleted successfully', 'success');
+                    _loadSalaryHistory();
+                })
+                .catch(function (err) {
+                    console.error('Error deleting calculation:', err);
+                    showToast('Failed to delete calculation', 'danger');
+                });
+            },
+            'Delete',
+            'btn-danger'
+        );
+    };
+
+    function _loadSalaryHistory() {
+        var loadingEl = document.getElementById('salaryHistoryLoading');
+        var emptyEl = document.getElementById('salaryHistoryEmpty');
+        var listEl = document.getElementById('salaryHistoryList');
+
+        loadingEl.style.display = 'block';
+        emptyEl.style.display = 'none';
+        listEl.style.display = 'none';
+
+        fetch('/api/salary-calc/history')
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                loadingEl.style.display = 'none';
+
+                if (!data.calculations || data.calculations.length === 0) {
+                    emptyEl.style.display = 'block';
+                    return;
+                }
+
+                listEl.style.display = 'block';
+                listEl.innerHTML = '';
+
+                data.calculations.forEach(function (calc) {
+                    var card = document.createElement('div');
+                    card.className = 'card mb-2';
+
+                    var calcDate = new Date(calc.calculation_date).toLocaleDateString();
+                    var createdDate = new Date(calc.created_at).toLocaleString();
+
+                    // Calculate if this is a partial calculation
+                    var totalExchanged = calc.exchanges.reduce(function (sum, ex) { return sum + parseFloat(ex.usd_amount); }, 0);
+                    var isPartial = totalExchanged < parseFloat(calc.total_usd);
+                    var partialBadge = isPartial ? '<span class="badge bg-warning text-dark ms-2 d-inline-flex align-items-center" style="height: fit-content;">Partial</span>' : '';
+
+                    var exchangesHtml = '';
+                    calc.exchanges.forEach(function (ex, idx) {
+                        var bankLabel = ex.bank_source || 'Unknown';
+                        exchangesHtml += '<li class="small">$' + ex.usd_amount.toFixed(2) +
+                                       ' @ ' + ex.exchange_rate.toFixed(4) +
+                                       ' (' + bankLabel + ') = රු ' + ex.lkr_amount.toFixed(2) + '</li>';
+                    });
+
+                    card.innerHTML = '\
+                        <div class="card-body p-2">\
+                            <div class="d-flex justify-content-between align-items-start mb-1">\
+                                <div>\
+                                    <strong class="text-primary">$' + calc.total_usd.toFixed(2) + ' → රු ' + calc.total_lkr.toFixed(2) + '</strong>' + partialBadge + '\
+                                    <div class="small text-muted">' + calcDate + '</div>\
+                                </div>\
+                                <div class="d-flex gap-1 align-items-center">\
+                                    <span class="badge bg-info d-inline-flex align-items-center" style="height: fit-content;">Avg: ' + calc.average_rate.toFixed(4) + '</span>\
+                                    <button class="btn btn-sm btn-outline-primary" onclick="window._editSalaryCalc(' + calc.id + ')" title="Edit">\
+                                        <i class="fas fa-edit"></i>\
+                                    </button>\
+                                    <button class="btn btn-sm btn-outline-danger" onclick="window._deleteSalaryCalc(' + calc.id + ')" title="Delete">\
+                                        <i class="fas fa-trash"></i>\
+                                    </button>\
+                                </div>\
+                            </div>\
+                            <div class="small mb-2">\
+                                <strong>Breakdown:</strong>\
+                                <ul class="mb-0 ps-3">' + exchangesHtml + '</ul>\
+                            </div>\
+                            ' + (calc.notes ? '<div class="small text-muted"><i class="fas fa-note-sticky me-1"></i>' + calc.notes + '</div>' : '') + '\
+                            <div class="small text-muted mt-1"><i class="fas fa-clock me-1"></i>Created: ' + createdDate + '</div>\
+                        </div>\
+                    ';
+
+                    listEl.appendChild(card);
+                });
+            })
+            .catch(function (err) {
+                console.error('Error loading history:', err);
+                loadingEl.style.display = 'none';
+                emptyEl.style.display = 'block';
+            });
     }
 
 })();

@@ -546,7 +546,7 @@ def register_report_routes(app, login_required):
             cursor = connection.cursor(dictionary=True)
             try:
                 user_id = session['user_id']
-
+                
                 # Get all years with month-by-month breakdown
                 cursor.execute("""
                                SELECT mr.year,

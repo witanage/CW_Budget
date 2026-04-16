@@ -8,6 +8,24 @@
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
+            <style>
+                /* Make placeholder text visible in dark theme */
+                #salaryCalcModal input::placeholder,
+                #salaryCalcModal textarea::placeholder {
+                    color: #888 !important;
+                    opacity: 1 !important;
+                }
+                #salaryCalcModal input::-webkit-input-placeholder,
+                #salaryCalcModal textarea::-webkit-input-placeholder {
+                    color: #888 !important;
+                    opacity: 1 !important;
+                }
+                #salaryCalcModal input::-moz-placeholder,
+                #salaryCalcModal textarea::-moz-placeholder {
+                    color: #888 !important;
+                    opacity: 1 !important;
+                }
+            </style>
             <div class="modal-body">
                 <div class="row">
                     <!-- Left Panel: Calculator -->
@@ -32,7 +50,7 @@
                                 <div class="mb-3">
                                     <label class="form-label d-flex justify-content-between align-items-center">
                                         <span>Exchange Breakdown</span>
-                                        <button type="button" class="btn btn-sm btn-outline-primary" id="addExchangeBtn">
+                                        <button type="button" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center" id="addExchangeBtn">
                                             <i class="fas fa-plus me-1"></i>Add Exchange
                                         </button>
                                     </label>
@@ -80,7 +98,7 @@
                                 </div>
 
                                 <!-- Save Button -->
-                                <button type="button" class="btn btn-primary w-100" id="saveCalcBtn">
+                                <button type="button" class="btn btn-primary w-100 d-inline-flex align-items-center justify-content-center" id="saveCalcBtn">
                                     <i class="fas fa-save me-1"></i>Save Calculation
                                 </button>
                             </div>
@@ -118,7 +136,7 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-secondary d-inline-flex align-items-center" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>

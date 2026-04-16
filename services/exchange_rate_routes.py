@@ -60,7 +60,7 @@ def refresh_all_exchange_rates(force=False):
                 ORDER BY created_at DESC
             """)
             rows = cursor.fetchall()
-
+            
             # Get the most recent rate for each source (first occurrence due to ORDER BY DESC)
             seen_sources = set()
             for row in rows:
@@ -72,7 +72,7 @@ def refresh_all_exchange_rates(force=False):
                         'timestamp': row['created_at']
                     }
                     seen_sources.add(source)
-
+            
             cursor.close()
             connection.close()
             logger.info(f"Previous rates from refresh logs: {previous_rates}")
@@ -90,19 +90,19 @@ def refresh_all_exchange_rates(force=False):
             hnb_ms = int((time.time() - hnb_start) * 1000)
             if hnb_rate:
                 logger.info(f"Scheduler: HNB rate updated: Buy={hnb_rate['buy_rate']}, Sell={hnb_rate['sell_rate']}")
-
+                
                 # Compute deltas
                 prev = previous_rates.get('HNB')
                 buy_change = None
                 sell_change = None
                 changed = False
                 is_new = prev is None
-
+                
                 if prev:
                     buy_change = round(float(hnb_rate['buy_rate']) - prev['buy_rate'], 4)
                     sell_change = round(float(hnb_rate['sell_rate']) - prev['sell_rate'], 4)
                     changed = (buy_change != 0)
-
+                
                 log_exchange_rate_refresh('HNB', 'success',
                                           buy_rate=hnb_rate['buy_rate'],
                                           sell_rate=hnb_rate['sell_rate'],
@@ -142,19 +142,19 @@ def refresh_all_exchange_rates(force=False):
             pb_ms = int((time.time() - pb_start) * 1000)
             if pb_rate:
                 logger.info(f"Scheduler: PB rate updated: Buy={pb_rate['buy_rate']}, Sell={pb_rate['sell_rate']}")
-
+                
                 # Compute deltas
                 prev = previous_rates.get('PB')
                 buy_change = None
                 sell_change = None
                 changed = False
                 is_new = prev is None
-
+                
                 if prev:
                     buy_change = round(float(pb_rate['buy_rate']) - prev['buy_rate'], 4)
                     sell_change = round(float(pb_rate['sell_rate']) - prev['sell_rate'], 4)
                     changed = (buy_change != 0)
-
+                
                 log_exchange_rate_refresh('PB', 'success',
                                           buy_rate=pb_rate['buy_rate'],
                                           sell_rate=pb_rate['sell_rate'],
@@ -195,19 +195,19 @@ def refresh_all_exchange_rates(force=False):
             if sampath_rate:
                 logger.info(
                     f"Scheduler: Sampath rate updated: Buy={sampath_rate['buy_rate']}, Sell={sampath_rate['sell_rate']}")
-
+                
                 # Compute deltas
                 prev = previous_rates.get('SAMPATH')
                 buy_change = None
                 sell_change = None
                 changed = False
                 is_new = prev is None
-
+                
                 if prev:
                     buy_change = round(float(sampath_rate['buy_rate']) - prev['buy_rate'], 4)
                     sell_change = round(float(sampath_rate['sell_rate']) - prev['sell_rate'], 4)
                     changed = (buy_change != 0)
-
+                
                 log_exchange_rate_refresh('SAMPATH', 'success',
                                           buy_rate=sampath_rate['buy_rate'],
                                           sell_rate=sampath_rate['sell_rate'],
@@ -248,19 +248,19 @@ def refresh_all_exchange_rates(force=False):
             if cbsl_rate:
                 logger.info(
                     f"Scheduler: CBSL rate for today: Buy={cbsl_rate['buy_rate']}, Sell={cbsl_rate['sell_rate']}")
-
+                
                 # Compute deltas
                 prev = previous_rates.get('CBSL')
                 buy_change = None
                 sell_change = None
                 changed = False
                 is_new = prev is None
-
+                
                 if prev:
                     buy_change = round(float(cbsl_rate['buy_rate']) - prev['buy_rate'], 4)
                     sell_change = round(float(cbsl_rate['sell_rate']) - prev['sell_rate'], 4)
                     changed = (buy_change != 0)
-
+                
                 log_exchange_rate_refresh('CBSL', 'success',
                                           buy_rate=cbsl_rate['buy_rate'],
                                           sell_rate=cbsl_rate['sell_rate'],
@@ -317,15 +317,15 @@ def refresh_all_exchange_rates(force=False):
         r.get('status') == 'success' and r.get('changed', False)
         for r in results.values()
     )
-
+    
     logger.info(f"Exchange rate refresh completed — changes_detected: {changes_detected}, results: {results}")
-
+    
     # Send notifications to users if any changes detected
     try:
         send_rate_change_notifications(results)
     except Exception as e:
         logger.error(f"Error sending notifications: {str(e)}")
-
+    
     return results
 
 
@@ -764,7 +764,7 @@ def refresh_all_rates_manually(log_audit_func):
             r.get('status') == 'success' and r.get('changed', False)
             for r in results.values()
         )
-
+        
         # Build changes summary
         changes_summary = []
         for bank in ['HNB', 'PB', 'SAMPATH', 'CBSL']:
@@ -1420,7 +1420,7 @@ def get_intraday_refresh_logs():
 def create_salary_calculation():
     """
     Create a new salary calculation with exchange breakdown.
-
+    
     Request Body (JSON):
         total_usd: Total USD salary amount
         exchanges: Array of exchange objects with:
@@ -1428,7 +1428,7 @@ def create_salary_calculation():
             - exchange_rate: LKR rate used
             - bank_source: Bank name (optional)
         notes: Optional notes for this calculation
-
+    
     Returns:
         JSON with the created calculation ID and summary
     """
@@ -1459,13 +1459,13 @@ def create_salary_calculation():
         for ex in exchanges:
             if 'usd_amount' not in ex or 'exchange_rate' not in ex:
                 return jsonify({'error': 'Each exchange must have usd_amount and exchange_rate'}), 400
-
+            
             usd_amt = Decimal(str(ex['usd_amount']))
             rate = Decimal(str(ex['exchange_rate']))
-
+            
             if usd_amt <= 0 or rate <= 0:
                 return jsonify({'error': 'All amounts and rates must be greater than 0'}), 400
-
+            
             total_exchanged_usd += usd_amt
             total_lkr += usd_amt * rate
 
@@ -1486,7 +1486,7 @@ def create_salary_calculation():
                 (user_id, total_usd, total_lkr, average_rate, calculation_date, notes)
                 VALUES (%s, %s, %s, %s, CURDATE(), %s)
             """, (user_id, total_usd, float(total_lkr), float(average_rate), notes))
-
+            
             calculation_id = cursor.lastrowid
 
             # Insert exchange breakdown
@@ -1532,7 +1532,7 @@ def create_salary_calculation():
 def get_salary_calculations():
     """
     Get all salary calculations for the current user with exchange breakdown.
-
+    
     Returns:
         JSON array of calculations with their exchange details
     """
@@ -1559,7 +1559,7 @@ def get_salary_calculations():
                 ORDER BY calculation_date DESC, created_at DESC
                 LIMIT 50
             """, (user_id,))
-
+            
             calculations = cursor.fetchall()
 
             # For each calculation, get the exchange breakdown
@@ -1575,9 +1575,9 @@ def get_salary_calculations():
                     WHERE calculation_id = %s
                     ORDER BY exchange_order
                 """, (calc['id'],))
-
+                
                 calc['exchanges'] = cursor.fetchall()
-
+                
                 # Format dates for JSON serialization
                 if calc['calculation_date']:
                     calc['calculation_date'] = calc['calculation_date'].isoformat()
@@ -1602,7 +1602,7 @@ def get_current_bank_rates():
     """
     Get the most recent exchange rates from all banks.
     Used by the salary calculator to populate rate dropdowns.
-
+    
     Returns:
         JSON object with current rates for each bank
     """
@@ -1622,7 +1622,7 @@ def get_current_bank_rates():
                   AND source IN ('HNB', 'PB', 'SAMPATH')
                 ORDER BY source
             """)
-
+            
             today_rates = cursor.fetchall()
 
             # If no rates for today, get the most recent rates
@@ -1671,13 +1671,13 @@ def update_salary_calculation():
     """
     Update an existing salary calculation with new exchanges.
     Can be used to add more exchanges to a partial calculation.
-
+    
     Request Body (JSON):
         calculation_id: ID of the calculation to update
         total_usd: Updated total USD salary amount (optional, keeps original if not provided)
         exchanges: Complete array of exchange objects (replaces all existing exchanges)
         notes: Updated notes (optional, keeps original if not provided)
-
+    
     Returns:
         JSON with the updated calculation summary
     """
@@ -1703,11 +1703,11 @@ def update_salary_calculation():
                 FROM salary_calculations 
                 WHERE id = %s
             """, (calculation_id,))
-
+            
             existing = cursor.fetchone()
             if not existing:
                 return jsonify({'error': 'Calculation not found'}), 404
-
+            
             if existing['user_id'] != user_id:
                 return jsonify({'error': 'Unauthorized'}), 403
 
@@ -1726,13 +1726,13 @@ def update_salary_calculation():
             for ex in exchanges:
                 if 'usd_amount' not in ex or 'exchange_rate' not in ex:
                     return jsonify({'error': 'Each exchange must have usd_amount and exchange_rate'}), 400
-
+                
                 usd_amt = Decimal(str(ex['usd_amount']))
                 rate = Decimal(str(ex['exchange_rate']))
-
+                
                 if usd_amt <= 0 or rate <= 0:
                     return jsonify({'error': 'All amounts and rates must be greater than 0'}), 400
-
+                
                 total_exchanged_usd += usd_amt
                 total_lkr += usd_amt * rate
 
@@ -1797,10 +1797,10 @@ def update_salary_calculation():
 def delete_salary_calculation():
     """
     Delete a salary calculation.
-
+    
     URL Parameter:
         calculation_id: ID of the calculation to delete
-
+    
     Returns:
         JSON with success message
     """
@@ -1820,11 +1820,11 @@ def delete_salary_calculation():
             cursor.execute("""
                 SELECT user_id FROM salary_calculations WHERE id = %s
             """, (calculation_id,))
-
+            
             existing = cursor.fetchone()
             if not existing:
                 return jsonify({'error': 'Calculation not found'}), 404
-
+            
             if existing['user_id'] != user_id:
                 return jsonify({'error': 'Unauthorized'}), 403
 
