@@ -75,6 +75,9 @@ class BackupService:
         db_name = DB_CONFIG['database']
         output = io.StringIO()
 
+        # Ensure SHOW CREATE TABLE uses backtick-quoted identifiers (not ANSI double quotes)
+        cursor.execute("SET SESSION sql_mode = REPLACE(REPLACE(@@sql_mode, 'ANSI_QUOTES', ''), 'ANSI', '')")
+
         # Get MySQL version
         cursor.execute("SELECT VERSION()")
         mysql_version = cursor.fetchone()[0]
