@@ -381,8 +381,8 @@ class BackupService:
         """
         # Check Google Drive availability
         if not self.drive_service.is_available():
-            msg = ("Google Drive backup not configured. Set GOOGLE_DRIVE_BACKUP_FOLDER_ID "
-                   "and GOOGLE_DRIVE_SA_KEY_PATH (or GOOGLE_DRIVE_SA_KEY_JSON) in .env")
+            msg = ("Google Drive backup not configured. Set google_drive_backup_folder_id "
+                   "and Google OAuth credentials in Admin → Settings")
             logger.error("Backup aborted: %s", msg)
             return False, msg
 

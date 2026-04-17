@@ -157,34 +157,13 @@ def add_header(response):
 # ---------------------------------------------------------------------------
 # Database connection pool (centralised in db.py)
 # ---------------------------------------------------------------------------
-from db import get_db_connection, DB_CONFIG  # noqa: E402
+from db import get_db_connection, DB_CONFIG, get_setting  # noqa: E402
 
 if DB_CONFIG is None:
     logger.warning(
         "Database is NOT configured. The application will start but all "
         "database operations will fail. Copy .env.example to .env and fill "
         "in your database credentials, then restart the application.")
-
-
-def get_setting(key, default=None):
-    """Read a single value from the app_settings table. Returns *default* when
-    the table does not exist yet, the key is missing, or the DB is unreachable."""
-    connection = get_db_connection()
-    if not connection:
-        return default
-    cursor = None
-    try:
-        cursor = connection.cursor(dictionary=True)
-        cursor.execute("SELECT value FROM app_settings WHERE setting_key = %s", (key,))
-        row = cursor.fetchone()
-        return row['value'] if row else default
-    except Exception as e:
-        logger.warning(f"get_setting('{key}'): {e} — using default {default}")
-        return default
-    finally:
-        if cursor:
-            cursor.close()
-        connection.close()
 
 
 def log_audit(admin_user_id, action, target_user_id=None, details=None):

@@ -111,3 +111,34 @@ def get_db_connection():
 
     logger.error("All connection attempts failed: %s", last_err)
     return None
+
+
+# ---------------------------------------------------------------------------
+# App-settings helper (lives here to avoid circular imports with app.py)
+# ---------------------------------------------------------------------------
+
+
+def get_setting(key, default=None):
+    """Read a single value from the app_settings table.
+
+    Returns *default* when the table does not exist yet, the key is missing,
+    or the DB is unreachable.
+    """
+    connection = get_db_connection()
+    if not connection:
+        return default
+    cursor = None
+    try:
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute(
+            "SELECT value FROM app_settings WHERE setting_key = %s", (key,)
+        )
+        row = cursor.fetchone()
+        return row['value'] if row else default
+    except Exception as e:
+        logger.warning("get_setting('%s'): %s — using default %s", key, e, default)
+        return default
+    finally:
+        if cursor:
+            cursor.close()
+        connection.close()

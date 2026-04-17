@@ -428,6 +428,16 @@
                             Fetch fresh rates from HNB, People's Bank, and CBSL on demand.
                         </span>
                     </div>
+
+                    <!-- Google Drive Re-authorize -->
+                    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 15px;">
+                        <button class="btn-sm btn-warning" id="reauthorizeGoogleBtn" onclick="reauthorizeGoogleDrive()">
+                            <i class="fab fa-google-drive"></i> Re-authorize Google Drive
+                        </button>
+                        <span style="color: var(--text-secondary); font-size: 0.9rem;">
+                            Refresh the OAuth token if Google Drive uploads have stopped working.
+                        </span>
+                    </div>
                 </div>
             </div>
 
@@ -1440,12 +1450,15 @@
                 throw new Error('Failed to load settings');
             }
 
-            if (settings.length === 0) {
+            // Filter out Google Drive keys — managed via DB only, not exposed in UI
+            const visibleSettings = settings.filter(s => !s.setting_key.startsWith('google_drive_'));
+
+            if (visibleSettings.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="4" class="text-center" style="color: var(--text-secondary);">No settings found</td></tr>';
                 return;
             }
 
-            tbody.innerHTML = settings.map(setting => {
+            tbody.innerHTML = visibleSettings.map(setting => {
                 const settingKey = setting.setting_key;
                 const settingValue = setting.value;
                 const description = setting.description || 'No description';
@@ -1516,6 +1529,33 @@
             console.error('Error updating setting:', error);
             showAlert('Network error: ' + error.message, 'danger');
             loadSettings(); // Reload to reset value
+        }
+    }
+
+    // ── Google Drive Re-authorization ────────────────────────────
+    async function reauthorizeGoogleDrive() {
+        const btn = document.getElementById('reauthorizeGoogleBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Preparing…';
+
+        try {
+            const response = await fetch('/api/admin/google-drive/auth-url');
+            const data = await response.json();
+
+            if (!response.ok) {
+                showAlert(data.error || 'Failed to generate authorization URL', 'danger');
+                return;
+            }
+
+            // Open Google consent screen in a new tab
+            window.open(data.auth_url, '_blank');
+            showAlert('Google authorization page opened in a new tab. Complete the consent flow there.', 'info');
+        } catch (error) {
+            console.error('Error starting Google re-authorization:', error);
+            showAlert('Network error: ' + error.message, 'danger');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fab fa-google-drive"></i> Re-authorize Google Drive';
         }
     }
 

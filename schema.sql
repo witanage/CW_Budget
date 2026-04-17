@@ -436,7 +436,17 @@ INSERT IGNORE INTO app_settings (setting_key, value, description) VALUES
 ('bill_upload_mode', 'sequential',
  'Bill image upload strategy: sequential = one-by-one (Vercel-friendly), batch = all at once (non-Vercel)'),
 ('ntfy_topic', '',
- 'Global ntfy.sh topic name for exchange rate push notifications (leave empty to disable)');
+ 'Global ntfy.sh topic name for exchange rate push notifications (leave empty to disable)'),
+('google_drive_client_id', '',
+ 'Google OAuth 2.0 Client ID for Drive API access'),
+('google_drive_client_secret', '',
+ 'Google OAuth 2.0 Client Secret'),
+('google_drive_refresh_token', '',
+ 'Google OAuth 2.0 Refresh Token (from one-time consent flow)'),
+('google_drive_backup_folder_id', '',
+ 'Google Drive folder ID for database backups'),
+('google_drive_bills_folder_id', '',
+ 'Google Drive folder ID for bill attachment storage');
 
 -- ============================================================
 -- Exchange-Rate Refresh Logs Table

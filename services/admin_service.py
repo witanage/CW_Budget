@@ -21,13 +21,13 @@ import calendar
 from datetime import datetime
 from decimal import Decimal
 
-from flask import request, jsonify, session, render_template
+from flask import redirect, request, jsonify, session, render_template
 from mysql.connector import Error
 
 from db import get_db_connection
-from services.google_drive_file_service import get_google_drive_file_service
+from services.google_drive_file_service import get_google_drive_file_service, reset_google_drive_file_service
 from services.backup_service import get_backup_service
-from services.google_drive_backup_service import get_google_drive_backup_service
+from services.google_drive_backup_service import get_google_drive_backup_service, reset_google_drive_backup_service
 
 logger = logging.getLogger(__name__)
 
@@ -479,9 +479,14 @@ def register_admin_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN):
             cursor.execute("UPDATE app_settings SET value = %s WHERE setting_key = %s", (new_value, key))
             connection.commit()
 
+            # Reset Google Drive singletons when their credentials change
+            if key.startswith('google_drive_'):
+                reset_google_drive_backup_service()
+                reset_google_drive_file_service()
+
             username = session.get('username')
-            logger.info(f"Admin setting updated: {key} = {new_value} (by {username})")
-            log_audit(session['user_id'], 'UPDATE_SETTING', details=f'{key} = {new_value}')
+            logger.info(f"Admin setting updated: {key} (by {username})")
+            log_audit(session['user_id'], 'UPDATE_SETTING', details=f'{key} updated')
 
             return jsonify({'message': 'Setting updated', 'key': key, 'value': new_value}), 200
         except Error as e:
@@ -490,6 +495,128 @@ def register_admin_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN):
         finally:
             cursor.close()
             connection.close()
+
+    # ------------------------------------------------------------------
+    # Google Drive OAuth re-authorization flow
+    # ------------------------------------------------------------------
+
+    GOOGLE_DRIVE_SCOPES = ['https://www.googleapis.com/auth/drive.file']
+
+    @app.route('/api/admin/google-drive/auth-url', methods=['GET'])
+    @admin_required
+    @limiter.limit(RATE_LIMIT_ADMIN)
+    def google_drive_auth_url():
+        """Generate the Google OAuth 2.0 authorization URL.
+
+        The admin clicks this to start the consent flow in a new tab.
+        After consent Google redirects back to /api/admin/google-drive/callback.
+        """
+        from db import get_setting as _gs
+
+        client_id = _gs('google_drive_client_id', '')
+        if not client_id:
+            return jsonify({'error': 'google_drive_client_id is not configured in Settings'}), 400
+
+        # Build the redirect URI from the current request's host
+        redirect_uri = request.url_root.rstrip('/') + '/api/admin/google-drive/callback'
+
+        from urllib.parse import urlencode
+        params = urlencode({
+            'client_id': client_id,
+            'redirect_uri': redirect_uri,
+            'response_type': 'code',
+            'scope': ' '.join(GOOGLE_DRIVE_SCOPES),
+            'access_type': 'offline',
+            'prompt': 'consent',         # force new refresh token
+        })
+        auth_url = f'https://accounts.google.com/o/oauth2/v2/auth?{params}'
+        return jsonify({'auth_url': auth_url}), 200
+
+    @app.route('/api/admin/google-drive/callback')
+    @admin_required
+    def google_drive_oauth_callback():
+        """Handle the OAuth 2.0 callback from Google.
+
+        Exchanges the authorization code for tokens and saves the new
+        refresh_token into app_settings, then redirects back to Admin.
+        """
+        import requests as http_requests
+        from db import get_setting as _gs
+
+        error = request.args.get('error')
+        if error:
+            logger.warning("Google OAuth callback error: %s", error)
+            return render_template('error.html',
+                                   error_title='Google Authorization Failed',
+                                   error_message=f'Google returned an error: {error}'), 400
+
+        code = request.args.get('code')
+        if not code:
+            return render_template('error.html',
+                                   error_title='Missing Authorization Code',
+                                   error_message='No authorization code received from Google.'), 400
+
+        client_id = _gs('google_drive_client_id', '')
+        client_secret = _gs('google_drive_client_secret', '')
+        redirect_uri = request.url_root.rstrip('/') + '/api/admin/google-drive/callback'
+
+        # Exchange code for tokens
+        try:
+            resp = http_requests.post('https://oauth2.googleapis.com/token', data={
+                'code': code,
+                'client_id': client_id,
+                'client_secret': client_secret,
+                'redirect_uri': redirect_uri,
+                'grant_type': 'authorization_code',
+            }, timeout=15)
+            token_data = resp.json()
+
+            if resp.status_code != 200 or 'error' in token_data:
+                err_desc = token_data.get('error_description', token_data.get('error', 'Unknown error'))
+                logger.error("Google token exchange failed: %s", err_desc)
+                return render_template('error.html',
+                                       error_title='Token Exchange Failed',
+                                       error_message=f'Google token exchange error: {err_desc}'), 400
+
+            new_refresh_token = token_data.get('refresh_token')
+            if not new_refresh_token:
+                return render_template('error.html',
+                                       error_title='No Refresh Token',
+                                       error_message='Google did not return a refresh token. '
+                                                      'Try revoking app access at myaccount.google.com/permissions and retry.'), 400
+
+            # Persist the new refresh token
+            connection = get_db_connection()
+            if not connection:
+                return render_template('error.html',
+                                       error_title='Database Error',
+                                       error_message='Could not connect to database to save the token.'), 500
+            cursor = connection.cursor()
+            try:
+                cursor.execute(
+                    "UPDATE app_settings SET value = %s WHERE setting_key = 'google_drive_refresh_token'",
+                    (new_refresh_token,))
+                connection.commit()
+            finally:
+                cursor.close()
+                connection.close()
+
+            # Reset cached singletons so they pick up the new token
+            reset_google_drive_backup_service()
+            reset_google_drive_file_service()
+
+            log_audit(session['user_id'], 'UPDATE_SETTING',
+                      details='google_drive_refresh_token refreshed via OAuth')
+            logger.info("Google Drive refresh token updated by %s", session.get('username'))
+
+            # Redirect back to admin settings page
+            return redirect('/admin')
+
+        except http_requests.RequestException as e:
+            logger.error("Google token exchange request failed: %s", e, exc_info=True)
+            return render_template('error.html',
+                                   error_title='Network Error',
+                                   error_message=f'Could not reach Google token endpoint: {e}'), 502
 
     @app.route('/api/admin/trigger-backup', methods=['GET'])
     def trigger_db_backup():

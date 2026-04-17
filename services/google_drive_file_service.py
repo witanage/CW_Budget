@@ -3,7 +3,7 @@ Google Drive File Service
 
 Handles all file operations with Google Drive for bill attachment storage.
 Reuses the same OAuth 2.0 credentials as the backup service but targets a
-separate folder (GOOGLE_DRIVE_BILLS_FOLDER_ID).
+separate folder (google_drive_bills_folder_id in app_settings).
 
 - Upload files (bill images and PDFs)
 - Download files
@@ -18,6 +18,8 @@ import ssl
 import tempfile
 import threading
 from typing import Dict, Optional, Tuple
+
+from db import get_setting
 
 logger = logging.getLogger(__name__)
 
@@ -51,10 +53,10 @@ class GoogleDriveFileService:
     _MAX_RETRIES = 2
 
     def __init__(self):
-        self.folder_id = os.environ.get('GOOGLE_DRIVE_BILLS_FOLDER_ID')
-        self._client_id = os.environ.get('GOOGLE_DRIVE_CLIENT_ID')
-        self._client_secret = os.environ.get('GOOGLE_DRIVE_CLIENT_SECRET')
-        self._refresh_token = os.environ.get('GOOGLE_DRIVE_REFRESH_TOKEN')
+        self.folder_id = get_setting('google_drive_bills_folder_id')
+        self._client_id = get_setting('google_drive_client_id')
+        self._client_secret = get_setting('google_drive_client_secret')
+        self._refresh_token = get_setting('google_drive_refresh_token')
         self._local = threading.local()
 
     def is_available(self) -> bool:
@@ -294,3 +296,9 @@ def get_google_drive_file_service() -> GoogleDriveFileService:
     if _google_drive_file_service is None:
         _google_drive_file_service = GoogleDriveFileService()
     return _google_drive_file_service
+
+
+def reset_google_drive_file_service():
+    """Discard the cached singleton so the next call re-reads credentials from DB."""
+    global _google_drive_file_service
+    _google_drive_file_service = None

@@ -2,15 +2,16 @@
 Google Drive Backup Service
 
 Uploads database backup files to Google Drive using OAuth 2.0 credentials.
-Requires:
-  - GOOGLE_DRIVE_BACKUP_FOLDER_ID: Target folder ID in Google Drive
-  - GOOGLE_DRIVE_CLIENT_ID: OAuth 2.0 Client ID
-  - GOOGLE_DRIVE_CLIENT_SECRET: OAuth 2.0 Client Secret
-  - GOOGLE_DRIVE_REFRESH_TOKEN: OAuth 2.0 Refresh Token (from one-time consent)
+Credentials are stored in the app_settings table (not environment variables):
+  - google_drive_backup_folder_id: Target folder ID in Google Drive
+  - google_drive_client_id: OAuth 2.0 Client ID
+  - google_drive_client_secret: OAuth 2.0 Client Secret
+  - google_drive_refresh_token: OAuth 2.0 Refresh Token (from one-time consent)
 """
 
 import logging
-import os
+
+from db import get_setting
 
 logger = logging.getLogger(__name__)
 
@@ -31,10 +32,10 @@ class GoogleDriveBackupService:
     """Service for uploading backup files to Google Drive."""
 
     def __init__(self):
-        self.folder_id = os.environ.get('GOOGLE_DRIVE_BACKUP_FOLDER_ID')
-        self._client_id = os.environ.get('GOOGLE_DRIVE_CLIENT_ID')
-        self._client_secret = os.environ.get('GOOGLE_DRIVE_CLIENT_SECRET')
-        self._refresh_token = os.environ.get('GOOGLE_DRIVE_REFRESH_TOKEN')
+        self.folder_id = get_setting('google_drive_backup_folder_id')
+        self._client_id = get_setting('google_drive_client_id')
+        self._client_secret = get_setting('google_drive_client_secret')
+        self._refresh_token = get_setting('google_drive_refresh_token')
         self._service = None
 
     def is_available(self):
@@ -250,3 +251,9 @@ def get_google_drive_backup_service():
     if _google_drive_backup_service is None:
         _google_drive_backup_service = GoogleDriveBackupService()
     return _google_drive_backup_service
+
+
+def reset_google_drive_backup_service():
+    """Discard the cached singleton so the next call re-reads credentials from DB."""
+    global _google_drive_backup_service
+    _google_drive_backup_service = None
