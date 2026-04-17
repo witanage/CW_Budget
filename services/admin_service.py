@@ -530,7 +530,7 @@ def register_admin_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN):
             'prompt': 'consent',         # force new refresh token
         })
         auth_url = f'https://accounts.google.com/o/oauth2/v2/auth?{params}'
-        return jsonify({'auth_url': auth_url}), 200
+        return jsonify({'auth_url': auth_url, 'redirect_uri': redirect_uri}), 200
 
     @app.route('/api/admin/google-drive/callback')
     @admin_required

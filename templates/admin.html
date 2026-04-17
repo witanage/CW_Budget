@@ -1549,7 +1549,12 @@
 
             // Open Google consent screen in a new tab
             window.open(data.auth_url, '_blank');
-            showAlert('Google authorization page opened in a new tab. Complete the consent flow there.', 'info');
+            showAlert(
+                'Google authorization page opened in a new tab. If you get a <strong>redirect_uri_mismatch</strong> error, ' +
+                'add this URI to your Google Cloud Console → Credentials → Authorized redirect URIs:<br>' +
+                '<code>' + data.redirect_uri + '</code>',
+                'info'
+            );
         } catch (error) {
             console.error('Error starting Google re-authorization:', error);
             showAlert('Network error: ' + error.message, 'danger');
