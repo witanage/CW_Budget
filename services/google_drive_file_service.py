@@ -53,16 +53,20 @@ class GoogleDriveFileService:
     _MAX_RETRIES = 2
 
     def __init__(self):
+        self._local = threading.local()
+
+    def _load_settings(self):
+        """Read current credentials and folder ID from the database."""
         self.folder_id = get_setting('google_drive_bills_folder_id')
         self._client_id = get_setting('google_drive_client_id')
         self._client_secret = get_setting('google_drive_client_secret')
         self._refresh_token = get_setting('google_drive_refresh_token')
-        self._local = threading.local()
 
     def is_available(self) -> bool:
         """Check if Google Drive file storage is properly configured."""
         if not GOOGLE_DRIVE_AVAILABLE:
             return False
+        self._load_settings()
         if not self.folder_id:
             return False
         if not all([self._client_id, self._client_secret, self._refresh_token]):
