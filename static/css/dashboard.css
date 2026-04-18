@@ -999,6 +999,144 @@ tr[draggable="true"] {
     padding: 1rem;
 }
 
+/* ===================================
+   INTELLIJ-STYLE DARK THEME
+   Save Calculation Card
+   =================================== */
+
+/* IntelliJ Darcula-inspired dark theme for save calculation section */
+#saveCalculationCard.intellij-dark {
+    background-color: #2B2B2B !important;
+    border: 1px solid #323232 !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+}
+
+#saveCalculationCard.intellij-dark .card-header {
+    background-color: #3C3F41 !important;
+    border-bottom: 1px solid #323232 !important;
+    color: #BBB !important;
+}
+
+#saveCalculationCard.intellij-dark .card-header h6 {
+    color: #BBB !important;
+    font-weight: 600;
+}
+
+#saveCalculationCard.intellij-dark .card-header i {
+    color: #6897BB !important;
+}
+
+#saveCalculationCard.intellij-dark .card-body {
+    background-color: #2B2B2B !important;
+    color: #A9B7C6 !important;
+}
+
+#saveCalculationCard.intellij-dark .form-label {
+    color: #BBB !important;
+    font-weight: 500;
+}
+
+#saveCalculationCard.intellij-dark .form-control {
+    background-color: #45494A !important;
+    border: 1px solid #555 !important;
+    color: #A9B7C6 !important;
+}
+
+#saveCalculationCard.intellij-dark .form-control:focus {
+    background-color: #4E5254 !important;
+    border-color: #6897BB !important;
+    box-shadow: 0 0 0 3px rgba(104, 151, 187, 0.25) !important;
+    color: #A9B7C6 !important;
+}
+
+#saveCalculationCard.intellij-dark .form-control::placeholder {
+    color: #787878 !important;
+}
+
+/* Info card inside */
+#saveCalculationCard.intellij-dark .card.bg-light {
+    background-color: #313335 !important;
+    border: 1px solid #3C3F41 !important;
+}
+
+#saveCalculationCard.intellij-dark .card.bg-light .card-body {
+    background-color: #313335 !important;
+}
+
+#saveCalculationCard.intellij-dark .form-check-label {
+    color: #A9B7C6 !important;
+}
+
+#saveCalculationCard.intellij-dark .form-check-label strong {
+    color: #CCC !important;
+}
+
+#saveCalculationCard.intellij-dark .text-muted,
+#saveCalculationCard.intellij-dark small {
+    color: #787878 !important;
+}
+
+#saveCalculationCard.intellij-dark .form-check-input {
+    background-color: #45494A !important;
+    border-color: #555 !important;
+}
+
+#saveCalculationCard.intellij-dark .form-check-input:checked {
+    background-color: #6897BB !important;
+    border-color: #6897BB !important;
+}
+
+#saveCalculationCard.intellij-dark .form-check-input:focus {
+    border-color: #6897BB !important;
+    box-shadow: 0 0 0 3px rgba(104, 151, 187, 0.25) !important;
+}
+
+/* Buttons in IntelliJ theme */
+#saveCalculationCard.intellij-dark .btn-primary {
+    background-color: #365880 !important;
+    border-color: #365880 !important;
+    color: #FFF !important;
+}
+
+#saveCalculationCard.intellij-dark .btn-primary:hover {
+    background-color: #4A688C !important;
+    border-color: #4A688C !important;
+}
+
+#saveCalculationCard.intellij-dark .btn-success {
+    background-color: #5C8C5C !important;
+    border-color: #5C8C5C !important;
+    color: #FFF !important;
+}
+
+#saveCalculationCard.intellij-dark .btn-success:hover {
+    background-color: #6FA46F !important;
+    border-color: #6FA46F !important;
+}
+
+#saveCalculationCard.intellij-dark .btn-outline-success {
+    background-color: #2B2B2B !important;
+    border-color: #5C8C5C !important;
+    color: #5C8C5C !important;
+}
+
+#saveCalculationCard.intellij-dark .btn-outline-success:hover {
+    background-color: #5C8C5C !important;
+    border-color: #5C8C5C !important;
+    color: #FFF !important;
+}
+
+/* Border variants for editing mode */
+#saveCalculationCard.intellij-dark.border-primary {
+    border-color: #6897BB !important;
+    border-width: 2px !important;
+}
+
+#saveCalculationCard.intellij-dark.border-success {
+    border-color: #5C8C5C !important;
+    border-width: 2px !important;
+}
+
 #billContentModal .modal-footer {
     flex-shrink: 0;
 }

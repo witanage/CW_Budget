@@ -550,9 +550,13 @@ def sidebar_summary():
 
                 tax_calc = cursor.fetchone()
                 if tax_calc:
+                    logger.info(
+                        f"Found active tax calculation: ID={tax_calc['id']}, Year={tax_calc['assessment_year']}, Name={tax_calc['calculation_name']}")
+
                     # Parse monthly_data to calculate quarterly payment
                     import json
                     monthly_data = json.loads(tax_calc['monthly_data']) if tax_calc.get('monthly_data') else []
+                    logger.info(f"Monthly data entries: {len(monthly_data)}")
 
                     # Calculate total annual income from salary_usd and bonuses
                     total_annual_income_lkr = 0
@@ -573,12 +577,32 @@ def sidebar_summary():
                                 total_annual_income_lkr += bonus_lkr
 
                     tax_free = float(tax_calc.get('tax_free_threshold', 0))
-                    tax_rate = float(tax_calc.get('tax_rate', 0))
 
-                    # Calculate tax
-                    taxable_income = max(0, total_annual_income_lkr - tax_free)
-                    total_tax = taxable_income * (tax_rate / 100)
+                    # Calculate tax using PROGRESSIVE BRACKETS (same as frontend)
+                    # This replaces the old single-rate calculation
+                    # Bracket 1: Up to tax_free_threshold - 0% (Relief)
+                    # Bracket 2: tax_free_threshold+1 to tax_free_threshold+1,000,000 - 6%
+                    # Bracket 3: Above tax_free_threshold+1,000,000 - 15%
+
+                    total_tax = 0
+                    if total_annual_income_lkr > tax_free:
+                        bracket_2_upper = tax_free + 1_000_000  # e.g., 1,800,000 + 1,000,000 = 2,800,000
+
+                        if total_annual_income_lkr <= bracket_2_upper:
+                            # Income is in the 6% bracket
+                            total_tax = (total_annual_income_lkr - tax_free) * 0.06
+                        else:
+                            # Income exceeds bracket 2
+                            # Tax on first 1,000,000 above tax_free: 6%
+                            total_tax = 1_000_000 * 0.06  # LKR 60,000
+                            # Tax on amount above bracket_2_upper: 15%
+                            total_tax += (total_annual_income_lkr - bracket_2_upper) * 0.15
+
                     quarterly_payment = total_tax / 4 if total_tax > 0 else 0
+
+                    # Log calculation details for debugging
+                    logger.info(
+                        f"Tax calculation for {tax_calc['assessment_year']}: Income={total_annual_income_lkr:,.2f}, Tax-Free={tax_free:,.2f}, Total Tax={total_tax:,.2f}, Quarterly={quarterly_payment:,.2f}")
 
                     # Determine current quarter based on start_month (0-indexed: 0=April, 1=May, etc.)
                     start_month_idx = int(tax_calc.get('start_month', 0))  # 0-11
@@ -606,8 +630,12 @@ def sidebar_summary():
                         'current_quarter': current_quarter,
                         'total_income': round(total_annual_income_lkr, 2)
                     }
+                else:
+                    logger.info("No active tax calculation found for user")
             except Exception as e:
                 logger.error(f"Error fetching tax data: {str(e)}")
+                import traceback
+                logger.error(traceback.format_exc())
             finally:
                 cursor.close()
                 connection.close()

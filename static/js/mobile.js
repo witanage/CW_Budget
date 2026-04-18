@@ -28,7 +28,7 @@ const confirmBtn = document.getElementById('confirmModalBtn');
 
 // Set content
 modalTitle.textContent = title;
-modalMessage.textContent = message;
+modalMessage.innerHTML = message;  // Use innerHTML to support HTML content
 confirmBtn.textContent = confirmBtnText;
 
 // Set button class

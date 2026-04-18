@@ -5376,6 +5376,9 @@ let lastCalculationData = null;
 // Store all saved calculations for filtering
 let allSavedCalculations = [];
 
+// Track if we're editing an existing calculation (null if new)
+let currentEditingCalculationId = null;
+
 function loadTaxCalculator() {
     console.log('Loading Tax Calculator...');
 
@@ -5790,6 +5793,11 @@ async function fetchExchangeRateForBonus(monthIndex, bonusId) {
 }
 
 function calculateMonthlyTax() {
+    // Debug: Check assessment year at start of calculation
+    const currentAssessmentYear = document.getElementById('assessmentYear').value;
+    console.log('=== CALCULATE TAX STARTED ===');
+    console.log('Assessment year dropdown value:', currentAssessmentYear);
+
     // Get form values
     const taxFreeThreshold = parseFloat(document.getElementById('taxFreeThreshold').value) || 1800000;
     const startMonthIndex = parseInt(document.getElementById('startMonth').value) || 0;
@@ -5942,8 +5950,12 @@ function calculateMonthlyTax() {
     document.getElementById('effectiveTaxRateSummary').textContent = `${effectiveRate.toFixed(2)}%`;
 
     // Store calculation data for saving (ONLY input data, calculations are computed on-the-fly)
+    const selectedAssessmentYear = document.getElementById('assessmentYear').value;
+    console.log('=== CAPTURING ASSESSMENT YEAR ===');
+    console.log('Selected assessment year from dropdown:', selectedAssessmentYear);
+
     lastCalculationData = {
-        assessment_year: document.getElementById('assessmentYear').value,
+        assessment_year: selectedAssessmentYear,
         tax_rate: 0, // Using progressive brackets (0%, 6%, 15%), not a single rate
         tax_free_threshold: taxFreeThreshold,
         start_month: startMonthIndex,
@@ -5976,8 +5988,25 @@ function calculateMonthlyTax() {
     const saveSection = document.getElementById('saveCalculationSection');
     if (saveSection) {
         saveSection.style.display = 'block';
-        // Auto-generate calculation name
-        document.getElementById('calculationName').value = `Tax Calculation ${lastCalculationData.assessment_year}`;
+
+        // Auto-generate calculation name only if not editing
+        if (!currentEditingCalculationId) {
+            document.getElementById('calculationName').value = `Tax Calculation ${lastCalculationData.assessment_year}`;
+            // For new calculations, default to active
+            const setAsActiveCheckbox = document.getElementById('setAsActive');
+            if (setAsActiveCheckbox) {
+                setAsActiveCheckbox.checked = true;
+            }
+        }
+
+        // Update the active year display
+        const activeYearDisplay = document.getElementById('activeYearDisplay');
+        if (activeYearDisplay) {
+            activeYearDisplay.textContent = lastCalculationData.assessment_year;
+        }
+
+        // Update button UI based on editing mode
+        updateSaveButtonUI();
     }
 
     // Show summary cards
@@ -6067,7 +6096,7 @@ function updateTaxScheduleTable(monthlyData) {
 
 function resetTaxCalculator() {
     // Reset form fields
-    document.getElementById('assessmentYear').value = '2024/2025';
+    document.getElementById('assessmentYear').value = '2026/2027';
     document.getElementById('taxFreeThreshold').value = '1800000';
     document.getElementById('startMonth').value = '0';
 
@@ -6122,14 +6151,84 @@ function resetTaxCalculator() {
 
     lastCalculationData = null;
 
+    // Clear editing mode
+    currentEditingCalculationId = null;
+    updateEditingBanner();
+    updateSaveButtonUI();
+
     showToast('Tax calculator reset', 'info');
+}
+
+// Update save button UI based on editing state
+function updateSaveButtonUI() {
+    const saveBtn = document.getElementById('saveCalculationBtnAlt');
+    const saveCard = document.getElementById('saveCalculationCard');
+    const saveHeader = document.getElementById('saveCalculationHeader');
+    const btnContainer = document.getElementById('saveButtonContainer');
+    const editingBanner = document.getElementById('editingStateBanner');
+
+    if (!saveBtn || !saveCard || !saveHeader || !btnContainer) return;
+
+    if (currentEditingCalculationId) {
+        // In edit mode - show update UI with IntelliJ dark theme
+        saveCard.className = 'card mb-3 border-primary intellij-dark';
+        saveHeader.innerHTML = '<i class="fas fa-edit me-2"></i>Update Calculation';
+        saveBtn.innerHTML = '<i class="fas fa-save me-2"></i>Update';
+        saveBtn.className = 'btn btn-primary flex-grow-1 d-flex align-items-center justify-content-center';
+        saveBtn.onclick = () => saveTaxCalculation(false);
+
+        // Add "Save As New" button if it doesn't exist
+        if (!document.getElementById('saveAsNewBtn')) {
+            const saveAsNewBtn = document.createElement('button');
+            saveAsNewBtn.type = 'button';
+            saveAsNewBtn.id = 'saveAsNewBtn';
+            saveAsNewBtn.className = 'btn btn-outline-success flex-grow-1 d-flex align-items-center justify-content-center';
+            saveAsNewBtn.innerHTML = '<i class="fas fa-copy me-2"></i>Save As New Copy';
+            saveAsNewBtn.onclick = () => {
+                // Suggest a different name for the copy
+                const calcNameInput = document.getElementById('calculationName');
+                if (calcNameInput && !calcNameInput.value.includes('(Copy)')) {
+                    calcNameInput.value = calcNameInput.value + ' (Copy)';
+                }
+                saveTaxCalculation(true);
+            };
+            btnContainer.appendChild(saveAsNewBtn);
+        }
+    } else {
+        // In new mode - show save UI with IntelliJ dark theme
+        saveCard.className = 'card mb-3 border-success intellij-dark';
+        saveHeader.innerHTML = '<i class="fas fa-save me-2"></i>Save New Calculation';
+        saveBtn.innerHTML = '<i class="fas fa-save me-2"></i>Save';
+        saveBtn.className = 'btn btn-success flex-grow-1 d-flex align-items-center justify-content-center';
+        saveBtn.onclick = () => saveTaxCalculation(false);
+
+        // Remove "Save As New" button if it exists
+        const saveAsNewBtn = document.getElementById('saveAsNewBtn');
+        if (saveAsNewBtn) {
+            saveAsNewBtn.remove();
+        }
+    }
+}
+
+// Update editing state banner (removed from UI, kept for compatibility)
+function updateEditingBanner(calc = null) {
+    // Banner removed from UI - function kept to avoid errors
+    return;
+}
+
+// Clear editing mode and start fresh
+function clearEditingMode() {
+    currentEditingCalculationId = null;
+    updateSaveButtonUI();
+    resetTaxCalculator();
+    showToast('Ready to create new calculation', 'info');
 }
 
 // ================================
 // SAVE AND LOAD CALCULATIONS
 // ================================
 
-function saveTaxCalculation() {
+function saveTaxCalculation(saveAsNew = false) {
     if (!lastCalculationData) {
         showToast('Please calculate tax first before saving', 'warning');
         return;
@@ -6143,20 +6242,89 @@ function saveTaxCalculation() {
 
     const setAsActive = document.getElementById('setAsActive')?.checked || false;
 
+    // CRITICAL: Always read current form values at save time
+    // User might have changed them after calculation but before saving
+    const currentAssessmentYear = document.getElementById('assessmentYear').value;
+    const currentTaxFreeThreshold = parseFloat(document.getElementById('taxFreeThreshold').value) || 1800000;
+    const currentStartMonth = parseInt(document.getElementById('startMonth').value) || 0;
+
     const dataToSave = {
         ...lastCalculationData,
+        assessment_year: currentAssessmentYear, // Override with current dropdown value
+        tax_free_threshold: currentTaxFreeThreshold, // Override with current value
+        start_month: currentStartMonth, // Override with current value
         calculation_name: calculationName,
         is_active: setAsActive
     };
 
     console.log('=== SAVING CALCULATION ===');
+    console.log('Assessment year from dropdown:', currentAssessmentYear);
+    console.log('Assessment year from lastCalculationData:', lastCalculationData.assessment_year);
+    console.log('Final assessment year being saved:', dataToSave.assessment_year);
+    console.log('Full data object:', dataToSave);
+
+    // Determine if we're updating existing or creating new
+    const isUpdate = currentEditingCalculationId && !saveAsNew;
+
+    // CRITICAL: Check for existing active calculation before proceeding
+    if (setAsActive) {
+        const existingActive = allSavedCalculations.find(calc =>
+            calc.assessment_year === currentAssessmentYear &&
+            calc.is_active &&
+            calc.id !== currentEditingCalculationId
+        );
+
+        if (existingActive) {
+            const warningMessage = `
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Another calculation is already active for ${currentAssessmentYear}:</strong>
+                    <div class="mt-2">
+                        <strong>"${existingActive.calculation_name}"</strong>
+                    </div>
+                </div>
+                <p class="mb-0">
+                    Setting this calculation as active will automatically <strong>deactivate</strong> the other calculation.
+                    Only one calculation can be active per assessment year.
+                </p>
+                <p class="mt-2 mb-0">Do you want to proceed?</p>
+            `;
+
+            showConfirmModal(
+                'Confirm Active Calculation Change',
+                warningMessage,
+                () => {
+                    // User confirmed, proceed with save
+                    proceedWithSave(dataToSave, isUpdate);
+                },
+                'Proceed',
+                'btn-warning'
+            );
+            return; // Exit and wait for user confirmation
+        }
+    }
+
+    // No conflict or not setting as active, proceed directly
+    proceedWithSave(dataToSave, isUpdate);
+}
+
+function proceedWithSave(dataToSave, isUpdate) {
+    const url = isUpdate
+        ? `/api/tax-calculations/${currentEditingCalculationId}`
+        : '/api/tax-calculations';
+    const method = isUpdate ? 'PUT' : 'POST';
+
+    console.log(`=== ${isUpdate ? 'UPDATING' : 'SAVING'} CALCULATION ===`);
     console.log('Data to save:', dataToSave);
     console.log('Monthly data being saved:', dataToSave.monthly_data);
+    if (isUpdate) {
+        console.log('Updating calculation ID:', currentEditingCalculationId);
+    }
 
     showLoading();
 
-    fetch('/api/tax-calculations', {
-        method: 'POST',
+    fetch(url, {
+        method: method,
         headers: {
             'Content-Type': 'application/json'
         },
@@ -6168,7 +6336,24 @@ function saveTaxCalculation() {
         if (data.error) {
             showToast(data.error, 'danger');
         } else {
-            showToast('Tax calculation saved successfully!', 'success');
+            const icon = isUpdate ? '<i class="fas fa-check-circle me-2"></i>' : '<i class="fas fa-save me-2"></i>';
+            const message = isUpdate ? 'Tax calculation updated successfully!' : 'Tax calculation saved successfully!';
+            showToast(icon + message, 'success');
+
+            // If we just created a new calculation, switch to editing mode for it
+            if (!isUpdate && data.id) {
+                currentEditingCalculationId = data.id;
+                // Fetch the full calculation to update the banner
+                fetch(`/api/tax-calculations/${data.id}`)
+                    .then(response => response.json())
+                    .then(calc => {
+                        if (!calc.error) {
+                            updateEditingBanner(calc);
+                        }
+                    });
+                updateSaveButtonUI();
+            }
+
             // Reload saved calculations list
             loadSavedCalculations();
             // Hide save section
@@ -6251,43 +6436,57 @@ function displaySavedCalculations(calculations, filterYear = null) {
     let html = headerHtml + '<div class="list-group">';
     calculations.forEach(calc => {
         const createdDate = new Date(calc.created_at).toLocaleDateString();
+        const updatedDate = calc.updated_at ? new Date(calc.updated_at).toLocaleDateString() : null;
         const isActive = calc.is_active || false;
-        const activeClass = isActive ? 'border-success' : '';
+        const isCurrentlyEditing = currentEditingCalculationId === calc.id;
+        const cardClass = isActive ? 'border-success border-2' : (isCurrentlyEditing ? 'border-primary border-2' : '');
+        const bgClass = isActive ? 'bg-success bg-opacity-10' : (isCurrentlyEditing ? 'bg-primary bg-opacity-10' : '');
 
         html += `
-            <div class="list-group-item list-group-item-action calculation-item mb-2 ${activeClass}">
-                <div class="d-flex justify-content-between align-items-start">
+            <div class="list-group-item calculation-item mb-2 ${cardClass} ${bgClass}">
+                <div class="d-flex justify-content-between align-items-center">
                     <div class="flex-grow-1">
-                        <h6 class="mb-1">
-                            ${calc.calculation_name}
-                            ${isActive ? '<span class="badge bg-success ms-2">Active</span>' : ''}
-                        </h6>
-                        <p class="mb-1 small">
+                        <div class="d-flex align-items-center mb-2">
+                            <h6 class="mb-0 me-2">${calc.calculation_name}</h6>
+                            ${isActive ? '<span class="badge bg-success"><i class="fas fa-star me-1"></i>Active</span>' : ''}
+                            ${isCurrentlyEditing ? '<span class="badge bg-primary ms-2"><i class="fas fa-edit me-1"></i>Editing</span>' : ''}
+                        </div>
+                        <div class="mb-2">
                             <span class="badge bg-primary me-2">${calc.assessment_year}</span>
-                            <span class="opacity-75">Saved: ${createdDate}</span>
-                        </p>
-                        <div class="row mt-2">
-                            <div class="col-md-6">
-                                <small class="opacity-75">Tax Structure:</small><br>
-                                <strong>Progressive Brackets</strong>
-                            </div>
-                            <div class="col-md-6">
-                                <small class="opacity-75">Tax-Free Threshold:</small><br>
-                                <strong>${formatCurrency(calc.tax_free_threshold)}</strong>
+                            <span class="text-muted small">
+                                <i class="fas fa-calendar-plus me-1"></i>${createdDate}
+                                ${updatedDate && updatedDate !== createdDate ? `<i class="fas fa-edit ms-2 me-1"></i>${updatedDate}` : ''}
+                            </span>
+                        </div>
+                        <div class="row g-2 small">
+                            <div class="col-auto">
+                                <span class="text-muted">Tax-Free Threshold:</span>
+                                <strong class="ms-1">${formatCurrency(calc.tax_free_threshold)}</strong>
                             </div>
                         </div>
-                        <p class="mb-0 mt-2"><small class="opacity-75"><i class="fas fa-info-circle me-1"></i>Tax totals will be calculated when you load this</small></p>
                     </div>
-                    <div class="ms-3 d-flex flex-column gap-1">
-                        <button class="btn btn-sm btn-outline-primary" onclick="loadCalculation(${calc.id})" title="Load this calculation">
-                            <i class="fas fa-download"></i>
-                        </button>
-                        ${!isActive ? `<button class="btn btn-sm btn-outline-success" onclick="setActiveCalculation(${calc.id})" title="Set as active">
-                            <i class="fas fa-star"></i>
-                        </button>` : ''}
-                        <button class="btn btn-sm btn-outline-danger" onclick="deleteCalculation(${calc.id})" title="Delete this calculation">
-                            <i class="fas fa-trash"></i>
-                        </button>
+                    <div class="ms-3 d-flex align-items-center">
+                        <div class="btn-group-vertical" role="group">
+                            <button class="btn btn-sm ${isCurrentlyEditing ? 'btn-primary' : 'btn-outline-primary'} d-flex align-items-center justify-content-center"
+                                    onclick="loadCalculation(${calc.id})"
+                                    title="${isCurrentlyEditing ? 'Currently editing' : 'Edit this calculation'}">
+                                <i class="fas fa-edit me-1"></i>Edit
+                            </button>
+                            ${!isActive ? `
+                            <button class="btn btn-sm btn-outline-success d-flex align-items-center justify-content-center"
+                                    onclick="setActiveCalculation(${calc.id})"
+                                    title="Set as active for ${calc.assessment_year}">
+                                <i class="fas fa-star me-1"></i>Activate
+                            </button>` : `
+                            <button class="btn btn-sm btn-success d-flex align-items-center justify-content-center" disabled title="Already active">
+                                <i class="fas fa-check me-1"></i>Active
+                            </button>`}
+                            <button class="btn btn-sm btn-outline-danger d-flex align-items-center justify-content-center"
+                                    onclick="deleteCalculation(${calc.id})"
+                                    title="Delete this calculation">
+                                <i class="fas fa-trash me-1"></i>Delete
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -6304,9 +6503,43 @@ function showAllCalculations() {
 }
 
 function setActiveCalculation(calculationId) {
+    // Find the calculation being activated
+    const calcToActivate = allSavedCalculations.find(c => c.id === calculationId);
+    if (!calcToActivate) {
+        showToast('Calculation not found', 'danger');
+        return;
+    }
+
+    // Find any existing active calculation for the same year
+    const existingActive = allSavedCalculations.find(calc =>
+        calc.assessment_year === calcToActivate.assessment_year &&
+        calc.is_active &&
+        calc.id !== calculationId
+    );
+
+    let warningMessage = `<p class="mb-2">Set <strong>"${calcToActivate.calculation_name}"</strong> as active for ${calcToActivate.assessment_year}?</p>`;
+
+    if (existingActive) {
+        warningMessage += `
+            <div class="alert alert-warning mb-0">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Note:</strong> This will automatically deactivate:<br>
+                <strong class="mt-1 d-block">"${existingActive.calculation_name}"</strong>
+                <small class="d-block mt-1 text-muted">Only one calculation can be active per assessment year.</small>
+            </div>
+        `;
+    } else {
+        warningMessage += `
+            <div class="alert alert-info mb-0">
+                <i class="fas fa-info-circle me-2"></i>
+                This calculation will become the active calculation for ${calcToActivate.assessment_year}.
+            </div>
+        `;
+    }
+
     showConfirmModal(
         'Set Active Calculation',
-        'Set this calculation as active for its assessment year?',
+        warningMessage,
         () => {
             showLoading();
 
@@ -6316,25 +6549,16 @@ function setActiveCalculation(calculationId) {
                     'Content-Type': 'application/json'
                 }
             })
-            .then(response => {
-                // Check if feature is not implemented (501)
-                if (response.status === 501) {
-                    return response.json().then(data => {
-                        hideLoading();
-                        showToast(data.error || 'This feature requires a database migration.', 'warning');
-                        return null;
-                    });
-                }
-                return response.json();
-            })
+            .then(response => response.json())
             .then(data => {
-                if (!data) return; // Already handled 501 case
-
                 hideLoading();
                 if (data.error) {
                     showToast(data.error, 'danger');
                 } else {
-                    showToast(`Calculation set as active for ${data.assessment_year}!`, 'success');
+                    showToast(
+                        `<i class="fas fa-star me-2"></i>Calculation activated for ${data.assessment_year}!`,
+                        'success'
+                    );
                     // Reload the calculations list to reflect the change
                     loadSavedCalculations();
                 }
@@ -6345,13 +6569,16 @@ function setActiveCalculation(calculationId) {
                 showToast('Failed to set active calculation', 'danger');
             });
         },
-        'Set Active',
-        'btn-primary'
+        'Activate',
+        'btn-success'
     );
 }
 
 function loadCalculation(calculationId) {
     showLoading();
+
+    // Set editing mode
+    currentEditingCalculationId = calculationId;
 
     fetch(`/api/tax-calculations/${calculationId}`)
     .then(response => response.json())
@@ -6360,20 +6587,33 @@ function loadCalculation(calculationId) {
 
         if (calc.error) {
             showToast(calc.error, 'danger');
+            currentEditingCalculationId = null;
+            updateEditingBanner();
             return;
         }
+
+        // Update editing banner with calculation details
+        updateEditingBanner(calc);
 
         console.log('=== LOADING CALCULATION ===');
         console.log('ID:', calc.id, '| Name:', calc.calculation_name);
         console.log('Year:', calc.assessment_year, '| Threshold:', calc.tax_free_threshold);
         console.log('Start month:', calc.start_month);
+        console.log('Active status:', calc.is_active);
         console.log('Monthly data entries:', calc.monthly_data ? calc.monthly_data.length : 0);
 
         // Load values into form fields
+        document.getElementById('calculationName').value = calc.calculation_name;
         document.getElementById('assessmentYear').value = calc.assessment_year;
         // Tax rate is now hardcoded in progressive brackets, not loaded from saved data
         document.getElementById('taxFreeThreshold').value = calc.tax_free_threshold;
         document.getElementById('startMonth').value = calc.start_month;
+
+        // Set the "Set as active" checkbox based on current status
+        const setAsActiveCheckbox = document.getElementById('setAsActive');
+        if (setAsActiveCheckbox) {
+            setAsActiveCheckbox.checked = calc.is_active || false;
+        }
 
         // Update year display
         updateYearDisplay();
@@ -6469,6 +6709,9 @@ function loadCalculation(calculationId) {
 
             // Recalculate tax schedule with loaded data
             calculateMonthlyTax();
+
+            // Update save button UI to show "Update" mode
+            updateSaveButtonUI();
         }, 100); // 100ms delay to ensure DOM is updated
 
         showToast(`Loaded: ${calc.calculation_name}`, 'success');
@@ -6484,9 +6727,14 @@ function loadCalculation(calculationId) {
 }
 
 function deleteCalculation(calculationId) {
+    const isCurrentlyEditing = currentEditingCalculationId === calculationId;
+    const warningMsg = isCurrentlyEditing
+        ? '<div class="alert alert-warning mb-3"><i class="fas fa-exclamation-triangle me-2"></i>You are currently editing this calculation. Deleting it will clear your current work.</div>'
+        : '';
+
     showConfirmModal(
         'Delete Calculation',
-        'Are you sure you want to delete this calculation? This action cannot be undone.',
+        warningMsg + 'Are you sure you want to delete this calculation? This action cannot be undone.',
         () => {
             showLoading();
 
@@ -6499,7 +6747,13 @@ function deleteCalculation(calculationId) {
                 if (data.error) {
                     showToast(data.error, 'danger');
                 } else {
-                    showToast('Calculation deleted successfully', 'success');
+                    showToast('<i class="fas fa-trash me-2"></i>Calculation deleted successfully', 'success');
+
+                    // If we were editing this calculation, clear the editing state
+                    if (isCurrentlyEditing) {
+                        clearEditingMode();
+                    }
+
                     loadSavedCalculations();
                 }
             })

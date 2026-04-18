@@ -1866,7 +1866,7 @@ def get_best_rate_today():
         # Fetch HNB rate
         try:
             hnb_service = get_hnb_exchange_rate_service()
-            hnb_rate = hnb_service.get_current_rate()
+            hnb_rate = hnb_service.get_exchange_rate()  # Use get_exchange_rate() instead
             if hnb_rate:
                 rates.append({
                     'bank': 'HNB',
@@ -1880,7 +1880,7 @@ def get_best_rate_today():
         # Fetch PB rate
         try:
             pb_service = get_pb_exchange_rate_service()
-            pb_rate = pb_service.get_current_rate()
+            pb_rate = pb_service.get_exchange_rate()  # Use get_exchange_rate() instead
             if pb_rate:
                 rates.append({
                     'bank': 'PB',
@@ -1894,7 +1894,7 @@ def get_best_rate_today():
         # Fetch Sampath rate
         try:
             sampath_service = get_sampath_exchange_rate_service()
-            sampath_rate = sampath_service.get_current_rate()
+            sampath_rate = sampath_service.get_exchange_rate()  # Use get_exchange_rate() instead
             if sampath_rate:
                 rates.append({
                     'bank': 'Sampath',
@@ -1918,24 +1918,24 @@ def get_best_rate_today():
             if connection:
                 cursor = connection.cursor(dictionary=True)
 
-                # Get yesterday's rate from the same bank
+                # Get most recent previous rate from the same bank (not just yesterday)
                 cursor.execute("""
                     SELECT buy_rate 
                     FROM exchange_rate_refresh_logs 
                     WHERE source = %s 
                       AND status = 'success' 
                       AND buy_rate IS NOT NULL
-                      AND DATE(created_at) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)
+                      AND DATE(created_at) < CURDATE()
                     ORDER BY created_at DESC 
                     LIMIT 1
                 """, (best_rate['bank'],))
 
-                yesterday = cursor.fetchone()
-                if yesterday and yesterday['buy_rate']:
-                    yesterday_rate = float(yesterday['buy_rate'])
-                    if best_rate['buy_rate'] > yesterday_rate:
+                previous_rate_data = cursor.fetchone()
+                if previous_rate_data and previous_rate_data['buy_rate']:
+                    previous_rate = float(previous_rate_data['buy_rate'])
+                    if best_rate['buy_rate'] > previous_rate:
                         trend = '▲'
-                    elif best_rate['buy_rate'] < yesterday_rate:
+                    elif best_rate['buy_rate'] < previous_rate:
                         trend = '▼'
 
                 cursor.close()
