@@ -1230,7 +1230,7 @@ def get_exchange_rate_ai_insights():
         if not analyzer:
             return jsonify({
                 'error': 'AI service not available',
-                'message': 'Gemini API is not configured. Please check your GEMINI_API_KEY.'
+                'message': 'Gemini API is not configured. Please set the API key in Admin → Settings.'
             }), 503
 
         # Fetch exchange rate data from database

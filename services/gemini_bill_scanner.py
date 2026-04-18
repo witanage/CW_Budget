@@ -4,7 +4,6 @@ This service uses Google's Gemini Flash 3 API to extract information from bill i
 Configuration is loaded from the ai_configs database table.
 """
 
-import os
 import json
 import logging
 import time
@@ -25,16 +24,16 @@ class GeminiBillScanner:
         Initialize the Gemini Bill Scanner.
 
         Args:
-            api_key: Gemini API key. If not provided, reads from database or GEMINI_API_KEY env variable.
+            api_key: Gemini API key. If not provided, reads from database (ai_provider_config table).
             model_name: Model name. If not provided, reads from database or uses default.
         """
         # Try to load config from database first
         config = self._load_config_from_db()
 
-        # Priority: constructor parameter > database config > environment variable
-        self.api_key = api_key or (config.get('api_key') if config else None) or os.getenv('GEMINI_API_KEY')
+        # Priority: constructor parameter > database config
+        self.api_key = api_key or (config.get('api_key') if config else None)
         if not self.api_key:
-            raise ValueError("Gemini API key not provided. Set it in ai_configs table or GEMINI_API_KEY env variable.")
+            raise ValueError("Gemini API key not provided. Set it in the ai_provider_config table via Admin → Settings.")
 
         # Configure model name
         self.model_name = model_name or (config.get('model_name') if config else None) or 'gemini-3.1-flash-lite-preview'
