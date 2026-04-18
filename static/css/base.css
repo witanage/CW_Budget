@@ -1849,11 +1849,17 @@ color: #ffffff;
     margin-bottom: 0.5rem;
     position: relative;
     z-index: 12;
+    padding-top: 0.2rem;
+    padding-bottom: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
 }
 
 .sidebar-title {
     color: var(--text-primary);
     font-size: 1.1rem;
+    line-height: 1;
     transition: opacity 0.3s ease;
 }
 
@@ -1862,7 +1868,12 @@ color: #ffffff;
     background-color: transparent;
     border: 1px solid var(--border-color);
     color: var(--text-primary);
-    padding: 0.25rem 0.5rem;
+    padding: 0.35rem 0.5rem;
+    line-height: 1;
+    height: 1.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     transition: all 0.3s ease;
     cursor: pointer;
     position: relative;

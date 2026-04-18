@@ -43,7 +43,7 @@
         <!-- Sidebar -->
         <nav class="col-md-3 col-lg-2 d-md-block sidebar" id="sidebar">
             <div class="position-sticky">
-                <div class="sidebar-header d-flex align-items-center justify-content-between p-3">
+                <div class="sidebar-header px-2">
                     <span class="sidebar-title fw-bold">Menu</span>
                     <button id="sidebarToggle" class="btn btn-sm sidebar-toggle-btn" title="Collapse sidebar">
                         <i class="fas fa-chevron-left"></i>
@@ -71,6 +71,69 @@
                         </a>
                     </li>
                 </ul>
+
+                <!-- Sidebar Widgets -->
+                <div class="sidebar-widgets">
+                    <div class="sidebar-widgets-header">
+                        <span class="sidebar-widgets-title">Quick Stats</span>
+                        <button id="widgetsToggle" class="btn btn-sm widgets-toggle-btn" title="Collapse widgets">
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                    </div>
+                    <div id="widgetsContent" class="sidebar-widgets-content">
+                        <!-- Balance Tile -->
+                        <div class="sidebar-widget-tile widget-balance">
+                            <div class="widget-icon">
+                                <i class="fas fa-wallet"></i>
+                            </div>
+                            <div class="widget-content">
+                                <div class="widget-label">This Month</div>
+                                <div class="widget-value" id="widgetBalance">
+                                    <span class="widget-skeleton"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Exchange Rate Tile -->
+                        <div class="sidebar-widget-tile widget-rate">
+                            <div class="widget-icon">
+                                <i class="fas fa-exchange-alt"></i>
+                            </div>
+                            <div class="widget-content">
+                                <div class="widget-label" id="widgetRateLabel">USD→LKR</div>
+                                <div class="widget-value" id="widgetRate">
+                                    <span class="widget-skeleton"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Unpaid Transactions Tile -->
+                        <div class="sidebar-widget-tile widget-unpaid" id="widgetUnpaidTile" style="display: none;">
+                            <div class="widget-icon">
+                                <i class="fas fa-exclamation-circle"></i>
+                            </div>
+                            <div class="widget-content">
+                                <div class="widget-label">Unpaid</div>
+                                <div class="widget-value" id="widgetUnpaid">
+                                    <span class="widget-skeleton"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Quarterly Tax Payment Tile -->
+                        <div class="sidebar-widget-tile widget-tax" id="widgetTaxTile" style="display: none;">
+                            <div class="widget-icon">
+                                <i class="fas fa-file-invoice-dollar"></i>
+                            </div>
+                            <div class="widget-content">
+                                <div class="widget-label" id="widgetTaxLabel">Quarterly Tax</div>
+                                <div class="widget-value" id="widgetTax">
+                                    <span class="widget-skeleton"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </nav>
 

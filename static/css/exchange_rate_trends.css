@@ -100,19 +100,6 @@
     /* Cursor will be dynamically set by JavaScript */
 }
 
-/* Period selector buttons */
-#ertPeriodSelector .btn-outline-primary {
-    border-color: var(--accent-color);
-    color: var(--accent-color);
-}
-
-#ertPeriodSelector .btn-outline-primary.active,
-#ertPeriodSelector .btn-outline-primary:hover {
-    background: var(--accent-color);
-    color: #fff;
-    border-color: var(--accent-color);
-}
-
 /* Form controls */
 .ert-container .form-select,
 .ert-container .form-control {

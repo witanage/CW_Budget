@@ -12,9 +12,9 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from mysql.connector import Error
 
-from services.exchange_rate_routes import register_exchange_rate_routes
+from services.exchange_rate_routes import register_exchange_rate_routes, get_best_rate_today
 from services.tax_service import register_tax_routes
-from services.transaction_service import register_transaction_routes
+from services.transaction_service import register_transaction_routes, get_month_summary
 from services.markup_rule_service import register_markup_rule_routes
 from services.admin_service import register_admin_routes
 from services.user_service import register_user_routes
@@ -515,6 +515,117 @@ def dashboard_stats():
             connection.close()
 
     return jsonify({'error': 'Database connection failed'}), 500
+
+
+@app.route('/api/sidebar-summary')
+@login_required
+@limiter.limit(RATE_LIMIT_API)
+def sidebar_summary():
+    """Get summary data for sidebar widgets."""
+    try:
+        user_id = session['user_id']
+        current_year = datetime.now().year
+        current_month = datetime.now().month
+
+        # Get month summary (balance + unpaid count)
+        month_data = get_month_summary(user_id, current_year, current_month)
+
+        # Get best exchange rate
+        rate_data = get_best_rate_today()
+
+        # Get active tax calculation
+        tax_data = None
+        connection = get_db_connection()
+        if connection:
+            cursor = connection.cursor(dictionary=True)
+            try:
+                cursor.execute("""
+                    SELECT id, calculation_name, assessment_year, tax_rate, 
+                           tax_free_threshold, start_month, monthly_data
+                    FROM tax_calculations
+                    WHERE user_id = %s AND is_active = TRUE
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                """, (user_id,))
+
+                tax_calc = cursor.fetchone()
+                if tax_calc:
+                    # Parse monthly_data to calculate quarterly payment
+                    import json
+                    monthly_data = json.loads(tax_calc['monthly_data']) if tax_calc.get('monthly_data') else []
+
+                    # Calculate total annual income from salary_usd and bonuses
+                    total_annual_income_lkr = 0
+                    for month_entry in monthly_data:
+                        # Salary income (USD * exchange rate)
+                        salary_usd = float(month_entry.get('salary_usd', 0))
+                        salary_rate = float(month_entry.get('salary_rate', 0))
+                        salary_lkr = salary_usd * salary_rate
+                        total_annual_income_lkr += salary_lkr
+
+                        # Bonus income
+                        bonuses = month_entry.get('bonuses', [])
+                        if bonuses and isinstance(bonuses, list):
+                            for bonus in bonuses:
+                                bonus_amount = float(bonus.get('amount', 0))
+                                bonus_rate = float(bonus.get('rate', 0))
+                                bonus_lkr = bonus_amount * bonus_rate
+                                total_annual_income_lkr += bonus_lkr
+
+                    tax_free = float(tax_calc.get('tax_free_threshold', 0))
+                    tax_rate = float(tax_calc.get('tax_rate', 0))
+
+                    # Calculate tax
+                    taxable_income = max(0, total_annual_income_lkr - tax_free)
+                    total_tax = taxable_income * (tax_rate / 100)
+                    quarterly_payment = total_tax / 4 if total_tax > 0 else 0
+
+                    # Determine current quarter based on start_month (0-indexed: 0=April, 1=May, etc.)
+                    start_month_idx = int(tax_calc.get('start_month', 0))  # 0-11
+
+                    # Convert start_month index to actual month number (0=April -> 4)
+                    tax_year_start_month = (start_month_idx + 4) % 12
+                    if tax_year_start_month == 0:
+                        tax_year_start_month = 12
+
+                    # Calculate months elapsed since tax year started
+                    if current_month >= tax_year_start_month:
+                        # Same calendar year
+                        months_since_start = current_month - tax_year_start_month
+                    else:
+                        # Wrapped to next calendar year
+                        months_since_start = (12 - tax_year_start_month) + current_month
+
+                    # Determine quarter (0-2 = Q1, 3-5 = Q2, 6-8 = Q3, 9-11 = Q4)
+                    current_quarter = (months_since_start // 3) + 1
+
+                    tax_data = {
+                        'assessment_year': tax_calc['assessment_year'],
+                        'quarterly_payment': round(quarterly_payment, 2),
+                        'total_tax': round(total_tax, 2),
+                        'current_quarter': current_quarter,
+                        'total_income': round(total_annual_income_lkr, 2)
+                    }
+            except Exception as e:
+                logger.error(f"Error fetching tax data: {str(e)}")
+            finally:
+                cursor.close()
+                connection.close()
+
+        return jsonify({
+            'month_summary': month_data or {
+                'total_income': 0,
+                'total_expenses': 0,
+                'balance': 0,
+                'unpaid_count': 0
+            },
+            'exchange_rate': rate_data,
+            'tax_summary': tax_data
+        })
+
+    except Exception as e:
+        logger.error(f"Error in sidebar_summary: {str(e)}")
+        return jsonify({'error': 'Failed to fetch sidebar summary'}), 500
 
 
 @app.route('/api/recalculate-balances', methods=['POST'])

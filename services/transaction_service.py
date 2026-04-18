@@ -2604,6 +2604,69 @@ def create_transaction_handler():
         return jsonify({'error': 'Failed to create transaction', 'details': str(e)}), 500
 
 
+def get_month_summary(user_id, year, month):
+    """
+    Get summary statistics for a specific month.
+
+    Args:
+        user_id: User ID
+        year: Year (int)
+        month: Month (int, 1-12)
+
+    Returns:
+        dict with keys: total_income, total_expenses, balance, unpaid_count
+        Returns None if database connection fails
+    """
+    connection = get_db_connection()
+    if not connection:
+        logger.error("Database connection failed in get_month_summary")
+        return None
+
+    try:
+        cursor = connection.cursor(dictionary=True)
+
+        # Single query to get all stats for the month
+        cursor.execute("""
+            SELECT 
+                COALESCE(SUM(t.debit), 0) as total_income,
+                COALESCE(SUM(t.credit), 0) as total_expenses,
+                COALESCE(SUM(CASE WHEN (t.is_paid = FALSE OR t.is_paid IS NULL) THEN 1 ELSE 0 END), 0) as unpaid_count
+            FROM transactions t
+            INNER JOIN monthly_records mr ON t.monthly_record_id = mr.id
+            WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s
+        """, (user_id, year, month))
+
+        result = cursor.fetchone()
+
+        if result:
+            total_income = float(result['total_income'])
+            total_expenses = float(result['total_expenses'])
+            balance = total_income - total_expenses
+
+            return {
+                'total_income': total_income,
+                'total_expenses': total_expenses,
+                'balance': balance,
+                'unpaid_count': int(result['unpaid_count'])
+            }
+        else:
+            return {
+                'total_income': 0.0,
+                'total_expenses': 0.0,
+                'balance': 0.0,
+                'unpaid_count': 0
+            }
+
+    except Exception as e:
+        logger.error(f"Error in get_month_summary: {str(e)}")
+        return None
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+
 # ==================================================
 # ROUTE REGISTRATION
 # ==================================================

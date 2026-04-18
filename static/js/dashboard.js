@@ -287,18 +287,22 @@ async function initApp() {
         // 2. Setup sidebar toggle
         setupSidebarToggle();
 
-        // 3. Setup form buttons
+        // 3. Setup widgets toggle and load initial widget data
+        setupWidgetsToggle();
+        loadSidebarWidgets();
+
+        // 4. Setup form buttons
         setupFormButtons();
 
-        // 3. Load initial data
+        // 5. Load initial data
         loadCategories();
         loadPaymentMethods();
         populateDateSelectors();
 
-        // 4. Initialize charts
+        // 6. Initialize charts
         initCharts();
 
-        // 5. Load user's preferred default page (or fallback to transactions)
+        // 7. Load user's preferred default page (or fallback to transactions)
         loadUserPreferredPage();
 
         console.log('✓ Dashboard loaded successfully');
@@ -1278,6 +1282,128 @@ function showEditCategoryMessage(text, type) {
     }
 }
 
+// ==================================================
+// SIDEBAR WIDGETS
+// ==================================================
+
+/**
+ * Setup widgets toggle functionality
+ */
+function setupWidgetsToggle() {
+    const toggleBtn = document.getElementById('widgetsToggle');
+    const widgetsContent = document.getElementById('widgetsContent');
+
+    if (!toggleBtn || !widgetsContent) return;
+
+    // Check localStorage for saved state
+    const isCollapsed = localStorage.getItem('widgetsCollapsed') === 'true';
+
+    if (isCollapsed) {
+        widgetsContent.classList.add('collapsed');
+        toggleBtn.classList.add('collapsed');
+    }
+
+    toggleBtn.addEventListener('click', function() {
+        const isCurrentlyCollapsed = widgetsContent.classList.contains('collapsed');
+
+        if (isCurrentlyCollapsed) {
+            widgetsContent.classList.remove('collapsed');
+            toggleBtn.classList.remove('collapsed');
+            localStorage.setItem('widgetsCollapsed', 'false');
+        } else {
+            widgetsContent.classList.add('collapsed');
+            toggleBtn.classList.add('collapsed');
+            localStorage.setItem('widgetsCollapsed', 'true');
+        }
+    });
+}
+
+/**
+ * Load sidebar widget data from the /api/sidebar-summary endpoint
+ * and populate all widgets
+ */
+async function loadSidebarWidgets() {
+    try {
+        const response = await fetch('/api/sidebar-summary');
+        if (!response.ok) {
+            console.error('Failed to load sidebar widgets:', response.status);
+            return;
+        }
+
+        const data = await response.json();
+        console.log('Sidebar widgets data:', data);
+
+        // Update balance widget
+        const balanceElement = document.getElementById('widgetBalance');
+        if (balanceElement && data.month_summary) {
+            const balance = data.month_summary.balance || 0;
+            const balanceText = balance >= 0 ?
+                `+LKR ${balance.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` :
+                `LKR ${balance.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            balanceElement.textContent = balanceText;
+        }
+
+        // Update exchange rate widget
+        const rateElement = document.getElementById('widgetRate');
+        const rateLabelElement = document.getElementById('widgetRateLabel');
+        if (rateElement && data.exchange_rate) {
+            const rate = data.exchange_rate.buy_rate || 0;
+            const trend = data.exchange_rate.trend || '—';
+            const bank = data.exchange_rate.bank || '';
+
+            // Update label with bank name
+            if (rateLabelElement && bank) {
+                rateLabelElement.textContent = `USD→LKR (${bank})`;
+            }
+
+            // Update value with rate and trend
+            rateElement.innerHTML = `${rate.toFixed(2)} <small style="margin-left:0.25rem;">${trend}</small>`;
+        } else if (rateElement) {
+            rateElement.textContent = '—';
+            if (rateLabelElement) {
+                rateLabelElement.textContent = 'USD→LKR';
+            }
+        }
+
+        // Update unpaid widget
+        const unpaidElement = document.getElementById('widgetUnpaid');
+        const unpaidTile = document.getElementById('widgetUnpaidTile');
+        if (unpaidElement && unpaidTile && data.month_summary) {
+            const unpaidCount = data.month_summary.unpaid_count || 0;
+            if (unpaidCount > 0) {
+                unpaidElement.textContent = `${unpaidCount} transaction${unpaidCount !== 1 ? 's' : ''}`;
+                unpaidTile.style.display = 'flex';
+            } else {
+                unpaidTile.style.display = 'none';
+            }
+        }
+
+        // Update monthly tax payment widget
+        const taxElement = document.getElementById('widgetTax');
+        const taxLabel = document.getElementById('widgetTaxLabel');
+        const taxTile = document.getElementById('widgetTaxTile');
+        if (taxElement && taxTile && data.tax_summary) {
+            const quarterlyPayment = data.tax_summary.quarterly_payment || 0;
+            const assessmentYear = data.tax_summary.assessment_year || '';
+            const currentQuarter = data.tax_summary.current_quarter || 1;
+
+            // Update label with assessment year and quarter
+            if (taxLabel && assessmentYear) {
+                taxLabel.textContent = `Tax Q${currentQuarter} (${assessmentYear})`;
+            }
+
+            // Update value with quarterly payment
+            taxElement.textContent = `LKR ${quarterlyPayment.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            taxTile.style.display = 'flex';
+        } else if (taxTile) {
+            taxTile.style.display = 'none';
+        }
+
+    } catch (error) {
+        console.error('Error loading sidebar widgets:', error);
+    }
+}
+
 // ================================
 // TRANSACTIONS PAGE
 // ================================
@@ -1348,6 +1474,9 @@ function loadTransactions(applyActiveFilters = false) {
             allTransactions = data; // Store all transactions globally
             displayTransactions(data); // Display transactions directly
             hideLoading();
+
+            // Update sidebar widgets
+            loadSidebarWidgets();
         })
         .catch(error => {
             console.error('Error loading transactions:', error);
@@ -2028,6 +2157,7 @@ async function saveTransaction() {
             capturedBillImages = [];
 
             loadTransactions();
+            loadSidebarWidgets();
         }
     })
     .catch(error => {
@@ -2049,6 +2179,7 @@ function deleteTransaction(id) {
                     hideLoading();
                     showToast('Transaction deleted successfully', 'success');
                     loadTransactions();
+                    loadSidebarWidgets();
                         })
                 .catch(error => {
                     hideLoading();

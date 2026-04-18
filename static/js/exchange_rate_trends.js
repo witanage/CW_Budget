@@ -98,15 +98,7 @@
     // Bind controls (once)
     // ===================================================================
     function _bindControls() {
-        var btns = document.querySelectorAll('#ertPeriodSelector .btn');
-        btns.forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                btns.forEach(function (b) { b.classList.remove('active'); });
-                btn.classList.add('active');
-                _s.period = btn.getAttribute('data-period');
-                _fetchAll();
-            });
-        });
+        // Period selector removed - always uses 'daily' (default in _s.period)
 
         _on('ertMonthsSelector',     'change', function () { _s.months           = +this.value; _fetchAll(); });
         _on('ertForecastDays',       'change', function () { _s.forecastDays     = +this.value; _fetchAll(); });
