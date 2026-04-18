@@ -78,7 +78,13 @@
                                         <button type="button" class="btn btn-outline-primary" data-period="weekly">Weekly</button>
                                         <button type="button" class="btn btn-outline-primary" data-period="monthly">Monthly</button>
                                     </div>
-                                    <div class="d-flex align-items-center gap-2">
+                                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                                        <button class="btn btn-sm btn-info d-inline-flex align-items-center" id="salaryCalcBtn" title="Calculate your USD salary exchanges at different rates">
+                                            <i class="fas fa-calculator me-1"></i>Calculate Salary
+                                        </button>
+                                        <button class="btn btn-sm btn-success d-inline-flex align-items-center" id="ertAiInsightsBtn" title="Get AI-powered insights about the best time to exchange currency">
+                                            <i class="fas fa-brain me-1"></i>Best Time to Exchange
+                                        </button>
                                         <label class="form-label mb-0 small">History:</label>
                                         <select class="form-select form-select-sm" id="ertMonthsSelector" style="width:auto;">
                                             <option value="1">1 Month</option>
@@ -89,29 +95,6 @@
                                         </select>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-
-                        <!-- Bank Comparison (first) -->
-                        <div class="card mb-3">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h6 class="card-title mb-0"><i class="fas fa-balance-scale me-2"></i>Bank Comparison</h6>
-                                <div class="d-flex align-items-center gap-2">
-                                    <button class="btn btn-sm btn-info d-inline-flex align-items-center" id="salaryCalcBtn" title="Calculate your USD salary exchanges at different rates">
-                                        <i class="fas fa-calculator me-1"></i>Calculate Salary
-                                    </button>
-                                    <button class="btn btn-sm btn-success d-inline-flex align-items-center" id="ertAiInsightsBtn" title="Get AI-powered insights about the best time to exchange currency">
-                                        <i class="fas fa-brain me-1"></i>Best Time to Exchange
-                                    </button>
-                                    <select class="form-select form-select-sm" id="ertCompMonths" style="width:auto;">
-                                        <option value="1">1M</option>
-                                        <option value="3" selected>3M</option>
-                                        <option value="6">6M</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <div class="ert-chart-container"><canvas id="ertSourceChart"></canvas></div>
                             </div>
                         </div>
 
@@ -151,6 +134,24 @@
                                     <i class="fas fa-info-circle me-1"></i>
                                     Shows exchange rate refresh attempts throughout the day. Each refresh cycle (run) fetches rates from multiple banks.
                                 </div>
+                            </div>
+                        </div>
+
+                        <!-- Bank Comparison -->
+                        <div class="card mb-3">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h6 class="card-title mb-0"><i class="fas fa-balance-scale me-2"></i>Bank Comparison</h6>
+                                <div class="d-flex align-items-center gap-2">
+                                    <label class="form-label mb-0 small">Period:</label>
+                                    <select class="form-select form-select-sm" id="ertCompMonths" style="width:auto;">
+                                        <option value="1">1M</option>
+                                        <option value="3" selected>3M</option>
+                                        <option value="6">6M</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="ert-chart-container"><canvas id="ertSourceChart"></canvas></div>
                             </div>
                         </div>
 

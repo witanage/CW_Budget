@@ -88,7 +88,8 @@
     }
     .user-table, .audit-table {
         width: 100%;
-        border-collapse: collapse;
+        border-collapse: separate;
+        border-spacing: 0;
         color: var(--text-primary);
     }
     .user-table th, .audit-table th {
@@ -98,6 +99,9 @@
         font-weight: 600;
         border-bottom: 2px solid var(--border-color);
         color: var(--text-primary);
+        position: sticky;
+        top: 0;
+        z-index: 10;
     }
     .user-table td, .audit-table td {
         padding: 12px;
@@ -108,6 +112,39 @@
     }
     .user-table tbody tr:hover, .audit-table tbody tr:hover {
         background: var(--table-hover);
+    }
+
+    /* Audit Log Table Container */
+    .audit-table-wrapper {
+        max-height: 65vh;
+        overflow-y: auto;
+        overflow-x: auto;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        background: var(--table-bg);
+    }
+
+    .audit-table thead th {
+        background: var(--card-bg);
+        color: var(--text-primary);
+        font-weight: 600;
+        font-size: 0.9rem;
+        padding: 14px 12px;
+        white-space: nowrap;
+        border-bottom: 2px solid var(--border-color);
+    }
+
+    .audit-table tbody td {
+        font-size: 0.9rem;
+        vertical-align: middle;
+    }
+
+    .audit-table tbody tr:nth-child(even) {
+        background: var(--table-bg);
+    }
+
+    .audit-table tbody tr:nth-child(odd) {
+        background: rgba(102, 126, 234, 0.02);
     }
     .badge {
         display: inline-block;
@@ -267,11 +304,6 @@
     }
 
     /* Ensure tables don't block buttons */
-    .user-table, .audit-table {
-        position: relative;
-        z-index: 1;
-    }
-
     .action-buttons {
         position: relative;
         z-index: 3;
@@ -722,32 +754,57 @@
                         <i class="fas fa-sync-alt"></i> Refresh
                     </button>
                 </div>
-                <div class="section-body" style="overflow-x: auto;">
+                <div class="section-body">
                     {% if audit_logs %}
-                    <table class="audit-table" id="auditTable">
-                        <thead>
-                            <tr>
-                                <th>Timestamp</th>
-                                <th>Admin</th>
-                                <th>Action</th>
-                                <th>Target User</th>
-                                <th>Details</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for log in audit_logs %}
-                            <tr>
-                                <td>{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') if log.created_at else 'N/A' }}</td>
-                                <td><strong>{{ log.admin_username }}</strong></td>
-                                <td><span class="badge badge-info">{{ log.action }}</span></td>
-                                <td>{{ log.target_username or 'N/A' }}</td>
-                                <td>{{ log.details or '' }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                    <div class="audit-table-wrapper">
+                        <table class="audit-table" id="auditTable">
+                            <thead>
+                                <tr>
+                                    <th><i class="fas fa-clock"></i> Timestamp</th>
+                                    <th><i class="fas fa-user-shield"></i> Admin</th>
+                                    <th><i class="fas fa-bolt"></i> Action</th>
+                                    <th><i class="fas fa-user"></i> Target User</th>
+                                    <th><i class="fas fa-info-circle"></i> Details</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for log in audit_logs %}
+                                <tr>
+                                    <td style="white-space: nowrap;">
+                                        <span style="color: #667eea; font-weight: 500;">
+                                            {{ log.created_at.strftime('%Y-%m-%d') if log.created_at else 'N/A' }}
+                                        </span><br>
+                                        <small style="color: var(--text-secondary);">
+                                            {{ log.created_at.strftime('%H:%M:%S') if log.created_at else '' }}
+                                        </small>
+                                    </td>
+                                    <td>
+                                        <strong style="color: var(--text-primary);">
+                                            <i class="fas fa-user-circle" style="color: #667eea; margin-right: 5px;"></i>
+                                            {{ log.admin_username }}
+                                        </strong>
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-info" style="padding: 6px 12px; font-size: 0.8rem;">
+                                            {{ log.action }}
+                                        </span>
+                                    </td>
+                                    <td style="color: var(--text-secondary);">
+                                        {{ log.target_username or 'N/A' }}
+                                    </td>
+                                    <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; color: var(--text-secondary);">
+                                        {{ log.details or '—' }}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                     {% else %}
-                    <p class="text-muted" style="text-align: center; padding: 40px;">No audit logs available.</p>
+                    <p class="text-muted" style="text-align: center; padding: 40px;">
+                        <i class="fas fa-inbox" style="font-size: 3rem; opacity: 0.3; display: block; margin-bottom: 15px;"></i>
+                        No audit logs available.
+                    </p>
                     {% endif %}
                 </div>
             </div>
