@@ -203,16 +203,18 @@ class BackupService:
         for view in views:
             output.write(f"--\n-- Final view structure for view `{view}`\n--\n\n")
             output.write(f"/*!50001 DROP VIEW IF EXISTS `{view}`*/;\n")
-            output.write("/*!50001 SET @saved_cs_client          = @@character_set_client */;\n")
-            output.write("/*!50001 SET @saved_cs_results         = @@character_set_results */;\n")
-            output.write("/*!50001 SET @saved_col_connection     = @@collation_connection */;\n")
-            output.write("/*!50001 SET character_set_client      = utf8mb4 */;\n")
-            output.write("/*!50001 SET character_set_results     = utf8mb4 */;\n")
-            output.write("/*!50001 SET collation_connection      = utf8mb4_0900_ai_ci */;\n")
             try:
                 cursor.execute(f"SHOW CREATE VIEW `{view}`")
                 result = cursor.fetchone()
                 if result and len(result) >= 2:
+                    cs_client = result[2] if len(result) > 2 and result[2] else 'utf8mb4'
+                    col_conn = result[3] if len(result) > 3 and result[3] else 'utf8mb4_0900_ai_ci'
+                    output.write("/*!50001 SET @saved_cs_client          = @@character_set_client */;\n")
+                    output.write("/*!50001 SET @saved_cs_results         = @@character_set_results */;\n")
+                    output.write("/*!50001 SET @saved_col_connection     = @@collation_connection */;\n")
+                    output.write(f"/*!50001 SET character_set_client      = {cs_client} */;\n")
+                    output.write(f"/*!50001 SET character_set_results     = {cs_client} */;\n")
+                    output.write(f"/*!50001 SET collation_connection      = {col_conn} */;\n")
                     output.write(f"/*!50001 {result[1]} */;\n")
                     output.write("/*!50001 SET character_set_client      = @saved_cs_client */;\n")
                     output.write("/*!50001 SET character_set_results     = @saved_cs_results */;\n")
@@ -226,80 +228,89 @@ class BackupService:
         for proc in procedures:
             output.write(f"--\n-- Procedure `{proc}`\n--\n\n")
             output.write(f"/*!50003 DROP PROCEDURE IF EXISTS `{proc}` */;\n")
-            output.write("/*!50003 SET @saved_cs_client      = @@character_set_client */ ;\n")
-            output.write("/*!50003 SET @saved_cs_results     = @@character_set_results */ ;\n")
-            output.write("/*!50003 SET @saved_col_connection = @@collation_connection */ ;\n")
-            output.write("/*!50003 SET character_set_client  = utf8mb4 */ ;\n")
-            output.write("/*!50003 SET character_set_results = utf8mb4 */ ;\n")
-            output.write("/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;\n")
-            output.write("/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;\n")
-            output.write("/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;\n")
-            output.write("DELIMITER ;;\n")
             try:
                 cursor.execute(f"SHOW CREATE PROCEDURE `{proc}`")
                 result = cursor.fetchone()
                 if result and len(result) >= 3:
+                    proc_sql_mode = result[1] or ''
+                    cs_client = result[3] if len(result) > 3 and result[3] else 'utf8mb4'
+                    col_conn = result[4] if len(result) > 4 and result[4] else 'utf8mb4_0900_ai_ci'
+                    output.write("/*!50003 SET @saved_cs_client      = @@character_set_client */ ;\n")
+                    output.write("/*!50003 SET @saved_cs_results     = @@character_set_results */ ;\n")
+                    output.write("/*!50003 SET @saved_col_connection = @@collation_connection */ ;\n")
+                    output.write(f"/*!50003 SET character_set_client  = {cs_client} */ ;\n")
+                    output.write(f"/*!50003 SET character_set_results = {cs_client} */ ;\n")
+                    output.write(f"/*!50003 SET collation_connection  = {col_conn} */ ;\n")
+                    output.write("/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;\n")
+                    output.write(f"/*!50003 SET sql_mode              = '{proc_sql_mode}' */ ;\n")
+                    output.write("DELIMITER ;;\n")
                     output.write(f"{result[2]} ;;\n")
+                    output.write("DELIMITER ;\n")
+                    output.write("/*!50003 SET sql_mode              = @saved_sql_mode */ ;\n")
+                    output.write("/*!50003 SET character_set_client  = @saved_cs_client */ ;\n")
+                    output.write("/*!50003 SET character_set_results = @saved_cs_results */ ;\n")
+                    output.write("/*!50003 SET collation_connection  = @saved_col_connection */ ;\n\n")
             except Exception as e:
-                output.write(f"-- Error exporting procedure `{proc}`: {e}\n")
-            output.write("DELIMITER ;\n")
-            output.write("/*!50003 SET sql_mode              = @saved_sql_mode */ ;\n")
-            output.write("/*!50003 SET character_set_client  = @saved_cs_client */ ;\n")
-            output.write("/*!50003 SET character_set_results = @saved_cs_results */ ;\n")
-            output.write("/*!50003 SET collation_connection  = @saved_col_connection */ ;\n\n")
+                output.write(f"-- Error exporting procedure `{proc}`: {e}\n\n")
 
     def _dump_functions(self, cursor, output, functions):
         """Dump function definitions."""
         for func in functions:
             output.write(f"--\n-- Function `{func}`\n--\n\n")
             output.write(f"/*!50003 DROP FUNCTION IF EXISTS `{func}` */;\n")
-            output.write("/*!50003 SET @saved_cs_client      = @@character_set_client */ ;\n")
-            output.write("/*!50003 SET @saved_cs_results     = @@character_set_results */ ;\n")
-            output.write("/*!50003 SET @saved_col_connection = @@collation_connection */ ;\n")
-            output.write("/*!50003 SET character_set_client  = utf8mb4 */ ;\n")
-            output.write("/*!50003 SET character_set_results = utf8mb4 */ ;\n")
-            output.write("/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;\n")
-            output.write("/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;\n")
-            output.write("/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;\n")
-            output.write("DELIMITER ;;\n")
             try:
                 cursor.execute(f"SHOW CREATE FUNCTION `{func}`")
                 result = cursor.fetchone()
                 if result and len(result) >= 3:
+                    func_sql_mode = result[1] or ''
+                    cs_client = result[3] if len(result) > 3 and result[3] else 'utf8mb4'
+                    col_conn = result[4] if len(result) > 4 and result[4] else 'utf8mb4_0900_ai_ci'
+                    output.write("/*!50003 SET @saved_cs_client      = @@character_set_client */ ;\n")
+                    output.write("/*!50003 SET @saved_cs_results     = @@character_set_results */ ;\n")
+                    output.write("/*!50003 SET @saved_col_connection = @@collation_connection */ ;\n")
+                    output.write(f"/*!50003 SET character_set_client  = {cs_client} */ ;\n")
+                    output.write(f"/*!50003 SET character_set_results = {cs_client} */ ;\n")
+                    output.write(f"/*!50003 SET collation_connection  = {col_conn} */ ;\n")
+                    output.write("/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;\n")
+                    output.write(f"/*!50003 SET sql_mode              = '{func_sql_mode}' */ ;\n")
+                    output.write("DELIMITER ;;\n")
                     output.write(f"{result[2]} ;;\n")
+                    output.write("DELIMITER ;\n")
+                    output.write("/*!50003 SET sql_mode              = @saved_sql_mode */ ;\n")
+                    output.write("/*!50003 SET character_set_client  = @saved_cs_client */ ;\n")
+                    output.write("/*!50003 SET character_set_results = @saved_cs_results */ ;\n")
+                    output.write("/*!50003 SET collation_connection  = @saved_col_connection */ ;\n\n")
             except Exception as e:
-                output.write(f"-- Error exporting function `{func}`: {e}\n")
-            output.write("DELIMITER ;\n")
-            output.write("/*!50003 SET sql_mode              = @saved_sql_mode */ ;\n")
-            output.write("/*!50003 SET character_set_client  = @saved_cs_client */ ;\n")
-            output.write("/*!50003 SET character_set_results = @saved_cs_results */ ;\n")
-            output.write("/*!50003 SET collation_connection  = @saved_col_connection */ ;\n\n")
+                output.write(f"-- Error exporting function `{func}`: {e}\n\n")
 
     def _dump_triggers(self, cursor, output, triggers):
         """Dump trigger definitions."""
         for trigger in triggers:
             output.write(f"--\n-- Trigger `{trigger}`\n--\n\n")
-            output.write("/*!50003 SET @saved_cs_client      = @@character_set_client */ ;\n")
-            output.write("/*!50003 SET @saved_cs_results     = @@character_set_results */ ;\n")
-            output.write("/*!50003 SET @saved_col_connection = @@collation_connection */ ;\n")
-            output.write("/*!50003 SET character_set_client  = utf8mb4 */ ;\n")
-            output.write("/*!50003 SET character_set_results = utf8mb4 */ ;\n")
-            output.write("/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;\n")
-            output.write("/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;\n")
-            output.write("/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;\n")
-            output.write("DELIMITER ;;\n")
             try:
                 cursor.execute(f"SHOW CREATE TRIGGER `{trigger}`")
                 result = cursor.fetchone()
                 if result and len(result) >= 3:
+                    trig_sql_mode = result[1] or ''
+                    cs_client = result[3] if len(result) > 3 and result[3] else 'utf8mb4'
+                    col_conn = result[4] if len(result) > 4 and result[4] else 'utf8mb4_0900_ai_ci'
+                    output.write("/*!50003 SET @saved_cs_client      = @@character_set_client */ ;\n")
+                    output.write("/*!50003 SET @saved_cs_results     = @@character_set_results */ ;\n")
+                    output.write("/*!50003 SET @saved_col_connection = @@collation_connection */ ;\n")
+                    output.write(f"/*!50003 SET character_set_client  = {cs_client} */ ;\n")
+                    output.write(f"/*!50003 SET character_set_results = {cs_client} */ ;\n")
+                    output.write(f"/*!50003 SET collation_connection  = {col_conn} */ ;\n")
+                    output.write("/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;\n")
+                    output.write(f"/*!50003 SET sql_mode              = '{trig_sql_mode}' */ ;\n")
+                    output.write("DELIMITER ;;\n")
                     output.write(f"/*!50003 {result[2]} */;;\n")
+                    output.write("DELIMITER ;\n")
+                    output.write("/*!50003 SET sql_mode              = @saved_sql_mode */ ;\n")
+                    output.write("/*!50003 SET character_set_client  = @saved_cs_client */ ;\n")
+                    output.write("/*!50003 SET character_set_results = @saved_cs_results */ ;\n")
+                    output.write("/*!50003 SET collation_connection  = @saved_col_connection */ ;\n\n")
             except Exception as e:
-                output.write(f"-- Error exporting trigger `{trigger}`: {e}\n")
-            output.write("DELIMITER ;\n")
-            output.write("/*!50003 SET sql_mode              = @saved_sql_mode */ ;\n")
-            output.write("/*!50003 SET character_set_client  = @saved_cs_client */ ;\n")
-            output.write("/*!50003 SET character_set_results = @saved_cs_results */ ;\n")
-            output.write("/*!50003 SET collation_connection  = @saved_col_connection */ ;\n\n")
+                output.write(f"-- Error exporting trigger `{trigger}`: {e}\n\n")
 
     def _dump_events(self, cursor, output, events):
         """Dump event definitions."""
@@ -307,30 +318,34 @@ class BackupService:
         for event in events:
             output.write(f"--\n-- Event `{event}`\n--\n\n")
             output.write(f"/*!50106 DROP EVENT IF EXISTS `{event}` */;\n")
-            output.write("DELIMITER ;;\n")
-            output.write("/*!50106 SET @save_time_zone= @@TIME_ZONE */ ;;\n")
-            output.write("/*!50106 SET TIME_ZONE= 'SYSTEM' */ ;;\n")
-            output.write("/*!50106 SET @saved_cs_client      = @@character_set_client */ ;;\n")
-            output.write("/*!50106 SET @saved_cs_results     = @@character_set_results */ ;;\n")
-            output.write("/*!50106 SET @saved_col_connection = @@collation_connection */ ;;\n")
-            output.write("/*!50106 SET character_set_client  = utf8mb4 */ ;;\n")
-            output.write("/*!50106 SET character_set_results = utf8mb4 */ ;;\n")
-            output.write("/*!50106 SET collation_connection  = utf8mb4_0900_ai_ci */ ;;\n")
-            output.write("/*!50106 SET @saved_sql_mode       = @@sql_mode */ ;;\n")
-            output.write("/*!50106 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;;\n")
             try:
                 cursor.execute(f"SHOW CREATE EVENT `{event}`")
                 result = cursor.fetchone()
                 if result and len(result) >= 4:
+                    evt_sql_mode = result[1] or ''
+                    evt_time_zone = result[2] if len(result) > 2 and result[2] else 'SYSTEM'
+                    cs_client = result[4] if len(result) > 4 and result[4] else 'utf8mb4'
+                    col_conn = result[5] if len(result) > 5 and result[5] else 'utf8mb4_0900_ai_ci'
+                    output.write("DELIMITER ;;\n")
+                    output.write("/*!50106 SET @save_time_zone= @@TIME_ZONE */ ;;\n")
+                    output.write(f"/*!50106 SET TIME_ZONE= '{evt_time_zone}' */ ;;\n")
+                    output.write("/*!50106 SET @saved_cs_client      = @@character_set_client */ ;;\n")
+                    output.write("/*!50106 SET @saved_cs_results     = @@character_set_results */ ;;\n")
+                    output.write("/*!50106 SET @saved_col_connection = @@collation_connection */ ;;\n")
+                    output.write(f"/*!50106 SET character_set_client  = {cs_client} */ ;;\n")
+                    output.write(f"/*!50106 SET character_set_results = {cs_client} */ ;;\n")
+                    output.write(f"/*!50106 SET collation_connection  = {col_conn} */ ;;\n")
+                    output.write("/*!50106 SET @saved_sql_mode       = @@sql_mode */ ;;\n")
+                    output.write(f"/*!50106 SET sql_mode              = '{evt_sql_mode}' */ ;;\n")
                     output.write(f"/*!50106 {result[3]} */ ;;\n")
+                    output.write("/*!50106 SET sql_mode              = @saved_sql_mode */ ;;\n")
+                    output.write("/*!50106 SET character_set_client  = @saved_cs_client */ ;;\n")
+                    output.write("/*!50106 SET character_set_results = @saved_cs_results */ ;;\n")
+                    output.write("/*!50106 SET collation_connection  = @saved_col_connection */ ;;\n")
+                    output.write("/*!50106 SET TIME_ZONE= @save_time_zone */ ;;\n")
+                    output.write("DELIMITER ;\n\n")
             except Exception as e:
-                output.write(f"-- Error exporting event `{event}`: {e}\n")
-            output.write("/*!50106 SET sql_mode              = @saved_sql_mode */ ;;\n")
-            output.write("/*!50106 SET character_set_client  = @saved_cs_client */ ;;\n")
-            output.write("/*!50106 SET character_set_results = @saved_cs_results */ ;;\n")
-            output.write("/*!50106 SET collation_connection  = @saved_col_connection */ ;;\n")
-            output.write("/*!50106 SET TIME_ZONE= @save_time_zone */ ;;\n")
-            output.write("DELIMITER ;\n\n")
+                output.write(f"-- Error exporting event `{event}`: {e}\n\n")
 
     def _compress_and_encrypt(self, sql_bytes, filename, timestamp):
         """Compress SQL dump and encrypt with password protection."""
