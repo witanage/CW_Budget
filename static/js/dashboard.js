@@ -5983,14 +5983,20 @@ function calculateMonthlyTax() {
             const bonuses = monthlyBonusesData[actualMonthIndex] || [];
             const salaryRateDate = monthlySalaryRateDates[actualMonthIndex] || null;
 
-            // Save ONLY income input data (salaries, rates, bonuses, and dates)
+            // Save both income input data AND calculated tax values
             const monthDataEntry = {
                 month_index: index,
                 month: row.month,
                 salary_usd: monthlySalaries[actualMonthIndex] || 0,
                 salary_rate: monthlySalaryRates[actualMonthIndex] || 0,
                 salary_rate_date: salaryRateDate,
-                bonuses: bonuses  // Array format: [{amount: 5000, rate: 299, date: '2025-11-21'}, ...]
+                bonuses: bonuses,  // Array format: [{amount: 5000, rate: 299, date: '2025-11-21'}, ...]
+                // Include calculated values for display in saved calculations
+                fcReceiptsUSD: row.fcReceiptsUSD,
+                fcReceiptsLKR: row.fcReceiptsLKR,
+                cumulativeIncome: row.cumulativeIncome,
+                totalTaxLiability: row.totalTaxLiability,
+                monthlyPayment: row.monthlyPayment
             };
 
             if (salaryRateDate) {
@@ -6489,9 +6495,79 @@ function displaySavedCalculations(calculations, filterYear = null) {
         const cardClass = isActive ? 'border-success border-2' : (isCurrentlyEditing ? 'border-primary border-2' : '');
         const bgClass = isActive ? 'bg-success bg-opacity-10' : (isCurrentlyEditing ? 'bg-primary bg-opacity-10' : '');
 
+        // Calculate quarterly and total tax payments from monthly_data
+        let quarterlyPayments = [0, 0, 0, 0]; // Q1, Q2, Q3, Q4
+        let totalTaxPayment = 0;
+
+        if (calc.monthly_data && Array.isArray(calc.monthly_data)) {
+            let previousTaxLiability = 0;
+
+            calc.monthly_data.forEach((monthData, index) => {
+                let payment = monthData.monthlyPayment;
+
+                // Fallback: If monthlyPayment is not saved (old calculations), calculate it
+                if (payment === undefined || payment === null) {
+                    const taxFreeThreshold = calc.tax_free_threshold || 1800000;
+
+                    // Reconstruct cumulative income and tax liability
+                    let cumulativeIncome = 0;
+                    for (let i = 0; i <= index; i++) {
+                        const md = calc.monthly_data[i];
+                        const salaryUSD = md.salary_usd || 0;
+                        const salaryRate = md.salary_rate || 0;
+                        let fcReceiptsLKR = salaryUSD * salaryRate;
+
+                        // Add bonuses
+                        if (md.bonuses && Array.isArray(md.bonuses)) {
+                            md.bonuses.forEach(bonus => {
+                                fcReceiptsLKR += (bonus.amount || 0) * (bonus.rate || 0);
+                            });
+                        }
+
+                        cumulativeIncome += fcReceiptsLKR;
+                    }
+
+                    // Calculate tax liability
+                    let totalTaxLiability = 0;
+                    if (cumulativeIncome > taxFreeThreshold) {
+                        if (cumulativeIncome <= 2_800_000) {
+                            totalTaxLiability = (cumulativeIncome - taxFreeThreshold) * 0.06;
+                        } else {
+                            totalTaxLiability = (2_800_000 - taxFreeThreshold) * 0.06;
+                            totalTaxLiability += (cumulativeIncome - 2_800_000) * 0.15;
+                        }
+                    }
+
+                    payment = Math.max(0, totalTaxLiability - previousTaxLiability);
+                    previousTaxLiability = totalTaxLiability;
+                } else {
+                    payment = payment || 0;
+                }
+
+                const quarterIndex = Math.floor(index / 3); // 0-2 -> Q1, 3-5 -> Q2, 6-8 -> Q3, 9-11 -> Q4
+                quarterlyPayments[quarterIndex] += payment;
+                totalTaxPayment += payment;
+            });
+        }
+
+        // Build quarterly payment display
+        let quarterlyHtml = '';
+        quarterlyPayments.forEach((payment, index) => {
+            if (payment > 0) {
+                quarterlyHtml += `
+                    <div class="col-6 col-lg-3">
+                        <div class="text-center p-2 bg-light rounded">
+                            <small class="text-muted d-block">Q${index + 1}</small>
+                            <strong class="small">${formatCurrency(payment)}</strong>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+
         html += `
             <div class="list-group-item calculation-item mb-2 ${cardClass} ${bgClass}">
-                <div class="d-flex justify-content-between align-items-center">
+                <div class="d-flex justify-content-between align-items-start">
                     <div class="flex-grow-1">
                         <div class="d-flex align-items-center mb-2">
                             <h6 class="mb-0 me-2">${calc.calculation_name}</h6>
@@ -6505,12 +6581,26 @@ function displaySavedCalculations(calculations, filterYear = null) {
                                 ${updatedDate && updatedDate !== createdDate ? `<i class="fas fa-edit ms-2 me-1"></i>${updatedDate}` : ''}
                             </span>
                         </div>
-                        <div class="row g-2 small">
+                        <div class="row g-2 small mb-2">
                             <div class="col-auto">
                                 <span class="text-muted">Tax-Free Threshold:</span>
                                 <strong class="ms-1">${formatCurrency(calc.tax_free_threshold)}</strong>
                             </div>
                         </div>
+                        ${totalTaxPayment > 0 ? `
+                        <div class="mb-2">
+                            <div class="d-flex align-items-center mb-2">
+                                <i class="fas fa-file-invoice-dollar me-2 text-danger"></i>
+                                <span class="text-muted small">Total Tax:</span>
+                                <strong class="ms-2 text-danger">${formatCurrency(totalTaxPayment)}</strong>
+                            </div>
+                        </div>
+                        ${quarterlyHtml ? `
+                        <div class="row g-2 small">
+                            ${quarterlyHtml}
+                        </div>
+                        ` : ''}
+                        ` : ''}
                     </div>
                     <div class="ms-3 d-flex align-items-center">
                         <div class="btn-group-vertical" role="group">

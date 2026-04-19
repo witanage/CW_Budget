@@ -867,6 +867,24 @@ tr[draggable="true"] {
     transform: translateX(2px);
 }
 
+/* Quarterly payment boxes in saved calculations */
+#taxPage .calculation-item .bg-light {
+    transition: all 0.2s ease;
+}
+
+#taxPage .calculation-item .bg-light:hover {
+    background-color: rgba(102, 126, 234, 0.1) !important;
+    transform: translateY(-1px);
+}
+
+[data-theme="dark"] #taxPage .calculation-item .bg-light {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+[data-theme="dark"] #taxPage .calculation-item .bg-light:hover {
+    background-color: rgba(102, 126, 234, 0.15) !important;
+}
+
 /* Buttons */
 #taxPage .btn {
     font-weight: 600;

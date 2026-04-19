@@ -221,6 +221,7 @@ def get_tax_calculations_handler():
                                   tax_rate,
                                   tax_free_threshold,
                                   start_month,
+                                  monthly_data,
                                   is_active,
                                   created_at,
                                   updated_at
@@ -237,6 +238,7 @@ def get_tax_calculations_handler():
                                   tax_rate,
                                   tax_free_threshold,
                                   start_month,
+                                  monthly_data,
                                   is_active,
                                   created_at,
                                   updated_at
@@ -253,6 +255,10 @@ def get_tax_calculations_handler():
                 calc['tax_rate'] = float(calc['tax_rate'])
             if calc.get('tax_free_threshold') is not None:
                 calc['tax_free_threshold'] = float(calc['tax_free_threshold'])
+            # Parse JSON monthly_data
+            if calc.get('monthly_data'):
+                if isinstance(calc['monthly_data'], str):
+                    calc['monthly_data'] = json.loads(calc['monthly_data'])
 
         # Validate: Check for multiple active calculations per year (data integrity)
         active_by_year = {}
