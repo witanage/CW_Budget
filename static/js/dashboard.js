@@ -5388,6 +5388,7 @@ function loadTaxCalculator() {
     const assessmentYearSelect = document.getElementById('assessmentYear');
     const startMonthSelect = document.getElementById('startMonth');
     const saveCalculationBtnAlt = document.getElementById('saveCalculationBtnAlt');
+    const saveCalculationBtnIncome = document.getElementById('saveCalculationBtnIncome');
     const refreshSavedBtn = document.getElementById('refreshSavedCalculationsBtn');
     const loadSavedByYearBtn = document.getElementById('loadSavedByYearBtn');
 
@@ -5401,6 +5402,10 @@ function loadTaxCalculator() {
 
     if (saveCalculationBtnAlt) {
         saveCalculationBtnAlt.onclick = saveTaxCalculation;
+    }
+
+    if (saveCalculationBtnIncome) {
+        saveCalculationBtnIncome.onclick = saveTaxCalculation;
     }
 
     if (refreshSavedBtn) {
@@ -5426,6 +5431,20 @@ function loadTaxCalculator() {
     // Update monthly data table when start month changes
     if (startMonthSelect) {
         startMonthSelect.addEventListener('change', populateMonthlyDataTable);
+    }
+
+    // Sync calculation name fields
+    const calculationNameInput = document.getElementById('calculationNameInput');
+    const calculationName = document.getElementById('calculationName');
+
+    if (calculationNameInput && calculationName) {
+        calculationNameInput.addEventListener('input', function() {
+            calculationName.value = this.value;
+        });
+
+        calculationName.addEventListener('input', function() {
+            calculationNameInput.value = this.value;
+        });
     }
 
     // Initial table population
@@ -5984,30 +6003,38 @@ function calculateMonthlyTax() {
 
     console.log('Full calculation data to be saved:', JSON.stringify(lastCalculationData.monthly_data, null, 2));
 
-    // Show save section
+    // Show save section and button
     const saveSection = document.getElementById('saveCalculationSection');
+    const saveButtonIncome = document.getElementById('saveCalculationBtnIncome');
     if (saveSection) {
         saveSection.style.display = 'block';
 
         // Auto-generate calculation name only if not editing
         if (!currentEditingCalculationId) {
-            document.getElementById('calculationName').value = `Tax Calculation ${lastCalculationData.assessment_year}`;
+            const calcName = `Tax Calculation ${lastCalculationData.assessment_year}`;
+            document.getElementById('calculationName').value = calcName;
+            document.getElementById('calculationNameInput').value = calcName;
             // For new calculations, default to active
             const setAsActiveCheckbox = document.getElementById('setAsActive');
             if (setAsActiveCheckbox) {
                 setAsActiveCheckbox.checked = true;
             }
         }
-
-        // Update the active year display
-        const activeYearDisplay = document.getElementById('activeYearDisplay');
-        if (activeYearDisplay) {
-            activeYearDisplay.textContent = lastCalculationData.assessment_year;
-        }
-
-        // Update button UI based on editing mode
-        updateSaveButtonUI();
     }
+
+    // Show the save button in the income details card
+    if (saveButtonIncome) {
+        saveButtonIncome.style.display = 'flex';
+    }
+
+    // Update the active year display
+    const activeYearDisplay = document.getElementById('activeYearDisplay');
+    if (activeYearDisplay) {
+        activeYearDisplay.textContent = lastCalculationData.assessment_year;
+    }
+
+    // Update button UI based on editing mode
+    updateSaveButtonUI();
 
     // Show summary cards
     const summaryCards = document.getElementById('taxSummaryCards');
@@ -6137,6 +6164,16 @@ function resetTaxCalculator() {
         saveSection.style.display = 'none';
     }
 
+    // Hide save button in Income Details card
+    const saveButtonIncome = document.getElementById('saveCalculationBtnIncome');
+    if (saveButtonIncome) {
+        saveButtonIncome.style.display = 'none';
+    }
+
+    // Clear calculation name fields
+    document.getElementById('calculationNameInput').value = '';
+    document.getElementById('calculationName').value = '';
+
     // Hide summary cards
     const summaryCards = document.getElementById('taxSummaryCards');
     if (summaryCards) {
@@ -6234,11 +6271,21 @@ function saveTaxCalculation(saveAsNew = false) {
         return;
     }
 
-    const calculationName = document.getElementById('calculationName').value.trim();
+    // Get calculation name from the input in Income Details card first, fallback to the other field
+    let calculationName = document.getElementById('calculationNameInput')?.value.trim();
+    if (!calculationName) {
+        calculationName = document.getElementById('calculationName')?.value.trim();
+    }
+
     if (!calculationName) {
         showToast('Please enter a name for this calculation', 'warning');
+        document.getElementById('calculationNameInput')?.focus();
         return;
     }
+
+    // Keep both fields in sync
+    document.getElementById('calculationNameInput').value = calculationName;
+    document.getElementById('calculationName').value = calculationName;
 
     const setAsActive = document.getElementById('setAsActive')?.checked || false;
 
@@ -6469,18 +6516,14 @@ function displaySavedCalculations(calculations, filterYear = null) {
                         <div class="btn-group-vertical" role="group">
                             <button class="btn btn-sm ${isCurrentlyEditing ? 'btn-primary' : 'btn-outline-primary'} d-flex align-items-center justify-content-center"
                                     onclick="loadCalculation(${calc.id})"
-                                    title="${isCurrentlyEditing ? 'Currently editing' : 'Edit this calculation'}">
-                                <i class="fas fa-edit me-1"></i>Edit
+                                    title="${isCurrentlyEditing ? 'Currently loaded' : 'Load this calculation'}">
+                                <i class="fas fa-download me-1"></i>Load
                             </button>
-                            ${!isActive ? `
-                            <button class="btn btn-sm btn-outline-success d-flex align-items-center justify-content-center"
-                                    onclick="setActiveCalculation(${calc.id})"
-                                    title="Set as active for ${calc.assessment_year}">
-                                <i class="fas fa-star me-1"></i>Activate
-                            </button>` : `
-                            <button class="btn btn-sm btn-success d-flex align-items-center justify-content-center" disabled title="Already active">
-                                <i class="fas fa-check me-1"></i>Active
-                            </button>`}
+                            <button class="btn btn-sm ${isActive ? 'btn-success' : 'btn-outline-success'} d-flex align-items-center justify-content-center"
+                                    onclick="toggleActiveCalculation(${calc.id}, ${isActive})"
+                                    title="${isActive ? 'Deactivate this calculation' : 'Set as active for ' + calc.assessment_year}">
+                                <i class="fas ${isActive ? 'fa-check' : 'fa-star'} me-1"></i>${isActive ? 'Active' : 'Activate'}
+                            </button>
                             <button class="btn btn-sm btn-outline-danger d-flex align-items-center justify-content-center"
                                     onclick="deleteCalculation(${calc.id})"
                                     title="Delete this calculation">
@@ -6574,6 +6617,59 @@ function setActiveCalculation(calculationId) {
     );
 }
 
+function toggleActiveCalculation(calculationId, isCurrentlyActive) {
+    const calcToToggle = allSavedCalculations.find(c => c.id === calculationId);
+    if (!calcToToggle) {
+        showToast('Calculation not found', 'danger');
+        return;
+    }
+
+    if (isCurrentlyActive) {
+        // Deactivate
+        showConfirmModal(
+            'Deactivate Calculation',
+            `<p class="mb-2">Deactivate <strong>"${calcToToggle.calculation_name}"</strong> for ${calcToToggle.assessment_year}?</p>
+            <div class="alert alert-info mb-0">
+                <i class="fas fa-info-circle me-2"></i>
+                This calculation will no longer be marked as active.
+            </div>`,
+            () => {
+                showLoading();
+
+                fetch(`/api/tax-calculations/${calculationId}/deactivate`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    hideLoading();
+                    if (data.error) {
+                        showToast(data.error, 'danger');
+                    } else {
+                        showToast(
+                            `<i class="fas fa-times-circle me-2"></i>Calculation deactivated for ${data.assessment_year}!`,
+                            'info'
+                        );
+                        loadSavedCalculations();
+                    }
+                })
+                .catch(error => {
+                    hideLoading();
+                    console.error('Error deactivating calculation:', error);
+                    showToast('Failed to deactivate calculation', 'danger');
+                });
+            },
+            'Deactivate',
+            'btn-warning'
+        );
+    } else {
+        // Activate (use existing function)
+        setActiveCalculation(calculationId);
+    }
+}
+
 function loadCalculation(calculationId) {
     showLoading();
 
@@ -6604,6 +6700,7 @@ function loadCalculation(calculationId) {
 
         // Load values into form fields
         document.getElementById('calculationName').value = calc.calculation_name;
+        document.getElementById('calculationNameInput').value = calc.calculation_name;
         document.getElementById('assessmentYear').value = calc.assessment_year;
         // Tax rate is now hardcoded in progressive brackets, not loaded from saved data
         document.getElementById('taxFreeThreshold').value = calc.tax_free_threshold;

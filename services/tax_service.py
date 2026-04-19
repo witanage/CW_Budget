@@ -454,6 +454,64 @@ def set_active_tax_calculation_handler(calculation_id):
             connection.close()
 
 
+def deactivate_tax_calculation_handler(calculation_id):
+    """Deactivate a tax calculation."""
+    connection = None
+    cursor = None
+    try:
+        user_id = session['user_id']
+
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+
+        # Verify ownership and get assessment year
+        cursor.execute("""
+                       SELECT assessment_year, is_active
+                       FROM tax_calculations
+                       WHERE id = %s
+                         AND user_id = %s
+                       """, (calculation_id, user_id))
+
+        calculation = cursor.fetchone()
+
+        if not calculation:
+            return jsonify({'error': 'Tax calculation not found'}), 404
+
+        if not calculation['is_active']:
+            return jsonify({'error': 'Calculation is already inactive'}), 400
+
+        assessment_year = calculation['assessment_year']
+
+        # Deactivate the calculation
+        cursor.execute("""
+                       UPDATE tax_calculations
+                       SET is_active  = FALSE,
+                           updated_at = CURRENT_TIMESTAMP
+                       WHERE id = %s
+                         AND user_id = %s
+                       """, (calculation_id, user_id))
+
+        connection.commit()
+        logger.info(f"Tax calculation ID={calculation_id} deactivated for year {assessment_year}")
+
+        return jsonify({
+            'message': 'Tax calculation deactivated successfully',
+            'id': calculation_id,
+            'assessment_year': assessment_year
+        }), 200
+
+    except Error as e:
+        if connection:
+            connection.rollback()
+        logger.error(f"Error deactivating tax calculation {calculation_id}: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+
 def cleanup_multiple_active_calculations_handler():
     """Admin utility: Fix data integrity by ensuring only one active calculation per user per year.
 
@@ -571,6 +629,11 @@ def register_tax_routes(app, login_required):
     @login_required
     def set_active_tax_calculation(calculation_id):
         return set_active_tax_calculation_handler(calculation_id)
+
+    @app.route('/api/tax-calculations/<int:calculation_id>/deactivate', methods=['PUT'])
+    @login_required
+    def deactivate_tax_calculation(calculation_id):
+        return deactivate_tax_calculation_handler(calculation_id)
 
     @app.route('/api/tax-calculations/cleanup-duplicates', methods=['POST'])
     @login_required

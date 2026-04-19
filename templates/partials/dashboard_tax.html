@@ -68,6 +68,13 @@
                             </div>
                             <div class="card-body">
                                 <form id="taxCalculatorForm">
+                                    <!-- Calculation Name -->
+                                    <div class="mb-3">
+                                        <label for="calculationNameInput" class="form-label">Calculation Name</label>
+                                        <input type="text" class="form-control" id="calculationNameInput" placeholder="e.g., My 2026/2027 Tax Plan">
+                                        <small class="text-muted">Optional: Give this calculation a name to save it</small>
+                                    </div>
+
                                     <!-- Form Fields Row -->
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
@@ -79,9 +86,6 @@
                                                 <option value="2026/2027" selected>2026/2027</option>
                                                 <option value="2025/2026">2025/2026</option>
                                                 <option value="2024/2025">2024/2025</option>
-                                                <option value="2023/2024">2023/2024</option>
-                                                <option value="2022/2023">2022/2023</option>
-                                                <option value="2021/2022">2021/2022</option>
                                             </select>
                                         </div>
                                         <div class="col-md-6 mb-3">
@@ -136,6 +140,9 @@
                                     <div class="d-grid gap-2">
                                         <button type="button" class="btn btn-primary btn-lg d-flex align-items-center justify-content-center" id="calculateTaxBtn">
                                             <i class="fas fa-calculator me-2"></i>Calculate Tax
+                                        </button>
+                                        <button type="button" class="btn btn-success btn-lg d-flex align-items-center justify-content-center" id="saveCalculationBtnIncome" style="display: none;">
+                                            <i class="fas fa-save me-2"></i>Save Calculation
                                         </button>
                                         <button type="button" class="btn btn-outline-secondary btn-lg d-flex align-items-center justify-content-center" id="resetTaxBtn">
                                             <i class="fas fa-redo me-2"></i>Reset Form
