@@ -488,6 +488,11 @@
                         Upload a CSV file with columns: <strong>Description, Credit, Debit, Note, Method</strong>.
                         Amounts may include currency prefixes (e.g. Rs) and thousand-separators.
                     </p>
+                    <div style="margin-bottom: 15px;">
+                        <button class="btn-sm btn-info" onclick="downloadCsvTemplate()" style="background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); border: none; color: white;">
+                            <i class="fas fa-download"></i> Download CSV Template with Sample Data
+                        </button>
+                    </div>
 
                     <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 15px;">
                         <!-- User selector -->
@@ -651,6 +656,9 @@
                                class="search-box"
                                placeholder="Search by username, email, or ID..."
                                onkeyup="filterUsers()">
+                        <button class="btn-sm btn-success" onclick="openCreateUserModal()">
+                            <i class="fas fa-user-plus"></i> Create User
+                        </button>
                         <button class="btn-sm btn-primary" onclick="refreshData()">
                             <i class="fas fa-sync-alt"></i> Refresh
                         </button>
@@ -1111,6 +1119,20 @@
                     <i class="fas fa-exclamation-circle"></i>
                     <strong>Warning:</strong> This action cannot be undone. All user data including transactions and records will be permanently deleted.
                 </div>
+                <div style="margin-top: 15px;">
+                    <label for="deleteUserPassword" style="display: block; font-weight: 600; margin-bottom: 5px; color: var(--text-primary);">
+                        <i class="fas fa-lock"></i> Confirm Your Password
+                    </label>
+                    <input type="password"
+                           id="deleteUserPassword"
+                           class="form-control"
+                           placeholder="Enter your password to confirm"
+                           style="background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color);"
+                           required>
+                    <small style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 5px; display: block;">
+                        For security, please enter your password to confirm this action.
+                    </small>
+                </div>
             </div>
             <div class="modal-footer" style="border-top: 1px solid var(--border-color, #dee2e6);">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
@@ -1329,6 +1351,101 @@
     </div>
 </div>
 
+<!-- Create User Modal -->
+<div class="modal fade" id="createUserModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content" style="background: var(--card-bg); color: var(--text-primary);">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border-color);">
+                <h5 class="modal-title">
+                    <i class="fas fa-user-plus"></i> Create New User
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 5px; color: var(--text-primary);">
+                        <i class="fas fa-user"></i> Username *
+                    </label>
+                    <input type="text" id="createUsername" placeholder="Enter username"
+                           style="width: 100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary);">
+                    <small style="color: var(--text-secondary); font-size: 0.85rem; display: block; margin-top: 3px;">
+                        Must be unique
+                    </small>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 5px; color: var(--text-primary);">
+                        <i class="fas fa-envelope"></i> Email *
+                    </label>
+                    <input type="email" id="createEmail" placeholder="user@example.com"
+                           style="width: 100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary);">
+                    <small style="color: var(--text-secondary); font-size: 0.85rem; display: block; margin-top: 3px;">
+                        Must be a valid email address
+                    </small>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 5px; color: var(--text-primary);">
+                        <i class="fas fa-lock"></i> Password *
+                    </label>
+                    <input type="password" id="createPassword" placeholder="Enter password"
+                           style="width: 100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary);">
+                    <small style="color: var(--text-secondary); font-size: 0.85rem; display: block; margin-top: 3px;">
+                        Minimum 6 characters
+                    </small>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 5px; color: var(--text-primary);">
+                        <i class="fas fa-home"></i> Default Landing Page
+                    </label>
+                    <select id="createDefaultPage"
+                            style="width: 100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary);">
+                        <option value="transactions">Transactions</option>
+                        <option value="tax">Tax</option>
+                        <option value="reports">Reports</option>
+                        <option value="rateTrends">Rate Trends</option>
+                    </select>
+                </div>
+
+                <div style="margin-bottom: 10px;">
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" id="createIsActive" checked
+                               style="width: 18px; height: 18px; margin-right: 8px; cursor: pointer;">
+                        <span style="font-weight: 600; color: var(--text-primary);">
+                            <i class="fas fa-check-circle"></i> Active Account
+                        </span>
+                    </label>
+                    <small style="color: var(--text-secondary); font-size: 0.85rem; display: block; margin-left: 26px;">
+                        User can login immediately if checked
+                    </small>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" id="createIsAdmin"
+                               style="width: 18px; height: 18px; margin-right: 8px; cursor: pointer;">
+                        <span style="font-weight: 600; color: var(--text-primary);">
+                            <i class="fas fa-crown"></i> Admin Privileges
+                        </span>
+                    </label>
+                    <small style="color: var(--text-secondary); font-size: 0.85rem; display: block; margin-left: 26px;">
+                        Grant admin access to this user
+                    </small>
+                </div>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid var(--border-color);">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+                <button type="button" class="btn btn-success" id="createUserBtn" onclick="createUser()">
+                    <i class="fas fa-user-plus"></i> Create User
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Delete Payment Method Confirmation Modal -->
 <div class="modal fade" id="deletePmModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
@@ -1370,11 +1487,13 @@
 
     let currentDeleteUserId = null;
     let deleteModal = null;
+    let createUserModalInstance = null;
 
     // Initialize on page load
     document.addEventListener('DOMContentLoaded', function() {
         console.log('DOM Content Loaded');
         deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+        createUserModalInstance = new bootstrap.Modal(document.getElementById('createUserModal'));
 
         // CRITICAL FIX: Remove any lingering modal backdrops or overlays
         clearModalBackdrops();
@@ -1542,12 +1661,19 @@
     function showDeleteModal(userId, username) {
         currentDeleteUserId = userId;
         document.getElementById('deleteUsername').textContent = username;
+        document.getElementById('deleteUserPassword').value = '';
         deleteModal.show();
     }
 
     // Confirm and execute delete
     async function confirmDelete() {
         if (!currentDeleteUserId) return;
+
+        const password = document.getElementById('deleteUserPassword').value;
+        if (!password) {
+            showAlert('Please enter your password to confirm deletion', 'warning');
+            return;
+        }
 
         const deleteBtn = document.getElementById('confirmDeleteBtn');
         const originalText = deleteBtn.innerHTML;
@@ -1556,7 +1682,11 @@
 
         try {
             const response = await fetch(`/api/admin/users/${currentDeleteUserId}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ password: password })
             });
 
             const data = await response.json();
@@ -1575,6 +1705,80 @@
             showAlert('Network error: ' + error.message, 'danger');
             deleteBtn.disabled = false;
             deleteBtn.innerHTML = originalText;
+        }
+    }
+
+    // Open create user modal
+    function openCreateUserModal() {
+        document.getElementById('createUsername').value = '';
+        document.getElementById('createEmail').value = '';
+        document.getElementById('createPassword').value = '';
+        document.getElementById('createDefaultPage').value = 'transactions';
+        document.getElementById('createIsActive').checked = true;
+        document.getElementById('createIsAdmin').checked = false;
+        createUserModalInstance.show();
+    }
+
+    // Create new user
+    async function createUser() {
+        const username = document.getElementById('createUsername').value.trim();
+        const email = document.getElementById('createEmail').value.trim();
+        const password = document.getElementById('createPassword').value;
+        const defaultPage = document.getElementById('createDefaultPage').value;
+        const isActive = document.getElementById('createIsActive').checked;
+        const isAdmin = document.getElementById('createIsAdmin').checked;
+
+        // Validation
+        if (!username) {
+            showAlert('Username is required', 'warning');
+            return;
+        }
+        if (!email) {
+            showAlert('Email is required', 'warning');
+            return;
+        }
+        if (!password || password.length < 6) {
+            showAlert('Password must be at least 6 characters', 'warning');
+            return;
+        }
+
+        const createBtn = document.getElementById('createUserBtn');
+        const originalText = createBtn.innerHTML;
+        createBtn.disabled = true;
+        createBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+
+        try {
+            const response = await fetch('/api/admin/users', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    username: username,
+                    email: email,
+                    password: password,
+                    default_page: defaultPage,
+                    is_active: isActive,
+                    is_admin: isAdmin
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                createUserModalInstance.hide();
+                showAlert(data.message, 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showAlert(data.error || 'Failed to create user', 'danger');
+                createBtn.disabled = false;
+                createBtn.innerHTML = originalText;
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showAlert('Network error: ' + error.message, 'danger');
+            createBtn.disabled = false;
+            createBtn.innerHTML = originalText;
         }
     }
 
@@ -1912,6 +2116,11 @@
             setTimeout(clearModalBackdrops, 100);
         });
     });
+
+    // Download CSV template with sample data
+    function downloadCsvTemplate() {
+        window.location.href = '/api/admin/download-csv-template';
+    }
 
     function previewCsv() {
         const fileInput = document.getElementById('csvFileInput');

@@ -21,7 +21,7 @@ import calendar
 from datetime import datetime
 from decimal import Decimal
 
-from flask import redirect, request, jsonify, session, render_template
+from flask import redirect, request, jsonify, session, render_template, send_file
 from mysql.connector import Error
 
 from db import get_db_connection
@@ -125,6 +125,93 @@ def register_admin_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN):
                                error_message=error_message,
                                current_user_id=session.get('user_id'))
 
+    @app.route('/api/admin/users', methods=['POST'])
+    @admin_required
+    @limiter.limit(RATE_LIMIT_ADMIN)
+    def create_user():
+        """Create a new user (admin only)."""
+        from werkzeug.security import generate_password_hash
+
+        data = request.get_json()
+        username = data.get('username', '').strip()
+        email = data.get('email', '').strip()
+        password = data.get('password')
+        default_page = data.get('default_page', 'transactions')
+        is_active = data.get('is_active', True)
+        is_admin = data.get('is_admin', False)
+
+        # Validation
+        if not username or not email or not password:
+            return jsonify({'error': 'Username, email, and password are required'}), 400
+
+        if len(password) < 6:
+            return jsonify({'error': 'Password must be at least 6 characters'}), 400
+
+        connection = get_db_connection()
+        if not connection:
+            return jsonify({'error': 'Database connection failed'}), 500
+
+        cursor = connection.cursor(dictionary=True)
+        admin_id = session['user_id']
+
+        try:
+            # Check if username or email already exists
+            cursor.execute("SELECT id FROM users WHERE username = %s OR email = %s", (username, email))
+            if cursor.fetchone():
+                return jsonify({'error': 'Username or email already exists'}), 400
+
+            # Create new user
+            password_hash = generate_password_hash(password)
+            cursor.execute(
+                """INSERT INTO users (username, email, password_hash, is_active, is_admin, default_page) 
+                   VALUES (%s, %s, %s, %s, %s, %s)""",
+                (username, email, password_hash, is_active, is_admin, default_page)
+            )
+            user_id = cursor.lastrowid
+
+            # Initialize all tabs as enabled for new user (both desktop and mobile)
+            available_tabs = ['transactions', 'tax', 'reports', 'rateTrends']
+            for tab in available_tabs:
+                cursor.execute(
+                    "INSERT INTO user_tabs (user_id, tab_name, is_enabled, is_enabled_mobile) VALUES (%s, %s, TRUE, TRUE)",
+                    (user_id, tab)
+                )
+
+            # Assign default Cash payment method (ID=1) if active
+            if is_active:
+                try:
+                    cursor.execute("SELECT id FROM payment_methods WHERE id = 1 AND is_active = TRUE")
+                    if cursor.fetchone():
+                        cursor.execute(
+                            "INSERT INTO user_payment_methods (user_id, payment_method_id) VALUES (%s, 1)",
+                            (user_id,)
+                        )
+                except Error as e:
+                    logger.warning(f"Could not assign default payment method to user {user_id}: {str(e)}")
+
+            connection.commit()
+
+            # Log the action
+            status = 'active' if is_active else 'inactive'
+            role = 'admin' if is_admin else 'user'
+            log_audit(admin_id, 'Created user', user_id,
+                      f"Created user '{username}' ({email}) - Status: {status}, Role: {role}")
+
+            logger.info(f"Admin {admin_id} created user {user_id} ({username})")
+
+            return jsonify({
+                'message': f'User {username} created successfully',
+                'user_id': user_id
+            }), 201
+
+        except Error as e:
+            logger.error(f"Error creating user: {str(e)}")
+            connection.rollback()
+            return jsonify({'error': str(e)}), 500
+        finally:
+            cursor.close()
+            connection.close()
+
     @app.route('/api/admin/users', methods=['GET'])
     @admin_required
     @limiter.limit(RATE_LIMIT_ADMIN)
@@ -191,6 +278,29 @@ def register_admin_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN):
             # Toggle active status
             new_status = not user['is_active']
             cursor.execute("UPDATE users SET is_active = %s WHERE id = %s", (new_status, user_id))
+
+            # If activating a user, assign default Cash payment method (ID=1)
+            if new_status:
+                try:
+                    # Check if payment method ID 1 (Cash) exists
+                    cursor.execute("SELECT id FROM payment_methods WHERE id = 1 AND is_active = TRUE")
+                    if cursor.fetchone():
+                        # Check if not already assigned
+                        cursor.execute(
+                            "SELECT id FROM user_payment_methods WHERE user_id = %s AND payment_method_id = 1",
+                            (user_id,)
+                        )
+                        if not cursor.fetchone():
+                            # Assign Cash payment method to the newly activated user
+                            cursor.execute(
+                                "INSERT INTO user_payment_methods (user_id, payment_method_id) VALUES (%s, 1)",
+                                (user_id,)
+                            )
+                            logger.info(f"Assigned default Cash payment method to user {user_id}")
+                except Error as e:
+                    logger.warning(f"Could not assign default payment method to user {user_id}: {str(e)}")
+                    # Don't fail the activation if payment method assignment fails
+
             connection.commit()
 
             # Log the action
@@ -264,6 +374,14 @@ def register_admin_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN):
     @limiter.limit(RATE_LIMIT_ADMIN)
     def delete_user(user_id):
         """Delete a user and all their data."""
+        from werkzeug.security import check_password_hash
+
+        data = request.get_json() or {}
+        password = data.get('password')
+
+        if not password:
+            return jsonify({'error': 'Password is required to confirm deletion'}), 400
+
         connection = get_db_connection()
         if not connection:
             return jsonify({'error': 'Database connection failed'}), 500
@@ -275,6 +393,13 @@ def register_admin_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN):
             # Prevent admin from deleting themselves
             if user_id == admin_id:
                 return jsonify({'error': 'Cannot delete your own account'}), 400
+
+            # Verify admin's password
+            cursor.execute("SELECT password_hash FROM users WHERE id = %s", (admin_id,))
+            admin_user = cursor.fetchone()
+
+            if not admin_user or not check_password_hash(admin_user['password_hash'], password):
+                return jsonify({'error': 'Invalid password. Please try again.'}), 401
 
             # Get user details before deletion
             cursor.execute("SELECT username, email FROM users WHERE id = %s", (user_id,))
@@ -1239,6 +1364,39 @@ def register_admin_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN):
         finally:
             cursor.close()
             connection.close()
+
+    @app.route('/api/admin/download-csv-template', methods=['GET'])
+    @admin_required
+    def download_csv_template():
+        """Download a CSV template with sample data."""
+        # Create an in-memory CSV with sample data
+        output = io.StringIO()
+        writer = csv.writer(output)
+
+        # Write header
+        writer.writerow(['Description', 'Credit', 'Debit', 'Note', 'Method'])
+
+        # Write sample rows
+        writer.writerow(['Salary Payment', '5000.00', '', 'Monthly salary', 'Bank Transfer'])
+        writer.writerow(['Grocery Shopping', '', '150.50', 'Supermarket', 'Credit Card'])
+        writer.writerow(['Utility Bill - Electricity', '', '75.00', 'Monthly bill', 'Cash'])
+        writer.writerow(['Freelance Income', '500.00', '', 'Project payment', 'Bank Transfer'])
+        writer.writerow(['Restaurant Dinner', '', '45.25', 'Weekend outing', 'Debit Card'])
+
+        # Convert to bytes
+        output.seek(0)
+        csv_bytes = io.BytesIO(output.getvalue().encode('utf-8'))
+        csv_bytes.seek(0)
+
+        # Log the action
+        log_audit(session['user_id'], 'DOWNLOADED_CSV_TEMPLATE', details='Downloaded CSV import template')
+
+        return send_file(
+            csv_bytes,
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name='transaction_import_template.csv'
+        )
 
     @app.route('/api/admin/users/<int:user_id>/monthly-records', methods=['GET'])
     @admin_required

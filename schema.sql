@@ -91,8 +91,10 @@ CREATE TABLE IF NOT EXISTS payment_methods (
     color VARCHAR(7) DEFAULT '#007bff',
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_is_active (is_active)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    INDEX idx_is_active (is_active),
+    INDEX idx_type (type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+COMMENT='Supported types: credit_card, debit_card, bank_transfer, cash, digital_wallet, card, other';
 
 -- ============================================================
 -- User Payment Methods (Junction Table)
