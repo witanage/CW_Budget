@@ -50,26 +50,34 @@
                     </button>
                 </div>
                 <ul class="nav flex-column">
+                    {% if 'transactions' in enabled_tabs %}
                     <li class="nav-item">
-                        <a class="nav-link active" href="#" data-page="transactions">
+                        <a class="nav-link{% if enabled_tabs[0] == 'transactions' %} active{% endif %}" href="#" data-page="transactions">
                             <i class="fas fa-exchange-alt me-2"></i>Transactions
                         </a>
                     </li>
-<li class="nav-item">
-                        <a class="nav-link" href="#" data-page="tax">
+                    {% endif %}
+                    {% if 'tax' in enabled_tabs %}
+                    <li class="nav-item">
+                        <a class="nav-link{% if enabled_tabs[0] == 'tax' %} active{% endif %}" href="#" data-page="tax">
                             <i class="fas fa-calculator me-2"></i>Tax
                         </a>
                     </li>
+                    {% endif %}
+                    {% if 'reports' in enabled_tabs %}
                     <li class="nav-item">
-                        <a class="nav-link" href="#" data-page="reports">
+                        <a class="nav-link{% if enabled_tabs[0] == 'reports' %} active{% endif %}" href="#" data-page="reports">
                             <i class="fas fa-chart-bar me-2"></i>Reports
                         </a>
                     </li>
+                    {% endif %}
+                    {% if 'rateTrends' in enabled_tabs %}
                     <li class="nav-item">
-                        <a class="nav-link" href="#" data-page="rateTrends">
+                        <a class="nav-link{% if enabled_tabs[0] == 'rateTrends' %} active{% endif %}" href="#" data-page="rateTrends">
                             <i class="fas fa-chart-line me-2"></i>Rate Trends
                         </a>
                     </li>
+                    {% endif %}
                 </ul>
 
                 <!-- Sidebar Widgets -->
@@ -227,6 +235,9 @@
     if (typeof pdfjsLib !== 'undefined') {
         pdfjsLib.GlobalWorkerOptions.workerSrc = "{{ url_for('static', filename='js/vendor/pdf.worker.min.js') }}";
     }
+
+    // Pass enabled tabs to JavaScript
+    window.enabledTabs = {{ enabled_tabs | tojson }};
 </script>
 <!-- base.js is already loaded in base.html, no need to load it again -->
 <script src="{{ url_for('static', filename='js/dashboard.js') }}?v=3.1"></script>

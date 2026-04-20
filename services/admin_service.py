@@ -384,6 +384,158 @@ def register_admin_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN):
             cursor.close()
             connection.close()
 
+    @app.route('/api/admin/users/<int:user_id>/tabs', methods=['GET'])
+    @admin_required
+    @limiter.limit(RATE_LIMIT_ADMIN)
+    def get_user_tabs(user_id):
+        """Get user's tab permissions."""
+        connection = get_db_connection()
+        if not connection:
+            return jsonify({'error': 'Database connection failed'}), 500
+
+        cursor = connection.cursor(dictionary=True)
+
+        try:
+            # Verify user exists
+            cursor.execute("SELECT username FROM users WHERE id = %s", (user_id,))
+            user = cursor.fetchone()
+
+            if not user:
+                return jsonify({'error': 'User not found'}), 404
+
+            # Get user's tab permissions
+            cursor.execute("""
+                SELECT tab_name, is_enabled, is_enabled_mobile
+                FROM user_tabs
+                WHERE user_id = %s
+                ORDER BY 
+                    CASE tab_name
+                        WHEN 'transactions' THEN 1
+                        WHEN 'tax' THEN 2
+                        WHEN 'reports' THEN 3
+                        WHEN 'rateTrends' THEN 4
+                        ELSE 5
+                    END
+            """, (user_id,))
+
+            tabs = cursor.fetchall()
+
+            # If no tabs exist for user, initialize with all tabs enabled
+            if not tabs:
+                available_tabs = ['transactions', 'tax', 'reports', 'rateTrends']
+                for tab in available_tabs:
+                    cursor.execute("""
+                        INSERT INTO user_tabs (user_id, tab_name, is_enabled, is_enabled_mobile)
+                        VALUES (%s, %s, TRUE, TRUE)
+                    """, (user_id, tab))
+                connection.commit()
+
+                # Fetch the newly created tabs
+                cursor.execute("""
+                    SELECT tab_name, is_enabled, is_enabled_mobile
+                    FROM user_tabs
+                    WHERE user_id = %s
+                    ORDER BY 
+                        CASE tab_name
+                            WHEN 'transactions' THEN 1
+                            WHEN 'tax' THEN 2
+                            WHEN 'reports' THEN 3
+                            WHEN 'rateTrends' THEN 4
+                            ELSE 5
+                        END
+                """, (user_id,))
+                tabs = cursor.fetchall()
+
+            return jsonify({'tabs': tabs}), 200
+
+        except Error as e:
+            logger.error(f"Error fetching user tabs: {str(e)}")
+            return jsonify({'error': str(e)}), 500
+        finally:
+            cursor.close()
+            connection.close()
+
+    @app.route('/api/admin/users/<int:user_id>/tabs', methods=['PUT'])
+    @admin_required
+    @limiter.limit(RATE_LIMIT_ADMIN)
+    def update_user_tabs(user_id):
+        """Update user's tab permissions."""
+        data = request.get_json()
+        tab_permissions = data.get('tab_permissions', {})
+
+        # Validate tab permissions structure
+        valid_tabs = ['transactions', 'tax', 'reports', 'rateTrends']
+        for tab in tab_permissions.keys():
+            if tab not in valid_tabs:
+                return jsonify({'error': f'Invalid tab name: {tab}'}), 400
+
+        # Validate that at least one tab is enabled on desktop or mobile
+        has_any_enabled = any(
+            tab_permissions.get(tab, {}).get('desktop', False) or
+            tab_permissions.get(tab, {}).get('mobile', False)
+            for tab in valid_tabs
+        )
+
+        if not has_any_enabled:
+            return jsonify({'error': 'At least one tab must be enabled on desktop or mobile'}), 400
+
+        connection = get_db_connection()
+        if not connection:
+            return jsonify({'error': 'Database connection failed'}), 500
+
+        cursor = connection.cursor(dictionary=True)
+        admin_id = session['user_id']
+
+        try:
+            # Get user details
+            cursor.execute("SELECT username FROM users WHERE id = %s", (user_id,))
+            user = cursor.fetchone()
+
+            if not user:
+                return jsonify({'error': 'User not found'}), 404
+
+            # Update tabs with separate desktop and mobile permissions
+            for tab in valid_tabs:
+                desktop_enabled = tab_permissions.get(tab, {}).get('desktop', False)
+                mobile_enabled = tab_permissions.get(tab, {}).get('mobile', False)
+
+                cursor.execute("""
+                    INSERT INTO user_tabs (user_id, tab_name, is_enabled, is_enabled_mobile)
+                    VALUES (%s, %s, %s, %s)
+                    ON DUPLICATE KEY UPDATE 
+                        is_enabled = VALUES(is_enabled),
+                        is_enabled_mobile = VALUES(is_enabled_mobile)
+                """, (user_id, tab, desktop_enabled, mobile_enabled))
+
+            connection.commit()
+
+            # Build summary for audit log
+            desktop_tabs = [tab for tab in valid_tabs if tab_permissions.get(tab, {}).get('desktop', False)]
+            mobile_tabs = [tab for tab in valid_tabs if tab_permissions.get(tab, {}).get('mobile', False)]
+
+            summary = f"Desktop: {', '.join(desktop_tabs) if desktop_tabs else 'none'}; Mobile: {', '.join(mobile_tabs) if mobile_tabs else 'none'}"
+
+            # Log the action
+            log_audit(admin_id, 'Updated user tab permissions', user_id,
+                      f"User '{user['username']}' tabs set to: {summary}")
+
+            logger.info(
+                f"Admin {admin_id} updated tabs for user {user_id} ({user['username']}): {summary}")
+
+            return jsonify({
+                'message': 'Tab permissions updated successfully',
+                'desktop_tabs': desktop_tabs,
+                'mobile_tabs': mobile_tabs
+            }), 200
+
+        except Error as e:
+            logger.error(f"Error updating user tabs: {str(e)}")
+            connection.rollback()
+            return jsonify({'error': str(e)}), 500
+        finally:
+            cursor.close()
+            connection.close()
+
     @app.route('/api/admin/audit-logs', methods=['GET'])
     @admin_required
     @limiter.limit(RATE_LIMIT_ADMIN)

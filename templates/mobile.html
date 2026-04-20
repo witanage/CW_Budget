@@ -101,9 +101,21 @@
                 <button class="action-btn" data-bs-toggle="modal" data-bs-target="#paymentTotalsModal" title="Payment Totals">
                     <i class="fas fa-credit-card"></i>
                 </button>
+                {% if 'tax' in enabled_tabs %}
+                <a href="/dashboard?page=tax" class="action-btn" title="Tax Calculator" style="text-decoration: none; display: inline-flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-calculator"></i>
+                </a>
+                {% endif %}
+                {% if 'reports' in enabled_tabs %}
+                <a href="/dashboard?page=reports" class="action-btn" title="Reports" style="text-decoration: none; display: inline-flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-chart-bar"></i>
+                </a>
+                {% endif %}
+                {% if 'rateTrends' in enabled_tabs %}
                 <a href="/dashboard?page=rateTrends" class="action-btn" title="Rate Trends" style="text-decoration: none; display: inline-flex; align-items: center; justify-content: center;">
                     <i class="fas fa-chart-line"></i>
                 </a>
+                {% endif %}
             </div>
         </div>
         <!-- Table Headers (Fixed with mobile header) -->

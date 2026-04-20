@@ -711,23 +711,29 @@
                                 <td>{{ user.transactions_count or 0 }}</td>
                                 <td>
                                     <div class="action-buttons">
+                                        <button class="btn-sm"
+                                                onclick="showManageTabsModal({{ user.id }}, '{{ user.username }}')"
+                                                title="Manage tabs"
+                                                style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;">
+                                            <i class="fas fa-sliders-h"></i>
+                                        </button>
                                         <button class="btn-sm {{ 'btn-warning' if user.is_active else 'btn-success' }}"
                                                 onclick="toggleUserActive({{ user.id }}, '{{ user.username }}')"
                                                 title="{{ 'Deactivate' if user.is_active else 'Activate' }} user"
                                                 {% if user.id == current_user_id %}disabled{% endif %}>
-                                            <i class="fas fa-{{ 'ban' if user.is_active else 'check' }}"></i>
+                                            <i class="fas fa-{{ 'user-slash' if user.is_active else 'user-check' }}"></i>
                                         </button>
                                         <button class="btn-sm {{ 'btn-secondary' if user.is_admin else 'btn-primary' }}"
                                                 onclick="toggleUserAdmin({{ user.id }}, '{{ user.username }}')"
                                                 title="{{ 'Revoke' if user.is_admin else 'Grant' }} admin"
                                                 {% if user.id == current_user_id %}disabled{% endif %}>
-                                            <i class="fas fa-user-shield"></i>
+                                            <i class="fas fa-{{ 'crown' if user.is_admin else 'user-tie' }}"></i>
                                         </button>
                                         <button class="btn-sm btn-danger"
                                                 onclick="showDeleteModal({{ user.id }}, '{{ user.username }}')"
                                                 title="Delete user"
                                                 {% if user.id == current_user_id %}disabled{% endif %}>
-                                            <i class="fas fa-trash"></i>
+                                            <i class="fas fa-trash-alt"></i>
                                         </button>
                                     </div>
                                 </td>
@@ -974,6 +980,115 @@
                 </button>
                 <button type="button" class="btn btn-danger" id="confirmDeleteRecordBtn" onclick="executeDeleteRecord()">
                     <i class="fas fa-trash"></i> Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Manage User Tabs Modal -->
+<div class="modal fade" id="manageTabsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content" style="background: var(--card-bg); color: var(--text-primary);">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border-color, #dee2e6);">
+                <h5 class="modal-title">
+                    <i class="fas fa-th-large"></i> Manage Tabs for <strong id="manageTabsUsername"></strong>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p style="color: var(--text-secondary); margin-bottom: 20px; font-size: 0.9rem;">
+                    Select which dashboard tabs this user can access on <strong>Desktop</strong> and <strong>Mobile</strong>. At least one tab must be enabled.
+                </p>
+                <input type="hidden" id="manageTabsUserId">
+
+                <!-- Table header for Desktop/Mobile columns -->
+                <div style="display: grid; grid-template-columns: 1fr 80px 80px; gap: 8px; margin-bottom: 12px; padding: 8px 12px; background: var(--card-header-bg); border-radius: 6px; font-weight: 600; font-size: 0.85rem;">
+                    <div>Tab</div>
+                    <div style="text-align: center;"><i class="fas fa-desktop"></i> Desktop</div>
+                    <div style="text-align: center;"><i class="fas fa-mobile-alt"></i> Mobile</div>
+                </div>
+
+                <div class="tab-permissions-list">
+                    <!-- Transactions -->
+                    <div style="display: grid; grid-template-columns: 1fr 80px 80px; gap: 8px; padding: 12px; background: var(--bg-tertiary); border-radius: 6px; border: 1px solid var(--border-color); margin-bottom: 8px; align-items: center;">
+                        <div>
+                            <i class="fas fa-exchange-alt" style="width: 20px; color: #007bff;"></i>
+                            <strong>Transactions</strong>
+                            <span style="display: block; font-size: 0.8rem; color: var(--text-secondary); margin-left: 28px;">
+                                Manage income and expenses
+                            </span>
+                        </div>
+                        <div style="text-align: center;">
+                            <input class="form-check-input" type="checkbox" id="tab_transactions" value="transactions" checked style="cursor: pointer;">
+                        </div>
+                        <div style="text-align: center;">
+                            <input class="form-check-input" type="checkbox" id="tab_transactions_mobile" value="transactions" checked style="cursor: pointer;">
+                        </div>
+                    </div>
+
+                    <!-- Tax -->
+                    <div style="display: grid; grid-template-columns: 1fr 80px 80px; gap: 8px; padding: 12px; background: var(--bg-tertiary); border-radius: 6px; border: 1px solid var(--border-color); margin-bottom: 8px; align-items: center;">
+                        <div>
+                            <i class="fas fa-calculator" style="width: 20px; color: #28a745;"></i>
+                            <strong>Tax</strong>
+                            <span style="display: block; font-size: 0.8rem; color: var(--text-secondary); margin-left: 28px;">
+                                Tax calculator and assessments
+                            </span>
+                        </div>
+                        <div style="text-align: center;">
+                            <input class="form-check-input" type="checkbox" id="tab_tax" value="tax" checked style="cursor: pointer;">
+                        </div>
+                        <div style="text-align: center;">
+                            <input class="form-check-input" type="checkbox" id="tab_tax_mobile" value="tax" checked style="cursor: pointer;">
+                        </div>
+                    </div>
+
+                    <!-- Reports -->
+                    <div style="display: grid; grid-template-columns: 1fr 80px 80px; gap: 8px; padding: 12px; background: var(--bg-tertiary); border-radius: 6px; border: 1px solid var(--border-color); margin-bottom: 8px; align-items: center;">
+                        <div>
+                            <i class="fas fa-chart-bar" style="width: 20px; color: #fd7e14;"></i>
+                            <strong>Reports</strong>
+                            <span style="display: block; font-size: 0.8rem; color: var(--text-secondary); margin-left: 28px;">
+                                Financial reports and analytics
+                            </span>
+                        </div>
+                        <div style="text-align: center;">
+                            <input class="form-check-input" type="checkbox" id="tab_reports" value="reports" checked style="cursor: pointer;">
+                        </div>
+                        <div style="text-align: center;">
+                            <input class="form-check-input" type="checkbox" id="tab_reports_mobile" value="reports" checked style="cursor: pointer;">
+                        </div>
+                    </div>
+
+                    <!-- Rate Trends -->
+                    <div style="display: grid; grid-template-columns: 1fr 80px 80px; gap: 8px; padding: 12px; background: var(--bg-tertiary); border-radius: 6px; border: 1px solid var(--border-color); margin-bottom: 8px; align-items: center;">
+                        <div>
+                            <i class="fas fa-chart-line" style="width: 20px; color: #6f42c1;"></i>
+                            <strong>Rate Trends</strong>
+                            <span style="display: block; font-size: 0.8rem; color: var(--text-secondary); margin-left: 28px;">
+                                Exchange rate trends and analysis
+                            </span>
+                        </div>
+                        <div style="text-align: center;">
+                            <input class="form-check-input" type="checkbox" id="tab_rateTrends" value="rateTrends" checked style="cursor: pointer;">
+                        </div>
+                        <div style="text-align: center;">
+                            <input class="form-check-input" type="checkbox" id="tab_rateTrends_mobile" value="rateTrends" checked style="cursor: pointer;">
+                        </div>
+                    </div>
+                </div>
+                <div id="tabErrorMessage" class="alert alert-danger" style="display: none; margin-top: 15px;">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span id="tabErrorText"></span>
+                </div>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid var(--border-color, #dee2e6);">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+                <button type="button" class="btn btn-primary" id="saveTabsBtn" onclick="saveUserTabs()">
+                    <i class="fas fa-save"></i> Save Changes
                 </button>
             </div>
         </div>
@@ -1473,6 +1588,117 @@
     function refreshAuditLogs() {
         showAlert('Refreshing audit logs...', 'info');
         setTimeout(() => location.reload(), 500);
+    }
+
+    // ── Tab Management ──────────────────────────────────────
+    let manageTabsModal;
+
+    // Initialize modal
+    document.addEventListener('DOMContentLoaded', function() {
+        const modalElement = document.getElementById('manageTabsModal');
+        if (modalElement) {
+            manageTabsModal = new bootstrap.Modal(modalElement);
+        }
+    });
+
+    // Show manage tabs modal
+    async function showManageTabsModal(userId, username) {
+        document.getElementById('manageTabsUserId').value = userId;
+        document.getElementById('manageTabsUsername').textContent = username;
+        document.getElementById('tabErrorMessage').style.display = 'none';
+
+        // Load current tab permissions
+        try {
+            const response = await fetch(`/api/admin/users/${userId}/tabs`);
+            const data = await response.json();
+
+            if (response.ok) {
+                // Update checkboxes based on current permissions
+                const tabs = ['transactions', 'tax', 'reports', 'rateTrends'];
+                tabs.forEach(tab => {
+                    const desktopCheckbox = document.getElementById(`tab_${tab}`);
+                    const mobileCheckbox = document.getElementById(`tab_${tab}_mobile`);
+                    const tabData = data.tabs.find(t => t.tab_name === tab);
+
+                    if (desktopCheckbox) {
+                        desktopCheckbox.checked = tabData ? tabData.is_enabled : true;
+                    }
+                    if (mobileCheckbox) {
+                        mobileCheckbox.checked = tabData ? tabData.is_enabled_mobile : true;
+                    }
+                });
+                manageTabsModal.show();
+            } else {
+                showAlert(data.error || 'Failed to load tab permissions', 'danger');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showAlert('Network error: ' + error.message, 'danger');
+        }
+    }
+
+    // Save user tabs
+    async function saveUserTabs() {
+        const userId = document.getElementById('manageTabsUserId').value;
+        const tabs = ['transactions', 'tax', 'reports', 'rateTrends'];
+        const tabPermissions = {};
+
+        tabs.forEach(tab => {
+            const desktopCheckbox = document.getElementById(`tab_${tab}`);
+            const mobileCheckbox = document.getElementById(`tab_${tab}_mobile`);
+
+            tabPermissions[tab] = {
+                desktop: desktopCheckbox ? desktopCheckbox.checked : false,
+                mobile: mobileCheckbox ? mobileCheckbox.checked : false
+            };
+        });
+
+        // Validate at least one tab is enabled on desktop OR mobile
+        const hasAnyEnabled = tabs.some(tab =>
+            tabPermissions[tab].desktop || tabPermissions[tab].mobile
+        );
+
+        if (!hasAnyEnabled) {
+            document.getElementById('tabErrorText').textContent = 'At least one tab must be enabled on desktop or mobile.';
+            document.getElementById('tabErrorMessage').style.display = 'block';
+            return;
+        }
+
+        const saveBtn = document.getElementById('saveTabsBtn');
+        const originalText = saveBtn.innerHTML;
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+        document.getElementById('tabErrorMessage').style.display = 'none';
+
+        try {
+            const response = await fetch(`/api/admin/users/${userId}/tabs`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tab_permissions: tabPermissions })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                // Reset button state before hiding modal
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = originalText;
+                // Hide modal and show success message
+                manageTabsModal.hide();
+                showAlert(data.message, 'success');
+            } else {
+                document.getElementById('tabErrorText').textContent = data.error || 'Failed to save tab permissions';
+                document.getElementById('tabErrorMessage').style.display = 'block';
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = originalText;
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            document.getElementById('tabErrorText').textContent = 'Network error: ' + error.message;
+            document.getElementById('tabErrorMessage').style.display = 'block';
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = originalText;
+        }
     }
 
     // Debug helper: Log if any element is blocking clicks

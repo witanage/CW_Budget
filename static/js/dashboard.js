@@ -402,14 +402,22 @@ function showLoader() {
 // Load user's preferred default page
 async function loadUserPreferredPage() {
     try {
+        // Get enabled tabs from window (set by template)
+        const enabledTabs = window.enabledTabs || ['transactions', 'tax', 'reports', 'rateTrends'];
+
         // Check for page parameter in URL first
         const urlParams = new URLSearchParams(window.location.search);
         const pageParam = urlParams.get('page');
 
         if (pageParam) {
-            // Navigate to the specified page from URL parameter
-            console.log('✓ Loading page from URL parameter:', pageParam);
-            navigateToPage(pageParam);
+            // Check if the requested page is enabled for the user
+            if (enabledTabs.includes(pageParam)) {
+                console.log('✓ Loading page from URL parameter:', pageParam);
+                navigateToPage(pageParam);
+            } else {
+                console.warn('Requested page not enabled, loading first available tab');
+                navigateToPage(enabledTabs[0]);
+            }
             // Clear the URL parameter for cleaner URL
             window.history.replaceState({}, '', window.location.pathname);
             setTimeout(hideLoader, 800);
@@ -420,19 +428,28 @@ async function loadUserPreferredPage() {
         const response = await fetch('/api/user-preferences');
         if (response.ok) {
             const data = await response.json();
-            const defaultPage = data.default_page || 'transactions';
+            let defaultPage = data.default_page || 'transactions';
+
+            // Check if the preferred page is enabled for the user
+            if (!enabledTabs.includes(defaultPage)) {
+                console.warn('Preferred page not enabled, loading first available tab');
+                defaultPage = enabledTabs[0];
+            }
+
             console.log('✓ Loading user preferred page:', defaultPage);
             navigateToPage(defaultPage);
             // Hide loader after navigation and a brief moment for data to load
             setTimeout(hideLoader, 800);
         } else {
-            console.warn('Failed to fetch user preferences, loading default page');
-            navigateToPage('transactions');
+            console.warn('Failed to fetch user preferences, loading first available tab');
+            navigateToPage(enabledTabs[0]);
             setTimeout(hideLoader, 800);
         }
     } catch (error) {
         console.error('Error fetching user preferences:', error);
-        navigateToPage('transactions');
+        // Fallback to first enabled tab
+        const enabledTabs = window.enabledTabs || ['transactions'];
+        navigateToPage(enabledTabs[0]);
         setTimeout(hideLoader, 800);
     }
 }

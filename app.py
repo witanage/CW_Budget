@@ -325,7 +325,53 @@ def index():
 @login_required
 def dashboard():
     """Main dashboard."""
-    return render_template('dashboard.html', username=session.get('username'))
+    user_id = session.get('user_id')
+    enabled_tabs = []
+
+    # Fetch user's enabled tabs for desktop
+    connection = get_db_connection()
+    if connection:
+        cursor = connection.cursor(dictionary=True)
+        try:
+            cursor.execute("""
+                SELECT tab_name FROM user_tabs
+                WHERE user_id = %s AND is_enabled = TRUE
+                ORDER BY 
+                    CASE tab_name
+                        WHEN 'transactions' THEN 1
+                        WHEN 'tax' THEN 2
+                        WHEN 'reports' THEN 3
+                        WHEN 'rateTrends' THEN 4
+                        ELSE 5
+                    END
+            """, (user_id,))
+            enabled_tabs = [row['tab_name'] for row in cursor.fetchall()]
+
+            # If no tabs found, initialize with all tabs enabled (for existing users)
+            if not enabled_tabs:
+                available_tabs = ['transactions', 'tax', 'reports', 'rateTrends']
+                for tab in available_tabs:
+                    cursor.execute("""
+                        INSERT INTO user_tabs (user_id, tab_name, is_enabled, is_enabled_mobile)
+                        VALUES (%s, %s, TRUE, TRUE)
+                    """, (user_id, tab))
+                connection.commit()
+                enabled_tabs = available_tabs
+
+        except Error as e:
+            logger.error(f"Error fetching user tabs: {str(e)}")
+            # Default to all tabs on error
+            enabled_tabs = ['transactions', 'tax', 'reports', 'rateTrends']
+        finally:
+            cursor.close()
+            connection.close()
+    else:
+        # Default to all tabs if connection fails
+        enabled_tabs = ['transactions', 'tax', 'reports', 'rateTrends']
+
+    return render_template('dashboard.html',
+                           username=session.get('username'),
+                           enabled_tabs=enabled_tabs)
 
 
 # Lazy-loaded page fragment endpoints (return HTML partials for on-demand loading)
@@ -363,7 +409,53 @@ def get_upload_mode():
 @login_required
 def mobile():
     """Mobile view."""
-    return render_template('mobile.html', username=session.get('username'))
+    user_id = session.get('user_id')
+    enabled_tabs = []
+
+    # Fetch user's enabled tabs for mobile
+    connection = get_db_connection()
+    if connection:
+        cursor = connection.cursor(dictionary=True)
+        try:
+            cursor.execute("""
+                SELECT tab_name FROM user_tabs
+                WHERE user_id = %s AND is_enabled_mobile = TRUE
+                ORDER BY 
+                    CASE tab_name
+                        WHEN 'transactions' THEN 1
+                        WHEN 'tax' THEN 2
+                        WHEN 'reports' THEN 3
+                        WHEN 'rateTrends' THEN 4
+                        ELSE 5
+                    END
+            """, (user_id,))
+            enabled_tabs = [row['tab_name'] for row in cursor.fetchall()]
+
+            # If no tabs found, initialize with all tabs enabled (for existing users)
+            if not enabled_tabs:
+                available_tabs = ['transactions', 'tax', 'reports', 'rateTrends']
+                for tab in available_tabs:
+                    cursor.execute("""
+                        INSERT INTO user_tabs (user_id, tab_name, is_enabled, is_enabled_mobile)
+                        VALUES (%s, %s, TRUE, TRUE)
+                    """, (user_id, tab))
+                connection.commit()
+                enabled_tabs = available_tabs
+
+        except Error as e:
+            logger.error(f"Error fetching user tabs: {str(e)}")
+            # Default to all tabs on error
+            enabled_tabs = ['transactions', 'tax', 'reports', 'rateTrends']
+        finally:
+            cursor.close()
+            connection.close()
+    else:
+        # Default to all tabs if connection fails
+        enabled_tabs = ['transactions', 'tax', 'reports', 'rateTrends']
+
+    return render_template('mobile.html',
+                           username=session.get('username'),
+                           enabled_tabs=enabled_tabs)
 
 
 register_user_routes(app, limiter, RATE_LIMIT_LOGIN, RATE_LIMIT_REGISTER, RATE_LIMIT_CHANGE_PASSWORD, RATE_LIMIT_API,
