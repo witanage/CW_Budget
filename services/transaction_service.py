@@ -2109,7 +2109,7 @@ def get_payment_method_totals_handler():
                                     ON pm.id = upm.payment_method_id AND upm.user_id = %s
                                 LEFT JOIN transactions t ON pm.id = t.payment_method_id
                            AND t.monthly_record_id = %s
-                           AND t.is_done = TRUE
+                           AND (t.is_done = TRUE OR t.is_paid = TRUE)
                        WHERE pm.is_active = TRUE
                          AND (upm.id IS NOT NULL OR t.id IS NOT NULL)
                        GROUP BY pm.id, pm.name, pm.type, pm.color
