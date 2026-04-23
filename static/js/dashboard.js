@@ -49,6 +49,7 @@ let loadedReportTabs = new Set(); // Track which report tabs have been loaded
 let reportTabsInitialized = false; // Track if tab listeners are initialized
 let scannedBillContent = null; // Store scanned bill content temporarily
 let capturedBillImages = []; // Store all captured bill images for upload
+let editingTransaction = null; // Store the original transaction being edited
 let uploadMode = 'sequential'; // Upload mode: 'sequential' (one-by-one) or 'batch' (all at once)
 
 // --- Client-side file compression for Vercel's 4.5 MB body limit ---
@@ -732,6 +733,7 @@ function setupFormButtons() {
             // Reset the form and modal title for next use
             document.getElementById('transactionForm').reset();
             document.getElementById('editTransactionId').value = '';
+            editingTransaction = null; // Clear the editing transaction reference
             document.querySelector('#transactionModal .modal-title').textContent = 'Add Transaction';
 
             // Reset payment method dropdown to "None"
@@ -1494,6 +1496,11 @@ function loadTransactions(applyActiveFilters = false) {
 
             // Update sidebar widgets
             loadSidebarWidgets();
+
+            // Update filter stats badges
+            if (typeof updateFilterStatsBadges === 'function') {
+                updateFilterStatsBadges();
+            }
         })
         .catch(error => {
             console.error('Error loading transactions:', error);
@@ -1940,6 +1947,14 @@ function editTransaction(id) {
     document.getElementById('transCredit').value = transaction.credit || '';
     document.getElementById('transNotes').value = transaction.notes || '';
 
+    // Store the original transaction for reference during save
+    editingTransaction = {
+        id: transaction.id,
+        payment_method_id: transaction.payment_method_id,
+        is_paid: transaction.is_paid || false,
+        paid_at: transaction.paid_at
+    };
+
     // Set payment method (use payment_method_id if available)
     const paymentMethodSelect = document.getElementById('transPaymentMethod');
     if (paymentMethodSelect) {
@@ -2041,11 +2056,24 @@ async function saveTransaction() {
         const paidAtNotPaidRadio = document.getElementById('paidAtNotPaid');
 
         if (paidAtPaidRadio && paidAtPaidRadio.checked) {
-            // Mark as paid with current Sri Lankan time (UTC+5:30)
+            // Mark as paid
             data.is_paid = true;
-            const now = new Date();
-            const sriLankaTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
-            data.paid_at = sriLankaTime.toISOString();
+
+            // Check if payment method or payment status changed
+            const paymentMethodChanged = isEdit && editingTransaction &&
+                (editingTransaction.payment_method_id != data.payment_method_id);
+            const paymentStatusChanged = isEdit && editingTransaction &&
+                (editingTransaction.is_paid !== true);
+
+            if (isEdit && editingTransaction && editingTransaction.paid_at &&
+                !paymentMethodChanged && !paymentStatusChanged) {
+                // Editing: payment method and status unchanged, preserve existing paid_at
+                data.paid_at = editingTransaction.paid_at;
+                console.log('[DEBUG] Preserving existing paid_at:', data.paid_at);
+            } else {
+                // New payment OR payment method/status changed - set to current time
+                data.paid_at = new Date().toISOString();
+            }
         } else if (paidAtNotPaidRadio && paidAtNotPaidRadio.checked) {
             // Mark as not paid (payment method selected but not paid yet)
             data.is_paid = false;
@@ -2167,6 +2195,7 @@ async function saveTransaction() {
             closeModal('transactionModal');
             document.getElementById('transactionForm')?.reset();
             document.getElementById('editTransactionId').value = '';
+            editingTransaction = null; // Clear the editing transaction reference
             document.querySelector('#transactionModal .modal-title').textContent = 'Add Transaction';
 
             // Clear bill content and captured images
@@ -2894,32 +2923,25 @@ function downloadTransactions(format) {
     const monthYear = document.getElementById('monthYearPicker').value;
     const [year, month] = monthYear.split('-').map(Number);
 
-    // Build download URL with current filters
-    const params = new URLSearchParams({
-        year: year,
-        month: month,
-        format: format
-    });
-
-    // Add active filters if any
-    const activeFilters = getActiveFilters();
-    if (activeFilters) {
-        Object.keys(activeFilters).forEach(key => {
-            if (activeFilters[key]) {
-                params.append(key, activeFilters[key]);
-            }
-        });
-    }
-
-    // Create download URL
-    const downloadUrl = `/api/transactions/export?${params.toString()}`;
-
     // Close the modal
     const modal = bootstrap.Modal.getInstance(document.getElementById('downloadModal'));
     if (modal) modal.hide();
 
     // Show loading
     showLoading();
+
+    // Get the IDs of currently displayed transactions
+    const transactionIds = allTransactions.map(t => t.id);
+
+    // Build download URL
+    const params = new URLSearchParams({
+        year: year,
+        month: month,
+        format: format,
+        ids: transactionIds.join(',')
+    });
+
+    const downloadUrl = `/api/transactions/export?${params.toString()}`;
 
     // Trigger download
     fetch(downloadUrl)
@@ -2957,12 +2979,40 @@ function downloadTransactions(format) {
 }
 
 function getActiveFilters() {
-    // Return current filter state if filters are active
-    // This should match the filter logic used in loadTransactions
+    // Return current filter state to be used in downloads
     const filters = {};
 
-    // Add filter extraction logic here if needed
-    // For now, return empty to download all transactions for the month
+    // Add each active filter to the return object
+    if (activeFilters.description) {
+        filters.description = activeFilters.description;
+    }
+    if (activeFilters.notes) {
+        filters.notes = activeFilters.notes;
+    }
+    if (activeFilters.categories && activeFilters.categories.length > 0) {
+        filters.categories = activeFilters.categories.join(',');
+    }
+    if (activeFilters.paymentMethods && activeFilters.paymentMethods.length > 0) {
+        filters.paymentMethods = activeFilters.paymentMethods.join(',');
+    }
+    if (activeFilters.types && activeFilters.types.length > 0) {
+        filters.types = activeFilters.types.join(',');
+    }
+    if (activeFilters.statuses && activeFilters.statuses.length > 0) {
+        filters.statuses = activeFilters.statuses.join(',');
+    }
+    if (activeFilters.minAmount !== null && activeFilters.minAmount !== undefined) {
+        filters.minAmount = activeFilters.minAmount;
+    }
+    if (activeFilters.maxAmount !== null && activeFilters.maxAmount !== undefined) {
+        filters.maxAmount = activeFilters.maxAmount;
+    }
+    if (activeFilters.startDate) {
+        filters.startDate = activeFilters.startDate;
+    }
+    if (activeFilters.endDate) {
+        filters.endDate = activeFilters.endDate;
+    }
 
     return filters;
 }
@@ -3716,52 +3766,80 @@ function updateFilterPreviewDisplay() {
     const endDate = document.getElementById('filterEndDate')?.value;
 
     listEl.innerHTML = '';
-    let hasFilters = false;
+    let filterCount = 0;
 
     if (desc) {
-        hasFilters = true;
-        listEl.innerHTML += `<span class="badge bg-primary rounded-pill"><i class="fas fa-file-alt me-1"></i>Desc: "${desc}"</span>`;
+        filterCount++;
+        listEl.innerHTML += `<span class="badge bg-primary rounded-pill"><i class="fas fa-file-alt me-1"></i>Desc: "${desc}"</span> `;
     }
     if (notes) {
-        hasFilters = true;
-        listEl.innerHTML += `<span class="badge bg-primary rounded-pill"><i class="fas fa-sticky-note me-1"></i>Notes: "${notes}"</span>`;
+        filterCount++;
+        listEl.innerHTML += `<span class="badge bg-primary rounded-pill"><i class="fas fa-sticky-note me-1"></i>Notes: "${notes}"</span> `;
     }
     if (categories.length > 0) {
-        hasFilters = true;
-        listEl.innerHTML += `<span class="badge bg-info text-dark rounded-pill"><i class="fas fa-tags me-1"></i>${categories.length} Categories</span>`;
+        filterCount++;
+        listEl.innerHTML += `<span class="badge bg-info rounded-pill"><i class="fas fa-tags me-1"></i>${categories.length} Categories</span> `;
     }
     if (paymentMethods.length > 0) {
-        hasFilters = true;
-        listEl.innerHTML += `<span class="badge bg-info text-dark rounded-pill"><i class="fas fa-credit-card me-1"></i>${paymentMethods.length} Payment Methods</span>`;
+        filterCount++;
+        listEl.innerHTML += `<span class="badge bg-info rounded-pill"><i class="fas fa-credit-card me-1"></i>${paymentMethods.length} Methods</span> `;
     }
     if (types.length > 0) {
-        hasFilters = true;
-        listEl.innerHTML += `<span class="badge bg-warning text-dark rounded-pill"><i class="fas fa-exchange-alt me-1"></i>${types.map(t => t.value).join('/')}</span>`;
+        filterCount++;
+        listEl.innerHTML += `<span class="badge bg-warning rounded-pill"><i class="fas fa-exchange-alt me-1"></i>${types.map(t => t.value).join('/')}</span> `;
     }
     if (statuses.length > 0) {
-        hasFilters = true;
-        listEl.innerHTML += `<span class="badge bg-success rounded-pill"><i class="fas fa-check-circle me-1"></i>${statuses.length} Statuses</span>`;
+        filterCount++;
+        listEl.innerHTML += `<span class="badge bg-success rounded-pill"><i class="fas fa-check-circle me-1"></i>${statuses.length} Status</span> `;
     }
     if (minAmount || maxAmount) {
-        hasFilters = true;
+        filterCount++;
         let amtText = '';
-        if (minAmount && maxAmount) amtText = `$${minAmount} - $${maxAmount}`;
-        else if (minAmount) amtText = `≥ $${minAmount}`;
-        else amtText = `≤ $${maxAmount}`;
-        listEl.innerHTML += `<span class="badge bg-secondary rounded-pill"><i class="fas fa-dollar-sign me-1"></i>${amtText}</span>`;
+        if (minAmount && maxAmount) amtText = `${minAmount}-${maxAmount}`;
+        else if (minAmount) amtText = `≥${minAmount}`;
+        else amtText = `≤${maxAmount}`;
+        listEl.innerHTML += `<span class="badge bg-secondary rounded-pill"><i class="fas fa-dollar-sign me-1"></i>${amtText}</span> `;
     }
     if (startDate || endDate) {
-        hasFilters = true;
+        filterCount++;
         let dateText = '';
         if (startDate && endDate) dateText = `${startDate} to ${endDate}`;
         else if (startDate) dateText = `From ${startDate}`;
         else dateText = `Until ${endDate}`;
-        listEl.innerHTML += `<span class="badge bg-secondary rounded-pill"><i class="fas fa-calendar me-1"></i>${dateText}</span>`;
+        listEl.innerHTML += `<span class="badge bg-secondary rounded-pill"><i class="fas fa-calendar me-1"></i>${dateText}</span> `;
     }
 
-    if (!hasFilters) {
-        listEl.innerHTML = '<span class="badge bg-secondary">No filters applied</span>';
+    if (filterCount === 0) {
+        listEl.innerHTML = '<span class="badge bg-secondary">None</span>';
     }
+
+    // Update filter count in advanced tab
+    const activeFiltersCount = document.getElementById('activeFiltersCount');
+    if (activeFiltersCount) {
+        activeFiltersCount.textContent = `${filterCount} filter${filterCount !== 1 ? 's' : ''}`;
+    }
+
+    // Update stats badges with current transaction counts
+    updateFilterStatsBadges();
+}
+
+function updateFilterStatsBadges() {
+    // Calculate stats from currently displayed transactions
+    const totalBadge = document.getElementById('filterStatTotal');
+    const incomeBadge = document.getElementById('filterStatIncome');
+    const expenseBadge = document.getElementById('filterStatExpense');
+
+    if (!totalBadge || !incomeBadge || !expenseBadge) return;
+
+    // Count from all transactions or use a default
+    const transactions = allTransactions || [];
+    const total = transactions.length;
+    const income = transactions.filter(t => t.type === 'income' || (t.debit && parseFloat(t.debit) > 0)).length;
+    const expense = transactions.filter(t => t.type === 'expense' || (t.credit && parseFloat(t.credit) > 0)).length;
+
+    totalBadge.textContent = `${total} items`;
+    incomeBadge.textContent = `${income} in`;
+    expenseBadge.textContent = `${expense} out`;
 }
 
 function previewFilterResults() {
@@ -6621,18 +6699,18 @@ function displaySavedCalculations(calculations, filterYear = null) {
                     </div>
                     <div class="ms-3 d-flex align-items-center">
                         <div class="btn-group-vertical" role="group">
-                            <button class="btn btn-sm ${isCurrentlyEditing ? 'btn-primary' : 'btn-outline-primary'} d-flex align-items-center justify-content-center"
-                                    onclick="loadCalculation(${calc.id})"
+                            <button class="btn btn-sm ${isCurrentlyEditing ? 'btn-primary' : 'btn-outline-primary'} d-flex align-items-center justify-content-center" 
+                                    onclick="loadCalculation(${calc.id})" 
                                     title="${isCurrentlyEditing ? 'Currently loaded' : 'Load this calculation'}">
                                 <i class="fas fa-download me-1"></i>Load
                             </button>
-                            <button class="btn btn-sm ${isActive ? 'btn-success' : 'btn-outline-success'} d-flex align-items-center justify-content-center"
-                                    onclick="toggleActiveCalculation(${calc.id}, ${isActive})"
+                            <button class="btn btn-sm ${isActive ? 'btn-success' : 'btn-outline-success'} d-flex align-items-center justify-content-center" 
+                                    onclick="toggleActiveCalculation(${calc.id}, ${isActive})" 
                                     title="${isActive ? 'Deactivate this calculation' : 'Set as active for ' + calc.assessment_year}">
                                 <i class="fas ${isActive ? 'fa-check' : 'fa-star'} me-1"></i>${isActive ? 'Active' : 'Activate'}
                             </button>
-                            <button class="btn btn-sm btn-outline-danger d-flex align-items-center justify-content-center"
-                                    onclick="deleteCalculation(${calc.id})"
+                            <button class="btn btn-sm btn-outline-danger d-flex align-items-center justify-content-center" 
+                                    onclick="deleteCalculation(${calc.id})" 
                                     title="Delete this calculation">
                                 <i class="fas fa-trash me-1"></i>Delete
                             </button>

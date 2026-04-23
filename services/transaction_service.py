@@ -396,7 +396,7 @@ def log_transaction_audit(cursor, transaction_id, user_id, action, field_name=No
 # EXPORT HELPERS
 # ==================================================
 
-def generate_csv(transactions, year, month):
+def generate_csv(transactions, year, month, has_filters=False):
     """Generate CSV file from transactions."""
     output = io.StringIO()
     writer = csv.writer(output)
@@ -431,7 +431,7 @@ def generate_csv(transactions, year, month):
     # Create response
     output.seek(0)
     month_name = calendar.month_name[month]
-    filename = f'transactions_{month_name}_{year}.csv'
+    filename = f'transactions_filtered_{datetime.now().strftime("%Y%m%d")}.csv' if has_filters else f'transactions_{month_name}_{year}.csv'
 
     response = make_response(output.getvalue())
     response.headers['Content-Type'] = 'text/csv'
@@ -440,17 +440,17 @@ def generate_csv(transactions, year, month):
     return response
 
 
-def generate_excel(transactions, year, month):
+def generate_excel(transactions, year, month, has_filters=False):
     """Generate Excel file from transactions."""
     if not EXCEL_AVAILABLE:
         # Fallback to CSV
-        return generate_csv(transactions, year, month)
+        return generate_csv(transactions, year, month, has_filters)
 
     # Create workbook and worksheet
     wb = Workbook()
     ws = wb.active
     month_name = calendar.month_name[month]
-    ws.title = f"{month_name} {year}"
+    ws.title = "Filtered" if has_filters else f"{month_name} {year}"
 
     # Define styles
     header_font = Font(bold=True, color="FFFFFF")
@@ -505,7 +505,7 @@ def generate_excel(transactions, year, month):
     wb.save(output)
     output.seek(0)
 
-    filename = f'transactions_{month_name}_{year}.xlsx'
+    filename = f'transactions_filtered_{datetime.now().strftime("%Y%m%d")}.xlsx' if has_filters else f'transactions_{month_name}_{year}.xlsx'
 
     response = make_response(output.getvalue())
     response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -514,11 +514,11 @@ def generate_excel(transactions, year, month):
     return response
 
 
-def generate_pdf(transactions, year, month):
+def generate_pdf(transactions, year, month, has_filters=False):
     """Generate PDF file from transactions."""
     if not PDF_AVAILABLE:
         # Fallback to CSV
-        return generate_csv(transactions, year, month)
+        return generate_csv(transactions, year, month, has_filters)
 
     month_name = calendar.month_name[month]
     output = io.BytesIO()
@@ -529,7 +529,8 @@ def generate_pdf(transactions, year, month):
     styles = getSampleStyleSheet()
 
     # Add title
-    title = Paragraph(f"<b>Transaction Report - {month_name} {year}</b>", styles['Title'])
+    title_text = "<b>Filtered Transaction Report</b>" if has_filters else f"<b>Transaction Report - {month_name} {year}</b>"
+    title = Paragraph(title_text, styles['Title'])
     elements.append(title)
     elements.append(Spacer(1, 0.2 * inch))
 
@@ -584,7 +585,7 @@ def generate_pdf(transactions, year, month):
     doc.build(elements)
     output.seek(0)
 
-    filename = f'transactions_{month_name}_{year}.pdf'
+    filename = f'transactions_filtered_{datetime.now().strftime("%Y%m%d")}.pdf' if has_filters else f'transactions_{month_name}_{year}.pdf'
 
     response = make_response(output.getvalue())
     response.headers['Content-Type'] = 'application/pdf'
@@ -753,6 +754,13 @@ def transactions_handler():
 
                 cursor.execute(query, params)
                 transactions = cursor.fetchall()
+
+                # Format datetime fields as strings to avoid timezone conversion issues
+                for t in transactions:
+                    if t.get('paid_at') and isinstance(t['paid_at'], datetime):
+                        # Format as string without timezone info (local time)
+                        t['paid_at'] = t['paid_at'].strftime('%Y-%m-%d %H:%M:%S')
+
                 return jsonify(transactions)
             else:
                 return jsonify([])
@@ -1238,25 +1246,7 @@ def manage_transaction_handler(transaction_id):
                 is_done = False
                 payment_method_id = None
 
-            # Get payment status from frontend (explicit is_paid flag)
-            is_paid = data.get('is_paid', False)  # Use explicit flag from frontend
-
-            # Get paid_at timestamp if provided
-            paid_at = None
-            if is_paid:
-                paid_at_str = data.get('paid_at')
-                if paid_at_str:
-                    # Parse ISO timestamp from frontend
-                    try:
-                        paid_at = datetime.fromisoformat(paid_at_str.replace('Z', '+00:00'))
-                    except (ValueError, AttributeError):
-                        # If parsing fails, use current timestamp
-                        paid_at = datetime.now()
-                else:
-                    # No paid_at provided but marked as paid, use current timestamp
-                    paid_at = datetime.now()
-
-            # Update transaction (balance will be calculated on frontend)
+            # Step 1: Always update transaction details (description, amounts, category, notes, etc.)
             cursor.execute("""
                            UPDATE transactions
                            SET description      = %s,
@@ -1264,11 +1254,7 @@ def manage_transaction_handler(transaction_id):
                                debit            = %s,
                                credit           = %s,
                                transaction_date = %s,
-                               notes            = %s,
-                               payment_method_id = %s,
-                               is_done          = %s,
-                               is_paid          = %s,
-                               paid_at          = %s
+                               notes            = %s
                            WHERE id = %s
                            """, (
                 data.get('description'),
@@ -1277,12 +1263,69 @@ def manage_transaction_handler(transaction_id):
                 credit if credit > 0 else None,
                 transaction_date,
                 data.get('notes'),
-                payment_method_id,
-                is_done,
-                is_paid,
-                paid_at,
                 transaction_id
             ))
+
+            # Step 2: Check if payment-related fields actually changed
+            # Compare old values with new values to determine if we need to update payment fields
+            old_payment_method = old_transaction.get('payment_method_id')
+            old_is_paid = old_transaction.get('is_paid', False)
+            old_paid_at = old_transaction.get('paid_at')
+
+            # Get new values from request
+            new_payment_method = int(payment_method_id) if payment_method_id else None
+            new_is_paid = data.get('is_paid', False) if 'is_paid' in data else old_is_paid
+
+            # Determine if payment-related fields changed
+            payment_method_changed = old_payment_method != new_payment_method
+            is_paid_changed = old_is_paid != new_is_paid
+
+            # Only update payment fields if something actually changed
+            if payment_method_changed or is_paid_changed:
+                # Parse paid_at from frontend if provided
+                new_paid_at = None
+                if new_is_paid and 'paid_at' in data:
+                    paid_at_str = data.get('paid_at')
+                    if paid_at_str:
+                        try:
+                            new_paid_at = datetime.fromisoformat(paid_at_str.replace('Z', '+00:00'))
+                        except (ValueError, AttributeError):
+                            new_paid_at = datetime.now() if new_is_paid else None
+                elif new_is_paid and is_paid_changed:
+                    # Status changed to paid but no paid_at provided, use current time
+                    new_paid_at = datetime.now()
+                elif new_is_paid and not is_paid_changed:
+                    # Still paid, keep old paid_at
+                    new_paid_at = old_paid_at
+
+                # Update payment-related fields only
+                cursor.execute("""
+                               UPDATE transactions
+                               SET payment_method_id = %s,
+                                   is_done          = %s,
+                                   is_paid          = %s,
+                                   paid_at          = %s
+                               WHERE id = %s
+                               """, (
+                    new_payment_method,
+                    is_done,
+                    new_is_paid,
+                    new_paid_at,
+                    transaction_id
+                ))
+            elif payment_method_id != old_payment_method:
+                # Only payment_method_id changed (without payment status change)
+                # Update payment_method_id and is_done only (don't touch is_paid or paid_at)
+                cursor.execute("""
+                               UPDATE transactions
+                               SET payment_method_id = %s,
+                                   is_done          = %s
+                               WHERE id = %s
+                               """, (
+                    new_payment_method,
+                    is_done,
+                    transaction_id
+                ))
 
             print(f"[DEBUG] Transaction {transaction_id} updated successfully")
 
@@ -1347,17 +1390,24 @@ def manage_transaction_handler(transaction_id):
                 log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'is_done',
                                       old_is_done, new_is_done)
 
-            # Compare is_paid status
+            # Compare is_paid and paid_at status only if they actually changed
+            # (we only updated them if payment_method_changed or is_paid_changed was True)
             old_is_paid = old_transaction.get('is_paid', False)
-            if old_is_paid != is_paid:
-                log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'is_paid',
-                                      old_is_paid, is_paid)
+            new_is_paid = data.get('is_paid', False) if 'is_paid' in data else old_is_paid
 
-            # Compare paid_at timestamp
-            old_paid_at = old_transaction.get('paid_at')
-            if str(old_paid_at) != str(paid_at):
-                log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'paid_at',
-                                      old_paid_at, paid_at)
+            if old_is_paid != new_is_paid:
+                log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'is_paid',
+                                      old_is_paid, new_is_paid)
+
+                # Also log paid_at change if payment status changed
+                old_paid_at = old_transaction.get('paid_at')
+                # Get the current paid_at from database after update
+                cursor.execute("SELECT paid_at FROM transactions WHERE id = %s", (transaction_id,))
+                result = cursor.fetchone()
+                new_paid_at = result[0] if result else None
+                if str(old_paid_at) != str(new_paid_at):
+                    log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'paid_at',
+                                          old_paid_at, new_paid_at)
 
             connection.commit()
             print(f"[DEBUG] Transaction update committed successfully")
@@ -1840,48 +1890,73 @@ def export_transactions_handler():
         month = request.args.get('month', datetime.now().month, type=int)
         export_format = request.args.get('format', 'csv')
 
-        # Get monthly record
-        cursor.execute("""
-                       SELECT id
-                       FROM monthly_records
-                       WHERE user_id = %s AND year = %s AND month = %s
-                       """, (user_id, year, month))
+        # Get specific transaction IDs if provided (for filtered exports)
+        transaction_ids = request.args.get('ids')
 
-        monthly_record = cursor.fetchone()
+        if transaction_ids:
+            # Export specific transactions by ID (what's currently displayed)
+            id_list = [int(tid) for tid in transaction_ids.split(',') if tid]
+            if not id_list:
+                transactions = []
+            else:
+                placeholders = ','.join(['%s'] * len(id_list))
+                query = f"""
+                        SELECT t.id,
+                               t.transaction_date,
+                               t.description,
+                               c.name  as category,
+                               t.debit,
+                               t.credit,
+                               t.notes,
+                               pm.name as payment_method,
+                               t.is_done,
+                               t.is_paid,
+                               t.paid_at,
+                               t.display_order
+                        FROM transactions t
+                        LEFT JOIN categories c ON t.category_id = c.id
+                        LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id
+                        INNER JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                        WHERE t.id IN ({placeholders}) AND mr.user_id = %s
+                        ORDER BY t.display_order DESC, t.id DESC
+                        """
+                params = id_list + [user_id]
+                cursor.execute(query, params)
+                transactions = cursor.fetchall()
 
-        if not monthly_record:
-            # Return empty file if no transactions
-            transactions = []
+            has_filters = True  # Mark as filtered export
         else:
-            # Fetch transactions (DESC order for downloads - oldest first)
-            cursor.execute("""
-                           SELECT t.id,
-                                  t.transaction_date,
-                                  t.description,
-                                  c.name  as category,
-                                  t.debit,
-                                  t.credit,
-                                  t.notes,
-                                  pm.name as payment_method,
-                                  t.is_done,
-                                  t.is_paid,
-                                  t.paid_at
-                           FROM transactions t
-                                    LEFT JOIN categories c ON t.category_id = c.id
-                                    LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id
-                           WHERE t.monthly_record_id = %s
-                           ORDER BY t.display_order DESC, t.id DESC
-                           """, (monthly_record['id'],))
-
+            # Export all transactions for the month (no filters)
+            query = """
+                    SELECT t.id,
+                           t.transaction_date,
+                           t.description,
+                           c.name  as category,
+                           t.debit,
+                           t.credit,
+                           t.notes,
+                           pm.name as payment_method,
+                           t.is_done,
+                           t.is_paid,
+                           t.paid_at
+                    FROM transactions t
+                    LEFT JOIN categories c ON t.category_id = c.id
+                    LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id
+                    INNER JOIN monthly_records mr ON t.monthly_record_id = mr.id
+                    WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s
+                    ORDER BY t.display_order DESC, t.id DESC
+                    """
+            cursor.execute(query, (user_id, year, month))
             transactions = cursor.fetchall()
+            has_filters = False
 
         # Generate file based on format
         if export_format == 'csv':
-            return generate_csv(transactions, year, month)
+            return generate_csv(transactions, year, month, has_filters)
         elif export_format == 'excel':
-            return generate_excel(transactions, year, month)
+            return generate_excel(transactions, year, month, has_filters)
         elif export_format == 'pdf':
-            return generate_pdf(transactions, year, month)
+            return generate_pdf(transactions, year, month, has_filters)
         else:
             return jsonify({'error': 'Invalid format'}), 400
 
@@ -1954,15 +2029,18 @@ def mark_transaction_done_handler(transaction_id):
         data = request.get_json()
         payment_method_id = data.get('payment_method_id')
 
+        # Use Python's current datetime instead of MySQL's CURRENT_TIMESTAMP
+        current_time = datetime.now()
+
         cursor.execute("""
                        UPDATE transactions
                        SET is_done           = TRUE,
                            payment_method_id = %s,
-                           marked_done_at    = CURRENT_TIMESTAMP
+                           marked_done_at    = %s
                        WHERE id = %s
                          AND monthly_record_id IN
                              (SELECT id FROM monthly_records WHERE user_id = %s)
-                       """, (payment_method_id, transaction_id, session['user_id']))
+                       """, (payment_method_id, current_time, transaction_id, session['user_id']))
 
         connection.commit()
         return jsonify({'message': 'Transaction marked as done'})
@@ -2015,17 +2093,21 @@ def mark_transaction_paid_handler(transaction_id):
         data = request.get_json()
         payment_method_id = data.get('payment_method_id')
 
+        # Use Python's current datetime instead of MySQL's CURRENT_TIMESTAMP
+        # to ensure consistent timezone handling
+        current_time = datetime.now()
+
         cursor.execute("""
                        UPDATE transactions
                        SET is_done           = TRUE,
                            is_paid           = TRUE,
                            payment_method_id = %s,
-                           marked_done_at    = CURRENT_TIMESTAMP,
-                           paid_at           = CURRENT_TIMESTAMP
+                           marked_done_at    = %s,
+                           paid_at           = %s
                        WHERE id = %s
                          AND monthly_record_id IN
                              (SELECT id FROM monthly_records WHERE user_id = %s)
-                       """, (payment_method_id, transaction_id, session['user_id']))
+                       """, (payment_method_id, current_time, current_time, transaction_id, session['user_id']))
 
         connection.commit()
         return jsonify({'message': 'Transaction marked as paid'})

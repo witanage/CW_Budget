@@ -41,8 +41,15 @@ return 'රු ' + parseFloat(amount).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$
 
 // Format date
 function formatDate(dateString) {
-const options = { year: 'numeric', month: 'short', day: 'numeric' };
-return new Date(dateString).toLocaleDateString('en-US', options);
+    if (!dateString) return '';
+
+    // MySQL datetime format: "2026-04-23 21:05:30"
+    // Parse as local time by replacing space with 'T'
+    const isoString = dateString.replace(' ', 'T');
+    const date = new Date(isoString);
+
+    const options = { year: 'numeric', month: 'short', day: 'numeric' };
+    return date.toLocaleDateString('en-US', options);
 }
 
 // Show confirmation modal (replacement for confirm())
