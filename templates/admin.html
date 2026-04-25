@@ -94,57 +94,41 @@
     }
     .user-table th, .audit-table th {
         background: var(--card-bg);
-        padding: 12px;
+        padding: 14px 12px;
         text-align: left;
         font-weight: 600;
+        font-size: 0.9rem;
         border-bottom: 2px solid var(--border-color);
         color: var(--text-primary);
         position: sticky;
         top: 0;
         z-index: 10;
+        white-space: nowrap;
     }
     .user-table td, .audit-table td {
         padding: 12px;
         border-bottom: 1px solid var(--border-color);
+        font-size: 0.9rem;
+        vertical-align: middle;
     }
-    .user-table tbody tr, .audit-table tbody tr {
+    .user-table tbody tr:nth-child(even), .audit-table tbody tr:nth-child(even) {
         background: var(--table-bg);
+    }
+    .user-table tbody tr:nth-child(odd), .audit-table tbody tr:nth-child(odd) {
+        background: rgba(102, 126, 234, 0.02);
     }
     .user-table tbody tr:hover, .audit-table tbody tr:hover {
         background: var(--table-hover);
     }
     
-    /* Audit Log Table Container */
-    .audit-table-wrapper {
+    /* Table Container - Universal for all admin tables */
+    .admin-table-wrapper, .audit-table-wrapper {
         max-height: 65vh;
         overflow-y: auto;
         overflow-x: auto;
         border: 1px solid var(--border-color);
         border-radius: 8px;
         background: var(--table-bg);
-    }
-    
-    .audit-table thead th {
-        background: var(--card-bg);
-        color: var(--text-primary);
-        font-weight: 600;
-        font-size: 0.9rem;
-        padding: 14px 12px;
-        white-space: nowrap;
-        border-bottom: 2px solid var(--border-color);
-    }
-    
-    .audit-table tbody td {
-        font-size: 0.9rem;
-        vertical-align: middle;
-    }
-    
-    .audit-table tbody tr:nth-child(even) {
-        background: var(--table-bg);
-    }
-    
-    .audit-table tbody tr:nth-child(odd) {
-        background: rgba(102, 126, 234, 0.02);
     }
     .badge {
         display: inline-block;
@@ -664,9 +648,10 @@
                         </button>
                     </div>
                 </div>
-                <div class="section-body" style="overflow-x: auto;">
+                <div class="section-body">
                     {% if users %}
-                    <table class="user-table" id="userTable">
+                    <div class="admin-table-wrapper">
+                        <table class="user-table" id="userTable">
                         <thead>
                             <tr>
                                 <th>ID</th>
@@ -674,7 +659,6 @@
                                 <th>Email</th>
                                 <th>Status</th>
                                 <th>Role</th>
-                                <th>Default Page</th>
                                 <th>Last Login</th>
                                 <th>Created</th>
                                 <th>Records</th>
@@ -701,17 +685,6 @@
                                     {% else %}
                                     <span class="badge badge-secondary">User</span>
                                     {% endif %}
-                                </td>
-                                <td>
-                                    <select class="form-select form-select-sm default-page-select"
-                                            data-user-id="{{ user.id }}"
-                                            onchange="updateUserDefaultPage({{ user.id }}, this.value)"
-                                            style="min-width: 140px; font-size: 0.875rem;">
-                                        <option value="transactions" {% if user.default_page == 'transactions' or not user.default_page %}selected{% endif %}>Transactions</option>
-                                        <option value="tax" {% if user.default_page == 'tax' %}selected{% endif %}>Tax</option>
-                                        <option value="reports" {% if user.default_page == 'reports' %}selected{% endif %}>Reports</option>
-                                        <option value="rateTrends" {% if user.default_page == 'rateTrends' %}selected{% endif %}>Rate Trends</option>
-                                    </select>
                                 </td>
                                 <td>{{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else 'Never' }}</td>
                                 <td>{{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else 'N/A' }}</td>
@@ -749,6 +722,7 @@
                             {% endfor %}
                         </tbody>
                     </table>
+                    </div>
                     {% else %}
                     <p class="text-muted" style="text-align: center; padding: 40px;">No users found in the database.</p>
                     {% endif %}
@@ -840,7 +814,7 @@
                         Configure flexible markup/interest rates based on category, payment method, or both.
                         Rules with higher specificity (category + payment method) take precedence.
                     </p>
-                    <div style="overflow-x: auto;">
+                    <div class="admin-table-wrapper">
                         <table class="user-table" id="markupRulesTable">
                             <thead>
                                 <tr>
@@ -882,7 +856,7 @@
                     <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9rem;">
                         Manage global payment methods and assign them to users. Payment methods created here can be assigned to one or more users.
                     </p>
-                    <div style="overflow-x: auto;">
+                    <div class="admin-table-wrapper">
                         <table class="user-table" id="pmTable">
                             <thead>
                                 <tr>
@@ -998,104 +972,100 @@
 <div class="modal fade" id="manageTabsModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content" style="background: var(--card-bg); color: var(--text-primary);">
-            <div class="modal-header" style="border-bottom: 1px solid var(--border-color, #dee2e6);">
-                <h5 class="modal-title">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border-color, #dee2e6); padding: 12px 20px;">
+                <h5 class="modal-title" style="font-size: 1.1rem; margin: 0;">
                     <i class="fas fa-th-large"></i> Manage Tabs for <strong id="manageTabsUsername"></strong>
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
-                <p style="color: var(--text-secondary); margin-bottom: 20px; font-size: 0.9rem;">
-                    Select which dashboard tabs this user can access on <strong>Desktop</strong> and <strong>Mobile</strong>. At least one tab must be enabled.
-                </p>
+            <div class="modal-body" style="padding: 15px 20px;">
                 <input type="hidden" id="manageTabsUserId">
                 
-                <!-- Table header for Desktop/Mobile columns -->
-                <div style="display: grid; grid-template-columns: 1fr 80px 80px; gap: 8px; margin-bottom: 12px; padding: 8px 12px; background: var(--card-header-bg); border-radius: 6px; font-weight: 600; font-size: 0.85rem;">
-                    <div>Tab</div>
-                    <div style="text-align: center;"><i class="fas fa-desktop"></i> Desktop</div>
-                    <div style="text-align: center;"><i class="fas fa-mobile-alt"></i> Mobile</div>
+                <!-- Compact Default Page Selection -->
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding: 10px 12px; background: var(--bg-tertiary); border-radius: 6px; border: 1px solid var(--border-color);">
+                    <label for="defaultPageSelect" style="margin: 0; font-weight: 600; color: var(--text-primary); white-space: nowrap;">
+                        <i class="fas fa-home" style="color: #17a2b8;"></i> Default Page:
+                    </label>
+                    <select id="defaultPageSelect" class="form-select form-select-sm" style="flex: 1; background: var(--card-bg); color: var(--text-primary); border-color: var(--border-color);">
+                        <option value="transactions">Transactions</option>
+                        <option value="tax">Tax Calculator</option>
+                        <option value="reports">Reports</option>
+                        <option value="rateTrends">Rate Trends</option>
+                    </select>
                 </div>
                 
-                <div class="tab-permissions-list">
-                    <!-- Transactions -->
-                    <div style="display: grid; grid-template-columns: 1fr 80px 80px; gap: 8px; padding: 12px; background: var(--bg-tertiary); border-radius: 6px; border: 1px solid var(--border-color); margin-bottom: 8px; align-items: center;">
-                        <div>
-                            <i class="fas fa-exchange-alt" style="width: 20px; color: #007bff;"></i>
-                            <strong>Transactions</strong>
-                            <span style="display: block; font-size: 0.8rem; color: var(--text-secondary); margin-left: 28px;">
-                                Manage income and expenses
-                            </span>
-                        </div>
-                        <div style="text-align: center;">
-                            <input class="form-check-input" type="checkbox" id="tab_transactions" value="transactions" checked style="cursor: pointer;">
-                        </div>
-                        <div style="text-align: center;">
-                            <input class="form-check-input" type="checkbox" id="tab_transactions_mobile" value="transactions" checked style="cursor: pointer;">
-                        </div>
-                    </div>
-                    
-                    <!-- Tax -->
-                    <div style="display: grid; grid-template-columns: 1fr 80px 80px; gap: 8px; padding: 12px; background: var(--bg-tertiary); border-radius: 6px; border: 1px solid var(--border-color); margin-bottom: 8px; align-items: center;">
-                        <div>
-                            <i class="fas fa-calculator" style="width: 20px; color: #28a745;"></i>
-                            <strong>Tax</strong>
-                            <span style="display: block; font-size: 0.8rem; color: var(--text-secondary); margin-left: 28px;">
-                                Tax calculator and assessments
-                            </span>
-                        </div>
-                        <div style="text-align: center;">
-                            <input class="form-check-input" type="checkbox" id="tab_tax" value="tax" checked style="cursor: pointer;">
-                        </div>
-                        <div style="text-align: center;">
-                            <input class="form-check-input" type="checkbox" id="tab_tax_mobile" value="tax" checked style="cursor: pointer;">
-                        </div>
-                    </div>
-                    
-                    <!-- Reports -->
-                    <div style="display: grid; grid-template-columns: 1fr 80px 80px; gap: 8px; padding: 12px; background: var(--bg-tertiary); border-radius: 6px; border: 1px solid var(--border-color); margin-bottom: 8px; align-items: center;">
-                        <div>
-                            <i class="fas fa-chart-bar" style="width: 20px; color: #fd7e14;"></i>
-                            <strong>Reports</strong>
-                            <span style="display: block; font-size: 0.8rem; color: var(--text-secondary); margin-left: 28px;">
-                                Financial reports and analytics
-                            </span>
-                        </div>
-                        <div style="text-align: center;">
-                            <input class="form-check-input" type="checkbox" id="tab_reports" value="reports" checked style="cursor: pointer;">
-                        </div>
-                        <div style="text-align: center;">
-                            <input class="form-check-input" type="checkbox" id="tab_reports_mobile" value="reports" checked style="cursor: pointer;">
-                        </div>
-                    </div>
-                    
-                    <!-- Rate Trends -->
-                    <div style="display: grid; grid-template-columns: 1fr 80px 80px; gap: 8px; padding: 12px; background: var(--bg-tertiary); border-radius: 6px; border: 1px solid var(--border-color); margin-bottom: 8px; align-items: center;">
-                        <div>
-                            <i class="fas fa-chart-line" style="width: 20px; color: #6f42c1;"></i>
-                            <strong>Rate Trends</strong>
-                            <span style="display: block; font-size: 0.8rem; color: var(--text-secondary); margin-left: 28px;">
-                                Exchange rate trends and analysis
-                            </span>
-                        </div>
-                        <div style="text-align: center;">
-                            <input class="form-check-input" type="checkbox" id="tab_rateTrends" value="rateTrends" checked style="cursor: pointer;">
-                        </div>
-                        <div style="text-align: center;">
-                            <input class="form-check-input" type="checkbox" id="tab_rateTrends_mobile" value="rateTrends" checked style="cursor: pointer;">
-                        </div>
-                    </div>
+                <!-- Compact Tab Permissions Table -->
+                <div style="border: 1px solid var(--border-color); border-radius: 6px; overflow: hidden;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                        <thead>
+                            <tr style="background: var(--card-header-bg); border-bottom: 2px solid var(--border-color);">
+                                <th style="padding: 8px 12px; text-align: left; font-weight: 600;">Tab</th>
+                                <th style="padding: 8px 12px; text-align: center; font-weight: 600; width: 80px;"><i class="fas fa-desktop"></i> Desktop</th>
+                                <th style="padding: 8px 12px; text-align: center; font-weight: 600; width: 80px;"><i class="fas fa-mobile-alt"></i> Mobile</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="border-bottom: 1px solid var(--border-color);">
+                                <td style="padding: 8px 12px;">
+                                    <i class="fas fa-exchange-alt" style="width: 18px; color: #007bff;"></i>
+                                    <strong>Transactions</strong>
+                                </td>
+                                <td style="padding: 8px 12px; text-align: center;">
+                                    <input class="form-check-input" type="checkbox" id="tab_transactions" value="transactions" checked style="cursor: pointer;">
+                                </td>
+                                <td style="padding: 8px 12px; text-align: center;">
+                                    <input class="form-check-input" type="checkbox" id="tab_transactions_mobile" value="transactions" checked style="cursor: pointer;">
+                                </td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--border-color);">
+                                <td style="padding: 8px 12px;">
+                                    <i class="fas fa-calculator" style="width: 18px; color: #28a745;"></i>
+                                    <strong>Tax</strong>
+                                </td>
+                                <td style="padding: 8px 12px; text-align: center;">
+                                    <input class="form-check-input" type="checkbox" id="tab_tax" value="tax" checked style="cursor: pointer;">
+                                </td>
+                                <td style="padding: 8px 12px; text-align: center;">
+                                    <input class="form-check-input" type="checkbox" id="tab_tax_mobile" value="tax" checked style="cursor: pointer;">
+                                </td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--border-color);">
+                                <td style="padding: 8px 12px;">
+                                    <i class="fas fa-chart-bar" style="width: 18px; color: #fd7e14;"></i>
+                                    <strong>Reports</strong>
+                                </td>
+                                <td style="padding: 8px 12px; text-align: center;">
+                                    <input class="form-check-input" type="checkbox" id="tab_reports" value="reports" checked style="cursor: pointer;">
+                                </td>
+                                <td style="padding: 8px 12px; text-align: center;">
+                                    <input class="form-check-input" type="checkbox" id="tab_reports_mobile" value="reports" checked style="cursor: pointer;">
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 12px;">
+                                    <i class="fas fa-chart-line" style="width: 18px; color: #6f42c1;"></i>
+                                    <strong>Rate Trends</strong>
+                                </td>
+                                <td style="padding: 8px 12px; text-align: center;">
+                                    <input class="form-check-input" type="checkbox" id="tab_rateTrends" value="rateTrends" checked style="cursor: pointer;">
+                                </td>
+                                <td style="padding: 8px 12px; text-align: center;">
+                                    <input class="form-check-input" type="checkbox" id="tab_rateTrends_mobile" value="rateTrends" checked style="cursor: pointer;">
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
-                <div id="tabErrorMessage" class="alert alert-danger" style="display: none; margin-top: 15px;">
+                <div id="tabErrorMessage" class="alert alert-danger" style="display: none; margin-top: 12px; padding: 8px 12px; font-size: 0.875rem;">
                     <i class="fas fa-exclamation-circle"></i>
                     <span id="tabErrorText"></span>
                 </div>
             </div>
-            <div class="modal-footer" style="border-top: 1px solid var(--border-color, #dee2e6);">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+            <div class="modal-footer" style="border-top: 1px solid var(--border-color, #dee2e6); padding: 10px 20px;">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">
                     <i class="fas fa-times"></i> Cancel
                 </button>
-                <button type="button" class="btn btn-primary" id="saveTabsBtn" onclick="saveUserTabs()">
+                <button type="button" class="btn btn-primary btn-sm" id="saveTabsBtn" onclick="saveUserTabs()">
                     <i class="fas fa-save"></i> Save Changes
                 </button>
             </div>
@@ -1811,7 +1781,7 @@
         document.getElementById('manageTabsUsername').textContent = username;
         document.getElementById('tabErrorMessage').style.display = 'none';
 
-        // Load current tab permissions
+        // Load current tab permissions and default page
         try {
             const response = await fetch(`/api/admin/users/${userId}/tabs`);
             const data = await response.json();
@@ -1831,6 +1801,15 @@
                         mobileCheckbox.checked = tabData ? tabData.is_enabled_mobile : true;
                     }
                 });
+                
+                // Set default page
+                const defaultPageSelect = document.getElementById('defaultPageSelect');
+                if (defaultPageSelect && data.default_page) {
+                    defaultPageSelect.value = data.default_page;
+                } else if (defaultPageSelect) {
+                    defaultPageSelect.value = 'transactions'; // Default fallback
+                }
+                
                 manageTabsModal.show();
             } else {
                 showAlert(data.error || 'Failed to load tab permissions', 'danger');
@@ -1867,6 +1846,16 @@
             document.getElementById('tabErrorMessage').style.display = 'block';
             return;
         }
+        
+        // Get default page selection
+        const defaultPage = document.getElementById('defaultPageSelect').value;
+        
+        // Validate that default page is an enabled desktop tab
+        if (!tabPermissions[defaultPage].desktop) {
+            document.getElementById('tabErrorText').textContent = 'Default page must be one of the enabled desktop tabs.';
+            document.getElementById('tabErrorMessage').style.display = 'block';
+            return;
+        }
 
         const saveBtn = document.getElementById('saveTabsBtn');
         const originalText = saveBtn.innerHTML;
@@ -1878,7 +1867,10 @@
             const response = await fetch(`/api/admin/users/${userId}/tabs`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ tab_permissions: tabPermissions })
+                body: JSON.stringify({ 
+                    tab_permissions: tabPermissions,
+                    default_page: defaultPage
+                })
             });
 
             const data = await response.json();

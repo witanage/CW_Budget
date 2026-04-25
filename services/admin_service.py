@@ -545,6 +545,11 @@ def register_admin_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN):
             
             tabs = cursor.fetchall()
 
+            # Get user's default page
+            cursor.execute("SELECT default_page FROM users WHERE id = %s", (user_id,))
+            user_data = cursor.fetchone()
+            default_page = user_data['default_page'] if user_data and user_data['default_page'] else 'transactions'
+
             # If no tabs exist for user, initialize with all tabs enabled
             if not tabs:
                 available_tabs = ['transactions', 'tax', 'reports', 'rateTrends']
@@ -571,7 +576,10 @@ def register_admin_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN):
                 """, (user_id,))
                 tabs = cursor.fetchall()
 
-            return jsonify({'tabs': tabs}), 200
+            return jsonify({
+                'tabs': tabs,
+                'default_page': default_page
+            }), 200
 
         except Error as e:
             logger.error(f"Error fetching user tabs: {str(e)}")
@@ -584,15 +592,20 @@ def register_admin_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN):
     @admin_required
     @limiter.limit(RATE_LIMIT_ADMIN)
     def update_user_tabs(user_id):
-        """Update user's tab permissions."""
+        """Update user's tab permissions and default page."""
         data = request.get_json()
         tab_permissions = data.get('tab_permissions', {})
+        default_page = data.get('default_page', 'transactions')
         
         # Validate tab permissions structure
         valid_tabs = ['transactions', 'tax', 'reports', 'rateTrends']
         for tab in tab_permissions.keys():
             if tab not in valid_tabs:
                 return jsonify({'error': f'Invalid tab name: {tab}'}), 400
+        
+        # Validate default_page
+        if default_page not in valid_tabs:
+            return jsonify({'error': f'Invalid default_page. Must be one of: {", ".join(valid_tabs)}'}), 400
         
         # Validate that at least one tab is enabled on desktop or mobile
         has_any_enabled = any(
@@ -603,6 +616,10 @@ def register_admin_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN):
         
         if not has_any_enabled:
             return jsonify({'error': 'At least one tab must be enabled on desktop or mobile'}), 400
+        
+        # Validate that default_page is enabled on desktop
+        if not tab_permissions.get(default_page, {}).get('desktop', False):
+            return jsonify({'error': 'Default page must be one of the enabled desktop tabs'}), 400
 
         connection = get_db_connection()
         if not connection:
@@ -632,13 +649,19 @@ def register_admin_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN):
                         is_enabled_mobile = VALUES(is_enabled_mobile)
                 """, (user_id, tab, desktop_enabled, mobile_enabled))
             
+            # Update default page
+            cursor.execute(
+                "UPDATE users SET default_page = %s WHERE id = %s",
+                (default_page, user_id)
+            )
+            
             connection.commit()
 
             # Build summary for audit log
             desktop_tabs = [tab for tab in valid_tabs if tab_permissions.get(tab, {}).get('desktop', False)]
             mobile_tabs = [tab for tab in valid_tabs if tab_permissions.get(tab, {}).get('mobile', False)]
             
-            summary = f"Desktop: {', '.join(desktop_tabs) if desktop_tabs else 'none'}; Mobile: {', '.join(mobile_tabs) if mobile_tabs else 'none'}"
+            summary = f"Desktop: {', '.join(desktop_tabs) if desktop_tabs else 'none'}; Mobile: {', '.join(mobile_tabs) if mobile_tabs else 'none'}; Default: {default_page}"
             
             # Log the action
             log_audit(admin_id, 'Updated user tab permissions', user_id,
