@@ -131,7 +131,7 @@ def register_admin_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN):
     def create_user():
         """Create a new user (admin only)."""
         from werkzeug.security import generate_password_hash
-
+        
         data = request.get_json()
         username = data.get('username', '').strip()
         email = data.get('email', '').strip()
@@ -278,7 +278,7 @@ def register_admin_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN):
             # Toggle active status
             new_status = not user['is_active']
             cursor.execute("UPDATE users SET is_active = %s WHERE id = %s", (new_status, user_id))
-
+            
             # If activating a user, assign default Cash payment method (ID=1)
             if new_status:
                 try:
@@ -300,7 +300,7 @@ def register_admin_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN):
                 except Error as e:
                     logger.warning(f"Could not assign default payment method to user {user_id}: {str(e)}")
                     # Don't fail the activation if payment method assignment fails
-
+            
             connection.commit()
 
             # Log the action
@@ -375,13 +375,13 @@ def register_admin_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN):
     def delete_user(user_id):
         """Delete a user and all their data."""
         from werkzeug.security import check_password_hash
-
+        
         data = request.get_json() or {}
         password = data.get('password')
-
+        
         if not password:
             return jsonify({'error': 'Password is required to confirm deletion'}), 400
-
+        
         connection = get_db_connection()
         if not connection:
             return jsonify({'error': 'Database connection failed'}), 500
@@ -393,11 +393,11 @@ def register_admin_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN):
             # Prevent admin from deleting themselves
             if user_id == admin_id:
                 return jsonify({'error': 'Cannot delete your own account'}), 400
-
+            
             # Verify admin's password
             cursor.execute("SELECT password_hash FROM users WHERE id = %s", (admin_id,))
             admin_user = cursor.fetchone()
-
+            
             if not admin_user or not check_password_hash(admin_user['password_hash'], password):
                 return jsonify({'error': 'Invalid password. Please try again.'}), 401
 
@@ -542,7 +542,7 @@ def register_admin_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN):
                         ELSE 5
                     END
             """, (user_id,))
-
+            
             tabs = cursor.fetchall()
 
             # If no tabs exist for user, initialize with all tabs enabled
@@ -554,7 +554,7 @@ def register_admin_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN):
                         VALUES (%s, %s, TRUE, TRUE)
                     """, (user_id, tab))
                 connection.commit()
-
+                
                 # Fetch the newly created tabs
                 cursor.execute("""
                     SELECT tab_name, is_enabled, is_enabled_mobile
@@ -587,20 +587,20 @@ def register_admin_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN):
         """Update user's tab permissions."""
         data = request.get_json()
         tab_permissions = data.get('tab_permissions', {})
-
+        
         # Validate tab permissions structure
         valid_tabs = ['transactions', 'tax', 'reports', 'rateTrends']
         for tab in tab_permissions.keys():
             if tab not in valid_tabs:
                 return jsonify({'error': f'Invalid tab name: {tab}'}), 400
-
+        
         # Validate that at least one tab is enabled on desktop or mobile
         has_any_enabled = any(
-            tab_permissions.get(tab, {}).get('desktop', False) or
+            tab_permissions.get(tab, {}).get('desktop', False) or 
             tab_permissions.get(tab, {}).get('mobile', False)
             for tab in valid_tabs
         )
-
+        
         if not has_any_enabled:
             return jsonify({'error': 'At least one tab must be enabled on desktop or mobile'}), 400
 
@@ -623,7 +623,7 @@ def register_admin_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN):
             for tab in valid_tabs:
                 desktop_enabled = tab_permissions.get(tab, {}).get('desktop', False)
                 mobile_enabled = tab_permissions.get(tab, {}).get('mobile', False)
-
+                
                 cursor.execute("""
                     INSERT INTO user_tabs (user_id, tab_name, is_enabled, is_enabled_mobile)
                     VALUES (%s, %s, %s, %s)
@@ -631,15 +631,15 @@ def register_admin_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN):
                         is_enabled = VALUES(is_enabled),
                         is_enabled_mobile = VALUES(is_enabled_mobile)
                 """, (user_id, tab, desktop_enabled, mobile_enabled))
-
+            
             connection.commit()
 
             # Build summary for audit log
             desktop_tabs = [tab for tab in valid_tabs if tab_permissions.get(tab, {}).get('desktop', False)]
             mobile_tabs = [tab for tab in valid_tabs if tab_permissions.get(tab, {}).get('mobile', False)]
-
+            
             summary = f"Desktop: {', '.join(desktop_tabs) if desktop_tabs else 'none'}; Mobile: {', '.join(mobile_tabs) if mobile_tabs else 'none'}"
-
+            
             # Log the action
             log_audit(admin_id, 'Updated user tab permissions', user_id,
                       f"User '{user['username']}' tabs set to: {summary}")
@@ -741,6 +741,15 @@ def register_admin_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN):
         if key == 'bill_upload_mode':
             if new_value not in ('sequential', 'batch'):
                 return jsonify({'error': "bill_upload_mode must be 'sequential' or 'batch'"}), 400
+        elif key == 'modal_opacity':
+            try:
+                opacity_val = float(new_value)
+            except ValueError:
+                return jsonify({'error': "modal_opacity must be a number between 0.10 and 1.00"}), 400
+            if opacity_val < 0.10 or opacity_val > 1.00:
+                return jsonify({'error': "modal_opacity must be between 0.10 and 1.00"}), 400
+            # Normalize to 2 decimals so the stored value is consistent
+            new_value = f"{opacity_val:.2f}"
 
         connection = get_db_connection()
         if not connection:
@@ -1372,25 +1381,25 @@ def register_admin_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN):
         # Create an in-memory CSV with sample data
         output = io.StringIO()
         writer = csv.writer(output)
-
+        
         # Write header
         writer.writerow(['Description', 'Credit', 'Debit', 'Note', 'Method'])
-
+        
         # Write sample rows
         writer.writerow(['Salary Payment', '5000.00', '', 'Monthly salary', 'Bank Transfer'])
         writer.writerow(['Grocery Shopping', '', '150.50', 'Supermarket', 'Credit Card'])
         writer.writerow(['Utility Bill - Electricity', '', '75.00', 'Monthly bill', 'Cash'])
         writer.writerow(['Freelance Income', '500.00', '', 'Project payment', 'Bank Transfer'])
         writer.writerow(['Restaurant Dinner', '', '45.25', 'Weekend outing', 'Debit Card'])
-
+        
         # Convert to bytes
         output.seek(0)
         csv_bytes = io.BytesIO(output.getvalue().encode('utf-8'))
         csv_bytes.seek(0)
-
+        
         # Log the action
         log_audit(session['user_id'], 'DOWNLOADED_CSV_TEMPLATE', details='Downloaded CSV import template')
-
+        
         return send_file(
             csv_bytes,
             mimetype='text/csv',

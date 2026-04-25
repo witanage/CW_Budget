@@ -195,12 +195,12 @@
    ============================================================ */
 
 #aiInsightsModal .modal-content {
-    background: rgba(45, 45, 45, 0.85);
+    background: rgba(45, 45, 45, var(--modal-bg-opacity, 0.85));
     border: 1px solid var(--border-color);
 }
 
 [data-theme="light"] #aiInsightsModal .modal-content {
-    background: rgba(248, 250, 252, 0.92);
+    background: rgba(248, 250, 252, var(--modal-bg-opacity, 0.92));
 }
 
 #aiInsightsModal .modal-header {

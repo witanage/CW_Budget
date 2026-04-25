@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 def save_tax_calculation_handler():
     """Save income data only (tax calculations are computed on-the-fly).
-
+    
     Enforces business rule: Only ONE active calculation per user per assessment year.
     """
     connection = None
@@ -97,7 +97,7 @@ def save_tax_calculation_handler():
 
 def update_tax_calculation_handler(calculation_id):
     """Update an existing tax calculation.
-
+    
     Enforces business rule: Only ONE active calculation per user per assessment year.
     """
     connection = None
@@ -131,7 +131,7 @@ def update_tax_calculation_handler(calculation_id):
                        FROM tax_calculations
                        WHERE id = %s AND user_id = %s
                        """, (calculation_id, user_id))
-
+        
         existing = cursor.fetchone()
         if not existing:
             return jsonify({'error': 'Tax calculation not found'}), 404
@@ -154,7 +154,7 @@ def update_tax_calculation_handler(calculation_id):
             affected = cursor.rowcount
             if affected > 0:
                 logger.info(f"Deactivated {affected} other calculation(s) for year {assessment_year}")
-
+        
         # If the assessment year changed and this was active, we might need to clean up the old year too
         if old_is_active and old_year != assessment_year and not is_active:
             # This calculation was active in old_year but is being moved to a new year as inactive
@@ -268,7 +268,7 @@ def get_tax_calculations_handler():
                 if year not in active_by_year:
                     active_by_year[year] = []
                 active_by_year[year].append(calc['id'])
-
+        
         # Log warning if multiple active calculations found for any year
         for year, calc_ids in active_by_year.items():
             if len(calc_ids) > 1:
@@ -520,7 +520,7 @@ def deactivate_tax_calculation_handler(calculation_id):
 
 def cleanup_multiple_active_calculations_handler():
     """Admin utility: Fix data integrity by ensuring only one active calculation per user per year.
-
+    
     This endpoint scans all tax calculations and deactivates duplicates,
     keeping only the most recently created active calculation per year.
     """
@@ -528,10 +528,10 @@ def cleanup_multiple_active_calculations_handler():
     cursor = None
     try:
         user_id = session['user_id']
-
+        
         connection = get_db_connection()
         cursor = connection.cursor(dictionary=True)
-
+        
         # Find all years with multiple active calculations for this user
         cursor.execute("""
                        SELECT assessment_year, COUNT(*) as active_count, GROUP_CONCAT(id ORDER BY created_at DESC) as calc_ids
@@ -540,22 +540,22 @@ def cleanup_multiple_active_calculations_handler():
                        GROUP BY assessment_year
                        HAVING COUNT(*) > 1
                        """, (user_id,))
-
+        
         duplicates = cursor.fetchall()
-
+        
         if not duplicates:
             logger.info(f"No duplicate active calculations found for user {user_id}")
             return jsonify({'message': 'No cleanup needed - data is consistent', 'fixed': 0}), 200
-
+        
         fixed_count = 0
         fixes = []
-
+        
         for dup in duplicates:
             year = dup['assessment_year']
             calc_ids = dup['calc_ids'].split(',')
             keep_id = calc_ids[0]  # Keep the most recent (first in DESC order)
             deactivate_ids = calc_ids[1:]  # Deactivate the rest
-
+            
             # Deactivate all except the most recent
             for calc_id in deactivate_ids:
                 cursor.execute("""
@@ -564,23 +564,23 @@ def cleanup_multiple_active_calculations_handler():
                                WHERE id = %s AND user_id = %s
                                """, (calc_id, user_id))
                 fixed_count += 1
-
+            
             fixes.append({
                 'year': year,
                 'kept_id': int(keep_id),
                 'deactivated_ids': [int(x) for x in deactivate_ids]
             })
-
+            
             logger.info(f"Fixed year {year}: kept ID {keep_id}, deactivated {deactivate_ids}")
-
+        
         connection.commit()
-
+        
         return jsonify({
             'message': f'Successfully fixed {fixed_count} duplicate active calculation(s)',
             'fixed_count': fixed_count,
             'details': fixes
         }), 200
-
+        
     except Error as e:
         if connection:
             connection.rollback()
@@ -635,12 +635,12 @@ def register_tax_routes(app, login_required):
     @login_required
     def set_active_tax_calculation(calculation_id):
         return set_active_tax_calculation_handler(calculation_id)
-
+    
     @app.route('/api/tax-calculations/<int:calculation_id>/deactivate', methods=['PUT'])
     @login_required
     def deactivate_tax_calculation(calculation_id):
         return deactivate_tax_calculation_handler(calculation_id)
-
+    
     @app.route('/api/tax-calculations/cleanup-duplicates', methods=['POST'])
     @login_required
     def cleanup_multiple_active_calculations():

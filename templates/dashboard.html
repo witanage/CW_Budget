@@ -5,7 +5,7 @@
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/loader.css') }}?v=2.2">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/exchange_rate_trends.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}?v=1.0">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}?v=2.1">
 {% endblock %}
 
 {% block content %}
@@ -235,7 +235,7 @@
     if (typeof pdfjsLib !== 'undefined') {
         pdfjsLib.GlobalWorkerOptions.workerSrc = "{{ url_for('static', filename='js/vendor/pdf.worker.min.js') }}";
     }
-
+    
     // Pass enabled tabs to JavaScript
     window.enabledTabs = {{ enabled_tabs | tojson }};
 </script>

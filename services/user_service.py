@@ -61,7 +61,7 @@ def register_user_routes(app, limiter, RATE_LIMIT_LOGIN, RATE_LIMIT_REGISTER, RA
                         (username, email, password_hash, False)
                     )
                     user_id = cursor.lastrowid
-
+                    
                     # Initialize all tabs as enabled for new user (both desktop and mobile)
                     available_tabs = ['transactions', 'tax', 'reports', 'rateTrends']
                     for tab in available_tabs:
@@ -69,7 +69,7 @@ def register_user_routes(app, limiter, RATE_LIMIT_LOGIN, RATE_LIMIT_REGISTER, RA
                             "INSERT INTO user_tabs (user_id, tab_name, is_enabled, is_enabled_mobile) VALUES (%s, %s, TRUE, TRUE)",
                             (user_id, tab)
                         )
-
+                    
                     connection.commit()
 
                     logger.info(f"New user registered: {username} ({email}) - Account created in deactivated state")

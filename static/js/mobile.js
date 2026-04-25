@@ -540,43 +540,49 @@ descElement.textContent = transaction.description || '-';
 // Set notes
 if (notesElement) {
 notesElement.textContent = transaction.notes || '-';
-}
+    }
 
-// Set paid at date
-if (paidAtElement) {
-if (transaction.paid_at) {
-// Format the date nicely
-const date = new Date(transaction.paid_at);
-const formattedDate = date.toLocaleString('en-US', {
-year: 'numeric',
-month: 'short',
-day: 'numeric',
-hour: '2-digit',
-minute: '2-digit'
-});
-paidAtElement.textContent = formattedDate;
-} else {
-paidAtElement.textContent = '-';
-}
-}
+    // Set paid at date
+    if (paidAtElement) {
+        if (transaction.paid_at) {
+            // Format the date nicely
+            // Fix for iOS Safari: replace space with 'T' to make it ISO 8601 compatible
+            const dateStr = transaction.paid_at.replace(' ', 'T');
+            const date = new Date(dateStr);
+            
+            // Check if date is valid
+            if (!isNaN(date.getTime())) {
+                const formattedDate = date.toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                });
+                paidAtElement.textContent = formattedDate;
+            } else {
+                paidAtElement.textContent = '-';
+            }
+        } else {
+            paidAtElement.textContent = '-';
+        }
+    }
 
-// Check if bill items exist
-let hasBillItems = false;
-try {
-if (transaction.bill_content) {
-const billContent = typeof transaction.bill_content === 'string'
-? JSON.parse(transaction.bill_content)
-: transaction.bill_content;
-hasBillItems = billContent && billContent.items && billContent.items.length > 0;
-}
-} catch (e) {
-console.error('Error parsing bill content:', e);
-}
+    // Check if bill items exist
+    let hasBillItems = false;
+    try {
+        if (transaction.bill_content) {
+            const billContent = typeof transaction.bill_content === 'string'
+                ? JSON.parse(transaction.bill_content)
+                : transaction.bill_content;
+            hasBillItems = billContent && billContent.items && billContent.items.length > 0;
+        }
+    } catch (e) {
+        console.error('Error parsing bill content:', e);
+    }
 
-// Show/hide View Bill Items button based on bill_content
-if (viewBillItemsBtn) {
-viewBillItemsBtn.style.display = hasBillItems ? 'inline-block' : 'none';
-}
+    // Show/hide View Bill Items button based on bill_content
+    if (viewBillItemsBtn) {
+        viewBillItemsBtn.style.display = hasBillItems ? 'inline-block' : 'none';
+    }
 
     // Show/hide View Attachment button in Transaction Info Modal
     // Hide it when bill items exist (attachment can be viewed from Bill Items modal instead)

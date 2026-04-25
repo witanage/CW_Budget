@@ -754,13 +754,13 @@ def transactions_handler():
 
                 cursor.execute(query, params)
                 transactions = cursor.fetchall()
-
+                
                 # Format datetime fields as strings to avoid timezone conversion issues
                 for t in transactions:
                     if t.get('paid_at') and isinstance(t['paid_at'], datetime):
                         # Format as string without timezone info (local time)
                         t['paid_at'] = t['paid_at'].strftime('%Y-%m-%d %H:%M:%S')
-
+                
                 return jsonify(transactions)
             else:
                 return jsonify([])
@@ -1271,15 +1271,15 @@ def manage_transaction_handler(transaction_id):
             old_payment_method = old_transaction.get('payment_method_id')
             old_is_paid = old_transaction.get('is_paid', False)
             old_paid_at = old_transaction.get('paid_at')
-
+            
             # Get new values from request
             new_payment_method = int(payment_method_id) if payment_method_id else None
             new_is_paid = data.get('is_paid', False) if 'is_paid' in data else old_is_paid
-
+            
             # Determine if payment-related fields changed
             payment_method_changed = old_payment_method != new_payment_method
             is_paid_changed = old_is_paid != new_is_paid
-
+            
             # Only update payment fields if something actually changed
             if payment_method_changed or is_paid_changed:
                 # Parse paid_at from frontend if provided
@@ -1297,7 +1297,7 @@ def manage_transaction_handler(transaction_id):
                 elif new_is_paid and not is_paid_changed:
                     # Still paid, keep old paid_at
                     new_paid_at = old_paid_at
-
+                
                 # Update payment-related fields only
                 cursor.execute("""
                                UPDATE transactions
@@ -1394,7 +1394,7 @@ def manage_transaction_handler(transaction_id):
             # (we only updated them if payment_method_changed or is_paid_changed was True)
             old_is_paid = old_transaction.get('is_paid', False)
             new_is_paid = data.get('is_paid', False) if 'is_paid' in data else old_is_paid
-
+            
             if old_is_paid != new_is_paid:
                 log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'is_paid',
                                       old_is_paid, new_is_paid)
@@ -1889,7 +1889,7 @@ def export_transactions_handler():
         year = request.args.get('year', datetime.now().year, type=int)
         month = request.args.get('month', datetime.now().month, type=int)
         export_format = request.args.get('format', 'csv')
-
+        
         # Get specific transaction IDs if provided (for filtered exports)
         transaction_ids = request.args.get('ids')
 
@@ -1923,7 +1923,7 @@ def export_transactions_handler():
                 params = id_list + [user_id]
                 cursor.execute(query, params)
                 transactions = cursor.fetchall()
-
+            
             has_filters = True  # Mark as filtered export
         else:
             # Export all transactions for the month (no filters)
@@ -2689,12 +2689,12 @@ def create_transaction_handler():
 def get_month_summary(user_id, year, month):
     """
     Get summary statistics for a specific month.
-
+    
     Args:
         user_id: User ID
         year: Year (int)
         month: Month (int, 1-12)
-
+    
     Returns:
         dict with keys: total_income, total_expenses, balance, unpaid_count
         Returns None if database connection fails
@@ -2703,10 +2703,10 @@ def get_month_summary(user_id, year, month):
     if not connection:
         logger.error("Database connection failed in get_month_summary")
         return None
-
+    
     try:
         cursor = connection.cursor(dictionary=True)
-
+        
         # Single query to get all stats for the month
         cursor.execute("""
             SELECT 
@@ -2717,14 +2717,14 @@ def get_month_summary(user_id, year, month):
             INNER JOIN monthly_records mr ON t.monthly_record_id = mr.id
             WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s
         """, (user_id, year, month))
-
+        
         result = cursor.fetchone()
-
+        
         if result:
             total_income = float(result['total_income'])
             total_expenses = float(result['total_expenses'])
             balance = total_income - total_expenses
-
+            
             return {
                 'total_income': total_income,
                 'total_expenses': total_expenses,
@@ -2738,7 +2738,7 @@ def get_month_summary(user_id, year, month):
                 'balance': 0.0,
                 'unpaid_count': 0
             }
-
+    
     except Exception as e:
         logger.error(f"Error in get_month_summary: {str(e)}")
         return None

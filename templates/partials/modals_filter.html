@@ -2,12 +2,12 @@
 <div class="modal fade" id="filterModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header bg-gradient text-white py-2">
+            <div class="modal-header py-2">
                 <h6 class="modal-title mb-0">
-                    <i class="fas fa-filter me-2"></i>Advanced Filters
-                    <span class="badge bg-light text-dark ms-2 small" id="filterPreviewCount">0 results</span>
+                    <i class="fas fa-filter me-2 text-primary"></i>Advanced Filters
+                    <span class="badge bg-primary ms-2 small" id="filterPreviewCount">0 results</span>
                 </h6>
-                <button type="button" class="btn-close btn-close-white btn-sm" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-2" style="max-height: 70vh; overflow-y: auto;">
                 <!-- Quick Actions Bar -->
@@ -111,14 +111,14 @@
 
                             <!-- Amount Range -->
                             <div class="col-md-6">
-                                <label class="form-label small mb-1"><i class="fas fa-dollar-sign"></i> Min Amount</label>
+                                <label class="form-label small mb-1">Min Amount</label>
                                 <div class="input-group input-group-sm">
                                     <span class="input-group-text">රු</span>
                                     <input type="number" class="form-control form-control-sm" id="filterMinAmount" placeholder="0.00" step="0.01" min="0">
                                 </div>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label small mb-1"><i class="fas fa-dollar-sign"></i> Max Amount</label>
+                                <label class="form-label small mb-1">Max Amount</label>
                                 <div class="input-group input-group-sm">
                                     <span class="input-group-text">රු</span>
                                     <input type="number" class="form-control form-control-sm" id="filterMaxAmount" placeholder="No limit" step="0.01" min="0">

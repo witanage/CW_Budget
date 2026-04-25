@@ -18,6 +18,9 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/loader.css') }}?v=2.2">
 
+    <!-- Admin-tunable modal background opacity (read from app_settings) -->
+    <style id="modalOpacityVar">:root { --modal-bg-opacity: {{ modal_opacity }}; }</style>
+
     {% block extra_css %}{% endblock %}
 </head>
 <body>

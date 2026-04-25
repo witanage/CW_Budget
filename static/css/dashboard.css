@@ -1,50 +1,23 @@
-/* IntelliJ Darcula Dark Theme Filter Modal Styles */
-#filterModal .bg-gradient {
-    background: linear-gradient(135deg, #3c3f41 0%, #2b2b2b 100%);
-    border-bottom: 1px solid #323232;
-}
-
-#filterModal .modal-content {
-    background: #2b2b2b;
-    color: #a9b7c6;
-    border: 1px solid #323232;
-    border-radius: 8px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-}
-
-#filterModal .modal-header {
-    background: #3c3f41;
-    border-bottom: 1px solid #323232;
-    color: #a9b7c6;
-}
-
-#filterModal .modal-body {
-    background: #2b2b2b;
-    color: #a9b7c6;
-}
-
-#filterModal .modal-footer {
-    background: #3c3f41;
-    border-top: 1px solid #323232;
-    color: #a9b7c6;
-}
+/* ============================================================================ */
+/* Filter Modal - Clean Modern Theme (inherits from base.css) */
+/* ============================================================================ */
 
 #filterModal .modal-dialog {
     max-width: 700px;
 }
 
-/* Compact Tabs - Darcula Style */
+/* Compact Tabs */
 .compact-tabs {
-    border-bottom: 2px solid #6897bb;
+    border-bottom: 2px solid var(--primary-color, #0866ff);
     margin-bottom: 0;
-    background: #3c3f41;
+    background: rgba(255, 255, 255, 0.03);
     border-radius: 4px 4px 0 0;
 }
 
 .compact-tabs .nav-link {
     padding: 0.5rem 0.75rem;
     font-size: 0.875rem;
-    color: #888888;
+    color: var(--text-secondary);
     border: none;
     border-bottom: 2px solid transparent;
     margin-bottom: -2px;
@@ -53,317 +26,162 @@
 }
 
 .compact-tabs .nav-link:hover {
-    color: #6897bb;
-    border-bottom-color: rgba(104, 151, 187, 0.5);
-    background: rgba(104, 151, 187, 0.1);
+    color: var(--primary-color, #0866ff);
+    border-bottom-color: rgba(8, 102, 255, 0.3);
+    background: rgba(8, 102, 255, 0.05);
 }
 
 .compact-tabs .nav-link.active {
-    color: #a9b7c6;
+    color: var(--text-primary);
     font-weight: 600;
-    background: #2b2b2b;
-    border-bottom-color: #6897bb;
+    background: rgba(255, 255, 255, 0.05);
+    border-bottom-color: var(--primary-color, #0866ff);
 }
 
-/* Form controls - Darcula Style */
-#filterModal .form-control,
+/* Form controls - subtle styling */
 #filterModal .form-control-sm,
 #filterModal .input-group-sm .form-control,
 #filterModal .input-group-sm .input-group-text {
-    background: #3c3f41;
-    border: 1px solid #323232;
-    color: #a9b7c6;
     padding: 0.25rem 0.5rem;
     font-size: 0.875rem;
 }
 
-#filterModal .form-control:focus,
-#filterModal .form-control-sm:focus {
-    background: #3c3f41;
-    border-color: #6897bb;
-    color: #a9b7c6;
-    box-shadow: 0 0 0 0.2rem rgba(104, 151, 187, 0.25);
-}
-
-#filterModal .input-group-text {
-    background: #3c3f41;
-    border: 1px solid #323232;
-    color: #888888;
-}
-
-#filterModal .form-label,
 #filterModal .form-label.small {
     margin-bottom: 0.25rem;
     font-weight: 500;
-    color: #a9b7c6;
+    font-size: 0.875rem;
 }
 
-/* Checkbox container - Darcula Style */
+/* Checkbox container */
 .filter-checkbox-container {
-    padding: 0.5rem;
-    background: #3c3f41;
-    border: 1px solid #323232;
+    padding: 0.75rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--glass-border);
     border-radius: 4px;
+    contain: layout style paint;
+    will-change: scroll-position;
 }
 
 .filter-checkbox-container .form-check {
-    padding: 0.35rem 0.5rem;
+    padding: 0.5rem 0.75rem;
     border-radius: 3px;
     transition: background-color 0.15s;
     margin-bottom: 0.25rem;
+    margin-left: 0;
+    padding-left: 0.5rem;
+    display: flex;
+    align-items: center;
 }
 
 .filter-checkbox-container .form-check:hover {
-    background-color: rgba(104, 151, 187, 0.1);
+    background-color: rgba(8, 102, 255, 0.05);
+}
+
+.filter-checkbox-container .form-check-input {
+    margin-top: 0;
+    margin-left: 0.25rem;
+    margin-right: 0.625rem;
+    flex-shrink: 0;
 }
 
 .filter-checkbox-container .form-check-label {
     font-size: 0.875rem;
     cursor: pointer;
-    color: #a9b7c6;
     margin-bottom: 0;
-    line-height: 1.2;
+    line-height: 1.4;
+    display: flex;
+    align-items: center;
 }
 
 /* Fixed checkbox alignment for inline checkboxes */
 #filterModal .form-check-inline {
     margin-right: 1rem;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.5rem;
+    padding-left: 0.25rem;
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.5rem;
 }
 
 #filterModal .form-check-inline .form-check-input {
-    margin-top: 0.1rem;
+    margin-top: 0;
+    margin-left: 0;
+    margin-right: 0.625rem;
+    flex-shrink: 0;
 }
 
 #filterModal .form-check-inline .form-check-label {
-    margin-left: 0.25rem;
-    vertical-align: top;
+    margin-left: 0;
+    margin-bottom: 0;
+    line-height: 1.4;
 }
 
 /* Status checkboxes in grid - better alignment */
 #filterModal .row.row-cols-2 .form-check {
     margin-bottom: 0.5rem;
+    padding-left: 0.5rem;
+    display: flex;
+    align-items: center;
+    min-height: 1.5rem;
 }
 
 #filterModal .row.row-cols-2 .form-check .form-check-input {
-    margin-top: 0.15rem;
+    margin-top: 0;
+    margin-left: 0;
+    margin-right: 0.625rem;
+    flex-shrink: 0;
 }
 
 #filterModal .row.row-cols-2 .form-check .form-check-label {
-    margin-left: 0.375rem;
-    vertical-align: top;
-    line-height: 1.3;
+    margin-left: 0;
+    margin-bottom: 0;
+    line-height: 1.4;
+    cursor: pointer;
 }
 
-/* Dropdown menus - Darcula Style */
-#filterModal .dropdown-menu {
-    background: #3c3f41;
-    border: 1px solid #323232;
-    font-size: 0.875rem;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-    color: #a9b7c6;
-}
-
-#filterModal .dropdown-item {
-    padding: 0.4rem 0.75rem;
-    color: #a9b7c6;
-}
-
-#filterModal .dropdown-item:hover {
-    background: #2b2b2b;
-    color: #a9b7c6;
-}
-
-#filterModal .dropdown-divider {
-    border-top-color: #323232;
-}
-
-/* Button groups - Darcula Style */
+/* Button groups - minimal styling */
 #filterModal .btn-group-sm .btn {
     padding: 0.25rem 0.5rem;
     font-size: 0.8125rem;
-    background: #3c3f41;
-    border: 1px solid #323232;
-    color: #a9b7c6;
 }
 
-#filterModal .btn-group-sm .btn:hover {
-    background: #2b2b2b;
-    border-color: #6897bb;
-    color: #a9b7c6;
-}
-
-#filterModal .btn-group-sm .btn-outline-secondary {
-    border-color: #323232;
-    color: #888888;
-}
-
-#filterModal .btn-group-sm .btn-outline-secondary:hover {
-    background: #2b2b2b;
-    border-color: #6897bb;
-    color: #a9b7c6;
-}
-
-#filterModal .btn-group-sm .btn-outline-primary {
-    border-color: #6897bb;
-    color: #6897bb;
-}
-
-#filterModal .btn-group-sm .btn-outline-primary:hover {
-    background: #6897bb;
-    border-color: #6897bb;
-    color: #2b2b2b;
-}
-
-#filterModal .btn-group-sm .btn-outline-success {
-    border-color: #629755;
-    color: #629755;
-}
-
-#filterModal .btn-group-sm .btn-outline-success:hover {
-    background: #629755;
-    border-color: #629755;
-    color: #2b2b2b;
-}
-
-#filterModal .btn-group-sm .btn-outline-danger {
-    border-color: #cc7832;
-    color: #cc7832;
-}
-
-#filterModal .btn-group-sm .btn-outline-danger:hover {
-    background: #cc7832;
-    border-color: #cc7832;
-    color: #2b2b2b;
-}
-
-#filterModal .btn-group-sm .btn-outline-info {
-    border-color: #6897bb;
-    color: #6897bb;
-}
-
-#filterModal .btn-group-sm .btn-outline-info:hover {
-    background: #6897bb;
-    border-color: #6897bb;
-    color: #2b2b2b;
-}
-
-/* Modal buttons */
-#filterModal .btn-primary {
-    background: #6897bb;
-    border-color: #6897bb;
-    color: #2b2b2b;
-}
-
-#filterModal .btn-primary:hover {
-    background: #5c8aa0;
-    border-color: #5c8aa0;
-    color: #2b2b2b;
-}
-
-#filterModal .btn-outline-secondary {
-    border-color: #323232;
-    color: #888888;
-}
-
-#filterModal .btn-outline-secondary:hover {
-    background: #2b2b2b;
-    border-color: #6897bb;
-    color: #a9b7c6;
-}
-
-#filterModal .btn-outline-info {
-    border-color: #6897bb;
-    color: #6897bb;
-}
-
-#filterModal .btn-outline-info:hover {
-    background: #6897bb;
-    border-color: #6897bb;
-    color: #2b2b2b;
-}
-
-/* Badges - Darcula Style */
+/* Badges - inherit base colors */
 #filterModal .badge {
     font-size: 0.75rem;
     padding: 0.25rem 0.5rem;
     font-weight: 500;
-    background: #6897bb;
-    color: #2b2b2b;
 }
 
-#filterModal .badge.bg-light {
-    background: #888888 !important;
-    color: #2b2b2b !important;
-}
-
-#filterModal .badge.bg-info {
-    background: #6897bb;
-    color: #2b2b2b;
-}
-
-#filterModal .badge.bg-success {
-    background: #629755;
-    color: #2b2b2b;
-}
-
-#filterModal .badge.bg-danger {
-    background: #cc7832;
-    color: #2b2b2b;
-}
-
-#filterModal .badge.bg-secondary {
-    background: #888888;
-    color: #2b2b2b;
-}
-
-/* Alert - Darcula Style */
-#filterModal .alert {
-    background: #3c3f41;
-    border: 1px solid #323232;
-    border-radius: 4px;
-    color: #a9b7c6;
-    font-size: 0.875rem;
-}
-
-#filterModal .alert.alert-info {
-    border-color: #6897bb;
-    background: rgba(104, 151, 187, 0.1);
-}
-
-/* Close button */
-#filterModal .btn-close {
-    filter: invert(1) grayscale(100%) brightness(200%);
-}
-
-#filterModal .btn-close:hover {
-    filter: invert(1) grayscale(100%) brightness(250%);
-}
-
-/* Focus states */
-#filterModal .form-check-input:focus,
-#filterModal .btn:focus {
-    border-color: #6897bb;
-    box-shadow: 0 0 0 0.2rem rgba(104, 151, 187, 0.25);
-}
-
-/* Scrollbar styling - Darcula */
+/* Scrollbar styling */
 .filter-checkbox-container::-webkit-scrollbar {
     width: 6px;
 }
 
 .filter-checkbox-container::-webkit-scrollbar-track {
-    background: #2b2b2b;
+    background: rgba(255, 255, 255, 0.05);
     border-radius: 3px;
 }
 
 .filter-checkbox-container::-webkit-scrollbar-thumb {
-    background: #6897bb;
+    background: var(--primary-color, #0866ff);
     border-radius: 3px;
 }
 
 .filter-checkbox-container::-webkit-scrollbar-thumb:hover {
-    background: #5c8aa0;
+    background: var(--primary-hover, #0052cc);
+}
+
+/* Close button - Universal for all modals */
+.modal .btn-close,
+.modal .btn-close-white {
+    filter: brightness(0) invert(1);
+    opacity: 0.8;
+}
+
+.modal .btn-close:hover,
+.modal .btn-close-white:hover {
+    filter: brightness(0) invert(1);
+    opacity: 1;
 }
 
 /* Animation for modal */
@@ -388,11 +206,11 @@
         max-width: 95%;
         margin: 0.5rem auto;
     }
-
+    
     #filterModal .btn-group {
         flex-wrap: wrap;
     }
-
+    
     .compact-tabs .nav-link {
         padding: 0.4rem 0.5rem;
         font-size: 0.8125rem;
@@ -538,12 +356,6 @@ tr[draggable="true"] {
     cursor: move;
 }
 
-/* Filter Modal Styling - Using Base Template Colors */
-#filterModal .modal-content {
-    background-color: var(--modal-bg);
-    color: var(--text-primary);
-}
-
 /* Ensure ALL modals are on top of navbar */
 .modal {
     z-index: 1200 !important;
@@ -551,123 +363,6 @@ tr[draggable="true"] {
 
 .modal-backdrop {
     z-index: 1199 !important;
-}
-
-/* Prevent cards in filter modal from moving on hover */
-#filterModal .card:hover {
-    transform: none !important;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
-}
-
-[data-theme="light"] #filterModal .card:hover {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
-}
-
-#filterModal .modal-header {
-    background: var(--card-header-bg);
-    border-bottom: 1px solid var(--border-color);
-}
-
-#filterModal .modal-footer {
-    background: var(--card-header-bg);
-    border-top: 1px solid var(--border-color);
-}
-
-#filterModal .card {
-    background-color: var(--card-bg);
-    border-color: var(--border-color);
-}
-
-#filterModal .card-title {
-    color: var(--text-primary);
-}
-
-#filterModal .input-group-text {
-    background-color: var(--bg-tertiary);
-    border-color: var(--input-border);
-    color: var(--text-primary);
-}
-
-.filter-checkbox-container {
-    max-height: 140px;
-    overflow-y: auto;
-    border: 1px solid var(--border-color);
-    border-radius: 0.375rem;
-    padding: 0.5rem;
-    background-color: var(--bg-secondary);
-}
-
-.filter-checkbox-container .form-check {
-    margin-bottom: 0.25rem;
-    font-size: 0.85rem;
-}
-
-.filter-checkbox-container .form-check:last-child {
-    margin-bottom: 0;
-}
-
-.filter-checkbox-container .form-check-label {
-    color: var(--text-primary);
-    font-weight: normal;
-}
-
-.filter-checkbox-container::-webkit-scrollbar {
-    width: 8px;
-}
-
-.filter-checkbox-container::-webkit-scrollbar-track {
-    background: var(--bg-tertiary);
-    border-radius: 4px;
-}
-
-.filter-checkbox-container::-webkit-scrollbar-thumb {
-    background: var(--border-color);
-    border-radius: 4px;
-}
-
-.filter-checkbox-container::-webkit-scrollbar-thumb:hover {
-    background: var(--text-secondary);
-}
-
-/* Make all filter labels use theme colors */
-#filterModal .form-check-label {
-    color: var(--text-primary);
-}
-
-#filterModal .text-muted {
-    color: var(--text-secondary) !important;
-}
-
-#filterModal hr {
-    border-color: var(--border-color);
-    opacity: 1;
-}
-
-/* Filter modal button styling */
-.filter-quick-btn {
-    font-size: 0.8rem;
-    padding: 0.375rem 0.75rem;
-    border-radius: 6px;
-    font-weight: 500;
-    transition: all 0.2s ease;
-}
-
-.filter-quick-btn:hover {
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.filter-action-btn {
-    font-size: 0.875rem;
-    padding: 0.5rem 1.25rem;
-    border-radius: 6px;
-    font-weight: 500;
-    min-width: 120px;
-}
-
-.filter-toggle-btn {
-    font-size: 0.75rem;
-    padding: 0.125rem 0.5rem;
-    white-space: nowrap;
 }
 
 /* Mobile view: Optimize Add Category section width */
@@ -1860,22 +1555,22 @@ tr[draggable="true"] {
     .sidebar-widgets {
         padding: 0.5rem 0;
     }
-
+    
     .sidebar-widget-tile {
         margin: 0 8px 6px 8px;
         padding: 0.45rem 0.6rem;
     }
-
+    
     .sidebar-widget-tile .widget-icon {
         width: 28px;
         height: 28px;
         font-size: 0.8rem;
     }
-
+    
     .sidebar-widget-tile .widget-label {
         font-size: 0.6rem;
     }
-
+    
     .sidebar-widget-tile .widget-value {
         font-size: 0.8rem;
     }

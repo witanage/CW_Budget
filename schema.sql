@@ -448,7 +448,9 @@ INSERT IGNORE INTO app_settings (setting_key, value, description) VALUES
 ('google_drive_backup_folder_id', '',
  'Google Drive folder ID for database backups'),
 ('google_drive_bills_folder_id', '',
- 'Google Drive folder ID for bill attachment storage');
+ 'Google Drive folder ID for bill attachment storage'),
+('modal_opacity', '0.85',
+ 'Background opacity (0.10-1.00) applied to all modal dialogs across the app');
 
 -- ============================================================
 -- Exchange-Rate Refresh Logs Table

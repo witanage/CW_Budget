@@ -288,6 +288,28 @@ def token_required(f):
     return decorated_function
 
 
+@app.context_processor
+def inject_global_template_vars():
+    """Make admin-tunable UI settings available to all templates.
+
+    Currently exposes:
+      - modal_opacity: float string ('0.10'-'1.00') used by base.html to set
+        the --modal-bg-opacity CSS custom property consumed by modal styles.
+    """
+    from db import get_setting as _gs
+    raw = _gs('modal_opacity', '0.85') or '0.85'
+    try:
+        val = float(raw)
+        if val < 0.1:
+            val = 0.1
+        elif val > 1.0:
+            val = 1.0
+        modal_opacity = f"{val:.2f}"
+    except (TypeError, ValueError):
+        modal_opacity = '0.85'
+    return {'modal_opacity': modal_opacity}
+
+
 @app.before_request
 def make_session_permanent():
     """Ensure authenticated sessions always use a persistent cookie.
@@ -327,7 +349,7 @@ def dashboard():
     """Main dashboard."""
     user_id = session.get('user_id')
     enabled_tabs = []
-
+    
     # Fetch user's enabled tabs for desktop
     connection = get_db_connection()
     if connection:
@@ -346,7 +368,7 @@ def dashboard():
                     END
             """, (user_id,))
             enabled_tabs = [row['tab_name'] for row in cursor.fetchall()]
-
+            
             # If no tabs found, initialize with all tabs enabled (for existing users)
             if not enabled_tabs:
                 available_tabs = ['transactions', 'tax', 'reports', 'rateTrends']
@@ -357,7 +379,7 @@ def dashboard():
                     """, (user_id, tab))
                 connection.commit()
                 enabled_tabs = available_tabs
-
+                
         except Error as e:
             logger.error(f"Error fetching user tabs: {str(e)}")
             # Default to all tabs on error
@@ -368,10 +390,10 @@ def dashboard():
     else:
         # Default to all tabs if connection fails
         enabled_tabs = ['transactions', 'tax', 'reports', 'rateTrends']
-
-    return render_template('dashboard.html',
-                           username=session.get('username'),
-                           enabled_tabs=enabled_tabs)
+    
+    return render_template('dashboard.html', 
+                          username=session.get('username'),
+                          enabled_tabs=enabled_tabs)
 
 
 # Lazy-loaded page fragment endpoints (return HTML partials for on-demand loading)
@@ -411,7 +433,7 @@ def mobile():
     """Mobile view."""
     user_id = session.get('user_id')
     enabled_tabs = []
-
+    
     # Fetch user's enabled tabs for mobile
     connection = get_db_connection()
     if connection:
@@ -430,7 +452,7 @@ def mobile():
                     END
             """, (user_id,))
             enabled_tabs = [row['tab_name'] for row in cursor.fetchall()]
-
+            
             # If no tabs found, initialize with all tabs enabled (for existing users)
             if not enabled_tabs:
                 available_tabs = ['transactions', 'tax', 'reports', 'rateTrends']
@@ -441,7 +463,7 @@ def mobile():
                     """, (user_id, tab))
                 connection.commit()
                 enabled_tabs = available_tabs
-
+                
         except Error as e:
             logger.error(f"Error fetching user tabs: {str(e)}")
             # Default to all tabs on error
@@ -452,10 +474,10 @@ def mobile():
     else:
         # Default to all tabs if connection fails
         enabled_tabs = ['transactions', 'tax', 'reports', 'rateTrends']
-
-    return render_template('mobile.html',
-                           username=session.get('username'),
-                           enabled_tabs=enabled_tabs)
+    
+    return render_template('mobile.html', 
+                          username=session.get('username'),
+                          enabled_tabs=enabled_tabs)
 
 
 register_user_routes(app, limiter, RATE_LIMIT_LOGIN, RATE_LIMIT_REGISTER, RATE_LIMIT_CHANGE_PASSWORD, RATE_LIMIT_API,
@@ -618,13 +640,13 @@ def sidebar_summary():
         user_id = session['user_id']
         current_year = datetime.now().year
         current_month = datetime.now().month
-
+        
         # Get month summary (balance + unpaid count)
         month_data = get_month_summary(user_id, current_year, current_month)
-
+        
         # Get best exchange rate
         rate_data = get_best_rate_today()
-
+        
         # Get active tax calculation
         tax_data = None
         connection = get_db_connection()
@@ -639,17 +661,16 @@ def sidebar_summary():
                     ORDER BY created_at DESC
                     LIMIT 1
                 """, (user_id,))
-
+                
                 tax_calc = cursor.fetchone()
                 if tax_calc:
-                    logger.info(
-                        f"Found active tax calculation: ID={tax_calc['id']}, Year={tax_calc['assessment_year']}, Name={tax_calc['calculation_name']}")
-
+                    logger.info(f"Found active tax calculation: ID={tax_calc['id']}, Year={tax_calc['assessment_year']}, Name={tax_calc['calculation_name']}")
+                    
                     # Parse monthly_data to calculate quarterly payment
                     import json
                     monthly_data = json.loads(tax_calc['monthly_data']) if tax_calc.get('monthly_data') else []
                     logger.info(f"Monthly data entries: {len(monthly_data)}")
-
+                    
                     # Calculate total annual income from salary_usd and bonuses
                     total_annual_income_lkr = 0
                     for month_entry in monthly_data:
@@ -658,7 +679,7 @@ def sidebar_summary():
                         salary_rate = float(month_entry.get('salary_rate', 0))
                         salary_lkr = salary_usd * salary_rate
                         total_annual_income_lkr += salary_lkr
-
+                        
                         # Bonus income
                         bonuses = month_entry.get('bonuses', [])
                         if bonuses and isinstance(bonuses, list):
@@ -667,19 +688,19 @@ def sidebar_summary():
                                 bonus_rate = float(bonus.get('rate', 0))
                                 bonus_lkr = bonus_amount * bonus_rate
                                 total_annual_income_lkr += bonus_lkr
-
+                    
                     tax_free = float(tax_calc.get('tax_free_threshold', 0))
-
+                    
                     # Calculate tax using PROGRESSIVE BRACKETS (same as frontend)
                     # This replaces the old single-rate calculation
                     # Bracket 1: Up to tax_free_threshold - 0% (Relief)
                     # Bracket 2: tax_free_threshold+1 to tax_free_threshold+1,000,000 - 6%
                     # Bracket 3: Above tax_free_threshold+1,000,000 - 15%
-
+                    
                     total_tax = 0
                     if total_annual_income_lkr > tax_free:
                         bracket_2_upper = tax_free + 1_000_000  # e.g., 1,800,000 + 1,000,000 = 2,800,000
-
+                        
                         if total_annual_income_lkr <= bracket_2_upper:
                             # Income is in the 6% bracket
                             total_tax = (total_annual_income_lkr - tax_free) * 0.06
@@ -689,21 +710,20 @@ def sidebar_summary():
                             total_tax = 1_000_000 * 0.06  # LKR 60,000
                             # Tax on amount above bracket_2_upper: 15%
                             total_tax += (total_annual_income_lkr - bracket_2_upper) * 0.15
-
+                    
                     quarterly_payment = total_tax / 4 if total_tax > 0 else 0
-
+                    
                     # Log calculation details for debugging
-                    logger.info(
-                        f"Tax calculation for {tax_calc['assessment_year']}: Income={total_annual_income_lkr:,.2f}, Tax-Free={tax_free:,.2f}, Total Tax={total_tax:,.2f}, Quarterly={quarterly_payment:,.2f}")
-
+                    logger.info(f"Tax calculation for {tax_calc['assessment_year']}: Income={total_annual_income_lkr:,.2f}, Tax-Free={tax_free:,.2f}, Total Tax={total_tax:,.2f}, Quarterly={quarterly_payment:,.2f}")
+                    
                     # Determine current quarter based on start_month (0-indexed: 0=April, 1=May, etc.)
                     start_month_idx = int(tax_calc.get('start_month', 0))  # 0-11
-
+                    
                     # Convert start_month index to actual month number (0=April -> 4)
                     tax_year_start_month = (start_month_idx + 4) % 12
                     if tax_year_start_month == 0:
                         tax_year_start_month = 12
-
+                    
                     # Calculate months elapsed since tax year started
                     if current_month >= tax_year_start_month:
                         # Same calendar year
@@ -711,10 +731,10 @@ def sidebar_summary():
                     else:
                         # Wrapped to next calendar year
                         months_since_start = (12 - tax_year_start_month) + current_month
-
+                    
                     # Determine quarter (0-2 = Q1, 3-5 = Q2, 6-8 = Q3, 9-11 = Q4)
                     current_quarter = (months_since_start // 3) + 1
-
+                    
                     tax_data = {
                         'assessment_year': tax_calc['assessment_year'],
                         'quarterly_payment': round(quarterly_payment, 2),
@@ -731,7 +751,7 @@ def sidebar_summary():
             finally:
                 cursor.close()
                 connection.close()
-
+        
         return jsonify({
             'month_summary': month_data or {
                 'total_income': 0,
@@ -742,7 +762,7 @@ def sidebar_summary():
             'exchange_rate': rate_data,
             'tax_summary': tax_data
         })
-
+    
     except Exception as e:
         logger.error(f"Error in sidebar_summary: {str(e)}")
         return jsonify({'error': 'Failed to fetch sidebar summary'}), 500

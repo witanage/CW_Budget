@@ -1855,14 +1855,14 @@ def delete_salary_calculation():
 def get_best_rate_today():
     """
     Get the best USD->LKR buy rate from all available banks for today.
-
+    
     Returns:
         dict with keys: bank, buy_rate, sell_rate, trend (▲/▼/—)
         Returns None if no rates are available
     """
     try:
         rates = []
-
+        
         # Fetch HNB rate
         try:
             hnb_service = get_hnb_exchange_rate_service()
@@ -1876,7 +1876,7 @@ def get_best_rate_today():
                 })
         except Exception as e:
             logger.warning(f"Failed to fetch HNB rate: {str(e)}")
-
+        
         # Fetch PB rate
         try:
             pb_service = get_pb_exchange_rate_service()
@@ -1890,7 +1890,7 @@ def get_best_rate_today():
                 })
         except Exception as e:
             logger.warning(f"Failed to fetch PB rate: {str(e)}")
-
+        
         # Fetch Sampath rate
         try:
             sampath_service = get_sampath_exchange_rate_service()
@@ -1904,20 +1904,20 @@ def get_best_rate_today():
                 })
         except Exception as e:
             logger.warning(f"Failed to fetch Sampath rate: {str(e)}")
-
+        
         if not rates:
             return None
-
+        
         # Find the best (highest) buy rate
         best_rate = max(rates, key=lambda x: x['buy_rate'])
-
+        
         # Calculate trend by comparing today vs yesterday
         trend = '—'  # Default to no change
         try:
             connection = get_db_connection()
             if connection:
                 cursor = connection.cursor(dictionary=True)
-
+                
                 # Get most recent previous rate from the same bank (not just yesterday)
                 cursor.execute("""
                     SELECT buy_rate 
@@ -1929,7 +1929,7 @@ def get_best_rate_today():
                     ORDER BY created_at DESC 
                     LIMIT 1
                 """, (best_rate['bank'],))
-
+                
                 previous_rate_data = cursor.fetchone()
                 if previous_rate_data and previous_rate_data['buy_rate']:
                     previous_rate = float(previous_rate_data['buy_rate'])
@@ -1937,19 +1937,19 @@ def get_best_rate_today():
                         trend = '▲'
                     elif best_rate['buy_rate'] < previous_rate:
                         trend = '▼'
-
+                
                 cursor.close()
                 connection.close()
         except Exception as e:
             logger.warning(f"Could not calculate trend: {str(e)}")
-
+        
         return {
             'bank': best_rate['bank'],
             'buy_rate': best_rate['buy_rate'],
             'sell_rate': best_rate['sell_rate'],
             'trend': trend
         }
-
+    
     except Exception as e:
         logger.error(f"Error in get_best_rate_today: {str(e)}")
         return None

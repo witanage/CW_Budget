@@ -405,7 +405,7 @@ async function loadUserPreferredPage() {
     try {
         // Get enabled tabs from window (set by template)
         const enabledTabs = window.enabledTabs || ['transactions', 'tax', 'reports', 'rateTrends'];
-
+        
         // Check for page parameter in URL first
         const urlParams = new URLSearchParams(window.location.search);
         const pageParam = urlParams.get('page');
@@ -430,13 +430,13 @@ async function loadUserPreferredPage() {
         if (response.ok) {
             const data = await response.json();
             let defaultPage = data.default_page || 'transactions';
-
+            
             // Check if the preferred page is enabled for the user
             if (!enabledTabs.includes(defaultPage)) {
                 console.warn('Preferred page not enabled, loading first available tab');
                 defaultPage = enabledTabs[0];
             }
-
+            
             console.log('✓ Loading user preferred page:', defaultPage);
             navigateToPage(defaultPage);
             // Hide loader after navigation and a brief moment for data to load
@@ -818,17 +818,19 @@ function setupFormButtons() {
     const filterModal = document.getElementById('filterModal');
     if (filterModal) {
         filterModal.addEventListener('shown.bs.modal', function() {
-            // Only populate dropdowns and setup listeners once
-            if (!filterDropdownsInitialized) {
-                populateFilterDropdowns();
-            }
-            if (!filterSearchListenersInitialized) {
-                setupFilterSearchListeners();
-            }
-            // These can be updated each time (lightweight operations)
-            displaySavedPresets();
-            displayRecentFilters();
-            updateFilterPreview();
+            // Only populate dropdowns and setup listeners once (deferred for faster modal opening)
+            requestAnimationFrame(() => {
+                if (!filterDropdownsInitialized) {
+                    populateFilterDropdowns();
+                }
+                if (!filterSearchListenersInitialized) {
+                    setupFilterSearchListeners();
+                }
+                // These can be updated each time (lightweight operations)
+                displaySavedPresets();
+                displayRecentFilters();
+                updateFilterPreviewDisplay(); // Call directly without debounce on modal open
+            });
         });
     }
 
@@ -1311,20 +1313,20 @@ function showEditCategoryMessage(text, type) {
 function setupWidgetsToggle() {
     const toggleBtn = document.getElementById('widgetsToggle');
     const widgetsContent = document.getElementById('widgetsContent');
-
+    
     if (!toggleBtn || !widgetsContent) return;
-
+    
     // Check localStorage for saved state
     const isCollapsed = localStorage.getItem('widgetsCollapsed') === 'true';
-
+    
     if (isCollapsed) {
         widgetsContent.classList.add('collapsed');
         toggleBtn.classList.add('collapsed');
     }
-
+    
     toggleBtn.addEventListener('click', function() {
         const isCurrentlyCollapsed = widgetsContent.classList.contains('collapsed');
-
+        
         if (isCurrentlyCollapsed) {
             widgetsContent.classList.remove('collapsed');
             toggleBtn.classList.remove('collapsed');
@@ -1348,20 +1350,20 @@ async function loadSidebarWidgets() {
             console.error('Failed to load sidebar widgets:', response.status);
             return;
         }
-
+        
         const data = await response.json();
         console.log('Sidebar widgets data:', data);
-
+        
         // Update balance widget
         const balanceElement = document.getElementById('widgetBalance');
         if (balanceElement && data.month_summary) {
             const balance = data.month_summary.balance || 0;
-            const balanceText = balance >= 0 ?
+            const balanceText = balance >= 0 ? 
                 `+LKR ${balance.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` :
                 `LKR ${balance.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
             balanceElement.textContent = balanceText;
         }
-
+        
         // Update exchange rate widget
         const rateElement = document.getElementById('widgetRate');
         const rateLabelElement = document.getElementById('widgetRateLabel');
@@ -1369,12 +1371,12 @@ async function loadSidebarWidgets() {
             const rate = data.exchange_rate.buy_rate || 0;
             const trend = data.exchange_rate.trend || '—';
             const bank = data.exchange_rate.bank || '';
-
+            
             // Update label with bank name
             if (rateLabelElement && bank) {
                 rateLabelElement.textContent = `USD→LKR (${bank})`;
             }
-
+            
             // Update value with rate and trend
             rateElement.innerHTML = `${rate.toFixed(2)} <small style="margin-left:0.25rem;">${trend}</small>`;
         } else if (rateElement) {
@@ -1383,7 +1385,7 @@ async function loadSidebarWidgets() {
                 rateLabelElement.textContent = 'USD→LKR';
             }
         }
-
+        
         // Update unpaid widget
         const unpaidElement = document.getElementById('widgetUnpaid');
         const unpaidTile = document.getElementById('widgetUnpaidTile');
@@ -1396,7 +1398,7 @@ async function loadSidebarWidgets() {
                 unpaidTile.style.display = 'none';
             }
         }
-
+        
         // Update monthly tax payment widget
         const taxElement = document.getElementById('widgetTax');
         const taxLabel = document.getElementById('widgetTaxLabel');
@@ -1405,19 +1407,19 @@ async function loadSidebarWidgets() {
             const quarterlyPayment = data.tax_summary.quarterly_payment || 0;
             const assessmentYear = data.tax_summary.assessment_year || '';
             const currentQuarter = data.tax_summary.current_quarter || 1;
-
+            
             // Update label with assessment year and quarter
             if (taxLabel && assessmentYear) {
                 taxLabel.textContent = `Tax Q${currentQuarter} (${assessmentYear})`;
             }
-
+            
             // Update value with quarterly payment
             taxElement.textContent = `LKR ${quarterlyPayment.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
             taxTile.style.display = 'flex';
         } else if (taxTile) {
             taxTile.style.display = 'none';
         }
-
+        
     } catch (error) {
         console.error('Error loading sidebar widgets:', error);
     }
@@ -1493,10 +1495,10 @@ function loadTransactions(applyActiveFilters = false) {
             allTransactions = data; // Store all transactions globally
             displayTransactions(data); // Display transactions directly
             hideLoading();
-
+            
             // Update sidebar widgets
             loadSidebarWidgets();
-
+            
             // Update filter stats badges
             if (typeof updateFilterStatsBadges === 'function') {
                 updateFilterStatsBadges();
@@ -2058,14 +2060,14 @@ async function saveTransaction() {
         if (paidAtPaidRadio && paidAtPaidRadio.checked) {
             // Mark as paid
             data.is_paid = true;
-
+            
             // Check if payment method or payment status changed
-            const paymentMethodChanged = isEdit && editingTransaction &&
+            const paymentMethodChanged = isEdit && editingTransaction && 
                 (editingTransaction.payment_method_id != data.payment_method_id);
-            const paymentStatusChanged = isEdit && editingTransaction &&
+            const paymentStatusChanged = isEdit && editingTransaction && 
                 (editingTransaction.is_paid !== true);
-
-            if (isEdit && editingTransaction && editingTransaction.paid_at &&
+            
+            if (isEdit && editingTransaction && editingTransaction.paid_at && 
                 !paymentMethodChanged && !paymentStatusChanged) {
                 // Editing: payment method and status unchanged, preserve existing paid_at
                 data.paid_at = editingTransaction.paid_at;
@@ -3069,40 +3071,36 @@ function populateFilterDropdowns() {
         return;
     }
 
-    // Populate categories
+    // Populate categories - optimized with single innerHTML update
     const categoryContainer = document.getElementById('filterCategoryCheckboxes');
     if (categoryContainer && currentCategories.length > 0) {
-        categoryContainer.innerHTML = '';
-        currentCategories.forEach(cat => {
+        const categoryHTML = currentCategories.map(cat => {
             const iconClass = cat.type === 'income' ? 'fa-arrow-down text-success' : 'fa-arrow-up text-danger';
-            const checkbox = document.createElement('div');
-            checkbox.className = 'form-check';
-            checkbox.innerHTML = `
-                <input class="form-check-input filter-category-checkbox" type="checkbox" value="${cat.id}" id="filterCat${cat.id}">
-                <label class="form-check-label" for="filterCat${cat.id}">
-                    <i class="fas ${iconClass} me-1"></i>${cat.name}
-                </label>
-            `;
-            categoryContainer.appendChild(checkbox);
-        });
+            return `
+                <div class="form-check">
+                    <input class="form-check-input filter-category-checkbox" type="checkbox" value="${cat.id}" id="filterCat${cat.id}">
+                    <label class="form-check-label" for="filterCat${cat.id}">
+                        <i class="fas ${iconClass} me-1"></i>${cat.name}
+                    </label>
+                </div>`;
+        }).join('');
+        categoryContainer.innerHTML = categoryHTML;
     }
 
-    // Populate payment methods
+    // Populate payment methods - optimized with single innerHTML update
     const paymentContainer = document.getElementById('filterPaymentMethodCheckboxes');
     if (paymentContainer && Array.isArray(paymentMethods) && paymentMethods.length > 0) {
-        paymentContainer.innerHTML = '';
-        paymentMethods.forEach(method => {
+        const paymentHTML = paymentMethods.map(method => {
             const iconClass = method.type === 'cash' ? 'fa-money-bill-wave' : 'fa-credit-card';
-            const checkbox = document.createElement('div');
-            checkbox.className = 'form-check';
-            checkbox.innerHTML = `
-                <input class="form-check-input filter-payment-checkbox" type="checkbox" value="${method.id}" id="filterPay${method.id}">
-                <label class="form-check-label" for="filterPay${method.id}">
-                    <i class="fas ${iconClass} me-1"></i>${method.name}
-                </label>
-            `;
-            paymentContainer.appendChild(checkbox);
-        });
+            return `
+                <div class="form-check">
+                    <input class="form-check-input filter-payment-checkbox" type="checkbox" value="${method.id}" id="filterPay${method.id}">
+                    <label class="form-check-label" for="filterPay${method.id}">
+                        <i class="fas ${iconClass} me-1"></i>${method.name}
+                    </label>
+                </div>`;
+        }).join('');
+        paymentContainer.innerHTML = paymentHTML;
     }
 
     filterDropdownsInitialized = true;
@@ -3585,8 +3583,8 @@ function displayRecentFilters() {
         return;
     }
 
-    container.innerHTML = '';
-    recentFilters.forEach((filterSnapshot, index) => {
+    // Build HTML string for single update
+    const badgesHTML = recentFilters.map((filterSnapshot, index) => {
         const filters = filterSnapshot.filters;
         const date = new Date(filterSnapshot.timestamp);
         const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -3599,16 +3597,14 @@ function displayRecentFilters() {
         if (filters.minAmount || filters.maxAmount) desc.push('Amount');
         if (filters.startDate || filters.endDate) desc.push('Date');
 
-        const badge = document.createElement('span');
-        badge.className = 'badge bg-info preset-badge';
-        badge.innerHTML = `
-            <i class="fas fa-history me-1"></i>
-            ${desc.length > 0 ? desc.join(', ') : 'Filter'} (${timeStr})
-        `;
-        badge.style.cursor = 'pointer';
-        badge.onclick = () => loadFilterFromSnapshot(filterSnapshot);
-        container.appendChild(badge);
-    });
+        return `
+            <span class="badge bg-info preset-badge" style="cursor: pointer;" onclick="loadFilterFromSnapshot(recentFilters[${index}])">
+                <i class="fas fa-history me-1"></i>
+                ${desc.length > 0 ? desc.join(', ') : 'Filter'} (${timeStr})
+            </span>`;
+    }).join('');
+    
+    container.innerHTML = badgesHTML;
 }
 
 function displaySavedPresets() {
@@ -3620,19 +3616,17 @@ function displaySavedPresets() {
         return;
     }
 
-    container.innerHTML = '';
-    savedFilterPresets.forEach((preset, index) => {
-        const badge = document.createElement('span');
-        badge.className = 'badge bg-primary preset-badge';
-        badge.innerHTML = `
-            <i class="fas fa-bookmark me-1"></i>
-            ${preset.name}
-            <button class="btn-close btn-close-white" onclick="event.stopPropagation(); deletePreset(${index})"></button>
-        `;
-        badge.style.cursor = 'pointer';
-        badge.onclick = () => loadFilterFromPreset(preset);
-        container.appendChild(badge);
-    });
+    // Build HTML string for single update
+    const badgesHTML = savedFilterPresets.map((preset, index) => {
+        return `
+            <span class="badge bg-primary preset-badge" style="cursor: pointer;" onclick="loadFilterFromPreset(savedFilterPresets[${index}])">
+                <i class="fas fa-bookmark me-1"></i>
+                ${preset.name}
+                <button class="btn-close btn-close-white" onclick="event.stopPropagation(); deletePreset(${index})"></button>
+            </span>`;
+    }).join('');
+    
+    container.innerHTML = badgesHTML;
 }
 
 function loadFilterFromSnapshot(snapshot) {
@@ -3746,7 +3740,7 @@ function updateFilterPreview() {
     }
     updateFilterPreviewTimeout = setTimeout(() => {
         updateFilterPreviewDisplay();
-    }, 100); // 100ms debounce
+    }, 50); // 50ms debounce for faster response
 }
 
 function updateFilterPreviewDisplay() {
@@ -3765,32 +3759,33 @@ function updateFilterPreviewDisplay() {
     const startDate = document.getElementById('filterStartDate')?.value;
     const endDate = document.getElementById('filterEndDate')?.value;
 
-    listEl.innerHTML = '';
+    // Build HTML string in memory for single update
+    const badges = [];
     let filterCount = 0;
 
     if (desc) {
         filterCount++;
-        listEl.innerHTML += `<span class="badge bg-primary rounded-pill"><i class="fas fa-file-alt me-1"></i>Desc: "${desc}"</span> `;
+        badges.push(`<span class="badge bg-primary rounded-pill"><i class="fas fa-file-alt me-1"></i>Desc: "${desc}"</span>`);
     }
     if (notes) {
         filterCount++;
-        listEl.innerHTML += `<span class="badge bg-primary rounded-pill"><i class="fas fa-sticky-note me-1"></i>Notes: "${notes}"</span> `;
+        badges.push(`<span class="badge bg-primary rounded-pill"><i class="fas fa-sticky-note me-1"></i>Notes: "${notes}"</span>`);
     }
     if (categories.length > 0) {
         filterCount++;
-        listEl.innerHTML += `<span class="badge bg-info rounded-pill"><i class="fas fa-tags me-1"></i>${categories.length} Categories</span> `;
+        badges.push(`<span class="badge bg-info rounded-pill"><i class="fas fa-tags me-1"></i>${categories.length} Categories</span>`);
     }
     if (paymentMethods.length > 0) {
         filterCount++;
-        listEl.innerHTML += `<span class="badge bg-info rounded-pill"><i class="fas fa-credit-card me-1"></i>${paymentMethods.length} Methods</span> `;
+        badges.push(`<span class="badge bg-info rounded-pill"><i class="fas fa-credit-card me-1"></i>${paymentMethods.length} Methods</span>`);
     }
     if (types.length > 0) {
         filterCount++;
-        listEl.innerHTML += `<span class="badge bg-warning rounded-pill"><i class="fas fa-exchange-alt me-1"></i>${types.map(t => t.value).join('/')}</span> `;
+        badges.push(`<span class="badge bg-warning rounded-pill"><i class="fas fa-exchange-alt me-1"></i>${types.map(t => t.value).join('/')}</span>`);
     }
     if (statuses.length > 0) {
         filterCount++;
-        listEl.innerHTML += `<span class="badge bg-success rounded-pill"><i class="fas fa-check-circle me-1"></i>${statuses.length} Status</span> `;
+        badges.push(`<span class="badge bg-success rounded-pill"><i class="fas fa-check-circle me-1"></i>${statuses.length} Status</span>`);
     }
     if (minAmount || maxAmount) {
         filterCount++;
@@ -3798,7 +3793,7 @@ function updateFilterPreviewDisplay() {
         if (minAmount && maxAmount) amtText = `${minAmount}-${maxAmount}`;
         else if (minAmount) amtText = `≥${minAmount}`;
         else amtText = `≤${maxAmount}`;
-        listEl.innerHTML += `<span class="badge bg-secondary rounded-pill"><i class="fas fa-dollar-sign me-1"></i>${amtText}</span> `;
+        badges.push(`<span class="badge bg-secondary rounded-pill"><i class="fas fa-dollar-sign me-1"></i>${amtText}</span>`);
     }
     if (startDate || endDate) {
         filterCount++;
@@ -3806,12 +3801,11 @@ function updateFilterPreviewDisplay() {
         if (startDate && endDate) dateText = `${startDate} to ${endDate}`;
         else if (startDate) dateText = `From ${startDate}`;
         else dateText = `Until ${endDate}`;
-        listEl.innerHTML += `<span class="badge bg-secondary rounded-pill"><i class="fas fa-calendar me-1"></i>${dateText}</span> `;
+        badges.push(`<span class="badge bg-secondary rounded-pill"><i class="fas fa-calendar me-1"></i>${dateText}</span>`);
     }
 
-    if (filterCount === 0) {
-        listEl.innerHTML = '<span class="badge bg-secondary">None</span>';
-    }
+    // Single DOM update
+    listEl.innerHTML = filterCount === 0 ? '<span class="badge bg-secondary">None</span>' : badges.join(' ');
 
     // Update filter count in advanced tab
     const activeFiltersCount = document.getElementById('activeFiltersCount');
@@ -5527,16 +5521,16 @@ function loadTaxCalculator() {
     if (startMonthSelect) {
         startMonthSelect.addEventListener('change', populateMonthlyDataTable);
     }
-
+    
     // Sync calculation name fields
     const calculationNameInput = document.getElementById('calculationNameInput');
     const calculationName = document.getElementById('calculationName');
-
+    
     if (calculationNameInput && calculationName) {
         calculationNameInput.addEventListener('input', function() {
             calculationName.value = this.value;
         });
-
+        
         calculationName.addEventListener('input', function() {
             calculationNameInput.value = this.value;
         });
@@ -5911,7 +5905,7 @@ function calculateMonthlyTax() {
     const currentAssessmentYear = document.getElementById('assessmentYear').value;
     console.log('=== CALCULATE TAX STARTED ===');
     console.log('Assessment year dropdown value:', currentAssessmentYear);
-
+    
     // Get form values
     const taxFreeThreshold = parseFloat(document.getElementById('taxFreeThreshold').value) || 1800000;
     const startMonthIndex = parseInt(document.getElementById('startMonth').value) || 0;
@@ -6067,7 +6061,7 @@ function calculateMonthlyTax() {
     const selectedAssessmentYear = document.getElementById('assessmentYear').value;
     console.log('=== CAPTURING ASSESSMENT YEAR ===');
     console.log('Selected assessment year from dropdown:', selectedAssessmentYear);
-
+    
     lastCalculationData = {
         assessment_year: selectedAssessmentYear,
         tax_rate: 0, // Using progressive brackets (0%, 6%, 15%), not a single rate
@@ -6109,7 +6103,7 @@ function calculateMonthlyTax() {
     const saveButtonIncome = document.getElementById('saveCalculationBtnIncome');
     if (saveSection) {
         saveSection.style.display = 'block';
-
+        
         // Auto-generate calculation name only if not editing
         if (!currentEditingCalculationId) {
             const calcName = `Tax Calculation ${lastCalculationData.assessment_year}`;
@@ -6122,18 +6116,18 @@ function calculateMonthlyTax() {
             }
         }
     }
-
+    
     // Show the save button in the income details card
     if (saveButtonIncome) {
         saveButtonIncome.style.display = 'flex';
     }
-
+        
     // Update the active year display
     const activeYearDisplay = document.getElementById('activeYearDisplay');
     if (activeYearDisplay) {
         activeYearDisplay.textContent = lastCalculationData.assessment_year;
     }
-
+    
     // Update button UI based on editing mode
     updateSaveButtonUI();
 
@@ -6264,13 +6258,13 @@ function resetTaxCalculator() {
     if (saveSection) {
         saveSection.style.display = 'none';
     }
-
+    
     // Hide save button in Income Details card
     const saveButtonIncome = document.getElementById('saveCalculationBtnIncome');
     if (saveButtonIncome) {
         saveButtonIncome.style.display = 'none';
     }
-
+    
     // Clear calculation name fields
     document.getElementById('calculationNameInput').value = '';
     document.getElementById('calculationName').value = '';
@@ -6288,7 +6282,7 @@ function resetTaxCalculator() {
     }
 
     lastCalculationData = null;
-
+    
     // Clear editing mode
     currentEditingCalculationId = null;
     updateEditingBanner();
@@ -6304,9 +6298,9 @@ function updateSaveButtonUI() {
     const saveHeader = document.getElementById('saveCalculationHeader');
     const btnContainer = document.getElementById('saveButtonContainer');
     const editingBanner = document.getElementById('editingStateBanner');
-
+    
     if (!saveBtn || !saveCard || !saveHeader || !btnContainer) return;
-
+    
     if (currentEditingCalculationId) {
         // In edit mode - show update UI with IntelliJ dark theme
         saveCard.className = 'card mb-3 border-primary intellij-dark';
@@ -6314,7 +6308,7 @@ function updateSaveButtonUI() {
         saveBtn.innerHTML = '<i class="fas fa-save me-2"></i>Update';
         saveBtn.className = 'btn btn-primary flex-grow-1 d-flex align-items-center justify-content-center';
         saveBtn.onclick = () => saveTaxCalculation(false);
-
+        
         // Add "Save As New" button if it doesn't exist
         if (!document.getElementById('saveAsNewBtn')) {
             const saveAsNewBtn = document.createElement('button');
@@ -6339,7 +6333,7 @@ function updateSaveButtonUI() {
         saveBtn.innerHTML = '<i class="fas fa-save me-2"></i>Save';
         saveBtn.className = 'btn btn-success flex-grow-1 d-flex align-items-center justify-content-center';
         saveBtn.onclick = () => saveTaxCalculation(false);
-
+        
         // Remove "Save As New" button if it exists
         const saveAsNewBtn = document.getElementById('saveAsNewBtn');
         if (saveAsNewBtn) {
@@ -6377,13 +6371,13 @@ function saveTaxCalculation(saveAsNew = false) {
     if (!calculationName) {
         calculationName = document.getElementById('calculationName')?.value.trim();
     }
-
+    
     if (!calculationName) {
         showToast('Please enter a name for this calculation', 'warning');
         document.getElementById('calculationNameInput')?.focus();
         return;
     }
-
+    
     // Keep both fields in sync
     document.getElementById('calculationNameInput').value = calculationName;
     document.getElementById('calculationName').value = calculationName;
@@ -6395,7 +6389,7 @@ function saveTaxCalculation(saveAsNew = false) {
     const currentAssessmentYear = document.getElementById('assessmentYear').value;
     const currentTaxFreeThreshold = parseFloat(document.getElementById('taxFreeThreshold').value) || 1800000;
     const currentStartMonth = parseInt(document.getElementById('startMonth').value) || 0;
-
+    
     const dataToSave = {
         ...lastCalculationData,
         assessment_year: currentAssessmentYear, // Override with current dropdown value
@@ -6413,15 +6407,15 @@ function saveTaxCalculation(saveAsNew = false) {
 
     // Determine if we're updating existing or creating new
     const isUpdate = currentEditingCalculationId && !saveAsNew;
-
+    
     // CRITICAL: Check for existing active calculation before proceeding
     if (setAsActive) {
-        const existingActive = allSavedCalculations.find(calc =>
-            calc.assessment_year === currentAssessmentYear &&
-            calc.is_active &&
+        const existingActive = allSavedCalculations.find(calc => 
+            calc.assessment_year === currentAssessmentYear && 
+            calc.is_active && 
             calc.id !== currentEditingCalculationId
         );
-
+        
         if (existingActive) {
             const warningMessage = `
                 <div class="alert alert-warning">
@@ -6437,7 +6431,7 @@ function saveTaxCalculation(saveAsNew = false) {
                 </p>
                 <p class="mt-2 mb-0">Do you want to proceed?</p>
             `;
-
+            
             showConfirmModal(
                 'Confirm Active Calculation Change',
                 warningMessage,
@@ -6451,14 +6445,14 @@ function saveTaxCalculation(saveAsNew = false) {
             return; // Exit and wait for user confirmation
         }
     }
-
+    
     // No conflict or not setting as active, proceed directly
     proceedWithSave(dataToSave, isUpdate);
 }
 
 function proceedWithSave(dataToSave, isUpdate) {
-    const url = isUpdate
-        ? `/api/tax-calculations/${currentEditingCalculationId}`
+    const url = isUpdate 
+        ? `/api/tax-calculations/${currentEditingCalculationId}` 
         : '/api/tax-calculations';
     const method = isUpdate ? 'PUT' : 'POST';
 
@@ -6487,7 +6481,7 @@ function proceedWithSave(dataToSave, isUpdate) {
             const icon = isUpdate ? '<i class="fas fa-check-circle me-2"></i>' : '<i class="fas fa-save me-2"></i>';
             const message = isUpdate ? 'Tax calculation updated successfully!' : 'Tax calculation saved successfully!';
             showToast(icon + message, 'success');
-
+            
             // If we just created a new calculation, switch to editing mode for it
             if (!isUpdate && data.id) {
                 currentEditingCalculationId = data.id;
@@ -6501,7 +6495,7 @@ function proceedWithSave(dataToSave, isUpdate) {
                     });
                 updateSaveButtonUI();
             }
-
+            
             // Reload saved calculations list
             loadSavedCalculations();
             // Hide save section
@@ -6593,17 +6587,17 @@ function displaySavedCalculations(calculations, filterYear = null) {
         // Calculate quarterly and total tax payments from monthly_data
         let quarterlyPayments = [0, 0, 0, 0]; // Q1, Q2, Q3, Q4
         let totalTaxPayment = 0;
-
+        
         if (calc.monthly_data && Array.isArray(calc.monthly_data)) {
             let previousTaxLiability = 0;
-
+            
             calc.monthly_data.forEach((monthData, index) => {
                 let payment = monthData.monthlyPayment;
-
+                
                 // Fallback: If monthlyPayment is not saved (old calculations), calculate it
                 if (payment === undefined || payment === null) {
                     const taxFreeThreshold = calc.tax_free_threshold || 1800000;
-
+                    
                     // Reconstruct cumulative income and tax liability
                     let cumulativeIncome = 0;
                     for (let i = 0; i <= index; i++) {
@@ -6611,17 +6605,17 @@ function displaySavedCalculations(calculations, filterYear = null) {
                         const salaryUSD = md.salary_usd || 0;
                         const salaryRate = md.salary_rate || 0;
                         let fcReceiptsLKR = salaryUSD * salaryRate;
-
+                        
                         // Add bonuses
                         if (md.bonuses && Array.isArray(md.bonuses)) {
                             md.bonuses.forEach(bonus => {
                                 fcReceiptsLKR += (bonus.amount || 0) * (bonus.rate || 0);
                             });
                         }
-
+                        
                         cumulativeIncome += fcReceiptsLKR;
                     }
-
+                    
                     // Calculate tax liability
                     let totalTaxLiability = 0;
                     if (cumulativeIncome > taxFreeThreshold) {
@@ -6632,13 +6626,13 @@ function displaySavedCalculations(calculations, filterYear = null) {
                             totalTaxLiability += (cumulativeIncome - 2_800_000) * 0.15;
                         }
                     }
-
+                    
                     payment = Math.max(0, totalTaxLiability - previousTaxLiability);
                     previousTaxLiability = totalTaxLiability;
                 } else {
                     payment = payment || 0;
                 }
-
+                
                 const quarterIndex = Math.floor(index / 3); // 0-2 -> Q1, 3-5 -> Q2, 6-8 -> Q3, 9-11 -> Q4
                 quarterlyPayments[quarterIndex] += payment;
                 totalTaxPayment += payment;
@@ -6737,16 +6731,16 @@ function setActiveCalculation(calculationId) {
         showToast('Calculation not found', 'danger');
         return;
     }
-
+    
     // Find any existing active calculation for the same year
-    const existingActive = allSavedCalculations.find(calc =>
-        calc.assessment_year === calcToActivate.assessment_year &&
-        calc.is_active &&
+    const existingActive = allSavedCalculations.find(calc => 
+        calc.assessment_year === calcToActivate.assessment_year && 
+        calc.is_active && 
         calc.id !== calculationId
     );
-
+    
     let warningMessage = `<p class="mb-2">Set <strong>"${calcToActivate.calculation_name}"</strong> as active for ${calcToActivate.assessment_year}?</p>`;
-
+    
     if (existingActive) {
         warningMessage += `
             <div class="alert alert-warning mb-0">
@@ -6764,7 +6758,7 @@ function setActiveCalculation(calculationId) {
             </div>
         `;
     }
-
+    
     showConfirmModal(
         'Set Active Calculation',
         warningMessage,
@@ -6784,7 +6778,7 @@ function setActiveCalculation(calculationId) {
                     showToast(data.error, 'danger');
                 } else {
                     showToast(
-                        `<i class="fas fa-star me-2"></i>Calculation activated for ${data.assessment_year}!`,
+                        `<i class="fas fa-star me-2"></i>Calculation activated for ${data.assessment_year}!`, 
                         'success'
                     );
                     // Reload the calculations list to reflect the change
@@ -6834,7 +6828,7 @@ function toggleActiveCalculation(calculationId, isCurrentlyActive) {
                         showToast(data.error, 'danger');
                     } else {
                         showToast(
-                            `<i class="fas fa-times-circle me-2"></i>Calculation deactivated for ${data.assessment_year}!`,
+                            `<i class="fas fa-times-circle me-2"></i>Calculation deactivated for ${data.assessment_year}!`, 
                             'info'
                         );
                         loadSavedCalculations();
@@ -6857,7 +6851,7 @@ function toggleActiveCalculation(calculationId, isCurrentlyActive) {
 
 function loadCalculation(calculationId) {
     showLoading();
-
+    
     // Set editing mode
     currentEditingCalculationId = calculationId;
 
@@ -6872,7 +6866,7 @@ function loadCalculation(calculationId) {
             updateEditingBanner();
             return;
         }
-
+        
         // Update editing banner with calculation details
         updateEditingBanner(calc);
 
@@ -6890,7 +6884,7 @@ function loadCalculation(calculationId) {
         // Tax rate is now hardcoded in progressive brackets, not loaded from saved data
         document.getElementById('taxFreeThreshold').value = calc.tax_free_threshold;
         document.getElementById('startMonth').value = calc.start_month;
-
+        
         // Set the "Set as active" checkbox based on current status
         const setAsActiveCheckbox = document.getElementById('setAsActive');
         if (setAsActiveCheckbox) {
@@ -6991,7 +6985,7 @@ function loadCalculation(calculationId) {
 
             // Recalculate tax schedule with loaded data
             calculateMonthlyTax();
-
+            
             // Update save button UI to show "Update" mode
             updateSaveButtonUI();
         }, 100); // 100ms delay to ensure DOM is updated
@@ -7010,10 +7004,10 @@ function loadCalculation(calculationId) {
 
 function deleteCalculation(calculationId) {
     const isCurrentlyEditing = currentEditingCalculationId === calculationId;
-    const warningMsg = isCurrentlyEditing
+    const warningMsg = isCurrentlyEditing 
         ? '<div class="alert alert-warning mb-3"><i class="fas fa-exclamation-triangle me-2"></i>You are currently editing this calculation. Deleting it will clear your current work.</div>'
         : '';
-
+    
     showConfirmModal(
         'Delete Calculation',
         warningMsg + 'Are you sure you want to delete this calculation? This action cannot be undone.',
@@ -7030,12 +7024,12 @@ function deleteCalculation(calculationId) {
                     showToast(data.error, 'danger');
                 } else {
                     showToast('<i class="fas fa-trash me-2"></i>Calculation deleted successfully', 'success');
-
+                    
                     // If we were editing this calculation, clear the editing state
                     if (isCurrentlyEditing) {
                         clearEditingMode();
                     }
-
+                    
                     loadSavedCalculations();
                 }
             })

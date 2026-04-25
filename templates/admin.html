@@ -113,7 +113,7 @@
     .user-table tbody tr:hover, .audit-table tbody tr:hover {
         background: var(--table-hover);
     }
-
+    
     /* Audit Log Table Container */
     .audit-table-wrapper {
         max-height: 65vh;
@@ -123,7 +123,7 @@
         border-radius: 8px;
         background: var(--table-bg);
     }
-
+    
     .audit-table thead th {
         background: var(--card-bg);
         color: var(--text-primary);
@@ -133,16 +133,16 @@
         white-space: nowrap;
         border-bottom: 2px solid var(--border-color);
     }
-
+    
     .audit-table tbody td {
         font-size: 0.9rem;
         vertical-align: middle;
     }
-
+    
     .audit-table tbody tr:nth-child(even) {
         background: var(--table-bg);
     }
-
+    
     .audit-table tbody tr:nth-child(odd) {
         background: rgba(102, 126, 234, 0.02);
     }
@@ -1009,14 +1009,14 @@
                     Select which dashboard tabs this user can access on <strong>Desktop</strong> and <strong>Mobile</strong>. At least one tab must be enabled.
                 </p>
                 <input type="hidden" id="manageTabsUserId">
-
+                
                 <!-- Table header for Desktop/Mobile columns -->
                 <div style="display: grid; grid-template-columns: 1fr 80px 80px; gap: 8px; margin-bottom: 12px; padding: 8px 12px; background: var(--card-header-bg); border-radius: 6px; font-weight: 600; font-size: 0.85rem;">
                     <div>Tab</div>
                     <div style="text-align: center;"><i class="fas fa-desktop"></i> Desktop</div>
                     <div style="text-align: center;"><i class="fas fa-mobile-alt"></i> Mobile</div>
                 </div>
-
+                
                 <div class="tab-permissions-list">
                     <!-- Transactions -->
                     <div style="display: grid; grid-template-columns: 1fr 80px 80px; gap: 8px; padding: 12px; background: var(--bg-tertiary); border-radius: 6px; border: 1px solid var(--border-color); margin-bottom: 8px; align-items: center;">
@@ -1034,7 +1034,7 @@
                             <input class="form-check-input" type="checkbox" id="tab_transactions_mobile" value="transactions" checked style="cursor: pointer;">
                         </div>
                     </div>
-
+                    
                     <!-- Tax -->
                     <div style="display: grid; grid-template-columns: 1fr 80px 80px; gap: 8px; padding: 12px; background: var(--bg-tertiary); border-radius: 6px; border: 1px solid var(--border-color); margin-bottom: 8px; align-items: center;">
                         <div>
@@ -1051,7 +1051,7 @@
                             <input class="form-check-input" type="checkbox" id="tab_tax_mobile" value="tax" checked style="cursor: pointer;">
                         </div>
                     </div>
-
+                    
                     <!-- Reports -->
                     <div style="display: grid; grid-template-columns: 1fr 80px 80px; gap: 8px; padding: 12px; background: var(--bg-tertiary); border-radius: 6px; border: 1px solid var(--border-color); margin-bottom: 8px; align-items: center;">
                         <div>
@@ -1068,7 +1068,7 @@
                             <input class="form-check-input" type="checkbox" id="tab_reports_mobile" value="reports" checked style="cursor: pointer;">
                         </div>
                     </div>
-
+                    
                     <!-- Rate Trends -->
                     <div style="display: grid; grid-template-columns: 1fr 80px 80px; gap: 8px; padding: 12px; background: var(--bg-tertiary); border-radius: 6px; border: 1px solid var(--border-color); margin-bottom: 8px; align-items: center;">
                         <div>
@@ -1123,9 +1123,9 @@
                     <label for="deleteUserPassword" style="display: block; font-weight: 600; margin-bottom: 5px; color: var(--text-primary);">
                         <i class="fas fa-lock"></i> Confirm Your Password
                     </label>
-                    <input type="password"
-                           id="deleteUserPassword"
-                           class="form-control"
+                    <input type="password" 
+                           id="deleteUserPassword" 
+                           class="form-control" 
                            placeholder="Enter your password to confirm"
                            style="background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color);"
                            required>
@@ -1823,7 +1823,7 @@
                     const desktopCheckbox = document.getElementById(`tab_${tab}`);
                     const mobileCheckbox = document.getElementById(`tab_${tab}_mobile`);
                     const tabData = data.tabs.find(t => t.tab_name === tab);
-
+                    
                     if (desktopCheckbox) {
                         desktopCheckbox.checked = tabData ? tabData.is_enabled : true;
                     }
@@ -1850,7 +1850,7 @@
         tabs.forEach(tab => {
             const desktopCheckbox = document.getElementById(`tab_${tab}`);
             const mobileCheckbox = document.getElementById(`tab_${tab}_mobile`);
-
+            
             tabPermissions[tab] = {
                 desktop: desktopCheckbox ? desktopCheckbox.checked : false,
                 mobile: mobileCheckbox ? mobileCheckbox.checked : false
@@ -1858,10 +1858,10 @@
         });
 
         // Validate at least one tab is enabled on desktop OR mobile
-        const hasAnyEnabled = tabs.some(tab =>
+        const hasAnyEnabled = tabs.some(tab => 
             tabPermissions[tab].desktop || tabPermissions[tab].mobile
         );
-
+        
         if (!hasAnyEnabled) {
             document.getElementById('tabErrorText').textContent = 'At least one tab must be enabled on desktop or mobile.';
             document.getElementById('tabErrorMessage').style.display = 'block';
@@ -1959,6 +1959,18 @@
                             <option value="batch" ${settingValue === 'batch' ? 'selected' : ''}>Batch</option>
                         </select>
                     `;
+                } else if (settingKey === 'modal_opacity') {
+                    const opacityNum = Math.min(1, Math.max(0.1, parseFloat(settingValue) || 0.85));
+                    const opacityStr = opacityNum.toFixed(2);
+                    inputHtml = `
+                        <div class="d-flex align-items-center gap-2">
+                            <input type="range" id="setting_${settingKey}" min="0.10" max="1.00" step="0.01"
+                                   value="${opacityStr}"
+                                   class="form-range" style="flex: 1; min-width: 140px;"
+                                   oninput="previewModalOpacity(this.value)">
+                            <span id="setting_${settingKey}_label" style="min-width: 3.2rem; text-align: right; font-variant-numeric: tabular-nums; color: var(--text-primary);">${opacityStr}</span>
+                        </div>
+                    `;
                 } else {
                     inputHtml = `
                         <input type="text" id="setting_${settingKey}" class="form-control form-control-sm" value="${settingValue}"
@@ -2008,6 +2020,15 @@
                         showAlert(`Upload mode changed to '${newValue}'. Client apps will use this mode on next page load.`, 'info');
                     }, 1500);
                 }
+
+                // Persist the live preview for modal opacity (already applied
+                // via previewModalOpacity, but make sure the displayed label
+                // reflects the server-normalised value).
+                if (key === 'modal_opacity' && data.value) {
+                    const lbl = document.getElementById(`setting_${key}_label`);
+                    if (lbl) lbl.textContent = parseFloat(data.value).toFixed(2);
+                    previewModalOpacity(data.value);
+                }
             } else {
                 showAlert(data.error || 'Failed to update setting', 'danger');
                 loadSettings(); // Reload to reset value
@@ -2017,6 +2038,21 @@
             showAlert('Network error: ' + error.message, 'danger');
             loadSettings(); // Reload to reset value
         }
+    }
+
+    // Live-preview the modal background opacity by updating the
+    // injected <style> element from base.html.  The change is also
+    // persisted via updateSetting() when the admin clicks Save.
+    function previewModalOpacity(value) {
+        const num = Math.min(1, Math.max(0.1, parseFloat(value) || 0.85));
+        const styleEl = document.getElementById('modalOpacityVar');
+        if (styleEl) {
+            styleEl.textContent = `:root { --modal-bg-opacity: ${num.toFixed(2)}; }`;
+        } else {
+            document.documentElement.style.setProperty('--modal-bg-opacity', num.toFixed(2));
+        }
+        const lbl = document.getElementById('setting_modal_opacity_label');
+        if (lbl) lbl.textContent = num.toFixed(2);
     }
 
     // ── Google Drive Re-authorization ────────────────────────────

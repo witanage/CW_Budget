@@ -9,21 +9,46 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <style>
-                /* Make placeholder text visible in dark theme */
+                /* Use theme-consistent placeholder text */
                 #salaryCalcModal input::placeholder,
                 #salaryCalcModal textarea::placeholder {
-                    color: #888 !important;
-                    opacity: 1 !important;
+                    color: var(--text-secondary) !important;
+                    opacity: 0.7 !important;
                 }
-                #salaryCalcModal input::-webkit-input-placeholder,
-                #salaryCalcModal textarea::-webkit-input-placeholder {
-                    color: #888 !important;
-                    opacity: 1 !important;
+                #salaryCalcModal .calc-summary-card {
+                    background-color: var(--card-bg);
+                    border-color: var(--border-color);
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
                 }
-                #salaryCalcModal input::-moz-placeholder,
-                #salaryCalcModal textarea::-moz-placeholder {
-                    color: #888 !important;
-                    opacity: 1 !important;
+                #salaryCalcModal .calc-summary-body {
+                    border-left: 3px solid var(--primary-color);
+                }
+                #salaryCalcModal .calc-summary-title {
+                    color: var(--primary-color);
+                    font-weight: 600;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                }
+                #salaryCalcModal .calc-summary-label {
+                    color: var(--text-secondary);
+                    font-size: 0.75rem;
+                    text-transform: uppercase;
+                    letter-spacing: 0.3px;
+                }
+                #salaryCalcModal .calc-summary-value {
+                    color: var(--text-primary);
+                    font-family: 'JetBrains Mono', 'Courier New', monospace;
+                }
+                #salaryCalcModal .calc-summary-value-success {
+                    color: var(--success-color, #198754);
+                    font-family: 'JetBrains Mono', 'Courier New', monospace;
+                }
+                #salaryCalcModal .calc-summary-value-accent {
+                    color: var(--primary-color);
+                    font-family: 'JetBrains Mono', 'Courier New', monospace;
+                }
+                #salaryCalcModal .calc-summary-warning {
+                    border-top: 1px solid var(--border-color);
                 }
             </style>
             <div class="modal-body">
@@ -31,8 +56,8 @@
                     <!-- Left Panel: Calculator -->
                     <div class="col-lg-6">
                         <div class="card mb-3">
-                            <div class="card-header bg-primary text-white">
-                                <h6 class="mb-0"><i class="fas fa-plus-circle me-2"></i>New Calculation</h6>
+                            <div class="card-header">
+                                <h6 class="mb-0"><i class="fas fa-plus-circle me-2 text-primary"></i>New Calculation</h6>
                             </div>
                             <div class="card-body">
                                 <!-- Total USD Salary -->
@@ -61,28 +86,28 @@
                                 </div>
 
                                 <!-- Calculation Summary -->
-                                <div class="card" style="background-color: #2B2B2B; border-color: #3C3F41; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
-                                    <div class="card-body" style="border-left: 3px solid #6897BB;">
-                                        <h6 class="card-subtitle mb-3" style="color: #6897BB; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Summary</h6>
+                                <div class="card calc-summary-card">
+                                    <div class="card-body calc-summary-body">
+                                        <h6 class="card-subtitle mb-3 calc-summary-title">Summary</h6>
                                         <div class="row g-3">
                                             <div class="col-6">
-                                                <small class="d-block" style="color: #808080; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.3px;">Total USD</small>
-                                                <strong id="summaryTotalUSD" class="fs-5" style="color: #A9B7C6; font-family: 'JetBrains Mono', 'Courier New', monospace;">$0.00</strong>
+                                                <small class="d-block calc-summary-label">Total USD</small>
+                                                <strong id="summaryTotalUSD" class="fs-5 calc-summary-value">$0.00</strong>
                                             </div>
                                             <div class="col-6">
-                                                <small class="d-block" style="color: #808080; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.3px;">Total LKR</small>
-                                                <strong id="summaryTotalLKR" class="fs-5" style="color: #6A8759; font-family: 'JetBrains Mono', 'Courier New', monospace;">රු 0.00</strong>
+                                                <small class="d-block calc-summary-label">Total LKR</small>
+                                                <strong id="summaryTotalLKR" class="fs-5 calc-summary-value-success">රු 0.00</strong>
                                             </div>
                                             <div class="col-6">
-                                                <small class="d-block" style="color: #808080; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.3px;">Remaining USD</small>
-                                                <strong id="summaryRemainingUSD" class="fs-6" style="color: #A9B7C6; font-family: 'JetBrains Mono', 'Courier New', monospace;">$0.00</strong>
+                                                <small class="d-block calc-summary-label">Remaining USD</small>
+                                                <strong id="summaryRemainingUSD" class="fs-6 calc-summary-value">$0.00</strong>
                                             </div>
                                             <div class="col-6">
-                                                <small class="d-block" style="color: #808080; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.3px;">Avg Rate</small>
-                                                <strong id="summaryAvgRate" class="fs-6" style="color: #6897BB; font-family: 'JetBrains Mono', 'Courier New', monospace;">0.0000</strong>
+                                                <small class="d-block calc-summary-label">Avg Rate</small>
+                                                <strong id="summaryAvgRate" class="fs-6 calc-summary-value-accent">0.0000</strong>
                                             </div>
                                         </div>
-                                        <div class="mt-3 pt-2" id="warningMsg" style="display: none; border-top: 1px solid #3C3F41;">
+                                        <div class="mt-3 pt-2 calc-summary-warning" id="warningMsg" style="display: none;">
                                             <small>
                                                 <span id="warningText"></span>
                                             </small>
@@ -108,8 +133,8 @@
                     <!-- Right Panel: History -->
                     <div class="col-lg-6">
                         <div class="card">
-                            <div class="card-header bg-secondary text-white">
-                                <h6 class="mb-0"><i class="fas fa-history me-2"></i>Calculation History</h6>
+                            <div class="card-header">
+                                <h6 class="mb-0"><i class="fas fa-history me-2 text-secondary"></i>Calculation History</h6>
                             </div>
                             <div class="card-body" id="salaryHistoryContainer">
                                 <!-- Loading state -->
