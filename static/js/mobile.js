@@ -405,13 +405,13 @@ btn.style.color = '#aaa';
 
 // Show/hide payment status group based on payment method selection
 const paidAtGroup = document.getElementById('paidAtGroup');
-const paidAtPaid = document.getElementById('paidAtPaid');
+const paidAtNotPaid = document.getElementById('paidAtNotPaid');
 if (paidAtGroup) {
 if (methodId) {
 // Payment method selected - show payment status options
 paidAtGroup.style.display = 'block';
-// Default to "Paid"
-if (paidAtPaid) paidAtPaid.checked = true;
+// Default to "Not Paid"
+if (paidAtNotPaid) paidAtNotPaid.checked = true;
 } else {
 // No payment method - hide payment status
 paidAtGroup.style.display = 'none';
@@ -549,7 +549,7 @@ notesElement.textContent = transaction.notes || '-';
             // Fix for iOS Safari: replace space with 'T' to make it ISO 8601 compatible
             const dateStr = transaction.paid_at.replace(' ', 'T');
             const date = new Date(dateStr);
-            
+
             // Check if date is valid
             if (!isNaN(date.getTime())) {
                 const formattedDate = date.toLocaleDateString('en-US', {
@@ -2348,9 +2348,9 @@ document.getElementById('transPaymentMethod').value = '';
 document.getElementById('transPaymentMethodBtn').style.color = '#aaa';
 // Reset payment status field
 const paidAtGroup = document.getElementById('paidAtGroup');
-const paidAtPaid = document.getElementById('paidAtPaid');
+const paidAtNotPaid = document.getElementById('paidAtNotPaid');
 if (paidAtGroup) paidAtGroup.style.display = 'none';
-if (paidAtPaid) paidAtPaid.checked = true;
+if (paidAtNotPaid) paidAtNotPaid.checked = true;
 // Hide bill breakdown if visible
 const billBreakdown = document.getElementById('billBreakdown');
 if (billBreakdown) {

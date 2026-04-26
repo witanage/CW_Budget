@@ -700,8 +700,8 @@ function setupFormButtons() {
             if (this.value) {
                 // Payment method selected - show payment status options
                 paidAtGroup.style.display = 'block';
-                // Default to "Paid"
-                if (paidAtPaid) paidAtPaid.checked = true;
+                // Default to "Not Paid"
+                if (paidAtNotPaid) paidAtNotPaid.checked = true;
             } else {
                 // No payment method - hide payment status
                 paidAtGroup.style.display = 'none';
@@ -744,13 +744,13 @@ function setupFormButtons() {
 
             // Hide and reset payment status field
             const paidAtGroup = document.getElementById('paidAtGroup');
-            const paidAtPaid = document.getElementById('paidAtPaid');
+            const paidAtNotPaid = document.getElementById('paidAtNotPaid');
 
             if (paidAtGroup) {
                 paidAtGroup.style.display = 'none';
             }
-            if (paidAtPaid) {
-                paidAtPaid.checked = true;
+            if (paidAtNotPaid) {
+                paidAtNotPaid.checked = true;
             }
         });
     }
