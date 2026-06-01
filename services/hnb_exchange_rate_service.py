@@ -22,12 +22,21 @@ logger = logging.getLogger(__name__)
 class HNBExchangeRateService:
     """Service to fetch and store HNB bank exchange rates."""
 
+    # Currency mapping: internal code -> HNB API currency name
+    CURRENCY_MAP = {
+        'USD': 'US Dollars',
+        'GBP': 'British Pounds'
+    }
+
     def __init__(self):
         self.api_url = "https://venus.hnb.lk/api/get_rates_contents_web"
 
-    def fetch_hnb_rates(self):
+    def fetch_hnb_rates(self, currency='USD'):
         """
         Fetch current exchange rates from HNB API.
+
+        Args:
+            currency: Currency code (USD, GBP, EUR, etc.)
 
         Returns:
             dict: Exchange rate data or None if fetch fails
@@ -36,6 +45,7 @@ class HNBExchangeRateService:
                 'buy_rate': 308.50,
                 'sell_rate': 318.75,
                 'source': 'HNB',
+                'currency': 'USD',
                 'updated_on': '2026-01-30T03:55:26.000Z'
             }
         """
@@ -54,23 +64,24 @@ class HNBExchangeRateService:
                 logger.error("No exchange rates found in HNB API response ('ex' array is empty)")
                 return None
 
-            # Find US Dollar entry in the exchange rates array
-            usd_data = None
+            # Find the requested currency entry in the exchange rates array
+            currency_name = self.CURRENCY_MAP.get(currency, currency)
+            currency_data = None
             for entry in exchange_rates:
                 # Check for both 'currency' field and 'currencyCode' for flexibility
-                if (entry.get('currency') == 'US Dollars' or
-                        entry.get('currencyCode') == 'USD'):
-                    usd_data = entry
+                if (entry.get('currency') == currency_name or
+                        entry.get('currencyCode') == currency):
+                    currency_data = entry
                     break
 
-            if not usd_data:
-                logger.error("US Dollars not found in HNB API response")
+            if not currency_data:
+                logger.error(f"{currency} ({currency_name}) not found in HNB API response")
                 logger.debug(f"Available currencies: {[e.get('currency') for e in exchange_rates[:5]]}")
                 return None
 
             # Extract buy and sell rates (new field names: buyingRate, sellingRate)
-            buy_rate = float(usd_data.get('buyingRate', 0))
-            sell_rate = float(usd_data.get('sellingRate', 0))
+            buy_rate = float(currency_data.get('buyingRate', 0))
+            sell_rate = float(currency_data.get('sellingRate', 0))
 
             if buy_rate <= 0 or sell_rate <= 0:
                 logger.error(f"Invalid rates from HNB: buy={buy_rate}, sell={sell_rate}")
@@ -80,17 +91,18 @@ class HNBExchangeRateService:
             today = datetime.now().date()
 
             # Get the updated_on timestamp from API if available
-            updated_on = usd_data.get('updated_on')
+            updated_on = currency_data.get('updated_on')
 
             rate_data = {
                 'date': today.strftime('%Y-%m-%d'),
                 'buy_rate': buy_rate,
                 'sell_rate': sell_rate,
                 'source': 'HNB',
+                'currency': currency,
                 'updated_on': updated_on
             }
 
-            logger.info(f"Successfully fetched HNB rates for {rate_data['date']}: "
+            logger.info(f"Successfully fetched HNB {currency} rates for {rate_data['date']}: "
                         f"Buy={buy_rate}, Sell={sell_rate}, Updated={updated_on}")
 
             return rate_data
@@ -105,7 +117,7 @@ class HNBExchangeRateService:
             logger.error(f"Unexpected error fetching HNB rates: {str(e)}", exc_info=True)
             return None
 
-    def save_exchange_rate(self, date, buy_rate, sell_rate, source='HNB'):
+    def save_exchange_rate(self, date, buy_rate, sell_rate, source='HNB', currency='USD'):
         """
         Save exchange rate to database.
 
@@ -142,18 +154,18 @@ class HNBExchangeRateService:
 
             # Insert or update exchange rate
             cursor.execute("""
-                           INSERT INTO exchange_rates (date, buy_rate, sell_rate, source)
-                           VALUES (%s, %s, %s, %s) ON DUPLICATE KEY
+                           INSERT INTO exchange_rates (date, buy_rate, sell_rate, source, currency)
+                           VALUES (%s, %s, %s, %s, %s) ON DUPLICATE KEY
                            UPDATE
-                               buy_rate =
-                           VALUES (buy_rate), sell_rate =
-                           VALUES (sell_rate), source =
-                           VALUES (source), updated_at = CURRENT_TIMESTAMP
-                           """, (date_str, buy_rate_decimal, sell_rate_decimal, source))
+                               buy_rate = VALUES(buy_rate),
+                               sell_rate = VALUES(sell_rate),
+                               source = VALUES(source),
+                               updated_at = CURRENT_TIMESTAMP
+                           """, (date_str, buy_rate_decimal, sell_rate_decimal, source, currency))
 
             connection.commit()
 
-            logger.info(f"Saved exchange rate for {date_str}: Buy={buy_rate}, Sell={sell_rate}, Source={source}")
+            logger.info(f"Saved {currency} exchange rate for {date_str}: Buy={buy_rate}, Sell={sell_rate}, Source={source}")
             return True
 
         except Error as e:
@@ -172,12 +184,13 @@ class HNBExchangeRateService:
             if connection:
                 connection.close()
 
-    def get_exchange_rate(self, date=None):
+    def get_exchange_rate(self, date=None, currency='USD'):
         """
-        Get exchange rate for a specific date from database.
+        Get exchange rate for a specific date and currency from database.
 
         Args:
             date: datetime.date or str (YYYY-MM-DD). If None, uses today.
+            currency: Currency code (default 'USD')
 
         Returns:
             dict: Exchange rate data or None
@@ -192,6 +205,7 @@ class HNBExchangeRateService:
                 date = datetime.strptime(date, '%Y-%m-%d').date()
 
             date_str = date.strftime('%Y-%m-%d')
+            currency = currency.upper()
 
             connection = get_db_connection()
             if not connection:
@@ -200,10 +214,10 @@ class HNBExchangeRateService:
             cursor = connection.cursor(dictionary=True)
 
             cursor.execute("""
-                           SELECT date, buy_rate, sell_rate, source, updated_at
+                           SELECT date, buy_rate, sell_rate, source, currency, updated_at
                            FROM exchange_rates
-                           WHERE date = %s AND source = 'HNB'
-                           """, (date_str,))
+                           WHERE date = %s AND source = 'HNB' AND currency = %s
+                           """, (date_str, currency))
 
             result = cursor.fetchone()
 
@@ -213,6 +227,7 @@ class HNBExchangeRateService:
                     'buy_rate': float(result['buy_rate']),
                     'sell_rate': float(result['sell_rate']),
                     'source': result['source'],
+                    'currency': result.get('currency', 'USD'),
                     'updated_at': str(result['updated_at']) if result['updated_at'] else None
                 }
 
@@ -227,18 +242,21 @@ class HNBExchangeRateService:
             if connection:
                 connection.close()
 
-    def fetch_and_store_current_rate(self):
+    def fetch_and_store_current_rate(self, currency='USD'):
         """
         Fetch current exchange rate from HNB and store in database.
+
+        Args:
+            currency: Currency code (USD, GBP, EUR, etc.)
 
         Returns:
             dict: Saved exchange rate data or None if failed
         """
         # Fetch from HNB API
-        rate_data = self.fetch_hnb_rates()
+        rate_data = self.fetch_hnb_rates(currency=currency)
 
         if not rate_data:
-            logger.error("Failed to fetch exchange rate from HNB")
+            logger.error(f"Failed to fetch {currency} exchange rate from HNB")
             return None
 
         # Save to database
@@ -246,14 +264,15 @@ class HNBExchangeRateService:
             date=rate_data['date'],
             buy_rate=rate_data['buy_rate'],
             sell_rate=rate_data['sell_rate'],
-            source='HNB'
+            source='HNB',
+            currency=currency
         )
 
         if success:
-            logger.info(f"Successfully stored HNB rate for {rate_data['date']}")
+            logger.info(f"Successfully stored HNB {currency} rate for {rate_data['date']}")
             return rate_data
         else:
-            logger.error("Failed to store HNB rate in database")
+            logger.error(f"Failed to store HNB {currency} rate in database")
             return None
 
     def get_or_fetch_rate(self, date=None):

@@ -50,69 +50,99 @@ def _format_rate_change(bank: str, result: Dict) -> str:
 
 def send_rate_change_notifications(results: Dict) -> None:
     """
-    Send push notification to the configured global ntfy topic when buy rates change.
-    
+    Send push notifications to currency-specific ntfy topics when rates change.
+
     Args:
         results: Dict of bank results from refresh_all_exchange_rates()
-                 Format: {'HNB': {...}, 'PB': {...}, 'SAMPATH': {...}, 'CBSL': {...}}
+                 Format: {'HNB_USD': {...}, 'HNB_GBP': {...}, 'PB_USD': {...}, etc.}
     """
-    # Check if any buy rate changes were detected
+    # Group results by currency
+    currencies = {}
+    for key, result in results.items():
+        # Extract currency from key (e.g., 'HNB_USD' -> 'USD')
+        if '_' in key:
+            bank, currency = key.rsplit('_', 1)
+            if currency not in currencies:
+                currencies[currency] = {}
+            currencies[currency][bank] = result
+        else:
+            # Backward compatibility: keys without currency suffix default to USD
+            if 'USD' not in currencies:
+                currencies['USD'] = {}
+            currencies['USD'][key] = result
+
+    # Process each currency separately
+    for currency, currency_results in currencies.items():
+        _send_currency_notification(currency, currency_results)
+
+
+def _send_currency_notification(currency: str, results: Dict) -> None:
+    """
+    Send notification for a specific currency's rate changes.
+
+    Args:
+        currency: Currency code (e.g., 'USD', 'GBP')
+        results: Dict of bank results for this currency
+                 Format: {'HNB': {...}, 'PB': {...}, etc.}
+    """
+    # Check if any rate changes were detected for this currency
     changes_detected = any(
         r.get('status') == 'success' and r.get('changed', False)
         for r in results.values()
     )
-    
+
     if not changes_detected:
-        logger.info("No buy rate changes detected, skipping notifications")
+        logger.info(f"No {currency} rate changes detected, skipping notification")
         return
-    
-    # Get global ntfy topic from app_settings
+
+    # Get currency-specific ntfy topic from app_settings
+    topic_key = 'ntfy_topic_gbp' if currency == 'GBP' else 'ntfy_topic'
     ntfy_topic = None
     connection = None
-    
+
     try:
         connection = get_db_connection()
         if not connection:
-            logger.error("Cannot send notifications: database connection failed")
+            logger.error(f"Cannot send {currency} notifications: database connection failed")
             return
-        
+
         cursor = connection.cursor(dictionary=True)
-        cursor.execute("SELECT value FROM app_settings WHERE setting_key = 'ntfy_topic'")
+        cursor.execute("SELECT value FROM app_settings WHERE setting_key = %s", (topic_key,))
         result = cursor.fetchone()
         cursor.close()
         connection.close()
-        
+
         if result:
             ntfy_topic = result['value'].strip()
-        
+
         if not ntfy_topic:
-            logger.info("No ntfy topic configured in app_settings, skipping notifications")
+            logger.info(f"No ntfy topic configured for {currency} (key: {topic_key}), skipping notification")
             return
-        
+
     except Exception as e:
-        logger.error(f"Error reading ntfy topic from app_settings: {str(e)}")
+        logger.error(f"Error reading ntfy topic for {currency} from app_settings: {str(e)}")
         if connection:
             connection.close()
         return
-    
+
     # Build notification message
     try:
         changes_lines = []
         max_abs_change = 0.0
-        
+
         for bank in ['HNB', 'PB', 'SAMPATH', 'CBSL']:
             if bank in results:
-                result = results[bank]
-                changes_lines.append(_format_rate_change(bank, result))
-                
+                bank_result = results[bank]
+                changes_lines.append(_format_rate_change(bank, bank_result))
+
                 # Track maximum absolute change for priority
-                if result.get('status') == 'success':
-                    buy_change = abs(result.get('buy_change', 0) or 0)
-                    sell_change = abs(result.get('sell_change', 0) or 0)
+                if bank_result.get('status') == 'success':
+                    buy_change = abs(bank_result.get('buy_change', 0) or 0)
+                    sell_change = abs(bank_result.get('sell_change', 0) or 0)
                     max_abs_change = max(max_abs_change, buy_change, sell_change)
-        
+
         message_body = "\n".join(changes_lines)
-        
+
         # Determine priority and tags
         if max_abs_change > 0.50:
             priority = "high"
@@ -123,33 +153,33 @@ def send_rate_change_notifications(results: Dict) -> None:
         else:
             priority = "low"
             tags = "information_source"
-        
+
         # Send notification to ntfy.sh
         url = f"{NTFY_SERVER}/{ntfy_topic}"
         headers = {
-            "Title": "Buy Rate Update - USD/LKR",
+            "Title": f"Exchange Rate Update - {currency}/LKR",
             "Priority": priority,
             "Tags": tags
         }
-        
+
         response = requests.post(
             url,
             data=message_body.encode('utf-8'),
             headers=headers,
             timeout=10
         )
-        
+
         if response.status_code == 200:
-            logger.info(f"Notification sent successfully to topic: {ntfy_topic}")
+            logger.info(f"{currency} notification sent successfully to topic: {ntfy_topic}")
         else:
             logger.warning(
-                f"Failed to send notification to topic {ntfy_topic}: "
+                f"Failed to send {currency} notification to topic {ntfy_topic}: "
                 f"status={response.status_code}, response={response.text[:100]}"
             )
-    
+
     except requests.exceptions.Timeout:
-        logger.error(f"Timeout sending notification to topic: {ntfy_topic}")
+        logger.error(f"Timeout sending {currency} notification to topic: {ntfy_topic}")
     except requests.exceptions.RequestException as e:
-        logger.error(f"Error sending notification: {str(e)}")
+        logger.error(f"Error sending {currency} notification: {str(e)}")
     except Exception as e:
-        logger.error(f"Unexpected error sending notification: {str(e)}")
+        logger.error(f"Unexpected error sending {currency} notification: {str(e)}")

@@ -174,8 +174,9 @@ console.error('Error:', error);
 const saveDefaultPageBtn = document.getElementById('saveDefaultPageBtn');
 const defaultPageModal = document.getElementById('defaultPageModal');
 const defaultPageSelect = document.getElementById('defaultPageSelect');
+const defaultCurrencySelect = document.getElementById('defaultCurrencySelect');
 
-if (saveDefaultPageBtn && defaultPageSelect) {
+if (saveDefaultPageBtn && defaultPageSelect && defaultCurrencySelect) {
     // Load current preference when modal is shown
     if (defaultPageModal) {
         defaultPageModal.addEventListener('show.bs.modal', async function() {
@@ -184,6 +185,7 @@ if (saveDefaultPageBtn && defaultPageSelect) {
                 if (response.ok) {
                     const data = await response.json();
                     defaultPageSelect.value = data.default_page || 'transactions';
+                    defaultCurrencySelect.value = data.default_currency || 'USD';
                 }
             } catch (error) {
                 console.error('Error loading preferences:', error);
@@ -194,9 +196,10 @@ if (saveDefaultPageBtn && defaultPageSelect) {
     // Save preference
     saveDefaultPageBtn.addEventListener('click', async function() {
         const defaultPage = defaultPageSelect.value;
+        const defaultCurrency = defaultCurrencySelect.value;
 
-        if (!defaultPage) {
-            showToast('Please select a default page', 'warning');
+        if (!defaultPage || !defaultCurrency) {
+            showToast('Please select both default page and currency', 'warning');
             return;
         }
 
@@ -205,7 +208,10 @@ if (saveDefaultPageBtn && defaultPageSelect) {
             const response = await fetch('/api/user-preferences', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ default_page: defaultPage })
+                body: JSON.stringify({
+                    default_page: defaultPage,
+                    default_currency: defaultCurrency
+                })
             });
 
             const data = await response.json();
@@ -213,6 +219,14 @@ if (saveDefaultPageBtn && defaultPageSelect) {
 
             if (response.ok) {
                 showToast(data.message, 'success');
+                // Store currency preference in localStorage for immediate use
+                localStorage.setItem('defaultCurrency', defaultCurrency);
+
+                // Reload sidebar widgets if on dashboard to update exchange rate widget
+                if (typeof loadSidebarWidgets === 'function') {
+                    loadSidebarWidgets();
+                }
+
                 // Close modal
                 const modal = bootstrap.Modal.getInstance(defaultPageModal);
                 modal.hide();

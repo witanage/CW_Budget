@@ -49,6 +49,7 @@ def refresh_all_exchange_rates(force=False):
         if connection:
             cursor = connection.cursor(dictionary=True)
             # Get the most recent successful refresh for each source from today
+            # Now includes currency-specific sources like HNB_USD, HNB_GBP, etc.
             cursor.execute("""
                 SELECT source, buy_rate, sell_rate, created_at
                 FROM exchange_rate_refresh_logs
@@ -56,11 +57,17 @@ def refresh_all_exchange_rates(force=False):
                   AND buy_rate IS NOT NULL 
                   AND sell_rate IS NOT NULL
                   AND DATE(created_at) = CURDATE()
-                  AND source IN ('HNB', 'PB', 'SAMPATH', 'CBSL')
+                  AND (
+                    source LIKE 'HNB_%' 
+                    OR source LIKE 'PB_%' 
+                    OR source LIKE 'SAMPATH_%' 
+                    OR source LIKE 'CBSL_%'
+                    OR source IN ('HNB', 'PB', 'SAMPATH', 'CBSL')
+                  )
                 ORDER BY created_at DESC
             """)
             rows = cursor.fetchall()
-            
+
             # Get the most recent rate for each source (first occurrence due to ORDER BY DESC)
             seen_sources = set()
             for row in rows:
@@ -72,7 +79,7 @@ def refresh_all_exchange_rates(force=False):
                         'timestamp': row['created_at']
                     }
                     seen_sources.add(source)
-            
+
             cursor.close()
             connection.close()
             logger.info(f"Previous rates from refresh logs: {previous_rates}")
@@ -81,35 +88,36 @@ def refresh_all_exchange_rates(force=False):
 
     results = {}
 
-    # Define fetch functions for each bank
-    def fetch_hnb():
+    # Define fetch functions for each bank and currency
+    def fetch_hnb(currency='USD'):
         hnb_start = time.time()
         try:
             hnb_service = get_hnb_exchange_rate_service()
-            hnb_rate = hnb_service.fetch_and_store_current_rate()
+            hnb_rate = hnb_service.fetch_and_store_current_rate(currency=currency)
             hnb_ms = int((time.time() - hnb_start) * 1000)
             if hnb_rate:
-                logger.info(f"Scheduler: HNB rate updated: Buy={hnb_rate['buy_rate']}, Sell={hnb_rate['sell_rate']}")
-                
-                # Compute deltas
-                prev = previous_rates.get('HNB')
+                logger.info(f"Scheduler: HNB {currency} rate updated: Buy={hnb_rate['buy_rate']}, Sell={hnb_rate['sell_rate']}")
+
+                # Compute deltas - look for currency-specific previous rate
+                prev = previous_rates.get(f'HNB_{currency}')
                 buy_change = None
                 sell_change = None
                 changed = False
                 is_new = prev is None
-                
+
                 if prev:
                     buy_change = round(float(hnb_rate['buy_rate']) - prev['buy_rate'], 4)
                     sell_change = round(float(hnb_rate['sell_rate']) - prev['sell_rate'], 4)
-                    changed = (buy_change != 0)
-                
-                log_exchange_rate_refresh('HNB', 'success',
+                    changed = (buy_change != 0 or sell_change != 0)
+
+                log_exchange_rate_refresh(f'HNB_{currency}', 'success',
                                           buy_rate=hnb_rate['buy_rate'],
                                           sell_rate=hnb_rate['sell_rate'],
                                           duration_ms=hnb_ms,
                                           run_key=run_key)
-                return ('HNB', {
+                return (f'HNB_{currency}', {
                     'status': 'success',
+                    'currency': currency,
                     'buy_rate': hnb_rate['buy_rate'],
                     'sell_rate': hnb_rate['sell_rate'],
                     'previous_buy_rate': prev['buy_rate'] if prev else None,
@@ -120,48 +128,49 @@ def refresh_all_exchange_rates(force=False):
                     'is_new': is_new
                 })
             else:
-                logger.warning("Scheduler: Failed to fetch HNB rate")
-                log_exchange_rate_refresh('HNB', 'failure',
-                                          error_message='No rate returned by HNB API',
+                logger.warning(f"Scheduler: Failed to fetch HNB {currency} rate")
+                log_exchange_rate_refresh(f'HNB_{currency}', 'failure',
+                                          error_message=f'No {currency} rate returned by HNB API',
                                           duration_ms=hnb_ms,
                                           run_key=run_key)
-                return ('HNB', {'status': 'failure', 'error': 'No rate returned by HNB API'})
+                return (f'HNB_{currency}', {'status': 'failure', 'currency': currency, 'error': f'No {currency} rate returned by HNB API'})
         except Exception as e:
-            logger.error(f"Scheduler: Error fetching HNB rate: {str(e)}")
-            log_exchange_rate_refresh('HNB', 'failure',
+            logger.error(f"Scheduler: Error fetching HNB {currency} rate: {str(e)}")
+            log_exchange_rate_refresh(f'HNB_{currency}', 'failure',
                                       error_message=str(e),
                                       duration_ms=int((time.time() - hnb_start) * 1000),
                                       run_key=run_key)
-            return ('HNB', {'status': 'failure', 'error': str(e)})
+            return (f'HNB_{currency}', {'status': 'failure', 'currency': currency, 'error': str(e)})
 
-    def fetch_pb():
+    def fetch_pb(currency='USD'):
         pb_start = time.time()
         try:
             pb_service = get_pb_exchange_rate_service()
-            pb_rate = pb_service.fetch_and_store_current_rate()
+            pb_rate = pb_service.fetch_and_store_current_rate(currency=currency)
             pb_ms = int((time.time() - pb_start) * 1000)
             if pb_rate:
-                logger.info(f"Scheduler: PB rate updated: Buy={pb_rate['buy_rate']}, Sell={pb_rate['sell_rate']}")
-                
-                # Compute deltas
-                prev = previous_rates.get('PB')
+                logger.info(f"Scheduler: PB {currency} rate updated: Buy={pb_rate['buy_rate']}, Sell={pb_rate['sell_rate']}")
+
+                # Compute deltas - look for currency-specific previous rate
+                prev = previous_rates.get(f'PB_{currency}')
                 buy_change = None
                 sell_change = None
                 changed = False
                 is_new = prev is None
-                
+
                 if prev:
                     buy_change = round(float(pb_rate['buy_rate']) - prev['buy_rate'], 4)
                     sell_change = round(float(pb_rate['sell_rate']) - prev['sell_rate'], 4)
-                    changed = (buy_change != 0)
-                
-                log_exchange_rate_refresh('PB', 'success',
+                    changed = (buy_change != 0 or sell_change != 0)
+
+                log_exchange_rate_refresh(f'PB_{currency}', 'success',
                                           buy_rate=pb_rate['buy_rate'],
                                           sell_rate=pb_rate['sell_rate'],
                                           duration_ms=pb_ms,
                                           run_key=run_key)
-                return ('PB', {
+                return (f'PB_{currency}', {
                     'status': 'success',
+                    'currency': currency,
                     'buy_rate': pb_rate['buy_rate'],
                     'sell_rate': pb_rate['sell_rate'],
                     'previous_buy_rate': prev['buy_rate'] if prev else None,
@@ -172,49 +181,50 @@ def refresh_all_exchange_rates(force=False):
                     'is_new': is_new
                 })
             else:
-                logger.warning("Scheduler: Failed to fetch PB rate")
-                log_exchange_rate_refresh('PB', 'failure',
-                                          error_message='No rate returned by PB scraper',
+                logger.warning(f"Scheduler: Failed to fetch PB {currency} rate")
+                log_exchange_rate_refresh(f'PB_{currency}', 'failure',
+                                          error_message=f'No {currency} rate returned by PB scraper',
                                           duration_ms=pb_ms,
                                           run_key=run_key)
-                return ('PB', {'status': 'failure', 'error': 'No rate returned by PB scraper'})
+                return (f'PB_{currency}', {'status': 'failure', 'currency': currency, 'error': f'No {currency} rate returned by PB scraper'})
         except Exception as e:
-            logger.error(f"Scheduler: Error fetching PB rate: {str(e)}")
-            log_exchange_rate_refresh('PB', 'failure',
+            logger.error(f"Scheduler: Error fetching PB {currency} rate: {str(e)}")
+            log_exchange_rate_refresh(f'PB_{currency}', 'failure',
                                       error_message=str(e),
                                       duration_ms=int((time.time() - pb_start) * 1000),
                                       run_key=run_key)
-            return ('PB', {'status': 'failure', 'error': str(e)})
+            return (f'PB_{currency}', {'status': 'failure', 'currency': currency, 'error': str(e)})
 
-    def fetch_sampath():
+    def fetch_sampath(currency='USD'):
         sampath_start = time.time()
         try:
             sampath_service = get_sampath_exchange_rate_service()
-            sampath_rate = sampath_service.fetch_and_store_current_rate()
+            sampath_rate = sampath_service.fetch_and_store_current_rate(currency=currency)
             sampath_ms = int((time.time() - sampath_start) * 1000)
             if sampath_rate:
                 logger.info(
-                    f"Scheduler: Sampath rate updated: Buy={sampath_rate['buy_rate']}, Sell={sampath_rate['sell_rate']}")
-                
-                # Compute deltas
-                prev = previous_rates.get('SAMPATH')
+                    f"Scheduler: Sampath {currency} rate updated: Buy={sampath_rate['buy_rate']}, Sell={sampath_rate['sell_rate']}")
+
+                # Compute deltas - look for currency-specific previous rate
+                prev = previous_rates.get(f'SAMPATH_{currency}')
                 buy_change = None
                 sell_change = None
                 changed = False
                 is_new = prev is None
-                
+
                 if prev:
                     buy_change = round(float(sampath_rate['buy_rate']) - prev['buy_rate'], 4)
                     sell_change = round(float(sampath_rate['sell_rate']) - prev['sell_rate'], 4)
-                    changed = (buy_change != 0)
-                
-                log_exchange_rate_refresh('SAMPATH', 'success',
+                    changed = (buy_change != 0 or sell_change != 0)
+
+                log_exchange_rate_refresh(f'SAMPATH_{currency}', 'success',
                                           buy_rate=sampath_rate['buy_rate'],
                                           sell_rate=sampath_rate['sell_rate'],
                                           duration_ms=sampath_ms,
                                           run_key=run_key)
-                return ('SAMPATH', {
+                return (f'SAMPATH_{currency}', {
                     'status': 'success',
+                    'currency': currency,
                     'buy_rate': sampath_rate['buy_rate'],
                     'sell_rate': sampath_rate['sell_rate'],
                     'previous_buy_rate': prev['buy_rate'] if prev else None,
@@ -225,49 +235,50 @@ def refresh_all_exchange_rates(force=False):
                     'is_new': is_new
                 })
             else:
-                logger.warning("Scheduler: Failed to fetch Sampath rate")
-                log_exchange_rate_refresh('SAMPATH', 'failure',
-                                          error_message='No rate returned by Sampath API',
+                logger.warning(f"Scheduler: Failed to fetch Sampath {currency} rate")
+                log_exchange_rate_refresh(f'SAMPATH_{currency}', 'failure',
+                                          error_message=f'No {currency} rate returned by Sampath API',
                                           duration_ms=sampath_ms,
                                           run_key=run_key)
-                return ('SAMPATH', {'status': 'failure', 'error': 'No rate returned by Sampath API'})
+                return (f'SAMPATH_{currency}', {'status': 'failure', 'currency': currency, 'error': f'No {currency} rate returned by Sampath API'})
         except Exception as e:
-            logger.error(f"Scheduler: Error fetching Sampath rate: {str(e)}")
-            log_exchange_rate_refresh('SAMPATH', 'failure',
+            logger.error(f"Scheduler: Error fetching Sampath {currency} rate: {str(e)}")
+            log_exchange_rate_refresh(f'SAMPATH_{currency}', 'failure',
                                       error_message=str(e),
                                       duration_ms=int((time.time() - sampath_start) * 1000),
                                       run_key=run_key)
-            return ('SAMPATH', {'status': 'failure', 'error': str(e)})
+            return (f'SAMPATH_{currency}', {'status': 'failure', 'currency': currency, 'error': str(e)})
 
-    def fetch_cbsl():
+    def fetch_cbsl(currency='USD'):
         cbsl_start = time.time()
         try:
             cbsl_service = get_exchange_rate_service()
-            cbsl_rate = cbsl_service.get_exchange_rate(datetime.now())
+            cbsl_rate = cbsl_service.fetch_and_store_current_rate(currency=currency)
             cbsl_ms = int((time.time() - cbsl_start) * 1000)
             if cbsl_rate:
                 logger.info(
-                    f"Scheduler: CBSL rate for today: Buy={cbsl_rate['buy_rate']}, Sell={cbsl_rate['sell_rate']}")
-                
-                # Compute deltas
-                prev = previous_rates.get('CBSL')
+                    f"Scheduler: CBSL {currency} rate for today: Buy={cbsl_rate['buy_rate']}, Sell={cbsl_rate['sell_rate']}")
+
+                # Compute deltas - look for currency-specific previous rate
+                prev = previous_rates.get(f'CBSL_{currency}')
                 buy_change = None
                 sell_change = None
                 changed = False
                 is_new = prev is None
-                
+
                 if prev:
                     buy_change = round(float(cbsl_rate['buy_rate']) - prev['buy_rate'], 4)
                     sell_change = round(float(cbsl_rate['sell_rate']) - prev['sell_rate'], 4)
-                    changed = (buy_change != 0)
-                
-                log_exchange_rate_refresh('CBSL', 'success',
+                    changed = (buy_change != 0 or sell_change != 0)
+
+                log_exchange_rate_refresh(f'CBSL_{currency}', 'success',
                                           buy_rate=cbsl_rate['buy_rate'],
                                           sell_rate=cbsl_rate['sell_rate'],
                                           duration_ms=cbsl_ms,
                                           run_key=run_key)
-                return ('CBSL', {
+                return (f'CBSL_{currency}', {
                     'status': 'success',
+                    'currency': currency,
                     'buy_rate': cbsl_rate['buy_rate'],
                     'sell_rate': cbsl_rate['sell_rate'],
                     'previous_buy_rate': prev['buy_rate'] if prev else None,
@@ -278,29 +289,34 @@ def refresh_all_exchange_rates(force=False):
                     'is_new': is_new
                 })
             else:
-                logger.warning("Scheduler: No CBSL rate available for today")
-                log_exchange_rate_refresh('CBSL', 'failure',
-                                          error_message='No CBSL rate available for today',
+                logger.warning(f"Scheduler: No CBSL {currency} rate available for today")
+                log_exchange_rate_refresh(f'CBSL_{currency}', 'failure',
+                                          error_message=f'No CBSL {currency} rate available for today',
                                           duration_ms=cbsl_ms,
                                           run_key=run_key)
-                return ('CBSL', {'status': 'failure', 'error': 'No CBSL rate available for today'})
+                return (f'CBSL_{currency}', {'status': 'failure', 'currency': currency, 'error': f'No CBSL {currency} rate available for today'})
         except Exception as e:
-            logger.error(f"Scheduler: Error fetching CBSL rate: {str(e)}")
-            log_exchange_rate_refresh('CBSL', 'failure',
+            logger.error(f"Scheduler: Error fetching CBSL {currency} rate: {str(e)}")
+            log_exchange_rate_refresh(f'CBSL_{currency}', 'failure',
                                       error_message=str(e),
                                       duration_ms=int((time.time() - cbsl_start) * 1000),
                                       run_key=run_key)
-            return ('CBSL', {'status': 'failure', 'error': str(e)})
+            return (f'CBSL_{currency}', {'status': 'failure', 'currency': currency, 'error': str(e)})
+
+    # Define currencies to fetch
+    currencies = ['USD', 'GBP']
 
     # Execute all fetches in parallel using ThreadPoolExecutor
-    with ThreadPoolExecutor(max_workers=4) as executor:
+    with ThreadPoolExecutor(max_workers=10) as executor:
         # Submit all tasks
-        futures = {
-            executor.submit(fetch_hnb): 'HNB',
-            executor.submit(fetch_pb): 'PB',
-            executor.submit(fetch_sampath): 'SAMPATH',
-            executor.submit(fetch_cbsl): 'CBSL'
-        }
+        futures = {}
+
+        # Submit fetches for all banks and all currencies
+        for currency in currencies:
+            futures[executor.submit(fetch_hnb, currency)] = f'HNB_{currency}'
+            futures[executor.submit(fetch_pb, currency)] = f'PB_{currency}'
+            futures[executor.submit(fetch_sampath, currency)] = f'SAMPATH_{currency}'
+            futures[executor.submit(fetch_cbsl, currency)] = f'CBSL_{currency}'
 
         # Collect results as they complete
         for future in as_completed(futures):
@@ -317,15 +333,15 @@ def refresh_all_exchange_rates(force=False):
         r.get('status') == 'success' and r.get('changed', False)
         for r in results.values()
     )
-    
+
     logger.info(f"Exchange rate refresh completed — changes_detected: {changes_detected}, results: {results}")
-    
+
     # Send notifications to users if any changes detected
     try:
         send_rate_change_notifications(results)
     except Exception as e:
         logger.error(f"Error sending notifications: {str(e)}")
-    
+
     return results
 
 
@@ -764,15 +780,15 @@ def refresh_all_rates_manually(log_audit_func):
             r.get('status') == 'success' and r.get('changed', False)
             for r in results.values()
         )
-        
+
         # Build changes summary
         changes_summary = []
-        for bank in ['HNB', 'PB', 'SAMPATH', 'CBSL']:
-            if bank in results:
-                result = results[bank]
+        for bank_currency in ['HNB_USD', 'HNB_GBP', 'PB', 'SAMPATH', 'CBSL']:
+            if bank_currency in results:
+                result = results[bank_currency]
                 if result.get('status') == 'success':
                     if result.get('is_new'):
-                        changes_summary.append(f"{bank}: New rate ({result['buy_rate']}/{result['sell_rate']})")
+                        changes_summary.append(f"{bank_currency}: New rate ({result['buy_rate']}/{result['sell_rate']})")
                     elif result.get('changed'):
                         parts = []
                         if result.get('buy_change') and result['buy_change'] != 0:
@@ -781,11 +797,11 @@ def refresh_all_rates_manually(log_audit_func):
                         if result.get('sell_change') and result['sell_change'] != 0:
                             arrow = "▲" if result['sell_change'] > 0 else "▼"
                             parts.append(f"Sell {arrow}{abs(result['sell_change']):.4f}")
-                        changes_summary.append(f"{bank}: {', '.join(parts)}")
+                        changes_summary.append(f"{bank_currency}: {', '.join(parts)}")
                     else:
-                        changes_summary.append(f"{bank}: No change")
+                        changes_summary.append(f"{bank_currency}: No change")
                 else:
-                    changes_summary.append(f"{bank}: Failed")
+                    changes_summary.append(f"{bank_currency}: Failed")
 
         logger.info("Exchange rate refresh completed successfully")
         return jsonify({
@@ -1025,6 +1041,7 @@ def get_exchange_rate_trends_all():
     load instead of hitting multiple endpoints.
 
     Query Parameters:
+        currency:         'USD' | 'GBP' | 'EUR' (default: 'USD')
         period:           'daily' | 'weekly' | 'monthly' (default: 'daily')
         months:           history months for main chart  (default: 6, max: 36)
         forecast_days:    days to project forward        (default: 30, max: 90)
@@ -1032,9 +1049,15 @@ def get_exchange_rate_trends_all():
         comparison_months: months for source comparison  (default: 3, max: 12)
 
     Returns:
-        JSON with keys: trend, forecast, source_comparison, monthly_volatility
+        JSON with keys: trend, forecast, source_comparison, monthly_volatility, currency
     """
     try:
+        currency = request.args.get('currency', 'USD').upper()
+        # Validate currency
+        valid_currencies = ['USD', 'GBP', 'EUR']
+        if currency not in valid_currencies:
+            currency = 'USD'
+
         period = request.args.get('period', 'daily')
         months = min(int(request.args.get('months', 6)), 36)
         forecast_days = min(int(request.args.get('forecast_days', 30)), 90)
@@ -1061,9 +1084,10 @@ def get_exchange_rate_trends_all():
                            COUNT(DISTINCT date) AS trading_days
                     FROM exchange_rates
                     WHERE date >= DATE_SUB(CURDATE(), INTERVAL %s MONTH)
+                      AND currency = %s
                     GROUP BY YEAR(date), MONTH(date)
                     ORDER BY YEAR(date), MONTH(date)
-                """, (months,))
+                """, (months, currency))
             elif period == 'weekly':
                 cursor.execute("""
                     SELECT MIN(date) AS week_start, MAX(date) AS week_end,
@@ -1074,9 +1098,10 @@ def get_exchange_rate_trends_all():
                            COUNT(DISTINCT date) AS trading_days
                     FROM exchange_rates
                     WHERE date >= DATE_SUB(CURDATE(), INTERVAL %s MONTH)
+                      AND currency = %s
                     GROUP BY YEAR(date), WEEK(date, 1)
                     ORDER BY YEAR(date), WEEK(date, 1)
-                """, (months,))
+                """, (months, currency))
             else:  # daily
                 cursor.execute("""
                     SELECT date,
@@ -1084,13 +1109,15 @@ def get_exchange_rate_trends_all():
                            COUNT(DISTINCT source) AS source_count
                     FROM exchange_rates
                     WHERE date >= DATE_SUB(CURDATE(), INTERVAL %s MONTH)
+                      AND currency = %s
                     GROUP BY date
                     ORDER BY date
-                """, (months,))
+                """, (months, currency))
 
             result['trend'] = _serialise_rows(cursor.fetchall())
             result['period'] = period
             result['months'] = months
+            result['currency'] = currency
 
             # --- 2. Forecast (linear regression on daily avg buy_rate) -
             cursor.execute("""
@@ -1098,9 +1125,10 @@ def get_exchange_rate_trends_all():
                        ROUND(AVG(buy_rate), 4) AS buy_rate
                 FROM exchange_rates
                 WHERE date >= DATE_SUB(CURDATE(), INTERVAL %s MONTH)
+                  AND currency = %s
                 GROUP BY date
                 ORDER BY date
-            """, (forecast_history,))
+            """, (forecast_history, currency))
             fc_history = _serialise_rows(cursor.fetchall())
 
             if len(fc_history) >= 7:
@@ -1157,8 +1185,9 @@ def get_exchange_rate_trends_all():
                 SELECT date, source, buy_rate
                 FROM exchange_rates
                 WHERE date >= DATE_SUB(CURDATE(), INTERVAL %s MONTH)
+                  AND currency = %s
                 ORDER BY date, source
-            """, (comp_months,))
+            """, (comp_months, currency))
             comp_rows = cursor.fetchall()
 
             sources = {}
@@ -1180,9 +1209,10 @@ def get_exchange_rate_trends_all():
                        COUNT(DISTINCT date) AS trading_days
                 FROM exchange_rates
                 WHERE date >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
+                  AND currency = %s
                 GROUP BY YEAR(date), MONTH(date)
                 ORDER BY YEAR(date), MONTH(date)
-            """)
+            """, (currency,))
             result['monthly_volatility'] = _serialise_rows(cursor.fetchall())
 
             return jsonify(result), 200
@@ -1333,6 +1363,7 @@ def get_intraday_refresh_logs():
     Query Parameters:
         date: YYYY-MM-DD format (default: today)
         limit_runs: Maximum number of runs to return (default: 20, max: 50)
+        currency: Currency code to filter (default: USD). Filters sources like HNB_USD, HNB_GBP, etc.
 
     Returns:
         JSON with array of runs, each containing timestamp and bank rates
@@ -1340,6 +1371,7 @@ def get_intraday_refresh_logs():
     try:
         target_date = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
         limit_runs = min(int(request.args.get('limit_runs', 20)), 50)
+        currency = request.args.get('currency', 'USD').upper()
 
         connection = get_db_connection()
         if not connection:
@@ -1349,6 +1381,7 @@ def get_intraday_refresh_logs():
 
         try:
             # Fetch all logs for the target date, grouped by run_key
+            # Filter by currency: include sources that end with _USD, _GBP, or legacy sources without suffix
             cursor.execute("""
                 SELECT 
                     run_key,
@@ -1361,9 +1394,13 @@ def get_intraday_refresh_logs():
                 FROM exchange_rate_refresh_logs
                 WHERE DATE(created_at) = %s
                   AND run_key IS NOT NULL
+                  AND (
+                    source LIKE CONCAT('%_', %s)  -- Matches HNB_USD, PB_USD, etc.
+                    OR (source NOT LIKE '%\\_%' AND %s = 'USD')  -- Legacy sources without suffix (assume USD)
+                  )
                 ORDER BY created_at DESC, run_key, source
                 LIMIT %s
-            """, (target_date, limit_runs * 10))  # Fetch more rows to account for multiple sources per run
+            """, (target_date, currency, currency, limit_runs * 10))  # Fetch more rows to account for multiple sources per run
 
             rows = cursor.fetchall()
 
@@ -1392,7 +1429,10 @@ def get_intraday_refresh_logs():
                     }
 
                 source = row['source']
-                runs_dict[run_key]['banks'][source] = {
+                # Strip currency suffix from source for display (HNB_USD -> HNB, HNB_GBP -> HNB)
+                display_source = source.split('_')[0] if '_' in source else source
+
+                runs_dict[run_key]['banks'][display_source] = {
                     'status': row['status'],
                     'buy_rate': float(row['buy_rate']) if row['buy_rate'] else None,
                     'sell_rate': float(row['sell_rate']) if row['sell_rate'] else None,
@@ -1404,6 +1444,7 @@ def get_intraday_refresh_logs():
 
             return jsonify({
                 'date': target_date,
+                'currency': currency,
                 'runs': runs_list,
                 'total_runs': len(runs_list)
             }), 200
@@ -1420,7 +1461,7 @@ def get_intraday_refresh_logs():
 def create_salary_calculation():
     """
     Create a new salary calculation with exchange breakdown.
-    
+
     Request Body (JSON):
         total_usd: Total USD salary amount
         exchanges: Array of exchange objects with:
@@ -1428,7 +1469,7 @@ def create_salary_calculation():
             - exchange_rate: LKR rate used
             - bank_source: Bank name (optional)
         notes: Optional notes for this calculation
-    
+
     Returns:
         JSON with the created calculation ID and summary
     """
@@ -1459,13 +1500,13 @@ def create_salary_calculation():
         for ex in exchanges:
             if 'usd_amount' not in ex or 'exchange_rate' not in ex:
                 return jsonify({'error': 'Each exchange must have usd_amount and exchange_rate'}), 400
-            
+
             usd_amt = Decimal(str(ex['usd_amount']))
             rate = Decimal(str(ex['exchange_rate']))
-            
+
             if usd_amt <= 0 or rate <= 0:
                 return jsonify({'error': 'All amounts and rates must be greater than 0'}), 400
-            
+
             total_exchanged_usd += usd_amt
             total_lkr += usd_amt * rate
 
@@ -1486,7 +1527,7 @@ def create_salary_calculation():
                 (user_id, total_usd, total_lkr, average_rate, calculation_date, notes)
                 VALUES (%s, %s, %s, %s, CURDATE(), %s)
             """, (user_id, total_usd, float(total_lkr), float(average_rate), notes))
-            
+
             calculation_id = cursor.lastrowid
 
             # Insert exchange breakdown
@@ -1532,7 +1573,7 @@ def create_salary_calculation():
 def get_salary_calculations():
     """
     Get all salary calculations for the current user with exchange breakdown.
-    
+
     Returns:
         JSON array of calculations with their exchange details
     """
@@ -1559,7 +1600,7 @@ def get_salary_calculations():
                 ORDER BY calculation_date DESC, created_at DESC
                 LIMIT 50
             """, (user_id,))
-            
+
             calculations = cursor.fetchall()
 
             # For each calculation, get the exchange breakdown
@@ -1575,9 +1616,9 @@ def get_salary_calculations():
                     WHERE calculation_id = %s
                     ORDER BY exchange_order
                 """, (calc['id'],))
-                
+
                 calc['exchanges'] = cursor.fetchall()
-                
+
                 # Format dates for JSON serialization
                 if calc['calculation_date']:
                     calc['calculation_date'] = calc['calculation_date'].isoformat()
@@ -1602,7 +1643,7 @@ def get_current_bank_rates():
     """
     Get the most recent exchange rates from all banks.
     Used by the salary calculator to populate rate dropdowns.
-    
+
     Returns:
         JSON object with current rates for each bank
     """
@@ -1622,7 +1663,7 @@ def get_current_bank_rates():
                   AND source IN ('HNB', 'PB', 'SAMPATH')
                 ORDER BY source
             """)
-            
+
             today_rates = cursor.fetchall()
 
             # If no rates for today, get the most recent rates
@@ -1671,13 +1712,13 @@ def update_salary_calculation():
     """
     Update an existing salary calculation with new exchanges.
     Can be used to add more exchanges to a partial calculation.
-    
+
     Request Body (JSON):
         calculation_id: ID of the calculation to update
         total_usd: Updated total USD salary amount (optional, keeps original if not provided)
         exchanges: Complete array of exchange objects (replaces all existing exchanges)
         notes: Updated notes (optional, keeps original if not provided)
-    
+
     Returns:
         JSON with the updated calculation summary
     """
@@ -1703,11 +1744,11 @@ def update_salary_calculation():
                 FROM salary_calculations 
                 WHERE id = %s
             """, (calculation_id,))
-            
+
             existing = cursor.fetchone()
             if not existing:
                 return jsonify({'error': 'Calculation not found'}), 404
-            
+
             if existing['user_id'] != user_id:
                 return jsonify({'error': 'Unauthorized'}), 403
 
@@ -1726,13 +1767,13 @@ def update_salary_calculation():
             for ex in exchanges:
                 if 'usd_amount' not in ex or 'exchange_rate' not in ex:
                     return jsonify({'error': 'Each exchange must have usd_amount and exchange_rate'}), 400
-                
+
                 usd_amt = Decimal(str(ex['usd_amount']))
                 rate = Decimal(str(ex['exchange_rate']))
-                
+
                 if usd_amt <= 0 or rate <= 0:
                     return jsonify({'error': 'All amounts and rates must be greater than 0'}), 400
-                
+
                 total_exchanged_usd += usd_amt
                 total_lkr += usd_amt * rate
 
@@ -1797,10 +1838,10 @@ def update_salary_calculation():
 def delete_salary_calculation():
     """
     Delete a salary calculation.
-    
+
     URL Parameter:
         calculation_id: ID of the calculation to delete
-    
+
     Returns:
         JSON with success message
     """
@@ -1820,11 +1861,11 @@ def delete_salary_calculation():
             cursor.execute("""
                 SELECT user_id FROM salary_calculations WHERE id = %s
             """, (calculation_id,))
-            
+
             existing = cursor.fetchone()
             if not existing:
                 return jsonify({'error': 'Calculation not found'}), 404
-            
+
             if existing['user_id'] != user_id:
                 return jsonify({'error': 'Unauthorized'}), 403
 
@@ -1852,21 +1893,25 @@ def delete_salary_calculation():
 # HELPER FUNCTIONS FOR WIDGET DATA
 # ==================================================
 
-def get_best_rate_today():
+def get_best_rate_today(currency='USD'):
     """
-    Get the best USD->LKR buy rate from all available banks for today.
-    
+    Get the best buy rate from all available banks for today for a specific currency.
+
+    Args:
+        currency: Currency code (default 'USD')
+
     Returns:
-        dict with keys: bank, buy_rate, sell_rate, trend (▲/▼/—)
+        dict with keys: bank, buy_rate, sell_rate, trend (▲/▼/—), currency
         Returns None if no rates are available
     """
     try:
+        currency = currency.upper()
         rates = []
-        
+
         # Fetch HNB rate
         try:
             hnb_service = get_hnb_exchange_rate_service()
-            hnb_rate = hnb_service.get_exchange_rate()  # Use get_exchange_rate() instead
+            hnb_rate = hnb_service.get_exchange_rate(currency=currency)
             if hnb_rate:
                 rates.append({
                     'bank': 'HNB',
@@ -1875,12 +1920,12 @@ def get_best_rate_today():
                     'date': hnb_rate.get('date')
                 })
         except Exception as e:
-            logger.warning(f"Failed to fetch HNB rate: {str(e)}")
-        
+            logger.warning(f"Failed to fetch HNB {currency} rate: {str(e)}")
+
         # Fetch PB rate
         try:
             pb_service = get_pb_exchange_rate_service()
-            pb_rate = pb_service.get_exchange_rate()  # Use get_exchange_rate() instead
+            pb_rate = pb_service.get_exchange_rate(currency=currency)
             if pb_rate:
                 rates.append({
                     'bank': 'PB',
@@ -1889,12 +1934,12 @@ def get_best_rate_today():
                     'date': pb_rate.get('date')
                 })
         except Exception as e:
-            logger.warning(f"Failed to fetch PB rate: {str(e)}")
-        
+            logger.warning(f"Failed to fetch PB {currency} rate: {str(e)}")
+
         # Fetch Sampath rate
         try:
             sampath_service = get_sampath_exchange_rate_service()
-            sampath_rate = sampath_service.get_exchange_rate()  # Use get_exchange_rate() instead
+            sampath_rate = sampath_service.get_exchange_rate(currency=currency)
             if sampath_rate:
                 rates.append({
                     'bank': 'Sampath',
@@ -1904,20 +1949,20 @@ def get_best_rate_today():
                 })
         except Exception as e:
             logger.warning(f"Failed to fetch Sampath rate: {str(e)}")
-        
+
         if not rates:
             return None
-        
+
         # Find the best (highest) buy rate
         best_rate = max(rates, key=lambda x: x['buy_rate'])
-        
+
         # Calculate trend by comparing today vs yesterday
         trend = '—'  # Default to no change
         try:
             connection = get_db_connection()
             if connection:
                 cursor = connection.cursor(dictionary=True)
-                
+
                 # Get most recent previous rate from the same bank (not just yesterday)
                 cursor.execute("""
                     SELECT buy_rate 
@@ -1928,8 +1973,8 @@ def get_best_rate_today():
                       AND DATE(created_at) < CURDATE()
                     ORDER BY created_at DESC 
                     LIMIT 1
-                """, (best_rate['bank'],))
-                
+                """, (f"{best_rate['bank']}_{currency}",))
+
                 previous_rate_data = cursor.fetchone()
                 if previous_rate_data and previous_rate_data['buy_rate']:
                     previous_rate = float(previous_rate_data['buy_rate'])
@@ -1937,17 +1982,18 @@ def get_best_rate_today():
                         trend = '▲'
                     elif best_rate['buy_rate'] < previous_rate:
                         trend = '▼'
-                
+
                 cursor.close()
                 connection.close()
         except Exception as e:
             logger.warning(f"Could not calculate trend: {str(e)}")
-        
+
         return {
             'bank': best_rate['bank'],
             'buy_rate': best_rate['buy_rate'],
             'sell_rate': best_rate['sell_rate'],
-            'trend': trend
+            'trend': trend,
+            'currency': currency
         }
     
     except Exception as e:

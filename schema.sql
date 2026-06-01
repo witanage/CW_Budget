@@ -36,12 +36,14 @@ CREATE TABLE IF NOT EXISTS users (
     is_active BOOLEAN DEFAULT FALSE,
     last_login TIMESTAMP NULL,
     default_page VARCHAR(50) DEFAULT 'transactions' COMMENT 'Default landing page: transactions, tax, reports, rateTrends',
+    default_currency VARCHAR(3) DEFAULT 'USD' COMMENT 'Default currency for exchange rate trends (USD, GBP, etc.)',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_username (username),
     INDEX idx_email (email),
     INDEX idx_is_admin (is_admin),
-    INDEX idx_is_active (is_active)
+    INDEX idx_is_active (is_active),
+    INDEX idx_default_currency (default_currency)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
@@ -408,16 +410,18 @@ INSERT IGNORE INTO ai_configs (service_name, provider, api_key, api_url, model_n
 CREATE TABLE IF NOT EXISTS exchange_rates (
     id INT AUTO_INCREMENT PRIMARY KEY,
     date DATE NOT NULL COMMENT 'Date for the exchange rate',
-    buy_rate DECIMAL(10, 4) NOT NULL COMMENT 'USD to LKR buy rate',
-    sell_rate DECIMAL(10, 4) NOT NULL COMMENT 'USD to LKR sell rate',
+    buy_rate DECIMAL(10, 4) NOT NULL COMMENT 'Buy rate (e.g., USD to LKR or GBP to LKR)',
+    sell_rate DECIMAL(10, 4) NOT NULL COMMENT 'Sell rate (e.g., USD to LKR or GBP to LKR)',
     source VARCHAR(50) DEFAULT 'CBSL' COMMENT 'Source of the rate (CBSL, HNB, Manual, CSV)',
+    currency VARCHAR(3) DEFAULT 'USD' COMMENT 'Currency code (USD, GBP, EUR, etc.)',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY unique_date_source (date, source),
+    UNIQUE KEY unique_date_source_currency (date, source, currency),
     INDEX idx_date (date),
+    INDEX idx_currency (currency),
     INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-COMMENT='Stores USD to LKR exchange rates (one row per bank per date)';
+COMMENT='Stores exchange rates to LKR for multiple currencies (one row per bank per date per currency)';
 
 -- ============================================================
 -- App Settings Table
@@ -438,7 +442,9 @@ INSERT IGNORE INTO app_settings (setting_key, value, description) VALUES
 ('bill_upload_mode', 'sequential',
  'Bill image upload strategy: sequential = one-by-one (Vercel-friendly), batch = all at once (non-Vercel)'),
 ('ntfy_topic', '',
- 'Global ntfy.sh topic name for exchange rate push notifications (leave empty to disable)'),
+ 'Global ntfy.sh topic name for USD exchange rate push notifications (leave empty to disable)'),
+('ntfy_topic_gbp', '',
+ 'ntfy.sh topic name for GBP exchange rate push notifications (leave empty to disable)'),
 ('google_drive_client_id', '',
  'Google OAuth 2.0 Client ID for Drive API access'),
 ('google_drive_client_secret', '',

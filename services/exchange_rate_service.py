@@ -17,6 +17,12 @@ class ExchangeRateService:
 
     CBSL_URL = "https://www.cbsl.gov.lk/cbsl_custom/exratestt/exrates_resultstt.php"
 
+    # Currency name mapping for CBSL form submission
+    CURRENCY_MAP = {
+        'USD': 'United States Dollar',
+        'GBP': 'British Pound'
+    }
+
     def __init__(self, db_config=None):
         # db_config kept for backward compatibility but is no longer used;
         # all connections now come from the shared pool in db.py.
@@ -166,7 +172,7 @@ class ExchangeRateService:
                 connection.close()
 
     def save_exchange_rate(self, date: datetime, buy_rate: float, sell_rate: float,
-                          source: str = 'CBSL') -> bool:
+                          source: str = 'CBSL', currency: str = 'USD') -> bool:
         """Save exchange rate to database"""
         connection = None
         cursor = None
@@ -175,17 +181,17 @@ class ExchangeRateService:
             cursor = connection.cursor()
 
             cursor.execute("""
-                INSERT INTO exchange_rates (date, buy_rate, sell_rate, source)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO exchange_rates (date, buy_rate, sell_rate, source, currency)
+                VALUES (%s, %s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE
                     buy_rate = VALUES(buy_rate),
                     sell_rate = VALUES(sell_rate),
                     source = VALUES(source),
                     updated_at = CURRENT_TIMESTAMP
-            """, (date.strftime('%Y-%m-%d'), buy_rate, sell_rate, source))
+            """, (date.strftime('%Y-%m-%d'), buy_rate, sell_rate, source, currency.upper()))
 
             connection.commit()
-            logger.info(f"Saved exchange rate for {date.strftime('%Y-%m-%d')}: {buy_rate}/{sell_rate}")
+            logger.info(f"Saved {currency} exchange rate for {date.strftime('%Y-%m-%d')}: {buy_rate}/{sell_rate}")
             return True
 
         except Error as e:
@@ -476,14 +482,14 @@ class ExchangeRateService:
                             sell_rate = float(cells[2].text.strip())
 
                             cursor.execute("""
-                                INSERT INTO exchange_rates (date, buy_rate, sell_rate, source)
-                                VALUES (%s, %s, %s, %s)
+                                INSERT INTO exchange_rates (date, buy_rate, sell_rate, source, currency)
+                                VALUES (%s, %s, %s, %s, %s)
                                 ON DUPLICATE KEY UPDATE
                                     buy_rate = VALUES(buy_rate),
                                     sell_rate = VALUES(sell_rate),
                                     source = VALUES(source),
                                     updated_at = CURRENT_TIMESTAMP
-                            """, (row_date_str, buy_rate, sell_rate, 'CBSL_BULK'))
+                            """, (row_date_str, buy_rate, sell_rate, 'CBSL_BULK', 'USD'))
 
                             success_count += 1
                             if success_count % 100 == 0:
@@ -509,6 +515,267 @@ class ExchangeRateService:
         except Exception as e:
             logger.error(f"Unexpected error in bulk import: {str(e)}", exc_info=True)
             return False
+
+    def fetch_cbsl_rates_multi(self, currencies=['USD', 'GBP'], date=None):
+        """
+        Fetch exchange rates from CBSL for multiple currencies at once.
+
+        Args:
+            currencies: List of currency codes (e.g., ['USD', 'GBP'])
+            date: Date to fetch (default: today)
+
+        Returns:
+            dict: Dictionary with currency codes as keys and rate data as values
+            Example: {
+                'USD': {'date': '2026-06-01', 'buy_rate': 325.98, 'sell_rate': 335.70, 'source': 'CBSL', 'currency': 'USD'},
+                'GBP': {'date': '2026-06-01', 'buy_rate': 437.11, 'sell_rate': 453.13, 'source': 'CBSL', 'currency': 'GBP'}
+            }
+        """
+        if date is None:
+            date = datetime.now()
+
+        date_str = date.strftime('%Y-%m-%d')
+        results = {}
+
+        try:
+            # Validate currencies
+            valid_currencies = [c for c in currencies if c.upper() in self.CURRENCY_MAP]
+            if not valid_currencies:
+                logger.error(f"No valid currencies specified. Supported: {list(self.CURRENCY_MAP.keys())}")
+                return results
+
+            logger.info(f"Fetching CBSL rates for {valid_currencies} on {date_str}")
+
+            # Build currency checkboxes for POST payload
+            currency_checkboxes = [f"{c.upper()}~{self.CURRENCY_MAP[c.upper()]}" for c in valid_currencies]
+            logger.info(f"CBSL currency checkboxes: {currency_checkboxes}")
+
+            payload = {
+                'lookupPage': 'lookup_daily_exchange_rates.php',
+                'startRange': '2006-11-11',
+                'txtStart': date_str,
+                'txtEnd': date_str,
+                'rangeType': 'range',
+                'rangeValue': '1',
+                'chk_cur[]': currency_checkboxes,
+                'submit_button': 'Submit'
+            }
+
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Origin': 'https://www.cbsl.gov.lk',
+                'Referer': 'https://www.cbsl.gov.lk/en/rates-and-indicators/exchange-rates/daily-buy-and-sell-exchange-rates'
+            }
+
+            # Step 1: Make POST request to get the results page
+            session = requests.Session()
+            response = session.post(self.CBSL_URL, data=payload, headers=headers, timeout=20)
+            response.raise_for_status()
+
+            logger.info(f"CBSL initial response status: {response.status_code}, content length: {len(response.text)}")
+
+            # Step 2: Look for CSV export button and submit to get CSV data
+            # The results page has a form with btnCSV button that downloads the CSV
+            soup = BeautifulSoup(response.text, 'html.parser')
+            csv_button = soup.find('button', {'name': 'btnCSV'})
+
+            if csv_button:
+                logger.info("Found CSV export button, clicking it to download CSV data")
+
+                # Find the parent form
+                form = csv_button.find_parent('form')
+                if not form:
+                    logger.error("CSV button found but no parent form")
+                    return results
+
+                # Get form action (if any) or use same URL
+                form_action = form.get('action', self.CBSL_URL)
+                if not form_action.startswith('http'):
+                    # Relative URL, make it absolute
+                    form_action = 'https://www.cbsl.gov.lk' + form_action if form_action.startswith('/') else self.CBSL_URL
+
+                # Build CSV download payload - include all hidden inputs from the form
+                csv_payload = {'btnCSV': 'CSV'}
+                for hidden_input in form.find_all('input', {'type': 'hidden'}):
+                    name = hidden_input.get('name')
+                    value = hidden_input.get('value')
+                    if name:
+                        csv_payload[name] = value
+
+                logger.info(f"Submitting CSV download form to: {form_action}")
+
+                # Submit the CSV download form
+                csv_response = session.post(form_action, data=csv_payload, headers=headers, timeout=20)
+                csv_response.raise_for_status()
+
+                logger.info(f"CSV response status: {csv_response.status_code}, content length: {len(csv_response.text)}")
+                logger.info(f"CSV response starts with: {csv_response.text[:200]}")
+
+                response = csv_response  # Use CSV response for parsing
+            else:
+                logger.warning("No CSV export button found in CBSL response, will try parsing HTML table")
+
+            # Now parse the response (either CSV or HTML)
+            # CSV format uses commas: Currency,Date,"Buy Rate","Sell Rate"
+            is_csv = (',' in response.text) and (('Currency' in response.text[:200]) or ('Buy Rate' in response.text[:200]))
+
+            if is_csv:
+                logger.info("CBSL returned CSV format (comma-separated)")
+                # Parse CSV format
+                # Expected format:
+                # Currency,Date,"Buy Rate","Sell Rate"
+                #
+                # GBP,2026-06-01,437.1140,453.1250
+                # USD,2026-06-01,325.9782,335.7046
+
+                lines = response.text.strip().split('\n')
+
+                if len(lines) < 2:
+                    logger.error(f"CBSL CSV response too short: {len(lines)} lines")
+                    logger.warning(f"Response content (first 1000 chars): {response.text[:1000]}")
+                    return results
+
+                # Skip header line and any empty lines
+                for line in lines[1:]:
+                    line = line.strip()
+                    if not line:  # Skip empty lines
+                        continue
+
+                    # Split by comma (handle quoted values)
+                    parts = line.split(',')
+
+                    if len(parts) >= 4:
+                        try:
+                            currency_code = parts[0].strip().strip('"').upper()
+                            rate_date = parts[1].strip().strip('"')
+                            buy_rate = float(parts[2].strip().strip('"'))
+                            sell_rate = float(parts[3].strip().strip('"'))
+
+                            logger.info(f"Parsed CSV line: {currency_code}, {rate_date}, {buy_rate}, {sell_rate}")
+
+                            if currency_code in [c.upper() for c in valid_currencies]:
+                                results[currency_code] = {
+                                    'date': rate_date,
+                                    'buy_rate': buy_rate,
+                                    'sell_rate': sell_rate,
+                                    'source': 'CBSL',
+                                    'currency': currency_code
+                                }
+                                logger.info(f"Parsed CBSL {currency_code} rate: Buy={buy_rate}, Sell={sell_rate}")
+                            else:
+                                logger.info(f"Skipping currency {currency_code} (not in requested list: {[c.upper() for c in valid_currencies]})")
+                        except (ValueError, IndexError) as e:
+                            logger.warning(f"Error parsing CBSL CSV line '{line}': {str(e)}")
+                            continue
+            else:
+                logger.info("CBSL returned HTML format, parsing table")
+                # Parse HTML table format
+                soup = BeautifulSoup(response.text, 'html.parser')
+
+                # Find all tables
+                tables = soup.find_all('table')
+
+                if not tables:
+                    logger.error("No tables found in CBSL HTML response")
+                    logger.debug(f"Response preview: {response.text[:500]}")
+                    return results
+
+                # The exchange rates table should have class 'table' or be the main data table
+                table = soup.find('table', class_='table') or tables[0]
+
+                # Find all data rows (both with and without class='odd')
+                rows = table.find_all('tr')
+                logger.info(f"Found {len(rows)} rows in CBSL HTML table")
+
+                for row in rows:
+                    cells = row.find_all('td')
+
+                    # Each row should have: Currency, Date, Buy Rate, Sell Rate
+                    if len(cells) >= 4:
+                        try:
+                            currency_code = cells[0].get_text(strip=True).upper()
+                            rate_date = cells[1].get_text(strip=True)
+                            buy_rate_str = cells[2].get_text(strip=True)
+                            sell_rate_str = cells[3].get_text(strip=True)
+
+                            logger.info(f"Parsing HTML row: {currency_code}, {rate_date}, {buy_rate_str}, {sell_rate_str}")
+
+                            buy_rate = float(buy_rate_str)
+                            sell_rate = float(sell_rate_str)
+
+                            if currency_code in [c.upper() for c in valid_currencies]:
+                                results[currency_code] = {
+                                    'date': rate_date,
+                                    'buy_rate': buy_rate,
+                                    'sell_rate': sell_rate,
+                                    'source': 'CBSL',
+                                    'currency': currency_code
+                                }
+                                logger.info(f"Parsed CBSL {currency_code} rate from HTML: Buy={buy_rate}, Sell={sell_rate}")
+                            else:
+                                logger.info(f"Skipping currency {currency_code} (not in requested list: {valid_currencies})")
+                        except (ValueError, IndexError, AttributeError) as e:
+                            logger.debug(f"Skipping CBSL row (likely header or invalid data): {str(e)}")
+                            continue
+
+            if not results:
+                logger.warning(f"No rates found in CBSL response for {valid_currencies}")
+                logger.warning(f"Response content (first 1000 chars): {response.text[:1000]}")
+            else:
+                logger.info(f"Successfully fetched CBSL rates for {list(results.keys())}")
+
+            return results
+
+        except requests.RequestException as e:
+            logger.error(f"HTTP error fetching CBSL rates: {str(e)}")
+            return results
+        except Exception as e:
+            logger.error(f"Unexpected error fetching CBSL multi-currency rates: {str(e)}", exc_info=True)
+            return results
+            return results
+
+    def fetch_and_store_current_rate(self, currency='USD'):
+        """
+        Fetch current CBSL exchange rate for a specific currency and store in database.
+
+        Args:
+            currency: Currency code ('USD' or 'GBP')
+
+        Returns:
+            dict: Saved exchange rate data or None if failed
+        """
+        try:
+            # Fetch rates for this currency
+            rates = self.fetch_cbsl_rates_multi(currencies=[currency])
+
+            if not rates or currency.upper() not in rates:
+                logger.error(f"Failed to fetch {currency} rate from CBSL")
+                return None
+
+            rate_data = rates[currency.upper()]
+
+            # Save to database
+            success = self.save_exchange_rate(
+                date=datetime.strptime(rate_data['date'], '%Y-%m-%d'),
+                buy_rate=rate_data['buy_rate'],
+                sell_rate=rate_data['sell_rate'],
+                source='CBSL',
+                currency=currency.upper()
+            )
+
+            if success:
+                logger.info(f"Successfully stored CBSL {currency} rate for {rate_data['date']}")
+                return rate_data
+            else:
+                logger.error(f"Failed to store CBSL {currency} rate in database")
+                return None
+
+        except Exception as e:
+            logger.error(f"Error in fetch_and_store_current_rate for {currency}: {str(e)}", exc_info=True)
+            return None
 
 # Singleton instance
 _exchange_rate_service = None

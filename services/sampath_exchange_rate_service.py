@@ -18,6 +18,12 @@ from db import get_db_connection
 
 logger = logging.getLogger(__name__)
 
+# Currency code mapping for Sampath Bank API
+CURRENCY_MAP = {
+    'USD': 'USD',
+    'GBP': 'GBP'
+}
+
 
 class SampathExchangeRateService:
     """Service to fetch and store Sampath Bank exchange rates."""
@@ -32,9 +38,12 @@ class SampathExchangeRateService:
             )
         }
 
-    def fetch_sampath_rates(self):
+    def fetch_sampath_rates(self, currency='USD'):
         """
-        Fetch current exchange rates from Sampath Bank API.
+        Fetch exchange rates from Sampath Bank API for a specific currency.
+
+        Args:
+            currency: Currency code ('USD' or 'GBP')
 
         Returns:
             dict: Exchange rate data or None if fetch fails
@@ -43,11 +52,18 @@ class SampathExchangeRateService:
                 'buy_rate': 306.25,
                 'sell_rate': 312.75,
                 'source': 'SAMPATH',
+                'currency': 'USD',
                 'updated_on': 'Monday, February 09 2026, 08:23:46 AM'
             }
         """
         try:
-            logger.info("Fetching exchange rates from Sampath Bank API...")
+            currency = currency.upper()
+
+            if currency not in CURRENCY_MAP:
+                logger.error(f"Unsupported currency: {currency}. Supported: {list(CURRENCY_MAP.keys())}")
+                return None
+
+            logger.info(f"Fetching {currency} exchange rates from Sampath Bank API...")
 
             response = requests.get(self.api_url, headers=self.headers, timeout=10)
             response.raise_for_status()
@@ -64,40 +80,41 @@ class SampathExchangeRateService:
                 logger.error("No exchange rates found in Sampath API response ('data' array is empty)")
                 return None
 
-            # Find USD entry in the exchange rates array
-            usd_data = None
+            # Find currency entry in the exchange rates array
+            currency_data = None
             for entry in exchange_rates:
-                if entry.get('CurrCode') == 'USD':
-                    usd_data = entry
+                if entry.get('CurrCode') == currency:
+                    currency_data = entry
                     break
 
-            if not usd_data:
-                logger.error("USD not found in Sampath API response")
+            if not currency_data:
+                logger.error(f"{currency} not found in Sampath API response")
                 logger.debug(f"Available currencies: {[e.get('CurrCode') for e in exchange_rates[:5]]}")
                 return None
 
             # TTBUY = TT Buying rate, TTSEL = TT Selling rate
-            buy_rate = float(usd_data.get('TTBUY', 0))
-            sell_rate = float(usd_data.get('TTSEL', 0))
+            buy_rate = float(currency_data.get('TTBUY', 0))
+            sell_rate = float(currency_data.get('TTSEL', 0))
 
             if buy_rate <= 0 or sell_rate <= 0:
-                logger.error(f"Invalid rates from Sampath: buy={buy_rate}, sell={sell_rate}")
+                logger.error(f"Invalid {currency} rates from Sampath: buy={buy_rate}, sell={sell_rate}")
                 return None
 
             today = datetime.now().date()
 
             # Get the RateWEF (Rate With Effect From) timestamp
-            updated_on = usd_data.get('RateWEF')
+            updated_on = currency_data.get('RateWEF')
 
             rate_data = {
                 'date': today.strftime('%Y-%m-%d'),
                 'buy_rate': buy_rate,
                 'sell_rate': sell_rate,
                 'source': 'SAMPATH',
+                'currency': currency,
                 'updated_on': updated_on
             }
 
-            logger.info(f"Successfully fetched Sampath rates for {rate_data['date']}: "
+            logger.info(f"Successfully fetched Sampath {currency} rates for {rate_data['date']}: "
                         f"Buy={buy_rate}, Sell={sell_rate}, Updated={updated_on}")
 
             return rate_data
@@ -112,7 +129,7 @@ class SampathExchangeRateService:
             logger.error(f"Unexpected error fetching Sampath rates: {str(e)}", exc_info=True)
             return None
 
-    def save_exchange_rate(self, date, buy_rate, sell_rate, source='SAMPATH'):
+    def save_exchange_rate(self, date, buy_rate, sell_rate, source='SAMPATH', currency='USD'):
         """
         Save exchange rate to database.
 
@@ -121,6 +138,7 @@ class SampathExchangeRateService:
             buy_rate: float or Decimal
             sell_rate: float or Decimal
             source: str (default 'SAMPATH')
+            currency: str (default 'USD')
 
         Returns:
             bool: True if successful, False otherwise
@@ -146,13 +164,13 @@ class SampathExchangeRateService:
             cursor = connection.cursor()
 
             cursor.execute("""
-                INSERT INTO exchange_rates (date, buy_rate, sell_rate, source)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO exchange_rates (date, buy_rate, sell_rate, source, currency)
+                VALUES (%s, %s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE
                     buy_rate = VALUES(buy_rate),
                     sell_rate = VALUES(sell_rate),
                     updated_at = CURRENT_TIMESTAMP
-            """, (date_str, buy_rate_decimal, sell_rate_decimal, source))
+            """, (date_str, buy_rate_decimal, sell_rate_decimal, source, currency.upper()))
 
             connection.commit()
 
@@ -175,12 +193,13 @@ class SampathExchangeRateService:
             if connection:
                 connection.close()
 
-    def get_exchange_rate(self, date=None):
+    def get_exchange_rate(self, date=None, currency='USD'):
         """
-        Get Sampath exchange rate for a specific date from database.
+        Get Sampath exchange rate for a specific date and currency from database.
 
         Args:
             date: datetime.date or str (YYYY-MM-DD). If None, uses today.
+            currency: Currency code (default 'USD')
 
         Returns:
             dict: Exchange rate data or None
@@ -195,6 +214,7 @@ class SampathExchangeRateService:
                 date = datetime.strptime(date, '%Y-%m-%d').date()
 
             date_str = date.strftime('%Y-%m-%d')
+            currency = currency.upper()
 
             connection = get_db_connection()
             if not connection:
@@ -203,10 +223,10 @@ class SampathExchangeRateService:
             cursor = connection.cursor(dictionary=True)
 
             cursor.execute("""
-                SELECT date, buy_rate, sell_rate, source, updated_at
+                SELECT date, buy_rate, sell_rate, source, currency, updated_at
                 FROM exchange_rates
-                WHERE date = %s AND source = 'SAMPATH'
-            """, (date_str,))
+                WHERE date = %s AND source = 'SAMPATH' AND currency = %s
+            """, (date_str, currency))
 
             result = cursor.fetchone()
 
@@ -216,6 +236,7 @@ class SampathExchangeRateService:
                     'buy_rate': float(result['buy_rate']),
                     'sell_rate': float(result['sell_rate']),
                     'source': result['source'],
+                    'currency': result.get('currency', 'USD'),
                     'updated_at': str(result['updated_at']) if result['updated_at'] else None
                 }
 
@@ -230,31 +251,35 @@ class SampathExchangeRateService:
             if connection:
                 connection.close()
 
-    def fetch_and_store_current_rate(self):
+    def fetch_and_store_current_rate(self, currency='USD'):
         """
         Fetch current exchange rate from Sampath Bank and store in database.
+
+        Args:
+            currency: Currency code ('USD' or 'GBP')
 
         Returns:
             dict: Saved exchange rate data or None if failed
         """
-        rate_data = self.fetch_sampath_rates()
+        rate_data = self.fetch_sampath_rates(currency=currency)
 
         if not rate_data:
-            logger.error("Failed to fetch exchange rate from Sampath Bank")
+            logger.error(f"Failed to fetch {currency} exchange rate from Sampath Bank")
             return None
 
         success = self.save_exchange_rate(
             date=rate_data['date'],
             buy_rate=rate_data['buy_rate'],
             sell_rate=rate_data['sell_rate'],
-            source='SAMPATH'
+            source='SAMPATH',
+            currency=currency
         )
 
         if success:
-            logger.info(f"Successfully stored Sampath rate for {rate_data['date']}")
+            logger.info(f"Successfully stored Sampath {currency} rate for {rate_data['date']}")
             return rate_data
         else:
-            logger.error("Failed to store Sampath rate in database")
+            logger.error(f"Failed to store Sampath {currency} rate in database")
             return None
 
     def get_or_fetch_rate(self, date=None):

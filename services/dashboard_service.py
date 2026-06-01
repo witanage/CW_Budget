@@ -169,27 +169,28 @@ def get_dashboard_stats(user_id):
         connection.close()
 
 
-def get_sidebar_summary(user_id, current_year, current_month):
+def get_sidebar_summary(user_id, current_year, current_month, currency='USD'):
     """
     Get summary data for sidebar widgets.
-    
+
     Args:
         user_id: The user's ID
         current_year: Current calendar year
         current_month: Current calendar month (1-12)
-    
+        currency: Currency code for exchange rate widget (default 'USD')
+
     Returns:
         Dictionary containing:
         - month_summary: Balance and unpaid transaction count
-        - exchange_rate: Best rate for today
+        - exchange_rate: Best rate for today for the selected currency
         - tax_summary: Active tax calculation with quarterly payment info
     """
     try:
         # Get month summary (balance + unpaid count)
         month_data = get_month_summary(user_id, current_year, current_month)
-        
-        # Get best exchange rate
-        rate_data = get_best_rate_today()
+
+        # Get best exchange rate for the selected currency
+        rate_data = get_best_rate_today(currency=currency)
         
         # Get active tax calculation
         tax_data = get_active_tax_summary(user_id, current_year, current_month)

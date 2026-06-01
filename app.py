@@ -227,10 +227,10 @@ def dashboard():
     """Main dashboard."""
     user_id = session.get('user_id')
     enabled_tabs = get_enabled_tabs(user_id, device_type='desktop')
-    
-    return render_template('dashboard.html', 
-                          username=session.get('username'),
-                          enabled_tabs=enabled_tabs)
+
+    return render_template('dashboard.html',
+                           username=session.get('username'),
+                           enabled_tabs=enabled_tabs)
 
 
 # Lazy-loaded page fragment endpoints (return HTML partials for on-demand loading)
@@ -269,10 +269,10 @@ def mobile():
     """Mobile view."""
     user_id = session.get('user_id')
     enabled_tabs = get_enabled_tabs(user_id, device_type='mobile')
-    
-    return render_template('mobile.html', 
-                          username=session.get('username'),
-                          enabled_tabs=enabled_tabs)
+
+    return render_template('mobile.html',
+                           username=session.get('username'),
+                           enabled_tabs=enabled_tabs)
 
 
 register_user_routes(app, limiter, RATE_LIMIT_LOGIN, RATE_LIMIT_REGISTER, RATE_LIMIT_CHANGE_PASSWORD, RATE_LIMIT_API,
@@ -294,10 +294,10 @@ def dashboard_stats():
     """Get dashboard statistics."""
     user_id = session['user_id']
     result = get_dashboard_stats(user_id)
-    
+
     if 'error' in result:
         return jsonify(result), 500
-    
+
     return jsonify(result)
 
 
@@ -310,10 +310,11 @@ def sidebar_summary():
         user_id = session['user_id']
         current_year = datetime.now().year
         current_month = datetime.now().month
-        
-        result = get_sidebar_summary(user_id, current_year, current_month)
+        currency = request.args.get('currency', 'USD').upper()
+
+        result = get_sidebar_summary(user_id, current_year, current_month, currency=currency)
         return jsonify(result)
-    
+
     except Exception as e:
         logger.error(f"Error in sidebar_summary: {str(e)}")
         return jsonify({'error': 'Failed to fetch sidebar summary'}), 500

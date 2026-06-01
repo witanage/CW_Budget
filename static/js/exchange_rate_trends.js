@@ -14,6 +14,7 @@
     var _s = {
         period: 'daily',
         months: 1,
+        currency: 'USD',
         forecastDays: 7,
         forecastHistory: 3,
         compMonths: 1,
@@ -39,12 +40,50 @@
         if (!_bound) {
             _initIntradayDate();
             _bindControls();
-            _syncDropdownValues();
             _bound = true;
+
+            // Load currency preference first, then fetch data
+            _loadUserCurrencyPreference()
+                .then(function() {
+                    _syncDropdownValues();
+                    _fetchAll();
+                    _fetchIntraday();
+                });
+        } else {
+            // Already bound, just refresh data
+            _fetchAll();
+            _fetchIntraday();
         }
-        _fetchAll();
-        _fetchIntraday();
     };
+
+    // ===================================================================
+    // Load user's saved currency preference
+    // ===================================================================
+    function _loadUserCurrencyPreference() {
+        // Try localStorage first (set when user changes preference)
+        var savedCurrency = localStorage.getItem('defaultCurrency');
+        if (savedCurrency && (savedCurrency === 'USD' || savedCurrency === 'GBP')) {
+            _s.currency = savedCurrency;
+            return Promise.resolve(); // Return resolved promise for consistency
+        }
+
+        // Otherwise fetch from server and return the promise
+        return fetch('/api/user-preferences')
+            .then(function(res) {
+                if (res.ok) return res.json();
+                throw new Error('Failed to load preferences');
+            })
+            .then(function(data) {
+                if (data.default_currency) {
+                    _s.currency = data.default_currency;
+                    localStorage.setItem('defaultCurrency', data.default_currency);
+                }
+            })
+            .catch(function(err) {
+                console.warn('Could not load currency preference:', err);
+                // Still resolve to allow page to load with default USD
+            });
+    }
 
     // ===================================================================
     // Initialize intraday date to today
@@ -68,6 +107,11 @@
     // Sync dropdown values with state
     // ===================================================================
     function _syncDropdownValues() {
+        var currencyEl = document.getElementById('ertCurrencySelector');
+        if (currencyEl) {
+            currencyEl.value = _s.currency;
+        }
+
         var monthsEl = document.getElementById('ertMonthsSelector');
         if (monthsEl) {
             monthsEl.value = _s.months;
@@ -100,6 +144,13 @@
     function _bindControls() {
         // Period selector removed - always uses 'daily' (default in _s.period)
 
+        _on('ertCurrencySelector',   'change', function () {
+            _s.currency = this.value;
+            localStorage.setItem('defaultCurrency', this.value);
+            _cache = null; // Clear cache to force fresh fetch
+            _fetchAll();
+            _fetchIntraday(); // Also refresh intraday chart with new currency
+        });
         _on('ertMonthsSelector',     'change', function () { _s.months           = +this.value; _fetchAll(); });
         _on('ertForecastDays',       'change', function () { _s.forecastDays     = +this.value; _fetchAll(); });
         _on('ertForecastHistory',    'change', function () { _s.forecastHistory  = +this.value; _fetchAll(); });
@@ -132,6 +183,7 @@
         _show('ertContent',  false);
 
         var params = new URLSearchParams({
+            currency:          _s.currency,
             period:            _s.period,
             months:            _s.months,
             forecast_days:     _s.forecastDays,
@@ -153,6 +205,7 @@
                 _show('ertLoading', false);
                 _show('ertContent', true);
 
+                _updatePageSubtitle();
                 _renderTrend(data.trend || []);
                 _renderForecast(data.forecast);
                 _renderSources(data.source_comparison || {});
@@ -190,6 +243,13 @@
 
     function _destroy(key) {
         if (_charts[key]) { _charts[key].destroy(); _charts[key] = null; }
+    }
+
+    function _updatePageSubtitle() {
+        var subtitle = document.querySelector('.container-fluid.ert-container p.text-muted');
+        if (subtitle) {
+            subtitle.textContent = _s.currency + ' to රු - Past, Present & Forecast';
+        }
     }
 
     // ===================================================================
@@ -647,11 +707,12 @@
     function _fetchIntraday() {
         if (!_s.intradayDate) return;
 
-        console.log('[ERT Intraday] Fetching data for date:', _s.intradayDate, 'timezone:', _s.intradayTimezone);
+        console.log('[ERT Intraday] Fetching data for date:', _s.intradayDate, 'currency:', _s.currency, 'timezone:', _s.intradayTimezone);
 
         var params = new URLSearchParams({
             date: _s.intradayDate,
-            limit_runs: _s.intradayLimit
+            limit_runs: _s.intradayLimit,
+            currency: _s.currency
         });
 
         fetch('/api/exchange-rate/intraday-logs?' + params)

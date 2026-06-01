@@ -228,14 +228,15 @@ def register_user_routes(app, limiter, RATE_LIMIT_LOGIN, RATE_LIMIT_REGISTER, RA
         user_id = session['user_id']
 
         try:
-            cursor.execute("SELECT default_page FROM users WHERE id = %s", (user_id,))
+            cursor.execute("SELECT default_page, default_currency FROM users WHERE id = %s", (user_id,))
             user = cursor.fetchone()
 
             if not user:
                 return jsonify({'error': 'User not found'}), 404
 
             return jsonify({
-                'default_page': user.get('default_page', 'transactions')
+                'default_page': user.get('default_page', 'transactions'),
+                'default_currency': user.get('default_currency', 'USD')
             }), 200
 
         except Error as e:
@@ -254,13 +255,23 @@ def register_user_routes(app, limiter, RATE_LIMIT_LOGIN, RATE_LIMIT_REGISTER, RA
 
         data = request.get_json()
         default_page = data.get('default_page')
+        default_currency = data.get('default_currency')
 
-        # Validate default_page value
-        valid_pages = ['transactions', 'tax', 'reports', 'rateTrends']
-        if default_page not in valid_pages:
-            return jsonify({
-                'error': f'Invalid default_page. Must be one of: {", ".join(valid_pages)}'
-            }), 400
+        # Validate default_page value if provided
+        if default_page is not None:
+            valid_pages = ['transactions', 'tax', 'reports', 'rateTrends']
+            if default_page not in valid_pages:
+                return jsonify({
+                    'error': f'Invalid default_page. Must be one of: {", ".join(valid_pages)}'
+                }), 400
+
+        # Validate default_currency value if provided
+        if default_currency is not None:
+            valid_currencies = ['USD', 'GBP', 'EUR']
+            if default_currency not in valid_currencies:
+                return jsonify({
+                    'error': f'Invalid default_currency. Must be one of: {", ".join(valid_currencies)}'
+                }), 400
 
         connection = get_db_connection()
         if not connection:
@@ -270,17 +281,42 @@ def register_user_routes(app, limiter, RATE_LIMIT_LOGIN, RATE_LIMIT_REGISTER, RA
         user_id = session['user_id']
 
         try:
-            cursor.execute(
-                "UPDATE users SET default_page = %s WHERE id = %s",
-                (default_page, user_id)
-            )
+            # Build dynamic UPDATE query based on provided fields
+            update_fields = []
+            update_values = []
+
+            if default_page is not None:
+                update_fields.append("default_page = %s")
+                update_values.append(default_page)
+
+            if default_currency is not None:
+                update_fields.append("default_currency = %s")
+                update_values.append(default_currency)
+
+            if not update_fields:
+                return jsonify({'error': 'No valid fields to update'}), 400
+
+            update_values.append(user_id)
+            query = f"UPDATE users SET {', '.join(update_fields)} WHERE id = %s"
+
+            cursor.execute(query, tuple(update_values))
             connection.commit()
 
-            logger.info(f"User {session.get('username')} updated default_page to {default_page}")
-            return jsonify({
-                'message': 'Preferences updated successfully',
-                'default_page': default_page
-            }), 200
+            log_parts = []
+            if default_page is not None:
+                log_parts.append(f"default_page to {default_page}")
+            if default_currency is not None:
+                log_parts.append(f"default_currency to {default_currency}")
+
+            logger.info(f"User {session.get('username')} updated {', '.join(log_parts)}")
+
+            response_data = {'message': 'Preferences updated successfully'}
+            if default_page is not None:
+                response_data['default_page'] = default_page
+            if default_currency is not None:
+                response_data['default_currency'] = default_currency
+
+            return jsonify(response_data), 200
 
         except Error as e:
             return jsonify({'error': str(e)}), 500

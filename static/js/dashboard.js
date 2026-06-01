@@ -1345,25 +1345,45 @@ function setupWidgetsToggle() {
  */
 async function loadSidebarWidgets() {
     try {
-        const response = await fetch('/api/sidebar-summary');
+        // Get user's currency preference - check localStorage first, then fetch from API
+        let userCurrency = localStorage.getItem('defaultCurrency');
+
+        if (!userCurrency) {
+            // Fetch from API and cache in localStorage
+            try {
+                const prefsResponse = await fetch('/api/user-preferences');
+                if (prefsResponse.ok) {
+                    const prefsData = await prefsResponse.json();
+                    userCurrency = prefsData.default_currency || 'USD';
+                    localStorage.setItem('defaultCurrency', userCurrency);
+                } else {
+                    userCurrency = 'USD';
+                }
+            } catch (error) {
+                console.warn('Failed to fetch user preferences, defaulting to USD:', error);
+                userCurrency = 'USD';
+            }
+        }
+
+        const response = await fetch(`/api/sidebar-summary?currency=${userCurrency}`);
         if (!response.ok) {
             console.error('Failed to load sidebar widgets:', response.status);
             return;
         }
-        
+
         const data = await response.json();
         console.log('Sidebar widgets data:', data);
-        
+
         // Update balance widget
         const balanceElement = document.getElementById('widgetBalance');
         if (balanceElement && data.month_summary) {
             const balance = data.month_summary.balance || 0;
-            const balanceText = balance >= 0 ? 
+            const balanceText = balance >= 0 ?
                 `+LKR ${balance.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` :
                 `LKR ${balance.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
             balanceElement.textContent = balanceText;
         }
-        
+
         // Update exchange rate widget
         const rateElement = document.getElementById('widgetRate');
         const rateLabelElement = document.getElementById('widgetRateLabel');
@@ -1371,18 +1391,19 @@ async function loadSidebarWidgets() {
             const rate = data.exchange_rate.buy_rate || 0;
             const trend = data.exchange_rate.trend || '—';
             const bank = data.exchange_rate.bank || '';
-            
-            // Update label with bank name
+            const currency = data.exchange_rate.currency || userCurrency;
+
+            // Update label with currency and bank name
             if (rateLabelElement && bank) {
-                rateLabelElement.textContent = `USD→LKR (${bank})`;
+                rateLabelElement.textContent = `${currency}→LKR (${bank})`;
             }
-            
+
             // Update value with rate and trend
             rateElement.innerHTML = `${rate.toFixed(2)} <small style="margin-left:0.25rem;">${trend}</small>`;
         } else if (rateElement) {
             rateElement.textContent = '—';
             if (rateLabelElement) {
-                rateLabelElement.textContent = 'USD→LKR';
+                rateLabelElement.textContent = `${userCurrency}→LKR`;
             }
         }
         
