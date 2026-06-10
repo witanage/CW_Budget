@@ -1406,7 +1406,7 @@ async function loadSidebarWidgets() {
                 rateLabelElement.textContent = `${userCurrency}→LKR`;
             }
         }
-        
+
         // Update unpaid widget
         const unpaidElement = document.getElementById('widgetUnpaid');
         const unpaidTile = document.getElementById('widgetUnpaidTile');
@@ -1419,7 +1419,7 @@ async function loadSidebarWidgets() {
                 unpaidTile.style.display = 'none';
             }
         }
-        
+
         // Update monthly tax payment widget
         const taxElement = document.getElementById('widgetTax');
         const taxLabel = document.getElementById('widgetTaxLabel');
@@ -1428,19 +1428,19 @@ async function loadSidebarWidgets() {
             const quarterlyPayment = data.tax_summary.quarterly_payment || 0;
             const assessmentYear = data.tax_summary.assessment_year || '';
             const currentQuarter = data.tax_summary.current_quarter || 1;
-            
+
             // Update label with assessment year and quarter
             if (taxLabel && assessmentYear) {
                 taxLabel.textContent = `Tax Q${currentQuarter} (${assessmentYear})`;
             }
-            
+
             // Update value with quarterly payment
             taxElement.textContent = `LKR ${quarterlyPayment.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
             taxTile.style.display = 'flex';
         } else if (taxTile) {
             taxTile.style.display = 'none';
         }
-        
+
     } catch (error) {
         console.error('Error loading sidebar widgets:', error);
     }
@@ -1516,10 +1516,10 @@ function loadTransactions(applyActiveFilters = false) {
             allTransactions = data; // Store all transactions globally
             displayTransactions(data); // Display transactions directly
             hideLoading();
-            
+
             // Update sidebar widgets
             loadSidebarWidgets();
-            
+
             // Update filter stats badges
             if (typeof updateFilterStatsBadges === 'function') {
                 updateFilterStatsBadges();
@@ -2081,14 +2081,14 @@ async function saveTransaction() {
         if (paidAtPaidRadio && paidAtPaidRadio.checked) {
             // Mark as paid
             data.is_paid = true;
-            
+
             // Check if payment method or payment status changed
-            const paymentMethodChanged = isEdit && editingTransaction && 
+            const paymentMethodChanged = isEdit && editingTransaction &&
                 (editingTransaction.payment_method_id != data.payment_method_id);
-            const paymentStatusChanged = isEdit && editingTransaction && 
+            const paymentStatusChanged = isEdit && editingTransaction &&
                 (editingTransaction.is_paid !== true);
-            
-            if (isEdit && editingTransaction && editingTransaction.paid_at && 
+
+            if (isEdit && editingTransaction && editingTransaction.paid_at &&
                 !paymentMethodChanged && !paymentStatusChanged) {
                 // Editing: payment method and status unchanged, preserve existing paid_at
                 data.paid_at = editingTransaction.paid_at;
@@ -3624,7 +3624,7 @@ function displayRecentFilters() {
                 ${desc.length > 0 ? desc.join(', ') : 'Filter'} (${timeStr})
             </span>`;
     }).join('');
-    
+
     container.innerHTML = badgesHTML;
 }
 
@@ -3646,7 +3646,7 @@ function displaySavedPresets() {
                 <button class="btn-close btn-close-white" onclick="event.stopPropagation(); deletePreset(${index})"></button>
             </span>`;
     }).join('');
-    
+
     container.innerHTML = badgesHTML;
 }
 
@@ -5480,6 +5480,34 @@ function markTransactionAsUnpaid(transactionId) {
 const monthNames = ['April', 'May', 'June', 'July', 'August', 'September',
                    'October', 'November', 'December', 'January', 'February', 'March'];
 
+// Currency tracking and constants
+// Track salary currency for each month (0-11)
+let salaryCurrencies = {
+    0: 'USD', 1: 'USD', 2: 'USD', 3: 'USD',
+    4: 'USD', 5: 'USD', 6: 'USD', 7: 'USD',
+    8: 'USD', 9: 'USD', 10: 'USD', 11: 'USD'
+};
+
+// Track month data including salary and extras with currencies
+let monthDataStore = {};
+
+// Currency symbols for display
+const CURRENCY_SYMBOLS = {
+    'USD': '$',
+    'GBP': '£',
+    'EUR': '€'
+};
+
+// Currency full names
+const CURRENCY_NAMES = {
+    'USD': 'US Dollar',
+    'GBP': 'British Pound',
+    'EUR': 'Euro'
+};
+
+// Store current month index being edited in modal
+let currentModalMonthIndex = null;
+
 // Store last calculation data for saving
 let lastCalculationData = null;
 
@@ -5542,16 +5570,16 @@ function loadTaxCalculator() {
     if (startMonthSelect) {
         startMonthSelect.addEventListener('change', populateMonthlyDataTable);
     }
-    
+
     // Sync calculation name fields
     const calculationNameInput = document.getElementById('calculationNameInput');
     const calculationName = document.getElementById('calculationName');
-    
+
     if (calculationNameInput && calculationName) {
         calculationNameInput.addEventListener('input', function() {
             calculationName.value = this.value;
         });
-        
+
         calculationName.addEventListener('input', function() {
             calculationNameInput.value = this.value;
         });
@@ -5559,6 +5587,9 @@ function loadTaxCalculator() {
 
     // Initial table population
     populateMonthlyDataTable();
+
+    // Initialize modal event listeners
+    initializeModalEventListeners();
 
     // Load all saved calculations on page load
     loadSavedCalculations();
@@ -5627,95 +5658,42 @@ function populateMonthlyDataTable() {
     if (!tbody) return;
 
     const startMonthIndex = parseInt(document.getElementById('startMonth').value) || 0;
-    const defaultSalaryRate = 0;
-    const defaultSalary = 0;
 
     let html = '';
     for (let i = 0; i < 12; i++) {
         const monthIndex = (startMonthIndex + i) % 12;
         const monthName = monthNames[monthIndex];
-        const collapseId = `month-${monthIndex}-collapse`;
+
+        // Get stored data for this month
+        const monthData = monthDataStore[monthIndex] || {};
+        const salary = monthData.salary || 0;
+        const salaryCurrency = monthData.salaryCurrency || 'USD';
+        const salaryRate = monthData.salaryRate || 0;
+        const extras = monthData.extras || [];
+
+        // Calculate summary
+        let summaryText = '';
+        if (salary > 0) {
+            const currencySymbol = CURRENCY_SYMBOLS[salaryCurrency];
+            summaryText = `Salary: ${currencySymbol}${salary.toFixed(2)}`;
+            if (extras.length > 0) {
+                summaryText += ` + ${extras.length} extra${extras.length > 1 ? 'es' : ''}`;
+            }
+        } else if (extras.length > 0) {
+            summaryText = `${extras.length} extra${extras.length > 1 ? 'es' : ''}`;
+        } else {
+            summaryText = 'No data';
+        }
 
         html += `
-            <tr class="month-header-row" data-bs-toggle="collapse" data-bs-target="#${collapseId}" role="button">
-                <td colspan="5" class="month-header">
-                    <i class="fas fa-chevron-right me-2 month-chevron"></i>
-                    <strong>${monthName}</strong>
-                    <span class="opacity-75 ms-2 month-summary" id="summary-${monthIndex}"></span>
-                </td>
-            </tr>
-            <tr class="collapse month-detail-row" id="${collapseId}">
-                <td colspan="5" class="p-0">
-                    <div class="month-detail-content">
-                        <div class="p-3">
-                            <div class="row g-3">
-                                <!-- Salary Section Card -->
-                                <div class="col-md-6">
-                                    <div class="card">
-                                        <div class="card-body">
-                                            <h6 class="card-subtitle mb-3">Monthly Salary</h6>
-                                            <div class="input-group input-group-sm">
-                                                <span class="input-group-text">$</span>
-                                                <input type="number" class="form-control month-salary"
-                                                       data-month="${monthIndex}"
-                                                       placeholder="6000"
-                                                       value="${defaultSalary}"
-                                                       step="100"
-                                                       min="0">
-                                                <span class="input-group-text">USD</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Exchange Rate Section Card -->
-                                <div class="col-md-6">
-                                    <div class="card">
-                                        <div class="card-body">
-                                            <h6 class="card-subtitle mb-3">Exchange Rate</h6>
-                                            <div class="input-group input-group-sm mb-2">
-                                                <input type="number" class="form-control month-salary-rate"
-                                                       data-month="${monthIndex}"
-                                                       placeholder="299"
-                                                       value="${defaultSalaryRate}"
-                                                       step="0.01"
-                                                       min="0">
-                                                <span class="input-group-text">රු</span>
-                                            </div>
-                                            <div class="input-group input-group-sm mb-2">
-                                                <input type="date" class="form-control month-salary-rate-date"
-                                                       data-month="${monthIndex}"
-                                                       placeholder="Select date">
-                                                <button type="button" class="btn btn-sm btn-outline-secondary fetch-salary-rate-btn"
-                                                        data-month="${monthIndex}"
-                                                        title="Auto-fetch rate from database">
-                                                    <i class="fas fa-sync-alt"></i>
-                                                </button>
-                                            </div>
-                                            <small class="d-block" style="opacity: 0.65;">Select date to auto-fetch rate</small>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Bonuses Section -->
-                            <div class="mt-3">
-                                <div class="card">
-                                    <div class="card-body">
-                                        <div class="d-flex justify-content-between align-items-center mb-3">
-                                            <h6 class="card-subtitle mb-0">Bonuses</h6>
-                                            <button type="button" class="btn btn-sm btn-outline-primary add-bonus-btn"
-                                                    data-month="${monthIndex}">
-                                                <i class="fas fa-plus me-1"></i>Add Bonus
-                                            </button>
-                                        </div>
-                                        <div class="bonuses-container" data-month="${monthIndex}">
-                                            <!-- Bonuses will be added dynamically here -->
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+            <tr class="month-row" data-month="${monthIndex}" style="cursor: pointer;">
+                <td>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="fas fa-edit me-2 text-primary"></i>
+                            <strong>${monthName}</strong>
                         </div>
+                        <small class="text-muted">${summaryText}</small>
                     </div>
                 </td>
             </tr>
@@ -5724,43 +5702,357 @@ function populateMonthlyDataTable() {
 
     tbody.innerHTML = html;
 
-    // Add event listeners to rotate chevron icons
-    document.querySelectorAll('.month-header-row').forEach(row => {
+    // Add click event listeners to open modal
+    document.querySelectorAll('.month-row').forEach(row => {
         row.addEventListener('click', function() {
-            const chevron = this.querySelector('.month-chevron');
-            chevron.classList.toggle('fa-chevron-right');
-            chevron.classList.toggle('fa-chevron-down');
-        });
-    });
-
-    // Add event listeners for "Add Bonus" buttons
-    document.querySelectorAll('.add-bonus-btn').forEach(btn => {
-        btn.addEventListener('click', function(e) {
-            e.stopPropagation(); // Prevent collapse toggle
             const monthIndex = parseInt(this.getAttribute('data-month'));
-            addBonusEntry(monthIndex);
-        });
-    });
-
-    // Add event listeners for "Fetch Salary Rate" buttons
-    document.querySelectorAll('.fetch-salary-rate-btn').forEach(btn => {
-        btn.addEventListener('click', function(e) {
-            e.stopPropagation(); // Prevent collapse toggle
-            const monthIndex = parseInt(this.getAttribute('data-month'));
-            fetchExchangeRateForSalary(monthIndex);
+            openMonthEntryModal(monthIndex);
         });
     });
 }
 
-// Helper function to add a bonus entry
-function addBonusEntry(monthIndex, bonusAmount = 0, bonusRate = 299, bonusDate = '') {
-    const container = document.querySelector(`.bonuses-container[data-month="${monthIndex}"]`);
+// Open month entry modal
+function openMonthEntryModal(monthIndex) {
+    currentModalMonthIndex = monthIndex;
+    const monthName = monthNames[monthIndex];
+
+    // Set modal title
+    document.getElementById('modalMonthName').textContent = monthName;
+
+    // Get existing month data
+    const monthData = monthDataStore[monthIndex] || {};
+
+    // Populate salary section
+    const salaryCurrency = monthData.salaryCurrency || 'USD';
+    document.getElementById('modalSalaryCurrency').value = salaryCurrency;
+    document.getElementById('modalSalaryCurrencySymbol').textContent = CURRENCY_SYMBOLS[salaryCurrency];
+    document.getElementById('modalSalaryAmount').value = monthData.salary || '';
+    document.getElementById('modalSalaryRate').value = monthData.salaryRate || '';
+    document.getElementById('modalSalaryRateDate').value = monthData.salaryRateDate || '';
+
+    // Populate extras section
+    populateModalExtras(monthData.extras || []);
+
+    // Show the modal
+    const modal = new bootstrap.Modal(document.getElementById('taxMonthEntryModal'));
+    modal.show();
+}
+
+// Populate extras in modal
+function populateModalExtras(extras) {
+    const container = document.getElementById('modalExtrasContainer');
+
+    let html = '';
+
+    // Always include the "no extras" message
+    const noExtrasMsgDisplay = extras.length === 0 ? 'block' : 'none';
+    html += `
+        <div class="text-center text-muted py-3" id="modalNoExtrasMessage" style="display: ${noExtrasMsgDisplay};">
+            <i class="fas fa-info-circle me-2"></i>No extras added yet. Click "Add Extra" to get started.
+        </div>
+    `;
+
+    // Add extra cards
+    extras.forEach((extra, index) => {
+        const extraId = `modal-extra-${index}`;
+        const currency = extra.currency || 'USD';
+        const currencySymbol = CURRENCY_SYMBOLS[currency];
+
+        html += `
+            <div class="card mb-3" data-extra-index="${index}">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="mb-0"><i class="fas fa-gift me-2"></i>Extra #${index + 1}</h6>
+                        <button type="button" class="btn btn-sm btn-outline-danger modal-remove-extra-btn" data-extra-index="${index}">
+                            <i class="fas fa-trash"></i> Remove
+                        </button>
+                    </div>
+                    <div class="row g-3">
+                        <!-- Currency Selector -->
+                        <div class="col-md-3">
+                            <label class="form-label small">Currency</label>
+                            <select class="form-select form-select-sm modal-extra-currency" data-extra-index="${index}">
+                                <option value="USD" ${currency === 'USD' ? 'selected' : ''}>💵 USD</option>
+                                <option value="GBP" ${currency === 'GBP' ? 'selected' : ''}>💷 GBP</option>
+                                <option value="EUR" ${currency === 'EUR' ? 'selected' : ''}>💶 EUR</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Amount -->
+                        <div class="col-md-3">
+                            <label class="form-label small">Amount</label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text modal-extra-currency-symbol" data-extra-index="${index}">${currencySymbol}</span>
+                                <input type="number" class="form-control modal-extra-amount" data-extra-index="${index}"
+                                       placeholder="0" step="100" min="0" value="${extra.amount || ''}">
+                            </div>
+                        </div>
+                        
+                        <!-- Exchange Rate -->
+                        <div class="col-md-3">
+                            <label class="form-label small">Exchange Rate</label>
+                            <div class="input-group input-group-sm">
+                                <input type="number" class="form-control modal-extra-rate" data-extra-index="${index}"
+                                       placeholder="299" step="0.01" min="0" value="${extra.rate || ''}">
+                                <span class="input-group-text">LKR</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Rate Date with Fetch -->
+                        <div class="col-md-3">
+                            <label class="form-label small">Rate Date</label>
+                            <div class="input-group input-group-sm">
+                                <input type="date" class="form-control modal-extra-rate-date" data-extra-index="${index}"
+                                       value="${extra.rateDate || ''}">
+                                <button type="button" class="btn btn-outline-secondary modal-fetch-extra-rate-btn" 
+                                        data-extra-index="${index}" title="Auto-fetch rate">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+
+    // Add event listeners for extra currency changes
+    document.querySelectorAll('.modal-extra-currency').forEach(select => {
+        select.addEventListener('change', function() {
+            const extraIndex = this.getAttribute('data-extra-index');
+            const currency = this.value;
+            const symbolSpan = document.querySelector(`.modal-extra-currency-symbol[data-extra-index="${extraIndex}"]`);
+            if (symbolSpan) {
+                symbolSpan.textContent = CURRENCY_SYMBOLS[currency];
+            }
+        });
+    });
+
+    // Add event listeners for remove extra buttons
+    document.querySelectorAll('.modal-remove-extra-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const extraIndex = parseInt(this.getAttribute('data-extra-index'));
+            removeModalExtra(extraIndex);
+        });
+    });
+
+    // Add event listeners for fetch rate buttons
+    document.querySelectorAll('.modal-fetch-extra-rate-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const extraIndex = parseInt(this.getAttribute('data-extra-index'));
+            fetchModalExtraRate(extraIndex);
+        });
+    });
+}
+
+// Add a new extra in the modal
+function addModalExtra() {
+    const monthData = monthDataStore[currentModalMonthIndex] || {};
+    const extras = monthData.extras || [];
+
+    // Add empty extra
+    extras.push({
+        currency: 'USD',
+        amount: 0,
+        rate: 0,
+        rateDate: ''
+    });
+
+    // Update store
+    monthDataStore[currentModalMonthIndex] = {
+        ...monthData,
+        extras: extras
+    };
+
+    // Repopulate extras display
+    populateModalExtras(extras);
+}
+
+// Remove a extra from the modal
+function removeModalExtra(extraIndex) {
+    const monthData = monthDataStore[currentModalMonthIndex] || {};
+    const extras = monthData.extras || [];
+
+    // Remove the extra
+    extras.splice(extraIndex, 1);
+
+    // Update store
+    monthDataStore[currentModalMonthIndex] = {
+        ...monthData,
+        extras: extras
+    };
+
+    // Repopulate extras display
+    populateModalExtras(extras);
+}
+
+// Save month data from modal
+function saveModalMonthData() {
+    if (currentModalMonthIndex === null) return;
+
+    // Get salary data
+    const salaryCurrency = document.getElementById('modalSalaryCurrency').value;
+    const salaryAmount = parseFloat(document.getElementById('modalSalaryAmount').value) || 0;
+    const salaryRate = parseFloat(document.getElementById('modalSalaryRate').value) || 0;
+    const salaryRateDate = document.getElementById('modalSalaryRateDate').value || '';
+
+    // Get extras data
+    const extras = [];
+    document.querySelectorAll('#modalExtrasContainer .card[data-extra-index]').forEach(card => {
+        const extraIndex = card.getAttribute('data-extra-index');
+        const currency = document.querySelector(`.modal-extra-currency[data-extra-index="${extraIndex}"]`).value;
+        const amount = parseFloat(document.querySelector(`.modal-extra-amount[data-extra-index="${extraIndex}"]`).value) || 0;
+        const rate = parseFloat(document.querySelector(`.modal-extra-rate[data-extra-index="${extraIndex}"]`).value) || 0;
+        const rateDate = document.querySelector(`.modal-extra-rate-date[data-extra-index="${extraIndex}"]`).value || '';
+
+        extras.push({
+            currency: currency,
+            amount: amount,
+            rate: rate,
+            rateDate: rateDate
+        });
+    });
+
+    // Save to store
+    monthDataStore[currentModalMonthIndex] = {
+        salary: salaryAmount,
+        salaryCurrency: salaryCurrency,
+        salaryRate: salaryRate,
+        salaryRateDate: salaryRateDate,
+        extras: extras
+    };
+
+    // Update salaryCurrencies for backward compatibility
+    salaryCurrencies[currentModalMonthIndex] = salaryCurrency;
+
+    // Close modal
+    const modalElement = document.getElementById('taxMonthEntryModal');
+    const modal = bootstrap.Modal.getInstance(modalElement);
+    if (modal) {
+        modal.hide();
+    }
+
+    // Refresh the table display
+    populateMonthlyDataTable();
+
+    showToast('Month data saved successfully', 'success');
+}
+
+// Fetch exchange rate for salary in modal
+async function fetchModalSalaryRate() {
+    const dateInput = document.getElementById('modalSalaryRateDate');
+    const rateInput = document.getElementById('modalSalaryRate');
+    const fetchBtn = document.getElementById('modalFetchSalaryRate');
+    const currency = document.getElementById('modalSalaryCurrency').value;
+
+    const date = dateInput.value;
+    if (!date) {
+        showToast('Please select a date first', 'warning');
+        return;
+    }
+
+    // Disable button and show loading state
+    const originalHtml = fetchBtn.innerHTML;
+    fetchBtn.disabled = true;
+    fetchBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+    try {
+        const response = await fetch(`/api/exchange-rate?date=${date}&currency=${currency}`);
+        const data = await response.json();
+
+        if (response.ok) {
+            rateInput.value = data.buy_rate.toFixed(2);
+            let message = `${currency} rate updated: ${data.buy_rate.toFixed(2)} LKR`;
+            if (data.note) {
+                message += ` (${data.note})`;
+            }
+            showToast(message, 'success');
+        } else {
+            showToast(data.error || `Failed to fetch ${currency} exchange rate`, 'error');
+        }
+    } catch (error) {
+        console.error('Error fetching exchange rate:', error);
+        showToast('Network error: Unable to fetch exchange rate', 'error');
+    } finally {
+        fetchBtn.disabled = false;
+        fetchBtn.innerHTML = originalHtml;
+    }
+}
+
+// Fetch exchange rate for extra in modal
+async function fetchModalExtraRate(extraIndex) {
+    const dateInput = document.querySelector(`.modal-extra-rate-date[data-extra-index="${extraIndex}"]`);
+    const rateInput = document.querySelector(`.modal-extra-rate[data-extra-index="${extraIndex}"]`);
+    const fetchBtn = document.querySelector(`.modal-fetch-extra-rate-btn[data-extra-index="${extraIndex}"]`);
+    const currencySelect = document.querySelector(`.modal-extra-currency[data-extra-index="${extraIndex}"]`);
+    const currency = currencySelect.value;
+
+    const date = dateInput.value;
+    if (!date) {
+        showToast('Please select a date first', 'warning');
+        return;
+    }
+
+    // Disable button and show loading state
+    const originalHtml = fetchBtn.innerHTML;
+    fetchBtn.disabled = true;
+    fetchBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+    try {
+        const response = await fetch(`/api/exchange-rate?date=${date}&currency=${currency}`);
+        const data = await response.json();
+
+        if (response.ok) {
+            rateInput.value = data.buy_rate.toFixed(2);
+            let message = `${currency} rate updated: ${data.buy_rate.toFixed(2)} LKR`;
+            if (data.note) {
+                message += ` (${data.note})`;
+            }
+            showToast(message, 'success');
+        } else {
+            showToast(data.error || `Failed to fetch ${currency} exchange rate`, 'error');
+        }
+    } catch (error) {
+        console.error('Error fetching exchange rate:', error);
+        showToast('Network error: Unable to fetch exchange rate', 'error');
+    } finally {
+        fetchBtn.disabled = false;
+        fetchBtn.innerHTML = originalHtml;
+    }
+}
+
+// Initialize modal event listeners
+function initializeModalEventListeners() {
+    // Salary currency change
+    document.getElementById('modalSalaryCurrency')?.addEventListener('change', function() {
+        const currency = this.value;
+        document.getElementById('modalSalaryCurrencySymbol').textContent = CURRENCY_SYMBOLS[currency];
+        // Clear rate when currency changes
+        document.getElementById('modalSalaryRate').value = '';
+        document.getElementById('modalSalaryRateDate').value = '';
+    });
+
+    // Add extra button
+    document.getElementById('modalAddExtraBtn')?.addEventListener('click', addModalExtra);
+
+    // Save month button
+    document.getElementById('modalSaveMonthBtn')?.addEventListener('click', saveModalMonthData);
+
+    // Fetch salary rate button
+    document.getElementById('modalFetchSalaryRate')?.addEventListener('click', fetchModalSalaryRate);
+}
+
+// Helper function to add a extra entry (OLD - will be replaced by modal)
+function addExtraEntry(monthIndex, extraAmount = 0, extraRate = 299, extraDate = '') {
+    const container = document.querySelector(`.extras-container[data-month="${monthIndex}"]`);
     if (!container) return;
 
-    const bonusId = `bonus-${monthIndex}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const extraId = `extra-${monthIndex}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-    const bonusHtml = `
-        <div class="bonus-entry mb-3" data-bonus-id="${bonusId}">
+    const extraHtml = `
+        <div class="extra-entry mb-3" data-extra-id="${extraId}">
             <div class="card">
                 <div class="card-body">
                     <div class="row g-3 align-items-start">
@@ -5768,10 +6060,10 @@ function addBonusEntry(monthIndex, bonusAmount = 0, bonusRate = 299, bonusDate =
                             <label class="form-label small mb-2" style="opacity: 0.65;">Amount</label>
                             <div class="input-group input-group-sm">
                                 <span class="input-group-text">$</span>
-                                <input type="number" class="form-control month-bonus"
+                                <input type="number" class="form-control month-extra"
                                        data-month="${monthIndex}"
                                        placeholder="0"
-                                       value="${bonusAmount}"
+                                       value="${extraAmount}"
                                        step="100"
                                        min="0">
                                 <span class="input-group-text">USD</span>
@@ -5780,32 +6072,32 @@ function addBonusEntry(monthIndex, bonusAmount = 0, bonusRate = 299, bonusDate =
                         <div class="col-md-6">
                             <label class="form-label small mb-2" style="opacity: 0.65;">Exchange Rate</label>
                             <div class="input-group input-group-sm mb-2">
-                                <input type="number" class="form-control month-bonus-rate"
+                                <input type="number" class="form-control month-extra-rate"
                                        data-month="${monthIndex}"
                                        placeholder="299"
-                                       value="${bonusRate}"
+                                       value="${extraRate}"
                                        step="0.01"
                                        min="0">
                                 <span class="input-group-text">LKR</span>
                             </div>
                             <div class="input-group input-group-sm">
-                                <input type="date" class="form-control month-bonus-rate-date"
+                                <input type="date" class="form-control month-extra-rate-date"
                                        data-month="${monthIndex}"
-                                       data-bonus-id="${bonusId}"
+                                       data-extra-id="${extraId}"
                                        placeholder="Select date"
-                                       value="${bonusDate}">
-                                <button type="button" class="btn btn-sm btn-outline-secondary fetch-bonus-rate-btn"
+                                       value="${extraDate}">
+                                <button type="button" class="btn btn-sm btn-outline-secondary fetch-extra-rate-btn"
                                         data-month="${monthIndex}"
-                                        data-bonus-id="${bonusId}"
+                                        data-extra-id="${extraId}"
                                         title="Auto-fetch rate from database">
                                     <i class="fas fa-sync-alt"></i>
                                 </button>
                             </div>
                         </div>
                         <div class="col-md-2 d-flex align-items-start" style="padding-top: 1.9rem;">
-                            <button type="button" class="btn btn-sm btn-outline-danger remove-bonus-btn w-100"
-                                    data-bonus-id="${bonusId}"
-                                    title="Remove bonus">
+                            <button type="button" class="btn btn-sm btn-outline-danger remove-extra-btn w-100"
+                                    data-extra-id="${extraId}"
+                                    title="Remove extra">
                                 <i class="fas fa-trash"></i>
                             </button>
                         </div>
@@ -5815,24 +6107,67 @@ function addBonusEntry(monthIndex, bonusAmount = 0, bonusRate = 299, bonusDate =
         </div>
     `;
 
-    container.insertAdjacentHTML('beforeend', bonusHtml);
+    container.insertAdjacentHTML('beforeend', extraHtml);
 
     // Add event listener for remove button
-    const removeBtn = container.querySelector(`[data-bonus-id="${bonusId}"] .remove-bonus-btn`);
+    const removeBtn = container.querySelector(`[data-extra-id="${extraId}"] .remove-extra-btn`);
     removeBtn.addEventListener('click', function(e) {
         e.stopPropagation(); // Prevent collapse toggle
-        const bonusEntry = this.closest('.bonus-entry');
-        bonusEntry.remove();
+        const extraEntry = this.closest('.extra-entry');
+        extraEntry.remove();
     });
 
-    // Add event listener for fetch bonus rate button
-    const fetchBtn = container.querySelector(`[data-bonus-id="${bonusId}"] .fetch-bonus-rate-btn`);
+    // Add event listener for fetch extra rate button
+    const fetchBtn = container.querySelector(`[data-extra-id="${extraId}"] .fetch-extra-rate-btn`);
     fetchBtn.addEventListener('click', function(e) {
         e.stopPropagation(); // Prevent collapse toggle
         const monthIndex = parseInt(this.getAttribute('data-month'));
-        const bonusId = this.getAttribute('data-bonus-id');
-        fetchExchangeRateForBonus(monthIndex, bonusId);
+        const extraId = this.getAttribute('data-extra-id');
+        fetchExchangeRateForExtra(monthIndex, extraId);
     });
+}
+
+function handleMonthCurrencyChange(event) {
+    const monthIndex = parseInt(event.target.getAttribute('data-month'));
+    const currency = event.target.value;
+
+    // Update state
+    monthCurrencies[monthIndex] = currency;
+
+    const currencySymbol = CURRENCY_SYMBOLS[currency];
+    const currencyName = CURRENCY_NAMES[currency];
+
+    // Update currency symbol in salary input
+    const symbolSpan = document.querySelector(`.month-currency-symbol[data-month="${monthIndex}"]`);
+    if (symbolSpan) {
+        symbolSpan.textContent = currencySymbol;
+    }
+
+    // Update currency code in salary input
+    const codeSpan = document.querySelector(`.month-currency-code[data-month="${monthIndex}"]`);
+    if (codeSpan) {
+        codeSpan.textContent = currency;
+    }
+
+    // Clear the exchange rate and date fields when currency changes
+    // This prevents showing the wrong currency's rate
+    const rateInput = document.querySelector(`.month-salary-rate[data-month="${monthIndex}"]`);
+    const dateInput = document.querySelector(`.month-salary-rate-date[data-month="${monthIndex}"]`);
+    if (rateInput) {
+        rateInput.value = '';
+    }
+    if (dateInput) {
+        dateInput.value = '';
+    }
+
+    // Also clear all extra rates for this month
+    const extraRateInputs = document.querySelectorAll(`.month-extra-rate[data-month="${monthIndex}"]`);
+    const extraDateInputs = document.querySelectorAll(`.month-extra-rate-date[data-month="${monthIndex}"]`);
+    extraRateInputs.forEach(input => input.value = '');
+    extraDateInputs.forEach(input => input.value = '');
+
+    console.log(`Month ${monthIndex} (${monthNames[monthIndex]}) currency changed to ${currency}`);
+    showToast(`Currency changed to ${currencyName}. Please fetch new exchange rates.`, 'info');
 }
 
 // Function to fetch exchange rate for salary
@@ -5847,26 +6182,29 @@ async function fetchExchangeRateForSalary(monthIndex) {
         return;
     }
 
+    // Get the currency for this specific month
+    const currency = monthCurrencies[monthIndex] || 'USD';
+
     // Disable button and show loading state
     const originalHtml = fetchBtn.innerHTML;
     fetchBtn.disabled = true;
     fetchBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
     try {
-        const response = await fetch(`/api/exchange-rate?date=${date}`);
+        const response = await fetch(`/api/exchange-rate?date=${date}&currency=${currency}`);
         const data = await response.json();
 
         if (response.ok) {
             // Use the buy rate as the default rate
             rateInput.value = data.buy_rate.toFixed(2);
 
-            let message = `Rate updated: ${data.buy_rate.toFixed(2)} LKR`;
+            let message = `${currency} rate updated: ${data.buy_rate.toFixed(2)} LKR`;
             if (data.note) {
                 message += ` (${data.note})`;
             }
             showToast(message, 'success');
         } else {
-            showToast(data.error || 'Failed to fetch exchange rate', 'error');
+            showToast(data.error || `Failed to fetch ${currency} exchange rate`, 'error');
         }
     } catch (error) {
         console.error('Error fetching exchange rate:', error);
@@ -5878,11 +6216,11 @@ async function fetchExchangeRateForSalary(monthIndex) {
     }
 }
 
-// Function to fetch exchange rate for bonus
-async function fetchExchangeRateForBonus(monthIndex, bonusId) {
-    const dateInput = document.querySelector(`.month-bonus-rate-date[data-bonus-id="${bonusId}"]`);
-    const rateInput = document.querySelector(`[data-bonus-id="${bonusId}"] .month-bonus-rate`);
-    const fetchBtn = document.querySelector(`.fetch-bonus-rate-btn[data-bonus-id="${bonusId}"]`);
+// Function to fetch exchange rate for extra
+async function fetchExchangeRateForExtra(monthIndex, extraId) {
+    const dateInput = document.querySelector(`.month-extra-rate-date[data-extra-id="${extraId}"]`);
+    const rateInput = document.querySelector(`[data-extra-id="${extraId}"] .month-extra-rate`);
+    const fetchBtn = document.querySelector(`.fetch-extra-rate-btn[data-extra-id="${extraId}"]`);
 
     const date = dateInput.value;
     if (!date) {
@@ -5890,20 +6228,23 @@ async function fetchExchangeRateForBonus(monthIndex, bonusId) {
         return;
     }
 
+    // Get the currency for this specific month
+    const currency = monthCurrencies[monthIndex] || 'USD';
+
     // Disable button and show loading state
     const originalHtml = fetchBtn.innerHTML;
     fetchBtn.disabled = true;
     fetchBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
     try {
-        const response = await fetch(`/api/exchange-rate?date=${date}`);
+        const response = await fetch(`/api/exchange-rate?date=${date}&currency=${currency}`);
         const data = await response.json();
 
         if (response.ok) {
             // Use the buy rate as the default rate
             rateInput.value = data.buy_rate.toFixed(2);
 
-            let message = `Rate updated: ${data.buy_rate.toFixed(2)} LKR`;
+            let message = `${currency} rate updated: ${data.buy_rate.toFixed(2)} LKR`;
             if (data.note) {
                 message += ` (${data.note})`;
             }
@@ -5926,70 +6267,60 @@ function calculateMonthlyTax() {
     const currentAssessmentYear = document.getElementById('assessmentYear').value;
     console.log('=== CALCULATE TAX STARTED ===');
     console.log('Assessment year dropdown value:', currentAssessmentYear);
-    
+
     // Get form values
     const taxFreeThreshold = parseFloat(document.getElementById('taxFreeThreshold').value) || 1800000;
     const startMonthIndex = parseInt(document.getElementById('startMonth').value) || 0;
 
-    // Read monthly salary and their exchange rates from table
-    const salaryInputs = document.querySelectorAll('.month-salary');
-    const salaryRateInputs = document.querySelectorAll('.month-salary-rate');
-    const salaryRateDateInputs = document.querySelectorAll('.month-salary-rate-date');
-
+    // Read monthly data from monthDataStore
     const monthlySalaries = {};
     const monthlySalaryRates = {};
     const monthlySalaryRateDates = {};
-    const monthlyBonusesData = {}; // Will store array of {amount, rate, date} for each month
+    const monthlySalaryCurrencies = {};
+    const monthlyExtrasData = {};
 
-    salaryInputs.forEach(input => {
-        const monthIndex = parseInt(input.getAttribute('data-month'));
-        monthlySalaries[monthIndex] = parseFloat(input.value) || 0;
-    });
+    // Process each month from store
+    for (let i = 0; i < 12; i++) {
+        const monthData = monthDataStore[i] || {};
 
-    salaryRateInputs.forEach(input => {
-        const monthIndex = parseInt(input.getAttribute('data-month'));
-        monthlySalaryRates[monthIndex] = parseFloat(input.value) || 0;
-    });
+        monthlySalaries[i] = monthData.salary || 0;
+        monthlySalaryRates[i] = monthData.salaryRate || 0;
+        monthlySalaryRateDates[i] = monthData.salaryRateDate || null;
+        monthlySalaryCurrencies[i] = monthData.salaryCurrency || 'USD';
 
-    salaryRateDateInputs.forEach(input => {
-        const monthIndex = parseInt(input.getAttribute('data-month'));
-        const dateValue = input.value || null;
-        monthlySalaryRateDates[monthIndex] = dateValue;
-        if (dateValue) {
-            console.log(`Collecting date for month ${monthIndex}: ${dateValue}`);
+        if (monthlySalaryRateDates[i]) {
+            console.log(`Collecting date for month ${i}: ${monthlySalaryRateDates[i]}`);
         }
-    });
 
-    // Collect all bonuses for each month
-    const bonusContainers = document.querySelectorAll('.bonuses-container');
-    bonusContainers.forEach(container => {
-        const monthIndex = parseInt(container.getAttribute('data-month'));
-        const bonusEntries = container.querySelectorAll('.bonus-entry');
+        // Process extras
+        monthlyExtrasData[i] = [];
+        if (monthData.extras && monthData.extras.length > 0) {
+            monthData.extras.forEach(extra => {
+                if (extra.amount > 0) {
+                    monthlyExtrasData[i].push({
+                        amount: extra.amount,
+                        rate: extra.rate,
+                        date: extra.rateDate || null,
+                        currency: extra.currency || 'USD'
+                    });
+                }
+            });
+        }
+    }
 
-        monthlyBonusesData[monthIndex] = [];
-        bonusEntries.forEach(entry => {
-            const bonusInput = entry.querySelector('.month-bonus');
-            const bonusRateInput = entry.querySelector('.month-bonus-rate');
-            const bonusRateDateInput = entry.querySelector('.month-bonus-rate-date');
-
-            const amount = parseFloat(bonusInput.value) || 0;
-            const rate = parseFloat(bonusRateInput.value) || 0;
-            const date = bonusRateDateInput ? (bonusRateDateInput.value || null) : null;
-
-            if (amount > 0) {
-                monthlyBonusesData[monthIndex].push({ amount, rate, date });
-            }
-        });
-    });
-
-    // Validate that all months have valid salary exchange rates
+    // Validate that all months with salary have valid exchange rates
     let hasInvalidRates = false;
-    Object.values(monthlySalaryRates).forEach(rate => {
-        if (rate <= 0) hasInvalidRates = true;
-    });
+    for (let i = 0; i < 12; i++) {
+        const salary = monthlySalaries[i] || 0;
+        const rate = monthlySalaryRates[i] || 0;
+        if (salary > 0 && rate <= 0) {
+            hasInvalidRates = true;
+            console.error(`Month ${i} has salary ${salary} but invalid rate ${rate}`);
+        }
+    }
 
     if (hasInvalidRates) {
-        showToast('Please enter valid salary exchange rates for all months', 'warning');
+        showToast('Please enter valid exchange rates for all months with salary', 'warning');
         return;
     }
 
@@ -6007,18 +6338,18 @@ function calculateMonthlyTax() {
         const salaryUSD = monthlySalaries[monthIndex] || 0;
         const salaryRate = monthlySalaryRates[monthIndex] || 0;
 
-        // Calculate total bonuses for this month
-        let totalBonusUSD = 0;
-        let totalBonusLKR = 0;
-        const bonuses = monthlyBonusesData[monthIndex] || [];
-        bonuses.forEach(bonus => {
-            totalBonusUSD += bonus.amount;
-            totalBonusLKR += bonus.amount * bonus.rate;
+        // Calculate total extras for this month
+        let totalExtraUSD = 0;
+        let totalExtraLKR = 0;
+        const extras = monthlyExtrasData[monthIndex] || [];
+        extras.forEach(extra => {
+            totalExtraUSD += extra.amount;
+            totalExtraLKR += extra.amount * extra.rate;
         });
 
         // Calculate FC receipts for this month
-        const fcReceiptsUSD = salaryUSD + totalBonusUSD;
-        const fcReceiptsLKR = (salaryUSD * salaryRate) + totalBonusLKR;
+        const fcReceiptsUSD = salaryUSD + totalExtraUSD;
+        const fcReceiptsLKR = (salaryUSD * salaryRate) + totalExtraLKR;
 
         // Update cumulative income
         cumulativeIncome += fcReceiptsLKR;
@@ -6045,9 +6376,13 @@ function calculateMonthlyTax() {
         // Calculate monthly payment (difference from previous month)
         const monthlyPayment = Math.max(0, totalTaxLiability - previousTaxLiability);
 
+        // Get currency for this month
+        const currency = monthlySalaryCurrencies[monthIndex] || 'USD';
+
         // Store data
         monthlyData.push({
             month: monthName,
+            currency: currency,  // Include currency in row data
             fcReceiptsUSD: fcReceiptsUSD,
             fcReceiptsLKR: fcReceiptsLKR,
             cumulativeIncome: cumulativeIncome,
@@ -6082,7 +6417,7 @@ function calculateMonthlyTax() {
     const selectedAssessmentYear = document.getElementById('assessmentYear').value;
     console.log('=== CAPTURING ASSESSMENT YEAR ===');
     console.log('Selected assessment year from dropdown:', selectedAssessmentYear);
-    
+
     lastCalculationData = {
         assessment_year: selectedAssessmentYear,
         tax_rate: 0, // Using progressive brackets (0%, 6%, 15%), not a single rate
@@ -6090,17 +6425,21 @@ function calculateMonthlyTax() {
         start_month: startMonthIndex,
         monthly_data: monthlyData.map((row, index) => {
             const actualMonthIndex = (startMonthIndex + index) % 12;
-            const bonuses = monthlyBonusesData[actualMonthIndex] || [];
+            const monthData = monthDataStore[actualMonthIndex] || {};
+            const extras = monthlyExtrasData[actualMonthIndex] || [];
             const salaryRateDate = monthlySalaryRateDates[actualMonthIndex] || null;
+            const salaryCurrency = monthData.salaryCurrency || 'USD';
 
             // Save both income input data AND calculated tax values
             const monthDataEntry = {
                 month_index: index,
                 month: row.month,
-                salary_usd: monthlySalaries[actualMonthIndex] || 0,
+                currency: salaryCurrency,  // Store salary currency
+                salary_amount: monthlySalaries[actualMonthIndex] || 0,  // NEW field name
+                salary_usd: monthlySalaries[actualMonthIndex] || 0,     // OLD field (backward compatibility)
                 salary_rate: monthlySalaryRates[actualMonthIndex] || 0,
                 salary_rate_date: salaryRateDate,
-                bonuses: bonuses,  // Array format: [{amount: 5000, rate: 299, date: '2025-11-21'}, ...]
+                extras: extras,  // Array format: [{amount, rate, date, currency}, ...]
                 // Include calculated values for display in saved calculations
                 fcReceiptsUSD: row.fcReceiptsUSD,
                 fcReceiptsLKR: row.fcReceiptsLKR,
@@ -6110,7 +6449,7 @@ function calculateMonthlyTax() {
             };
 
             if (salaryRateDate) {
-                console.log(`Saving month ${actualMonthIndex} (${row.month}) with date: ${salaryRateDate}`);
+                console.log(`Saving month ${actualMonthIndex} (${row.month}) with currency ${salaryCurrency} and date: ${salaryRateDate}`);
             }
 
             return monthDataEntry;
@@ -6124,7 +6463,7 @@ function calculateMonthlyTax() {
     const saveButtonIncome = document.getElementById('saveCalculationBtnIncome');
     if (saveSection) {
         saveSection.style.display = 'block';
-        
+
         // Auto-generate calculation name only if not editing
         if (!currentEditingCalculationId) {
             const calcName = `Tax Calculation ${lastCalculationData.assessment_year}`;
@@ -6137,18 +6476,18 @@ function calculateMonthlyTax() {
             }
         }
     }
-    
+
     // Show the save button in the income details card
     if (saveButtonIncome) {
         saveButtonIncome.style.display = 'flex';
     }
-        
+
     // Update the active year display
     const activeYearDisplay = document.getElementById('activeYearDisplay');
     if (activeYearDisplay) {
         activeYearDisplay.textContent = lastCalculationData.assessment_year;
     }
-    
+
     // Update button UI based on editing mode
     updateSaveButtonUI();
 
@@ -6177,11 +6516,17 @@ function updateTaxScheduleTable(monthlyData) {
     let quarterlyPayment = 0;
 
     monthlyData.forEach((row, index) => {
+        const currency = row.currency || 'USD';
+        const currencySymbol = CURRENCY_SYMBOLS[currency];
+
         // Add month row
         html += `
             <tr>
-                <td>${row.month}</td>
-                <td class="text-end">$${row.fcReceiptsUSD.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</td>
+                <td>
+                    ${row.month}
+                    <small class="badge bg-light text-dark ms-1">${currency}</small>
+                </td>
+                <td class="text-end">${currencySymbol}${row.fcReceiptsUSD.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</td>
                 <td class="text-end">${formatCurrency(row.fcReceiptsLKR)}</td>
                 <td class="text-end">${formatCurrency(row.cumulativeIncome)}</td>
                 <td class="text-end">${formatCurrency(row.totalTaxLiability)}</td>
@@ -6243,6 +6588,14 @@ function resetTaxCalculator() {
     document.getElementById('taxFreeThreshold').value = '1800000';
     document.getElementById('startMonth').value = '0';
 
+    // Clear month data store
+    monthDataStore = {};
+    salaryCurrencies = {
+        0: 'USD', 1: 'USD', 2: 'USD', 3: 'USD',
+        4: 'USD', 5: 'USD', 6: 'USD', 7: 'USD',
+        8: 'USD', 9: 'USD', 10: 'USD', 11: 'USD'
+    };
+
     // Repopulate monthly data table with default values
     populateMonthlyDataTable();
 
@@ -6279,13 +6632,13 @@ function resetTaxCalculator() {
     if (saveSection) {
         saveSection.style.display = 'none';
     }
-    
+
     // Hide save button in Income Details card
     const saveButtonIncome = document.getElementById('saveCalculationBtnIncome');
     if (saveButtonIncome) {
         saveButtonIncome.style.display = 'none';
     }
-    
+
     // Clear calculation name fields
     document.getElementById('calculationNameInput').value = '';
     document.getElementById('calculationName').value = '';
@@ -6303,7 +6656,7 @@ function resetTaxCalculator() {
     }
 
     lastCalculationData = null;
-    
+
     // Clear editing mode
     currentEditingCalculationId = null;
     updateEditingBanner();
@@ -6319,9 +6672,9 @@ function updateSaveButtonUI() {
     const saveHeader = document.getElementById('saveCalculationHeader');
     const btnContainer = document.getElementById('saveButtonContainer');
     const editingBanner = document.getElementById('editingStateBanner');
-    
+
     if (!saveBtn || !saveCard || !saveHeader || !btnContainer) return;
-    
+
     if (currentEditingCalculationId) {
         // In edit mode - show update UI with IntelliJ dark theme
         saveCard.className = 'card mb-3 border-primary intellij-dark';
@@ -6329,7 +6682,7 @@ function updateSaveButtonUI() {
         saveBtn.innerHTML = '<i class="fas fa-save me-2"></i>Update';
         saveBtn.className = 'btn btn-primary flex-grow-1 d-flex align-items-center justify-content-center';
         saveBtn.onclick = () => saveTaxCalculation(false);
-        
+
         // Add "Save As New" button if it doesn't exist
         if (!document.getElementById('saveAsNewBtn')) {
             const saveAsNewBtn = document.createElement('button');
@@ -6354,7 +6707,7 @@ function updateSaveButtonUI() {
         saveBtn.innerHTML = '<i class="fas fa-save me-2"></i>Save';
         saveBtn.className = 'btn btn-success flex-grow-1 d-flex align-items-center justify-content-center';
         saveBtn.onclick = () => saveTaxCalculation(false);
-        
+
         // Remove "Save As New" button if it exists
         const saveAsNewBtn = document.getElementById('saveAsNewBtn');
         if (saveAsNewBtn) {
@@ -6392,13 +6745,13 @@ function saveTaxCalculation(saveAsNew = false) {
     if (!calculationName) {
         calculationName = document.getElementById('calculationName')?.value.trim();
     }
-    
+
     if (!calculationName) {
         showToast('Please enter a name for this calculation', 'warning');
         document.getElementById('calculationNameInput')?.focus();
         return;
     }
-    
+
     // Keep both fields in sync
     document.getElementById('calculationNameInput').value = calculationName;
     document.getElementById('calculationName').value = calculationName;
@@ -6410,7 +6763,7 @@ function saveTaxCalculation(saveAsNew = false) {
     const currentAssessmentYear = document.getElementById('assessmentYear').value;
     const currentTaxFreeThreshold = parseFloat(document.getElementById('taxFreeThreshold').value) || 1800000;
     const currentStartMonth = parseInt(document.getElementById('startMonth').value) || 0;
-    
+
     const dataToSave = {
         ...lastCalculationData,
         assessment_year: currentAssessmentYear, // Override with current dropdown value
@@ -6428,15 +6781,15 @@ function saveTaxCalculation(saveAsNew = false) {
 
     // Determine if we're updating existing or creating new
     const isUpdate = currentEditingCalculationId && !saveAsNew;
-    
+
     // CRITICAL: Check for existing active calculation before proceeding
     if (setAsActive) {
-        const existingActive = allSavedCalculations.find(calc => 
-            calc.assessment_year === currentAssessmentYear && 
-            calc.is_active && 
+        const existingActive = allSavedCalculations.find(calc =>
+            calc.assessment_year === currentAssessmentYear &&
+            calc.is_active &&
             calc.id !== currentEditingCalculationId
         );
-        
+
         if (existingActive) {
             const warningMessage = `
                 <div class="alert alert-warning">
@@ -6452,7 +6805,7 @@ function saveTaxCalculation(saveAsNew = false) {
                 </p>
                 <p class="mt-2 mb-0">Do you want to proceed?</p>
             `;
-            
+
             showConfirmModal(
                 'Confirm Active Calculation Change',
                 warningMessage,
@@ -6466,14 +6819,14 @@ function saveTaxCalculation(saveAsNew = false) {
             return; // Exit and wait for user confirmation
         }
     }
-    
+
     // No conflict or not setting as active, proceed directly
     proceedWithSave(dataToSave, isUpdate);
 }
 
 function proceedWithSave(dataToSave, isUpdate) {
-    const url = isUpdate 
-        ? `/api/tax-calculations/${currentEditingCalculationId}` 
+    const url = isUpdate
+        ? `/api/tax-calculations/${currentEditingCalculationId}`
         : '/api/tax-calculations';
     const method = isUpdate ? 'PUT' : 'POST';
 
@@ -6502,7 +6855,7 @@ function proceedWithSave(dataToSave, isUpdate) {
             const icon = isUpdate ? '<i class="fas fa-check-circle me-2"></i>' : '<i class="fas fa-save me-2"></i>';
             const message = isUpdate ? 'Tax calculation updated successfully!' : 'Tax calculation saved successfully!';
             showToast(icon + message, 'success');
-            
+
             // If we just created a new calculation, switch to editing mode for it
             if (!isUpdate && data.id) {
                 currentEditingCalculationId = data.id;
@@ -6516,7 +6869,7 @@ function proceedWithSave(dataToSave, isUpdate) {
                     });
                 updateSaveButtonUI();
             }
-            
+
             // Reload saved calculations list
             loadSavedCalculations();
             // Hide save section
@@ -6608,35 +6961,36 @@ function displaySavedCalculations(calculations, filterYear = null) {
         // Calculate quarterly and total tax payments from monthly_data
         let quarterlyPayments = [0, 0, 0, 0]; // Q1, Q2, Q3, Q4
         let totalTaxPayment = 0;
-        
+
         if (calc.monthly_data && Array.isArray(calc.monthly_data)) {
             let previousTaxLiability = 0;
-            
+
             calc.monthly_data.forEach((monthData, index) => {
                 let payment = monthData.monthlyPayment;
-                
+
                 // Fallback: If monthlyPayment is not saved (old calculations), calculate it
                 if (payment === undefined || payment === null) {
                     const taxFreeThreshold = calc.tax_free_threshold || 1800000;
-                    
+
                     // Reconstruct cumulative income and tax liability
                     let cumulativeIncome = 0;
                     for (let i = 0; i <= index; i++) {
                         const md = calc.monthly_data[i];
-                        const salaryUSD = md.salary_usd || 0;
+                        // Backward compatibility: support both salary_amount and salary_usd
+                        const salaryAmount = md.salary_amount || md.salary_usd || 0;
                         const salaryRate = md.salary_rate || 0;
-                        let fcReceiptsLKR = salaryUSD * salaryRate;
-                        
-                        // Add bonuses
-                        if (md.bonuses && Array.isArray(md.bonuses)) {
-                            md.bonuses.forEach(bonus => {
-                                fcReceiptsLKR += (bonus.amount || 0) * (bonus.rate || 0);
+                        let fcReceiptsLKR = salaryAmount * salaryRate;
+
+                        // Add extras
+                        if (md.extras && Array.isArray(md.extras)) {
+                            md.extras.forEach(extra => {
+                                fcReceiptsLKR += (extra.amount || 0) * (extra.rate || 0);
                             });
                         }
-                        
+
                         cumulativeIncome += fcReceiptsLKR;
                     }
-                    
+
                     // Calculate tax liability
                     let totalTaxLiability = 0;
                     if (cumulativeIncome > taxFreeThreshold) {
@@ -6647,13 +7001,13 @@ function displaySavedCalculations(calculations, filterYear = null) {
                             totalTaxLiability += (cumulativeIncome - 2_800_000) * 0.15;
                         }
                     }
-                    
+
                     payment = Math.max(0, totalTaxLiability - previousTaxLiability);
                     previousTaxLiability = totalTaxLiability;
                 } else {
                     payment = payment || 0;
                 }
-                
+
                 const quarterIndex = Math.floor(index / 3); // 0-2 -> Q1, 3-5 -> Q2, 6-8 -> Q3, 9-11 -> Q4
                 quarterlyPayments[quarterIndex] += payment;
                 totalTaxPayment += payment;
@@ -6752,16 +7106,16 @@ function setActiveCalculation(calculationId) {
         showToast('Calculation not found', 'danger');
         return;
     }
-    
+
     // Find any existing active calculation for the same year
-    const existingActive = allSavedCalculations.find(calc => 
-        calc.assessment_year === calcToActivate.assessment_year && 
-        calc.is_active && 
+    const existingActive = allSavedCalculations.find(calc =>
+        calc.assessment_year === calcToActivate.assessment_year &&
+        calc.is_active &&
         calc.id !== calculationId
     );
-    
+
     let warningMessage = `<p class="mb-2">Set <strong>"${calcToActivate.calculation_name}"</strong> as active for ${calcToActivate.assessment_year}?</p>`;
-    
+
     if (existingActive) {
         warningMessage += `
             <div class="alert alert-warning mb-0">
@@ -6779,7 +7133,7 @@ function setActiveCalculation(calculationId) {
             </div>
         `;
     }
-    
+
     showConfirmModal(
         'Set Active Calculation',
         warningMessage,
@@ -6799,7 +7153,7 @@ function setActiveCalculation(calculationId) {
                     showToast(data.error, 'danger');
                 } else {
                     showToast(
-                        `<i class="fas fa-star me-2"></i>Calculation activated for ${data.assessment_year}!`, 
+                        `<i class="fas fa-star me-2"></i>Calculation activated for ${data.assessment_year}!`,
                         'success'
                     );
                     // Reload the calculations list to reflect the change
@@ -6849,7 +7203,7 @@ function toggleActiveCalculation(calculationId, isCurrentlyActive) {
                         showToast(data.error, 'danger');
                     } else {
                         showToast(
-                            `<i class="fas fa-times-circle me-2"></i>Calculation deactivated for ${data.assessment_year}!`, 
+                            `<i class="fas fa-times-circle me-2"></i>Calculation deactivated for ${data.assessment_year}!`,
                             'info'
                         );
                         loadSavedCalculations();
@@ -6872,7 +7226,7 @@ function toggleActiveCalculation(calculationId, isCurrentlyActive) {
 
 function loadCalculation(calculationId) {
     showLoading();
-    
+
     // Set editing mode
     currentEditingCalculationId = calculationId;
 
@@ -6887,7 +7241,7 @@ function loadCalculation(calculationId) {
             updateEditingBanner();
             return;
         }
-        
+
         // Update editing banner with calculation details
         updateEditingBanner(calc);
 
@@ -6905,7 +7259,7 @@ function loadCalculation(calculationId) {
         // Tax rate is now hardcoded in progressive brackets, not loaded from saved data
         document.getElementById('taxFreeThreshold').value = calc.tax_free_threshold;
         document.getElementById('startMonth').value = calc.start_month;
-        
+
         // Set the "Set as active" checkbox based on current status
         const setAsActiveCheckbox = document.getElementById('setAsActive');
         if (setAsActiveCheckbox) {
@@ -6921,95 +7275,68 @@ function loadCalculation(calculationId) {
             console.log('Sample monthly entry:', monthlyData[0]);
         }
 
-        // Repopulate monthly table with current start month (this creates fresh input fields)
+        // Repopulate monthly table with current start month (this creates fresh row structure)
         populateMonthlyDataTable();
 
-        // Clear any existing bonus data
-        monthlyBonusesData = {};
+        // Clear month data store
+        monthDataStore = {};
 
-        // Create a map of actual month index to salary, salary rate, and bonuses
+        // Create a map of actual month index to salary, salary rate, extras, and currency
         const monthDataMap = {};
         monthlyData.forEach((month) => {
             // Calculate the actual month index from start_month + month_index
             const actualMonthIndex = (calc.start_month + month.month_index) % 12;
 
+            // Backward compatibility: support both old (salary_usd) and new (salary_amount) field names
+            const salaryAmount = month.salary_amount || month.salary_usd || 0;
+
+            // Backward compatibility: default to USD if currency not specified
+            const salaryCurrency = month.currency || 'USD';
+
+            // Process extras - ensure they have currency field
+            // Backward compatibility: support both "extras" (new) and "bonuses" (old)
+            const extras = (month.extras || month.bonuses || []).map(extra => ({
+                amount: extra.amount || 0,
+                rate: extra.rate || 0,
+                rateDate: extra.date || extra.rateDate || null,
+                currency: extra.currency || 'USD'  // Default to USD for old data
+            }));
+
             monthDataMap[actualMonthIndex] = {
-                salary_usd: month.salary_usd || 0,
-                salary_rate: month.salary_rate || 0,
-                salary_rate_date: month.salary_rate_date || null,
-                bonuses: month.bonuses || []  // Array of {amount, rate, date}
+                salary: salaryAmount,
+                salaryCurrency: salaryCurrency,
+                salaryRate: month.salary_rate || 0,
+                salaryRateDate: month.salary_rate_date || null,
+                extras: extras
             };
+
+            // Update salary currencies for backward compatibility
+            salaryCurrencies[actualMonthIndex] = salaryCurrency;
         });
 
         console.log(`Mapped ${Object.keys(monthDataMap).length} months from saved data`);
         console.log('Sample month data:', monthDataMap[0] || monthDataMap[Object.keys(monthDataMap)[0]]);
 
-        // Wait for DOM to update after populateMonthlyDataTable()
-        // This ensures the date inputs are fully rendered before we try to set their values
-        setTimeout(() => {
-            // Load salary and salary rate by matching data-month attribute
-            const salaryInputs = document.querySelectorAll('.month-salary');
-            const salaryRateInputs = document.querySelectorAll('.month-salary-rate');
-            const salaryRateDateInputs = document.querySelectorAll('.month-salary-rate-date');
+        // Populate monthDataStore
+        for (let i = 0; i < 12; i++) {
+            if (monthDataMap[i]) {
+                monthDataStore[i] = monthDataMap[i];
+                console.log(`Loaded month ${i}:`, monthDataStore[i]);
+            }
+        }
 
-            console.log(`Found ${salaryInputs.length} salary inputs, ${salaryRateInputs.length} salary rate inputs, and ${salaryRateDateInputs.length} date inputs`);
+        // Refresh the table to show loaded data
+        populateMonthlyDataTable();
 
-            let salariesSet = 0, ratesSet = 0, datesSet = 0;
-            salaryInputs.forEach(input => {
-                const monthIndex = parseInt(input.getAttribute('data-month'));
-                if (monthDataMap[monthIndex]) {
-                    input.value = monthDataMap[monthIndex].salary_usd;
-                    salariesSet++;
-                }
-            });
+        console.log(`Loaded ${Object.keys(monthDataStore).length} months into store`);
 
-            salaryRateInputs.forEach(input => {
-                const monthIndex = parseInt(input.getAttribute('data-month'));
-                if (monthDataMap[monthIndex]) {
-                    input.value = monthDataMap[monthIndex].salary_rate;
-                    ratesSet++;
-                }
-            });
+        console.log('Form fields populated, recalculating tax schedule...');
 
-            salaryRateDateInputs.forEach(input => {
-                const monthIndex = parseInt(input.getAttribute('data-month'));
-                const monthData = monthDataMap[monthIndex];
-                console.log(`Month ${monthIndex}: salary_rate_date =`, monthData ? monthData.salary_rate_date : 'no data');
-                if (monthData && monthData.salary_rate_date) {
-                    input.value = monthData.salary_rate_date;
-                    console.log(`Set date input for month ${monthIndex} to ${monthData.salary_rate_date}`);
-                    datesSet++;
-                }
-            });
+        // Recalculate tax schedule with loaded data
+        calculateMonthlyTax();
 
-            console.log(`Set ${salariesSet} salaries, ${ratesSet} exchange rates, and ${datesSet} rate dates`);
-
-            // Load bonuses for each month
-            let bonusesLoaded = 0;
-            Object.keys(monthDataMap).forEach(monthIndex => {
-                const bonuses = monthDataMap[monthIndex].bonuses || [];
-
-                // Add each bonus entry
-                bonuses.forEach(bonus => {
-                    if (bonus.amount > 0) {
-                        const bonusDate = bonus.date || '';
-                        console.log(`Loading bonus for month ${monthIndex}: amount=${bonus.amount}, rate=${bonus.rate}, date=${bonusDate}`);
-                        addBonusEntry(parseInt(monthIndex), bonus.amount, bonus.rate, bonusDate);
-                        bonusesLoaded++;
-                    }
-                });
-            });
-
-            console.log(`Loaded ${bonusesLoaded} bonus entries`);
-
-            console.log('Form fields populated, recalculating tax schedule...');
-
-            // Recalculate tax schedule with loaded data
-            calculateMonthlyTax();
-            
-            // Update save button UI to show "Update" mode
-            updateSaveButtonUI();
-        }, 100); // 100ms delay to ensure DOM is updated
+        // Update save button UI to show "Update" mode
+        updateSaveButtonUI();
 
         showToast(`Loaded: ${calc.calculation_name}`, 'success');
 

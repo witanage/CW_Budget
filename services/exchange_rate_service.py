@@ -20,7 +20,8 @@ class ExchangeRateService:
     # Currency name mapping for CBSL form submission
     CURRENCY_MAP = {
         'USD': 'United States Dollar',
-        'GBP': 'British Pound'
+        'GBP': 'British Pound',
+        'EUR': 'Euro'
     }
 
     def __init__(self, db_config=None):
@@ -28,24 +29,31 @@ class ExchangeRateService:
         # all connections now come from the shared pool in db.py.
         pass
 
-    def get_exchange_rate(self, date: datetime) -> Optional[Dict[str, float]]:
+    def get_exchange_rate(self, date: datetime, currency: str = 'USD') -> Optional[Dict[str, float]]:
         """
-        Fetch exchange rate for a specific date
+        Fetch exchange rate for a specific date and currency
 
-        Checks database first, then attempts to fetch bulk CSV from CBSL if database is empty
+        Checks database first, then attempts to fetch from CBSL if not found
 
         Args:
             date: The date for which to fetch the exchange rate
+            currency: Currency code (USD, GBP, EUR) - default USD
 
         Returns:
-            Dictionary with 'buy_rate' and 'sell_rate' or None if not found
+            Dictionary with 'buy_rate', 'sell_rate', 'currency' or None if not found
         """
         date_str = date.strftime('%Y-%m-%d')
+        currency = currency.upper()
+
+        # Validate currency
+        if currency not in self.CURRENCY_MAP:
+            logger.error(f"Unsupported currency: {currency}")
+            return None
 
         # Check database first
-        db_rate = self._get_rate_from_db(date)
+        db_rate = self._get_rate_from_db(date, currency)
         if db_rate:
-            logger.info(f"Returning database exchange rate for {date_str}")
+            logger.info(f"Returning database exchange rate for {date_str} ({currency})")
             return db_rate
 
         # Check if database has ANY exchange rates
@@ -60,45 +68,46 @@ class ExchangeRateService:
 
             if bulk_imported:
                 logger.info("Bulk CSV import successful. Checking database again...")
-                db_rate = self._get_rate_from_db(date)
+                db_rate = self._get_rate_from_db(date, currency)
                 if db_rate:
                     logger.info(f"Found rate after bulk import: {db_rate}")
                     return db_rate
                 else:
-                    logger.warning(f"Rate for {date_str} not found even after bulk import")
+                    logger.warning(f"Rate for {date_str} ({currency}) not found even after bulk import")
             else:
                 logger.error("Bulk CSV import failed. Will try individual fetch.")
 
         # If still not found, try to fetch individual date from CBSL
-        logger.info(f"Exchange rate for {date_str} not in database, attempting individual fetch from CBSL")
-        cbsl_rate = self._fetch_from_cbsl(date)
+        logger.info(f"Exchange rate for {date_str} ({currency}) not in database, attempting individual fetch from CBSL")
+        cbsl_rate = self._fetch_from_cbsl(date, currency)
 
         if cbsl_rate:
-            logger.info(f"Individual CBSL fetch successful for {date_str}: {cbsl_rate}")
+            logger.info(f"Individual CBSL fetch successful for {date_str} ({currency}): {cbsl_rate}")
             # Save to database for future use
             saved = self.save_exchange_rate(
                 date,
                 cbsl_rate['buy_rate'],
                 cbsl_rate['sell_rate'],
-                source='CBSL'
+                source='CBSL',
+                currency=currency
             )
             logger.info(f"Save to database result: {saved}")
             return cbsl_rate
         else:
-            logger.warning(f"Individual CBSL fetch failed for {date_str}")
+            logger.warning(f"Individual CBSL fetch failed for {date_str} ({currency})")
 
         # If CBSL fetch fails, try to find nearest previous date in DB
-        logger.info(f"CBSL fetch failed for {date_str}, looking for nearest date in database")
-        nearest_rate = self._get_nearest_rate_from_db(date)
+        logger.info(f"CBSL fetch failed for {date_str} ({currency}), looking for nearest date in database")
+        nearest_rate = self._get_nearest_rate_from_db(date, currency)
         if nearest_rate:
-            logger.info(f"Using nearest rate from database for {date_str}")
+            logger.info(f"Using nearest rate from database for {date_str} ({currency})")
             return nearest_rate
 
-        logger.warning(f"No exchange rate found for {date_str}")
+        logger.warning(f"No exchange rate found for {date_str} ({currency})")
         return None
 
-    def _get_rate_from_db(self, date: datetime) -> Optional[Dict[str, float]]:
-        """Get exchange rate from database for specific date"""
+    def _get_rate_from_db(self, date: datetime, currency: str = 'USD') -> Optional[Dict[str, float]]:
+        """Get exchange rate from database for specific date and currency"""
         connection = None
         cursor = None
         try:
@@ -106,11 +115,11 @@ class ExchangeRateService:
             cursor = connection.cursor(dictionary=True)
 
             cursor.execute("""
-                SELECT date, buy_rate, sell_rate, source
+                SELECT date, buy_rate, sell_rate, source, currency
                 FROM exchange_rates
-                WHERE date = %s AND source IN ('CBSL', 'CBSL_BULK')
+                WHERE date = %s AND currency = %s AND source IN ('CBSL', 'CBSL_BULK')
                 LIMIT 1
-            """, (date.strftime('%Y-%m-%d'),))
+            """, (date.strftime('%Y-%m-%d'), currency.upper()))
 
             result = cursor.fetchone()
 
@@ -119,7 +128,8 @@ class ExchangeRateService:
                     'buy_rate': float(result['buy_rate']),
                     'sell_rate': float(result['sell_rate']),
                     'date': result['date'].strftime('%Y-%m-%d'),
-                    'source': result['source']
+                    'source': result['source'],
+                    'currency': result['currency']
                 }
 
             return None
@@ -133,8 +143,8 @@ class ExchangeRateService:
             if connection:
                 connection.close()
 
-    def _get_nearest_rate_from_db(self, date: datetime) -> Optional[Dict[str, float]]:
-        """Get nearest previous exchange rate from database"""
+    def _get_nearest_rate_from_db(self, date: datetime, currency: str = 'USD') -> Optional[Dict[str, float]]:
+        """Get nearest previous exchange rate from database for specific currency"""
         connection = None
         cursor = None
         try:
@@ -142,12 +152,12 @@ class ExchangeRateService:
             cursor = connection.cursor(dictionary=True)
 
             cursor.execute("""
-                SELECT date, buy_rate, sell_rate, source
+                SELECT date, buy_rate, sell_rate, source, currency
                 FROM exchange_rates
-                WHERE date <= %s AND source IN ('CBSL', 'CBSL_BULK')
+                WHERE date <= %s AND currency = %s AND source IN ('CBSL', 'CBSL_BULK')
                 ORDER BY date DESC
                 LIMIT 1
-            """, (date.strftime('%Y-%m-%d'),))
+            """, (date.strftime('%Y-%m-%d'), currency.upper()))
 
             result = cursor.fetchone()
 
@@ -205,19 +215,27 @@ class ExchangeRateService:
             if connection:
                 connection.close()
 
-    def _fetch_from_cbsl(self, date: datetime) -> Optional[Dict[str, float]]:
+    def _fetch_from_cbsl(self, date: datetime, currency: str = 'USD') -> Optional[Dict[str, float]]:
         """
         Fetch exchange rates from CBSL website using their form submission
 
         Args:
             date: The date for which to fetch the exchange rate
+            currency: Currency code (USD, GBP, EUR)
 
         Returns:
-            Dictionary with buy_rate and sell_rate or None if not found
+            Dictionary with buy_rate, sell_rate, currency or None if not found
         """
         try:
             # Prepare POST payload matching CBSL's form structure
             date_str = date.strftime('%Y-%m-%d')
+            currency = currency.upper()
+
+            # Get currency name for CBSL form
+            currency_name = self.CURRENCY_MAP.get(currency)
+            if not currency_name:
+                logger.error(f"Currency {currency} not supported by CBSL")
+                return None
 
             payload = {
                 'lookupPage': 'lookup_daily_exchange_rates.php',
@@ -226,7 +244,7 @@ class ExchangeRateService:
                 'txtEnd': date_str,
                 'rangeType': 'range',
                 'rangeValue': '1',
-                'chk_cur[]': 'USD~United States Dollar',
+                'chk_cur[]': f'{currency}~{currency_name}',
                 'submit_button': 'Submit'
             }
 
@@ -269,12 +287,13 @@ class ExchangeRateService:
                             'buy_rate': buy_rate,
                             'sell_rate': sell_rate,
                             'date': target_date_str,
-                            'source': 'CBSL'
+                            'source': 'CBSL',
+                            'currency': currency
                         }
 
             # If exact date not found, try to find the nearest previous date
             logger.info(f"Exact date {target_date_str} not found, looking for nearest previous date")
-            return self._find_nearest_rate(rows, date)
+            return self._find_nearest_rate(rows, date, currency)
 
         except requests.RequestException as e:
             logger.error(f"HTTP request error: {str(e)}")
@@ -283,7 +302,7 @@ class ExchangeRateService:
             logger.error(f"Unexpected error parsing CBSL data: {str(e)}")
             return None
 
-    def _find_nearest_rate(self, rows, target_date: datetime) -> Optional[Dict[str, float]]:
+    def _find_nearest_rate(self, rows, target_date: datetime, currency: str = 'USD') -> Optional[Dict[str, float]]:
         """
         Find the nearest previous exchange rate if exact date is not available
         (e.g., weekends, holidays)
@@ -309,6 +328,8 @@ class ExchangeRateService:
                                 'buy_rate': buy_rate,
                                 'sell_rate': sell_rate,
                                 'date': row_date_str,
+                                'source': 'CBSL',
+                                'currency': currency,
                                 'note': f'Rate from {row_date_str} (nearest available date)'
                             }
 

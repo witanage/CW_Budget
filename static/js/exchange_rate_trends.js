@@ -834,14 +834,14 @@
 
         var params = new URLSearchParams({
             months: analysisMonths,
-            currency_from: 'USD',
+            currency_from: _s.currency,
             currency_to: 'LKR',
             user_bank: userBank
         });
 
         console.log('🔍 Requesting AI insights with params:', {
             months: analysisMonths,
-            currency_from: 'USD',
+            currency_from: _s.currency,
             currency_to: 'LKR',
             user_bank: userBank
         });

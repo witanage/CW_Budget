@@ -1,0 +1,94 @@
+<!-- Tax Month Entry Modal -->
+<div class="modal fade" id="taxMonthEntryModal" tabindex="-1" aria-labelledby="taxMonthEntryModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="taxMonthEntryModalLabel">
+                    <i class="fas fa-calendar-alt me-2"></i><span id="modalMonthName">Month</span> Income Details
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-4">
+                    <!-- Salary Section -->
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h6 class="mb-0"><i class="fas fa-money-check-alt me-2"></i>Monthly Salary</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <!-- Currency Selector -->
+                                    <div class="col-md-3">
+                                        <label class="form-label">Currency</label>
+                                        <select class="form-select" id="modalSalaryCurrency">
+                                            <option value="USD">💵 USD - US Dollar</option>
+                                            <option value="GBP">💷 GBP - British Pound</option>
+                                            <option value="EUR">💶 EUR - Euro</option>
+                                        </select>
+                                    </div>
+
+                                    <!-- Salary Amount -->
+                                    <div class="col-md-3">
+                                        <label class="form-label">Salary Amount</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text" id="modalSalaryCurrencySymbol">$</span>
+                                            <input type="number" class="form-control" id="modalSalaryAmount"
+                                                   placeholder="6000" step="100" min="0">
+                                        </div>
+                                    </div>
+
+                                    <!-- Exchange Rate -->
+                                    <div class="col-md-3">
+                                        <label class="form-label">Exchange Rate</label>
+                                        <div class="input-group">
+                                            <input type="number" class="form-control" id="modalSalaryRate"
+                                                   placeholder="299" step="0.01" min="0">
+                                            <span class="input-group-text">LKR</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Rate Date with Fetch Button -->
+                                    <div class="col-md-3">
+                                        <label class="form-label">Rate Date</label>
+                                        <div class="input-group">
+                                            <input type="date" class="form-control" id="modalSalaryRateDate">
+                                            <button type="button" class="btn btn-outline-secondary" id="modalFetchSalaryRate" title="Auto-fetch rate">
+                                                <i class="fas fa-sync-alt"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Extras Section -->
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0"><i class="fas fa-gift me-2"></i>Extras</h6>
+                                <button type="button" class="btn btn-sm btn-light" id="modalAddExtraBtn">
+                                    <i class="fas fa-plus me-1"></i>Add Extra
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <div id="modalExtrasContainer">
+                                    <!-- Extras will be added dynamically here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-1"></i>Cancel
+                </button>
+                <button type="button" class="btn btn-primary" id="modalSaveMonthBtn">
+                    <i class="fas fa-save me-1"></i>Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

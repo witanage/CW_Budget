@@ -191,10 +191,10 @@ def get_sidebar_summary(user_id, current_year, current_month, currency='USD'):
 
         # Get best exchange rate for the selected currency
         rate_data = get_best_rate_today(currency=currency)
-        
+
         # Get active tax calculation
         tax_data = get_active_tax_summary(user_id, current_year, current_month)
-        
+
         return {
             'month_summary': month_data or {
                 'total_income': 0,
@@ -205,7 +205,7 @@ def get_sidebar_summary(user_id, current_year, current_month, currency='USD'):
             'exchange_rate': rate_data,
             'tax_summary': tax_data
         }
-    
+
     except Exception as e:
         logger.error(f"Error in sidebar_summary for user {user_id}: {str(e)}")
         raise
@@ -214,22 +214,22 @@ def get_sidebar_summary(user_id, current_year, current_month, currency='USD'):
 def get_active_tax_summary(user_id, current_year, current_month):
     """
     Get active tax calculation summary with progressive bracket calculation.
-    
+
     Args:
         user_id: The user's ID
         current_year: Current calendar year
         current_month: Current calendar month (1-12)
-    
+
     Returns:
         Dictionary with tax calculation details or None if no active calculation
     """
     tax_data = None
     connection = get_db_connection()
-    
+
     if not connection:
         logger.warning(f"Database connection failed for tax summary")
         return None
-    
+
     cursor = connection.cursor(dictionary=True)
     try:
         cursor.execute("""
@@ -240,35 +240,35 @@ def get_active_tax_summary(user_id, current_year, current_month):
             ORDER BY created_at DESC
             LIMIT 1
         """, (user_id,))
-        
+
         tax_calc = cursor.fetchone()
         if tax_calc:
             logger.info(f"Found active tax calculation: ID={tax_calc['id']}, "
                        f"Year={tax_calc['assessment_year']}, Name={tax_calc['calculation_name']}")
-            
+
             # Parse monthly_data to calculate quarterly payment
             monthly_data = json.loads(tax_calc['monthly_data']) if tax_calc.get('monthly_data') else []
             logger.info(f"Monthly data entries: {len(monthly_data)}")
-            
-            # Calculate total annual income from salary_usd and bonuses
+
+            # Calculate total annual income from salary_usd and extras
             total_annual_income_lkr = calculate_annual_income(monthly_data)
             tax_free = float(tax_calc.get('tax_free_threshold', 0))
-            
+
             # Calculate tax using PROGRESSIVE BRACKETS (same as frontend)
             total_tax = calculate_progressive_tax(total_annual_income_lkr, tax_free)
             quarterly_payment = total_tax / 4 if total_tax > 0 else 0
-            
+
             # Log calculation details for debugging
             logger.info(f"Tax calculation for {tax_calc['assessment_year']}: "
                        f"Income={total_annual_income_lkr:,.2f}, Tax-Free={tax_free:,.2f}, "
                        f"Total Tax={total_tax:,.2f}, Quarterly={quarterly_payment:,.2f}")
-            
+
             # Determine current quarter based on start_month
             current_quarter = calculate_current_quarter(
-                tax_calc.get('start_month', 0), 
+                tax_calc.get('start_month', 0),
                 current_month
             )
-            
+
             tax_data = {
                 'assessment_year': tax_calc['assessment_year'],
                 'quarterly_payment': round(quarterly_payment, 2),
@@ -278,7 +278,7 @@ def get_active_tax_summary(user_id, current_year, current_month):
             }
         else:
             logger.info("No active tax calculation found for user")
-            
+
     except Exception as e:
         logger.error(f"Error fetching tax data for user {user_id}: {str(e)}")
         import traceback
@@ -286,37 +286,38 @@ def get_active_tax_summary(user_id, current_year, current_month):
     finally:
         cursor.close()
         connection.close()
-    
+
     return tax_data
 
 
 def calculate_annual_income(monthly_data):
     """
-    Calculate total annual income from monthly salary and bonuses.
-    
+    Calculate total annual income from monthly salary and extras.
+
     Args:
-        monthly_data: List of monthly income entries with salary_usd, salary_rate, and bonuses
-    
+        monthly_data: List of monthly income entries with salary_usd, salary_rate, and extras
+
     Returns:
         Total annual income in LKR
     """
     total_annual_income_lkr = 0
-    
+
     for month_entry in monthly_data:
         # Salary income (USD * exchange rate)
         salary_usd = float(month_entry.get('salary_usd', 0))
         salary_rate = float(month_entry.get('salary_rate', 0))
         salary_lkr = salary_usd * salary_rate
         total_annual_income_lkr += salary_lkr
-        
-        # Bonus income
-        bonuses = month_entry.get('bonuses', [])
-        if bonuses and isinstance(bonuses, list):
-            for bonus in bonuses:
-                bonus_amount = float(bonus.get('amount', 0))
-                bonus_rate = float(bonus.get('rate', 0))
-                bonus_lkr = bonus_amount * bonus_rate
-                total_annual_income_lkr += bonus_lkr
+
+        # Extra income
+        # Backward compatibility: support both "extras" (new) and "bonuses" (old)
+        extras = month_entry.get('extras', month_entry.get('bonuses', []))
+        if extras and isinstance(extras, list):
+            for extra in extras:
+                extra_amount = float(extra.get('amount', 0))
+                extra_rate = float(extra.get('rate', 0))
+                extra_lkr = extra_amount * extra_rate
+                total_annual_income_lkr += extra_lkr
     
     return total_annual_income_lkr
 

@@ -17,35 +17,27 @@ NTFY_SERVER = "https://ntfy.sh"
 
 
 def _format_rate_change(bank: str, result: Dict) -> str:
-    """Format a single bank's rate change for notification message."""
+    """Format a single bank's rate change for notification message (buy rate only)."""
     if result.get('status') != 'success':
         return f"{bank}: Failed to fetch"
-    
+
     buy_rate = result.get('buy_rate')
-    sell_rate = result.get('sell_rate')
     buy_change = result.get('buy_change')
-    sell_change = result.get('sell_change')
     is_new = result.get('is_new', False)
     changed = result.get('changed', False)
-    
+
     if is_new:
-        return f"{bank}: New rate (Buy: {buy_rate}, Sell: {sell_rate})"
+        return f"{bank}: New rate (Buy: {buy_rate})"
     elif not changed:
-        return f"{bank}: No change (Buy: {buy_rate}, Sell: {sell_rate})"
-    
-    # Build change description with arrows
-    parts = []
+        return f"{bank}: No change (Buy: {buy_rate})"
+
+    # Build change description with arrows (buy rate only)
     if buy_change is not None and buy_change != 0:
         arrow = "▲" if buy_change > 0 else "▼"
         prev_buy = result.get('previous_buy_rate')
-        parts.append(f"Buy {arrow}{abs(buy_change):.4f} ({prev_buy:.4f}→{buy_rate:.4f})")
-    
-    if sell_change is not None and sell_change != 0:
-        arrow = "▲" if sell_change > 0 else "▼"
-        prev_sell = result.get('previous_sell_rate')
-        parts.append(f"Sell {arrow}{abs(sell_change):.4f} ({prev_sell:.4f}→{sell_rate:.4f})")
-    
-    return f"{bank}: {', '.join(parts)}" if parts else f"{bank}: No change"
+        return f"{bank}: Buy {arrow}{abs(buy_change):.4f} ({prev_buy:.4f}→{buy_rate:.4f})"
+
+    return f"{bank}: No buy rate change"
 
 
 def send_rate_change_notifications(results: Dict) -> None:
@@ -78,21 +70,24 @@ def send_rate_change_notifications(results: Dict) -> None:
 
 def _send_currency_notification(currency: str, results: Dict) -> None:
     """
-    Send notification for a specific currency's rate changes.
+    Send notification for a specific currency's rate changes (buy rate only).
 
     Args:
         currency: Currency code (e.g., 'USD', 'GBP')
         results: Dict of bank results for this currency
                  Format: {'HNB': {...}, 'PB': {...}, etc.}
     """
-    # Check if any rate changes were detected for this currency
+    # Check if any buy rate changes were detected for this currency
     changes_detected = any(
-        r.get('status') == 'success' and r.get('changed', False)
+        r.get('status') == 'success' and
+        r.get('changed', False) and
+        r.get('buy_change') is not None and
+        r.get('buy_change') != 0
         for r in results.values()
     )
 
     if not changes_detected:
-        logger.info(f"No {currency} rate changes detected, skipping notification")
+        logger.info(f"No {currency} buy rate changes detected, skipping notification")
         return
 
     # Get currency-specific ntfy topic from app_settings
@@ -135,11 +130,10 @@ def _send_currency_notification(currency: str, results: Dict) -> None:
                 bank_result = results[bank]
                 changes_lines.append(_format_rate_change(bank, bank_result))
 
-                # Track maximum absolute change for priority
+                # Track maximum absolute buy rate change for priority
                 if bank_result.get('status') == 'success':
                     buy_change = abs(bank_result.get('buy_change', 0) or 0)
-                    sell_change = abs(bank_result.get('sell_change', 0) or 0)
-                    max_abs_change = max(max_abs_change, buy_change, sell_change)
+                    max_abs_change = max(max_abs_change, buy_change)
 
         message_body = "\n".join(changes_lines)
 
@@ -157,7 +151,7 @@ def _send_currency_notification(currency: str, results: Dict) -> None:
         # Send notification to ntfy.sh
         url = f"{NTFY_SERVER}/{ntfy_topic}"
         headers = {
-            "Title": f"Exchange Rate Update - {currency}/LKR",
+            "Title": f"Buy Rate Update - {currency}/LKR",
             "Priority": priority,
             "Tags": tags
         }

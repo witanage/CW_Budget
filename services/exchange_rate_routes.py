@@ -391,23 +391,31 @@ def log_exchange_rate_refresh(source, status, buy_rate=None, sell_rate=None, err
 
 def get_exchange_rate_api():
     """
-    Get USD to LKR exchange rate for a specific date
+    Get exchange rate to LKR for a specific date and currency
 
     This endpoint:
     1. First checks the exchange_rates table in the database (cache)
-    2. If not found, fetches from CBSL and stores in DB for future use
-    3. If CBSL fails, returns nearest previous date from DB
+    2. If not found, fetches from bank sources and stores in DB for future use
+    3. If fetch fails, returns nearest previous date from DB
 
     Query Parameters:
         date: Date in YYYY-MM-DD format (required)
+        currency: Currency code USD/GBP/EUR (optional, default: USD)
 
     Returns:
-        JSON with buy_rate, sell_rate, source, and date
+        JSON with buy_rate, sell_rate, source, currency, and date
     """
     try:
         date_str = request.args.get('date')
         if not date_str:
             return jsonify({'error': 'Date parameter is required (format: YYYY-MM-DD)'}), 400
+
+        # Get currency parameter (default to USD for backward compatibility)
+        currency = request.args.get('currency', 'USD').upper()
+
+        # Validate currency
+        if currency not in ['USD', 'GBP', 'EUR']:
+            currency = 'USD'  # Fallback to USD for safety
 
         try:
             date = datetime.strptime(date_str, '%Y-%m-%d')
@@ -418,15 +426,19 @@ def get_exchange_rate_api():
         if date > datetime.now():
             return jsonify({'error': 'Cannot fetch exchange rates for future dates'}), 400
 
-        # Fetch exchange rate
+        # Use CBSL service for all currencies (USD, GBP, EUR)
+        # CBSL provides historical rates for exact dates
         service = get_exchange_rate_service()
-        rate = service.get_exchange_rate(date)
+        rate = service.get_exchange_rate(date, currency=currency)
 
         if rate:
-            logger.info(f"Exchange rate fetched for {date_str}: {rate}")
+            # Ensure currency is included in response
+            if 'currency' not in rate:
+                rate['currency'] = currency
+            logger.info(f"Exchange rate fetched for {date_str} ({currency}): {rate}")
             return jsonify(rate), 200
         else:
-            return jsonify({'error': 'Exchange rate not available for this date'}), 404
+            return jsonify({'error': f'{currency} exchange rate not available for this date'}), 404
 
     except Exception as e:
         logger.error(f"Error fetching exchange rate: {str(e)}")
@@ -1271,23 +1283,25 @@ def get_exchange_rate_ai_insights():
         cursor = connection.cursor(dictionary=True)
 
         try:
-            # Get daily buy rates per bank (CBSL, PB, HNB, SAMPATH) for the specified period
+            # Get daily buy rates per bank (CBSL, PB, HNB, SAMPATH) for the specified period and currency
             cursor.execute("""
                 SELECT date, source, buy_rate
                 FROM exchange_rates
                 WHERE date >= DATE_SUB(CURDATE(), INTERVAL %s MONTH)
                   AND source IN ('CBSL', 'PB', 'HNB', 'SAMPATH')
+                  AND currency = %s
                 ORDER BY date, source
-            """, (months,))
+            """, (months, currency_from))
 
             all_data = cursor.fetchall()
 
-            logger.info(f"✅ Fetched {len(all_data)} exchange rate records from YOUR database")
+            logger.info(f"✅ Fetched {len(all_data)} {currency_from} exchange rate records from database (past {months} months)")
 
             if not all_data or len(all_data) < 6:
+                logger.warning(f"Insufficient {currency_from} data: {len(all_data) if all_data else 0} records found (minimum 6 required)")
                 return jsonify({
                     'error': 'Insufficient data',
-                    'message': 'Not enough historical data available for analysis.'
+                    'message': f'Not enough {currency_from}/LKR historical data available for analysis. Found {len(all_data) if all_data else 0} records, need at least 6. Please ensure exchange rates are being fetched for {currency_from}.'
                 }), 400
 
             # Organize data by bank
