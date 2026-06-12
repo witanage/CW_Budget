@@ -255,6 +255,12 @@ def refresh_all_exchange_rates(force=False):
             cbsl_service = get_exchange_rate_service()
             cbsl_rate = cbsl_service.fetch_and_store_current_rate(currency=currency)
             cbsl_ms = int((time.time() - cbsl_start) * 1000)
+
+            # If fetch failed, try to get the most recent rate from database
+            if not cbsl_rate:
+                logger.warning(f"Scheduler: No new CBSL {currency} rate available, checking database for existing rate")
+                cbsl_rate = cbsl_service.get_nearest_rate(currency=currency)
+
             if cbsl_rate:
                 logger.info(
                     f"Scheduler: CBSL {currency} rate for today: Buy={cbsl_rate['buy_rate']}, Sell={cbsl_rate['sell_rate']}")
@@ -289,12 +295,12 @@ def refresh_all_exchange_rates(force=False):
                     'is_new': is_new
                 })
             else:
-                logger.warning(f"Scheduler: No CBSL {currency} rate available for today")
+                logger.warning(f"Scheduler: No CBSL {currency} rate available (neither new nor in database)")
                 log_exchange_rate_refresh(f'CBSL_{currency}', 'failure',
-                                          error_message=f'No CBSL {currency} rate available for today',
+                                          error_message=f'No CBSL {currency} rate available',
                                           duration_ms=cbsl_ms,
                                           run_key=run_key)
-                return (f'CBSL_{currency}', {'status': 'failure', 'currency': currency, 'error': f'No CBSL {currency} rate available for today'})
+                return (f'CBSL_{currency}', {'status': 'failure', 'currency': currency, 'error': f'No CBSL {currency} rate available'})
         except Exception as e:
             logger.error(f"Scheduler: Error fetching CBSL {currency} rate: {str(e)}")
             log_exchange_rate_refresh(f'CBSL_{currency}', 'failure',

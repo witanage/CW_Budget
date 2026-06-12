@@ -181,6 +181,10 @@ class ExchangeRateService:
             if connection:
                 connection.close()
 
+    def get_nearest_rate(self, currency: str = 'USD') -> Optional[Dict[str, float]]:
+        """Public method to get the most recent exchange rate from database for a currency"""
+        return self._get_nearest_rate_from_db(datetime.now(), currency)
+
     def save_exchange_rate(self, date: datetime, buy_rate: float, sell_rate: float,
                           source: str = 'CBSL', currency: str = 'USD') -> bool:
         """Save exchange rate to database"""
