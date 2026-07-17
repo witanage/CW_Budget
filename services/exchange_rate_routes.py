@@ -855,27 +855,27 @@ def refresh_all_rates_manually(log_audit_func):
             for r in results.values()
         )
 
-        # Build changes summary
+        # Build changes summary - iterate through all results dynamically
         changes_summary = []
-        for bank_currency in ['HNB_USD', 'HNB_GBP', 'PB', 'SAMPATH', 'CBSL']:
-            if bank_currency in results:
-                result = results[bank_currency]
-                if result.get('status') == 'success':
-                    if result.get('is_new'):
-                        changes_summary.append(f"{bank_currency}: New rate ({result['buy_rate']}/{result['sell_rate']})")
-                    elif result.get('changed'):
-                        parts = []
-                        if result.get('buy_change') and result['buy_change'] != 0:
-                            arrow = "▲" if result['buy_change'] > 0 else "▼"
-                            parts.append(f"Buy {arrow}{abs(result['buy_change']):.4f}")
-                        if result.get('sell_change') and result['sell_change'] != 0:
-                            arrow = "▲" if result['sell_change'] > 0 else "▼"
-                            parts.append(f"Sell {arrow}{abs(result['sell_change']):.4f}")
-                        changes_summary.append(f"{bank_currency}: {', '.join(parts)}")
-                    else:
-                        changes_summary.append(f"{bank_currency}: No change")
+        # Sort keys for consistent ordering (USD first, then GBP, then EUR for each bank)
+        for bank_currency in sorted(results.keys(), key=lambda x: (x.split('_')[0], x.split('_')[1] if '_' in x else '')):
+            result = results[bank_currency]
+            if result.get('status') == 'success':
+                if result.get('is_new'):
+                    changes_summary.append(f"{bank_currency}: New rate ({result['buy_rate']}/{result['sell_rate']})")
+                elif result.get('changed'):
+                    parts = []
+                    if result.get('buy_change') and result['buy_change'] != 0:
+                        arrow = "▲" if result['buy_change'] > 0 else "▼"
+                        parts.append(f"Buy {arrow}{abs(result['buy_change']):.4f}")
+                    if result.get('sell_change') and result['sell_change'] != 0:
+                        arrow = "▲" if result['sell_change'] > 0 else "▼"
+                        parts.append(f"Sell {arrow}{abs(result['sell_change']):.4f}")
+                    changes_summary.append(f"{bank_currency}: {', '.join(parts)}")
                 else:
-                    changes_summary.append(f"{bank_currency}: Failed")
+                    changes_summary.append(f"{bank_currency}: No change")
+            else:
+                changes_summary.append(f"{bank_currency}: Failed")
 
         logger.info("Exchange rate refresh completed successfully")
         return jsonify({
@@ -897,7 +897,7 @@ def refresh_all_rates_manually(log_audit_func):
 def get_all_bank_rates_for_date():
     """
     Get all bank exchange rates for a specific date.
-    Returns HNB, People's Bank, Sampath Bank, and CBSL rates from database cache only.
+    Returns HNB, People's Bank, Sampath Bank, Commercial Bank, and CBSL rates from database cache only.
 
     Query Parameters:
         date: Date in YYYY-MM-DD format (required)
@@ -944,6 +944,16 @@ def get_all_bank_rates_for_date():
                 rates.append(sampath_rate)
         except Exception as e:
             logger.warning(f"Failed to get Sampath rate for {date_str}: {str(e)}")
+
+        # Get Commercial Bank rate
+        try:
+            combank_service = get_combank_exchange_rate_service()
+            combank_rate = _resolve_rate(combank_service, date)
+            if combank_rate:
+                combank_rate['bank'] = 'COMBANK'
+                rates.append(combank_rate)
+        except Exception as e:
+            logger.warning(f"Failed to get Commercial Bank rate for {date_str}: {str(e)}")
 
         # Get CBSL rate from database only (no scraping)
         try:
@@ -1128,7 +1138,7 @@ def get_exchange_rate_trends_all():
     try:
         currency = request.args.get('currency', 'USD').upper()
         # Validate currency
-        valid_currencies = ['USD', 'GBP', 'EUR']
+        valid_currencies = ['USD', 'GBP']
         if currency not in valid_currencies:
             currency = 'USD'
 
@@ -1539,9 +1549,10 @@ def create_salary_calculation():
     Create a new salary calculation with exchange breakdown.
 
     Request Body (JSON):
-        total_usd: Total USD salary amount
+        total_usd: Total salary amount
+        currency: Currency code (USD, GBP, EUR) - default USD
         exchanges: Array of exchange objects with:
-            - usd_amount: USD amount for this exchange
+            - usd_amount: Amount for this exchange
             - exchange_rate: LKR rate used
             - bank_source: Bank name (optional)
         notes: Optional notes for this calculation
@@ -1559,12 +1570,17 @@ def create_salary_calculation():
             return jsonify({'error': 'Request body is required'}), 400
 
         total_usd = data.get('total_usd')
+        currency = data.get('currency', 'USD').upper()
         exchanges = data.get('exchanges', [])
         notes = data.get('notes', '')
 
         # Validation
         if not total_usd or total_usd <= 0:
             return jsonify({'error': 'total_usd must be greater than 0'}), 400
+
+        valid_currencies = ['USD', 'GBP']
+        if currency not in valid_currencies:
+            return jsonify({'error': f'Invalid currency. Must be one of: {", ".join(valid_currencies)}'}), 400
 
         if not exchanges or len(exchanges) == 0:
             return jsonify({'error': 'At least one exchange is required'}), 400
@@ -1588,7 +1604,7 @@ def create_salary_calculation():
 
         # Validate that exchanged amount doesn't exceed total salary
         if total_exchanged_usd > Decimal(str(total_usd)):
-            return jsonify({'error': f'Total exchanged USD ({total_exchanged_usd}) exceeds total salary ({total_usd})'}), 400
+            return jsonify({'error': f'Total exchanged amount ({total_exchanged_usd}) exceeds total salary ({total_usd})'}), 400
 
         # Calculate average rate (only for exchanged amount)
         average_rate = total_lkr / total_exchanged_usd if total_exchanged_usd > 0 else Decimal('0')
@@ -1600,9 +1616,9 @@ def create_salary_calculation():
             # Insert main calculation
             cursor.execute("""
                 INSERT INTO salary_calculations 
-                (user_id, total_usd, total_lkr, average_rate, calculation_date, notes)
-                VALUES (%s, %s, %s, %s, CURDATE(), %s)
-            """, (user_id, total_usd, float(total_lkr), float(average_rate), notes))
+                (user_id, total_usd, currency, total_lkr, average_rate, calculation_date, notes)
+                VALUES (%s, %s, %s, %s, %s, CURDATE(), %s)
+            """, (user_id, total_usd, currency, float(total_lkr), float(average_rate), notes))
 
             calculation_id = cursor.lastrowid
 
@@ -1621,12 +1637,13 @@ def create_salary_calculation():
 
             connection.commit()
 
-            logger.info(f"User {user_id} created salary calculation {calculation_id}: ${total_usd} (exchanged: ${total_exchanged_usd}) → රු{total_lkr:.2f} (avg rate: {average_rate:.4f})")
+            logger.info(f"User {user_id} created salary calculation {calculation_id}: {currency} {total_usd} (exchanged: {total_exchanged_usd}) → රු{total_lkr:.2f} (avg rate: {average_rate:.4f})")
 
             return jsonify({
                 'message': 'Salary calculation saved successfully',
                 'calculation_id': calculation_id,
                 'total_usd': float(total_usd),
+                'currency': currency,
                 'total_exchanged_usd': float(total_exchanged_usd),
                 'total_lkr': float(total_lkr),
                 'average_rate': float(average_rate),
@@ -1662,25 +1679,49 @@ def get_salary_calculations():
         cursor = connection.cursor(dictionary=True)
         try:
             # Get all calculations for this user
-            cursor.execute("""
-                SELECT 
-                    id,
-                    total_usd,
-                    total_lkr,
-                    average_rate,
-                    calculation_date,
-                    notes,
-                    created_at
-                FROM salary_calculations
-                WHERE user_id = %s
-                ORDER BY calculation_date DESC, created_at DESC
-                LIMIT 50
-            """, (user_id,))
+            # Try to fetch with currency column first
+            try:
+                cursor.execute("""
+                    SELECT 
+                        id,
+                        total_usd,
+                        currency,
+                        total_lkr,
+                        average_rate,
+                        calculation_date,
+                        notes,
+                        created_at
+                    FROM salary_calculations
+                    WHERE user_id = %s
+                    ORDER BY calculation_date DESC, created_at DESC
+                    LIMIT 50
+                """, (user_id,))
+            except Exception as col_error:
+                # Fallback for databases without currency column (backward compatibility)
+                logger.warning(f"Currency column not found, using fallback query: {str(col_error)}")
+                cursor.execute("""
+                    SELECT 
+                        id,
+                        total_usd,
+                        total_lkr,
+                        average_rate,
+                        calculation_date,
+                        notes,
+                        created_at
+                    FROM salary_calculations
+                    WHERE user_id = %s
+                    ORDER BY calculation_date DESC, created_at DESC
+                    LIMIT 50
+                """, (user_id,))
 
             calculations = cursor.fetchall()
 
             # For each calculation, get the exchange breakdown
             for calc in calculations:
+                # Set default currency for backward compatibility
+                if not calc.get('currency'):
+                    calc['currency'] = 'USD'
+
                 cursor.execute("""
                     SELECT 
                         usd_amount,
@@ -1720,25 +1761,37 @@ def get_current_bank_rates():
     Get the most recent exchange rates from all banks.
     Used by the salary calculator to populate rate dropdowns.
 
+    Query Parameters:
+        currency: Currency code (USD, GBP, EUR) - default USD
+
     Returns:
         JSON object with current rates for each bank
     """
     try:
+        currency = request.args.get('currency', 'USD').upper()
+
+        # Validate currency
+        valid_currencies = ['USD', 'GBP']
+        if currency not in valid_currencies:
+            return jsonify({'error': f'Invalid currency. Must be one of: {", ".join(valid_currencies)}'}), 400
+
         connection = get_db_connection()
         cursor = connection.cursor(dictionary=True)
         try:
-            # Get the most recent rate for each bank from today
+            # Get the most recent rate for each bank from today for the specified currency
             cursor.execute("""
                 SELECT 
                     source,
                     buy_rate,
                     sell_rate,
-                    date
+                    date,
+                    currency
                 FROM exchange_rates
                 WHERE date = CURDATE()
-                  AND source IN ('HNB', 'PB', 'SAMPATH')
+                  AND currency = %s
+                  AND source IN ('HNB', 'PB', 'SAMPATH', 'COMBANK')
                 ORDER BY source
-            """)
+            """, (currency,))
 
             today_rates = cursor.fetchall()
 
@@ -1749,16 +1802,19 @@ def get_current_bank_rates():
                         er.source,
                         er.buy_rate,
                         er.sell_rate,
-                        er.date
+                        er.date,
+                        er.currency
                     FROM exchange_rates er
                     INNER JOIN (
                         SELECT source, MAX(date) as max_date
                         FROM exchange_rates
-                        WHERE source IN ('HNB', 'PB', 'SAMPATH')
+                        WHERE source IN ('HNB', 'PB', 'SAMPATH', 'COMBANK')
+                          AND currency = %s
                         GROUP BY source
                     ) latest ON er.source = latest.source AND er.date = latest.max_date
+                    WHERE er.currency = %s
                     ORDER BY er.source
-                """)
+                """, (currency, currency))
                 today_rates = cursor.fetchall()
 
             # Format as dictionary
@@ -1767,11 +1823,13 @@ def get_current_bank_rates():
                 rates_dict[rate['source']] = {
                     'buy_rate': float(rate['buy_rate']),
                     'sell_rate': float(rate['sell_rate']),
-                    'date': rate['date'].isoformat() if rate['date'] else None
+                    'date': rate['date'].isoformat() if rate['date'] else None,
+                    'currency': rate['currency']
                 }
 
             return jsonify({
                 'rates': rates_dict,
+                'currency': currency,
                 'fetched_at': datetime.now().isoformat()
             }), 200
 
@@ -1791,7 +1849,8 @@ def update_salary_calculation():
 
     Request Body (JSON):
         calculation_id: ID of the calculation to update
-        total_usd: Updated total USD salary amount (optional, keeps original if not provided)
+        total_usd: Updated total salary amount (optional, keeps original if not provided)
+        currency: Currency code (USD, GBP, EUR) - optional, keeps original if not provided
         exchanges: Complete array of exchange objects (replaces all existing exchanges)
         notes: Updated notes (optional, keeps original if not provided)
 
@@ -1816,7 +1875,7 @@ def update_salary_calculation():
         cursor = connection.cursor(dictionary=True)
         try:
             cursor.execute("""
-                SELECT user_id, total_usd, notes 
+                SELECT user_id, total_usd, currency, notes 
                 FROM salary_calculations 
                 WHERE id = %s
             """, (calculation_id,))
@@ -1830,8 +1889,14 @@ def update_salary_calculation():
 
             # Get updated values or keep existing
             total_usd = data.get('total_usd', existing['total_usd'])
+            currency = data.get('currency', existing.get('currency') or 'USD').upper()
             notes = data.get('notes', existing['notes'])
             exchanges = data.get('exchanges', [])
+
+            # Validate currency
+            valid_currencies = ['USD', 'GBP']
+            if currency not in valid_currencies:
+                return jsonify({'error': f'Invalid currency. Must be one of: {", ".join(valid_currencies)}'}), 400
 
             if not exchanges or len(exchanges) == 0:
                 return jsonify({'error': 'At least one exchange is required'}), 400
@@ -1855,7 +1920,7 @@ def update_salary_calculation():
 
             # Validate that exchanged amount doesn't exceed total salary
             if total_exchanged_usd > Decimal(str(total_usd)):
-                return jsonify({'error': f'Total exchanged USD ({total_exchanged_usd}) exceeds total salary ({total_usd})'}), 400
+                return jsonify({'error': f'Total exchanged amount ({total_exchanged_usd}) exceeds total salary ({total_usd})'}), 400
 
             # Calculate average rate
             average_rate = total_lkr / total_exchanged_usd if total_exchanged_usd > 0 else Decimal('0')
@@ -1867,9 +1932,9 @@ def update_salary_calculation():
             # Update main calculation
             cursor.execute("""
                 UPDATE salary_calculations 
-                SET total_usd = %s, total_lkr = %s, average_rate = %s, notes = %s
+                SET total_usd = %s, currency = %s, total_lkr = %s, average_rate = %s, notes = %s
                 WHERE id = %s
-            """, (total_usd, float(total_lkr), float(average_rate), notes, calculation_id))
+            """, (total_usd, currency, float(total_lkr), float(average_rate), notes, calculation_id))
 
             # Insert new exchanges
             for idx, ex in enumerate(exchanges, start=1):
@@ -1886,12 +1951,13 @@ def update_salary_calculation():
 
             connection.commit()
 
-            logger.info(f"User {user_id} updated salary calculation {calculation_id}: ${total_usd} (exchanged: ${total_exchanged_usd}) → රු{total_lkr:.2f}")
+            logger.info(f"User {user_id} updated salary calculation {calculation_id}: {currency} {total_usd} (exchanged: {total_exchanged_usd}) → රු{total_lkr:.2f}")
 
             return jsonify({
                 'message': 'Salary calculation updated successfully',
                 'calculation_id': calculation_id,
                 'total_usd': float(total_usd),
+                'currency': currency,
                 'total_exchanged_usd': float(total_exchanged_usd),
                 'total_lkr': float(total_lkr),
                 'average_rate': float(average_rate),

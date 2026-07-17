@@ -5494,8 +5494,7 @@ let monthDataStore = {};
 // Currency symbols for display
 const CURRENCY_SYMBOLS = {
     'USD': '$',
-    'GBP': '£',
-    'EUR': '€'
+    'GBP': '£'
 };
 
 // Currency full names
@@ -7352,10 +7351,10 @@ function loadCalculation(calculationId) {
 
 function deleteCalculation(calculationId) {
     const isCurrentlyEditing = currentEditingCalculationId === calculationId;
-    const warningMsg = isCurrentlyEditing 
+    const warningMsg = isCurrentlyEditing
         ? '<div class="alert alert-warning mb-3"><i class="fas fa-exclamation-triangle me-2"></i>You are currently editing this calculation. Deleting it will clear your current work.</div>'
         : '';
-    
+
     showConfirmModal(
         'Delete Calculation',
         warningMsg + 'Are you sure you want to delete this calculation? This action cannot be undone.',
@@ -7372,12 +7371,12 @@ function deleteCalculation(calculationId) {
                     showToast(data.error, 'danger');
                 } else {
                     showToast('<i class="fas fa-trash me-2"></i>Calculation deleted successfully', 'success');
-                    
+
                     // If we were editing this calculation, clear the editing state
                     if (isCurrentlyEditing) {
                         clearEditingMode();
                     }
-                    
+
                     loadSavedCalculations();
                 }
             })
@@ -7735,4 +7734,587 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    // ========================================
+    // SALARY CALCULATOR
+    // ========================================
+
+    const CURRENCY_SYMBOLS = {
+        USD: '$',
+        GBP: '£'
+    };
+
+    const salaryCalc = {
+        exchanges: [],
+        currentRates: null,
+        nextExchangeId: 1,
+        currentEditId: null,
+        currentCurrency: 'USD'
+    };
+
+    function showSalaryCalculator() {
+        const modal = document.getElementById('salaryCalcModal');
+        if (!modal) {
+            console.error('Salary Calculator modal not found');
+            return;
+        }
+
+        const bsModal = bootstrap.Modal.getOrCreateInstance(modal);
+        bsModal.show();
+
+        // Reset calculator state
+        salaryCalc.exchanges = [];
+        salaryCalc.nextExchangeId = 1;
+        salaryCalc.currentEditId = null;
+        salaryCalc.currentCurrency = 'USD';
+        document.getElementById('salaryCurrency').value = 'USD';
+        document.getElementById('salaryTotalUSD').value = '';
+        document.getElementById('salaryNotes').value = '';
+        document.getElementById('exchangeEntries').innerHTML = '';
+        updateCurrencyDisplay();
+        updateSalarySummary();
+        updateSaveButtonText();
+
+        // Bind buttons
+        const addExchangeBtn = document.getElementById('addExchangeBtn');
+        if (addExchangeBtn) {
+            addExchangeBtn.onclick = addExchangeEntry;
+        }
+
+        const saveCalcBtn = document.getElementById('saveCalcBtn');
+        if (saveCalcBtn) {
+            saveCalcBtn.onclick = saveSalaryCalculation;
+        }
+
+        // Bind currency selector (remove old listener first to prevent duplicates)
+        const currencySelect = document.getElementById('salaryCurrency');
+        if (currencySelect) {
+            currencySelect.removeEventListener('change', onCurrencyChange);
+            currencySelect.addEventListener('change', onCurrencyChange);
+        }
+
+        // Fetch current bank rates, then add initial exchange entry
+        fetchCurrentBankRates().then(() => {
+            addExchangeEntry();
+        });
+
+        // Load calculation history
+        loadSalaryHistory();
+    }
+
+    function onCurrencyChange() {
+        const currency = document.getElementById('salaryCurrency').value;
+        salaryCalc.currentCurrency = currency;
+        updateCurrencyDisplay();
+
+        // Refetch rates for new currency, then update UI
+        fetchCurrentBankRates().then(() => {
+            // Clear and re-add exchange entries with new currency rates
+            document.getElementById('exchangeEntries').innerHTML = '';
+            salaryCalc.nextExchangeId = 1;
+            addExchangeEntry();
+
+            updateSalarySummary();
+        });
+    }
+
+    function updateCurrencyDisplay() {
+        const currency = salaryCalc.currentCurrency;
+        const symbol = CURRENCY_SYMBOLS[currency];
+
+        // Update currency symbol in input
+        document.getElementById('salaryCurrencySymbol').textContent = symbol;
+
+        // Update labels
+        document.getElementById('summaryTotalLabel').textContent = `Total ${currency}`;
+        document.getElementById('summaryRemainingLabel').textContent = `Remaining ${currency}`;
+    }
+
+    function fetchCurrentBankRates() {
+        const currency = salaryCalc.currentCurrency;
+        return fetch(`/api/salary-calc/current-rates?currency=${currency}`)
+            .then(res => res.json())
+            .then(data => {
+                salaryCalc.currentRates = data.rates || {};
+                console.log(`Current bank rates loaded for ${currency}:`, salaryCalc.currentRates);
+            })
+            .catch(err => {
+                console.error('Error fetching current rates:', err);
+                salaryCalc.currentRates = {};
+            });
+    }
+
+    function addExchangeEntry() {
+        const exchangeId = salaryCalc.nextExchangeId++;
+        const container = document.getElementById('exchangeEntries');
+        const currency = salaryCalc.currentCurrency;
+        const symbol = CURRENCY_SYMBOLS[currency];
+
+        const entryDiv = document.createElement('div');
+        entryDiv.className = 'card mb-2';
+        entryDiv.id = 'exchange-' + exchangeId;
+        entryDiv.setAttribute('data-exchange-id', exchangeId);
+
+        const rateOptions = buildRateOptions();
+
+        const removeBtn = exchangeId > 1
+            ? `<button type="button" class="btn btn-sm btn-outline-danger d-inline-flex align-items-center" onclick="removeExchange(${exchangeId})">
+                    <i class="fas fa-times"></i>
+                </button>`
+            : '';
+
+        entryDiv.innerHTML = `
+            <div class="card-body p-2">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <strong class="small">Exchange #${exchangeId}</strong>
+                    ${removeBtn}
+                </div>
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="form-label small mb-1">${currency} Amount</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">${symbol}</span>
+                            <input type="number" class="form-control exchange-usd" data-id="${exchangeId}" 
+                                   placeholder="0.00" step="0.01" min="0">
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small mb-1">LKR Rate</label>
+                        <select class="form-select form-select-sm exchange-rate-select" data-id="${exchangeId}">
+                            <option value="">Select Bank or Manual</option>
+                            <optgroup label="Current Bank Rates">
+                                ${rateOptions}
+                            </optgroup>
+                            <option value="manual">Manual Entry</option>
+                        </select>
+                        <input type="number" class="form-control form-control-sm mt-1 exchange-rate-manual" 
+                               data-id="${exchangeId}" placeholder="Enter rate" step="0.0001" min="0" style="display:none;">
+                    </div>
+                </div>
+            </div>
+        `;
+
+        container.appendChild(entryDiv);
+
+        // Bind events
+        const usdInput = entryDiv.querySelector('.exchange-usd');
+        const rateSelect = entryDiv.querySelector('.exchange-rate-select');
+        const rateManual = entryDiv.querySelector('.exchange-rate-manual');
+
+        usdInput.addEventListener('input', updateSalarySummary);
+        rateSelect.addEventListener('change', function () {
+            if (this.value === 'manual') {
+                rateManual.style.display = 'block';
+                rateManual.value = '';
+                rateManual.focus();
+            } else {
+                rateManual.style.display = 'none';
+            }
+            updateSalarySummary();
+        });
+        rateManual.addEventListener('input', updateSalarySummary);
+    }
+
+    window.removeExchange = function(exchangeId) {
+        if (exchangeId === 1) {
+            showToast('The first exchange entry cannot be removed', 'warning');
+            return;
+        }
+        const entry = document.getElementById('exchange-' + exchangeId);
+        if (entry) {
+            entry.remove();
+            updateSalarySummary();
+        }
+    };
+
+    function buildRateOptions() {
+        if (!salaryCalc.currentRates) return '';
+
+        let options = '';
+        const banks = ['HNB', 'PB', 'SAMPATH', 'COMBANK'];
+        banks.forEach(bank => {
+            const rate = salaryCalc.currentRates[bank];
+            if (rate && rate.buy_rate) {
+                options += `<option value="${bank}|${rate.buy_rate}">${bank}: ${rate.buy_rate.toFixed(4)} රු</option>`;
+            }
+        });
+        return options;
+    }
+
+    function updateSalarySummary() {
+        const totalUSD = parseFloat(document.getElementById('salaryTotalUSD').value) || 0;
+        const entries = document.querySelectorAll('[data-exchange-id]');
+        const currency = salaryCalc.currentCurrency;
+        const symbol = CURRENCY_SYMBOLS[currency];
+
+        let totalExchangedUSD = 0;
+        let totalLKR = 0;
+
+        entries.forEach(entry => {
+            const usdInput = entry.querySelector('.exchange-usd');
+            const rateSelect = entry.querySelector('.exchange-rate-select');
+            const rateManual = entry.querySelector('.exchange-rate-manual');
+
+            const usd = parseFloat(usdInput.value) || 0;
+            let rate = 0;
+
+            if (rateSelect.value && rateSelect.value !== 'manual') {
+                const parts = rateSelect.value.split('|');
+                if (parts.length === 2) {
+                    rate = parseFloat(parts[1]);
+                }
+            } else if (rateSelect.value === 'manual' && rateManual.value) {
+                rate = parseFloat(rateManual.value) || 0;
+            }
+
+            if (usd > 0 && rate > 0) {
+                totalExchangedUSD += usd;
+                totalLKR += usd * rate;
+            }
+        });
+
+        const remainingUSD = totalUSD - totalExchangedUSD;
+        const avgRate = totalExchangedUSD > 0 ? totalLKR / totalExchangedUSD : 0;
+
+        // Update summary with correct currency symbol
+        document.getElementById('summaryTotalUSD').textContent = symbol + totalUSD.toFixed(2);
+        document.getElementById('summaryTotalLKR').textContent = 'රු ' + totalLKR.toFixed(2);
+        document.getElementById('summaryRemainingUSD').textContent = symbol + remainingUSD.toFixed(2);
+        document.getElementById('summaryAvgRate').textContent = avgRate.toFixed(4);
+
+        // Show warning if amounts don't match
+        const warningMsg = document.getElementById('warningMsg');
+        const warningText = document.getElementById('warningText');
+        if (totalUSD > 0 && Math.abs(remainingUSD) > 0.01) {
+            warningMsg.style.display = 'block';
+            if (remainingUSD > 0) {
+                warningText.textContent = `You have ${symbol}${remainingUSD.toFixed(2)} ${currency} remaining (partial save allowed)`;
+                warningMsg.className = 'mt-2 pt-2 calc-summary-warning';
+                warningText.className = 'text-warning';
+                warningText.innerHTML = '<i class="fas fa-info-circle me-1"></i>' + warningText.textContent;
+            } else {
+                warningText.textContent = `Total exchanges exceed salary by ${symbol}${Math.abs(remainingUSD).toFixed(2)}`;
+                warningMsg.className = 'mt-2 pt-2 calc-summary-warning';
+                warningText.className = 'text-danger';
+                warningText.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i>' + warningText.textContent;
+            }
+        } else {
+            warningMsg.style.display = 'none';
+        }
+    }
+
+    function updateSaveButtonText() {
+        const saveBtn = document.getElementById('saveCalcBtn');
+        if (saveBtn) {
+            if (salaryCalc.currentEditId) {
+                saveBtn.innerHTML = '<i class="fas fa-edit me-1"></i>Update Calculation';
+            } else {
+                saveBtn.innerHTML = '<i class="fas fa-save me-1"></i>Save Calculation';
+            }
+        }
+    }
+
+    function saveSalaryCalculation() {
+        const totalUSD = parseFloat(document.getElementById('salaryTotalUSD').value) || 0;
+        const notes = document.getElementById('salaryNotes').value.trim();
+        const currency = salaryCalc.currentCurrency;
+        const symbol = CURRENCY_SYMBOLS[currency];
+
+        if (totalUSD <= 0) {
+            showToast('Please enter a valid total salary amount', 'warning');
+            return;
+        }
+
+        // Collect exchanges
+        const exchanges = [];
+        const entries = document.querySelectorAll('[data-exchange-id]');
+
+        entries.forEach(entry => {
+            const usdInput = entry.querySelector('.exchange-usd');
+            const rateSelect = entry.querySelector('.exchange-rate-select');
+            const rateManual = entry.querySelector('.exchange-rate-manual');
+
+            const usd = parseFloat(usdInput.value) || 0;
+            let rate = 0;
+            let bank = null;
+
+            if (rateSelect.value && rateSelect.value !== 'manual') {
+                const parts = rateSelect.value.split('|');
+                if (parts.length === 2) {
+                    bank = parts[0];
+                    rate = parseFloat(parts[1]);
+                }
+            } else if (rateSelect.value === 'manual' && rateManual.value) {
+                rate = parseFloat(rateManual.value) || 0;
+                bank = 'Manual';
+            }
+
+            if (usd > 0 && rate > 0) {
+                exchanges.push({
+                    usd_amount: usd,
+                    exchange_rate: rate,
+                    bank_source: bank
+                });
+            }
+        });
+
+        if (exchanges.length === 0) {
+            showToast('Please add at least one exchange entry with valid amount and rate', 'warning');
+            return;
+        }
+
+        // Check total doesn't exceed salary
+        const totalExchanged = exchanges.reduce((sum, ex) => sum + ex.usd_amount, 0);
+        if (totalExchanged > totalUSD) {
+            showToast(`Total exchanged ${currency} (${symbol}${totalExchanged.toFixed(2)}) exceeds total salary (${symbol}${totalUSD.toFixed(2)})`, 'danger');
+            return;
+        }
+
+        // Save to backend
+        const saveBtn = document.getElementById('saveCalcBtn');
+        saveBtn.disabled = true;
+        const isUpdate = salaryCalc.currentEditId !== null;
+        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>' + (isUpdate ? 'Updating...' : 'Saving...');
+
+        const requestData = {
+            total_usd: totalUSD,
+            currency: currency,
+            exchanges: exchanges,
+            notes: notes
+        };
+
+        if (isUpdate) {
+            requestData.calculation_id = salaryCalc.currentEditId;
+        }
+
+        const url = isUpdate ? '/api/salary-calc/update' : '/api/salary-calc/create';
+        const method = isUpdate ? 'PUT' : 'POST';
+
+        fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestData)
+        })
+        .then(res => {
+            if (!res.ok) throw new Error('Failed to save calculation');
+            return res.json();
+        })
+        .then(data => {
+            console.log('Salary calculation saved:', data);
+            const msg = isUpdate ? 'Calculation updated successfully!' : 'Calculation saved successfully!';
+            let details = `Total: ${symbol}${data.total_usd} → රු ${data.total_lkr.toFixed(2)}`;
+            if (data.is_partial) {
+                details += ` (Partial - ${symbol}${data.total_exchanged_usd.toFixed(2)} of ${symbol}${data.total_usd.toFixed(2)} exchanged)`;
+            }
+            details += ' • Avg Rate: ' + data.average_rate.toFixed(4);
+            showToast(msg + ' — ' + details, 'success');
+
+            // Reset form
+            document.getElementById('salaryTotalUSD').value = '';
+            document.getElementById('salaryNotes').value = '';
+            document.getElementById('exchangeEntries').innerHTML = '';
+            salaryCalc.exchanges = [];
+            salaryCalc.nextExchangeId = 1;
+            salaryCalc.currentEditId = null;
+            updateSalarySummary();
+            updateSaveButtonText();
+            addExchangeEntry();
+
+            // Reload history
+            loadSalaryHistory();
+        })
+        .catch(err => {
+            console.error('Error saving calculation:', err);
+            showToast('Failed to save calculation: ' + err.message, 'danger');
+        })
+        .finally(() => {
+            saveBtn.disabled = false;
+            updateSaveButtonText();
+        });
+    }
+
+    window.editSalaryCalc = function(calcId) {
+        fetch('/api/salary-calc/history')
+            .then(res => res.json())
+            .then(data => {
+                const calc = data.calculations.find(c => c.id === calcId);
+                if (!calc) {
+                    showToast('Calculation not found', 'danger');
+                    return;
+                }
+
+                salaryCalc.currentEditId = calcId;
+
+                // Set currency
+                const currency = calc.currency || 'USD';
+                salaryCalc.currentCurrency = currency;
+                document.getElementById('salaryCurrency').value = currency;
+                updateCurrencyDisplay();
+
+                document.getElementById('salaryTotalUSD').value = calc.total_usd;
+                document.getElementById('salaryNotes').value = calc.notes || '';
+                document.getElementById('exchangeEntries').innerHTML = '';
+                salaryCalc.nextExchangeId = 1;
+
+                // Refetch rates for the currency, then populate exchanges
+                fetchCurrentBankRates().then(() => {
+                    calc.exchanges.forEach(ex => {
+                        addExchangeEntry();
+                        const entries = document.querySelectorAll('[data-exchange-id]');
+                        const lastEntry = entries[entries.length - 1];
+
+                        if (lastEntry) {
+                            const usdInput = lastEntry.querySelector('.exchange-usd');
+                            const rateSelect = lastEntry.querySelector('.exchange-rate-select');
+                            const rateManual = lastEntry.querySelector('.exchange-rate-manual');
+
+                            usdInput.value = ex.usd_amount;
+
+                            let matched = false;
+                            if (ex.bank_source && ex.bank_source !== 'Manual') {
+                                const option = rateSelect.querySelector('option[value="' + ex.bank_source + '|' + ex.exchange_rate + '"]');
+                                if (option) {
+                                    rateSelect.value = option.value;
+                                    matched = true;
+                                }
+                            }
+
+                            if (!matched) {
+                                rateSelect.value = 'manual';
+                                rateManual.style.display = 'block';
+                                rateManual.value = ex.exchange_rate;
+                            }
+                        }
+                    });
+
+                    updateSalarySummary();
+                });
+
+                updateSaveButtonText();
+
+                const modalBody = document.querySelector('#salaryCalcModal .modal-body');
+                if (modalBody) modalBody.scrollTop = 0;
+            })
+            .catch(err => {
+                console.error('Error loading calculation:', err);
+                showToast('Failed to load calculation', 'danger');
+            });
+    };
+
+    window.deleteSalaryCalc = function(calcId) {
+        showConfirmModal(
+            'Delete Calculation',
+            'Are you sure you want to delete this salary calculation? This action cannot be undone.',
+            function() {
+                fetch('/api/salary-calc/delete?calculation_id=' + calcId, {
+                    method: 'DELETE'
+                })
+                .then(res => {
+                    if (!res.ok) throw new Error('Failed to delete');
+                    return res.json();
+                })
+                .then(() => {
+                    showToast('Calculation deleted successfully', 'success');
+                    loadSalaryHistory();
+                })
+                .catch(err => {
+                    console.error('Error deleting calculation:', err);
+                    showToast('Failed to delete calculation', 'danger');
+                });
+            },
+            'Delete',
+            'btn-danger'
+        );
+    };
+
+    function loadSalaryHistory() {
+        const loadingEl = document.getElementById('salaryHistoryLoading');
+        const emptyEl = document.getElementById('salaryHistoryEmpty');
+        const listEl = document.getElementById('salaryHistoryList');
+
+        loadingEl.style.display = 'block';
+        emptyEl.style.display = 'none';
+        listEl.style.display = 'none';
+
+        fetch('/api/salary-calc/history')
+            .then(res => res.json())
+            .then(data => {
+                loadingEl.style.display = 'none';
+
+                if (!data.calculations || data.calculations.length === 0) {
+                    emptyEl.style.display = 'block';
+                    return;
+                }
+
+                listEl.style.display = 'block';
+                listEl.innerHTML = '';
+
+                data.calculations.forEach(calc => {
+                    const card = document.createElement('div');
+                    card.className = 'card mb-2';
+
+                    const calcDate = new Date(calc.calculation_date).toLocaleDateString();
+                    const createdDate = new Date(calc.created_at).toLocaleString();
+
+                    const totalExchanged = calc.exchanges.reduce((sum, ex) => sum + parseFloat(ex.usd_amount), 0);
+                    const isPartial = totalExchanged < parseFloat(calc.total_usd);
+                    const partialBadge = isPartial ? '<span class="badge bg-warning text-dark ms-2 d-inline-flex align-items-center" style="height: fit-content;">Partial</span>' : '';
+
+                    // Get currency symbol
+                    const currency = calc.currency || 'USD';
+                    const symbol = CURRENCY_SYMBOLS[currency] || '$';
+                    const currencyBadge = currency !== 'USD' ? `<span class="badge bg-secondary ms-2 d-inline-flex align-items-center" style="height: fit-content;">${currency}</span>` : '';
+
+                    let exchangesHtml = '';
+                    calc.exchanges.forEach(ex => {
+                        const bankLabel = ex.bank_source || 'Unknown';
+                        exchangesHtml += `<li class="small">${symbol}${ex.usd_amount.toFixed(2)} @ ${ex.exchange_rate.toFixed(4)} (${bankLabel}) = රු ${ex.lkr_amount.toFixed(2)}</li>`;
+                    });
+
+                    card.innerHTML = `
+                        <div class="card-body p-2">
+                            <div class="d-flex justify-content-between align-items-start mb-1">
+                                <div>
+                                    <strong class="text-primary">${symbol}${calc.total_usd.toFixed(2)} → රු ${calc.total_lkr.toFixed(2)}</strong>${currencyBadge}${partialBadge}
+                                    <div class="small text-muted">${calcDate}</div>
+                                </div>
+                                <div class="d-flex gap-1 align-items-center">
+                                    <span class="badge bg-info d-inline-flex align-items-center" style="height: fit-content;">Avg: ${calc.average_rate.toFixed(4)}</span>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="editSalaryCalc(${calc.id})" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteSalaryCalc(${calc.id})" title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="small mb-2">
+                                <strong>Breakdown:</strong>
+                                <ul class="mb-0 ps-3">${exchangesHtml}</ul>
+                            </div>
+                            ${calc.notes ? '<div class="small text-muted"><i class="fas fa-note-sticky me-1"></i>' + calc.notes + '</div>' : ''}
+                            <div class="small text-muted mt-1"><i class="fas fa-clock me-1"></i>Created: ${createdDate}</div>
+                        </div>
+                    `;
+
+                    listEl.appendChild(card);
+                });
+            })
+            .catch(err => {
+                console.error('Error loading history:', err);
+                loadingEl.style.display = 'none';
+                emptyEl.style.display = 'block';
+            });
+    }
+
+    // Initialize salary calculator button
+    const openSalaryCalcBtn = document.getElementById('openSalaryCalcBtn');
+    if (openSalaryCalcBtn) {
+        openSalaryCalcBtn.addEventListener('click', showSalaryCalculator);
+    }
+
+    // ========================================
+    // END SALARY CALCULATOR
+    // ========================================
+
 });

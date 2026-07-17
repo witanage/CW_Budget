@@ -4,7 +4,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="salaryCalcModalLabel">
-                    <i class="fas fa-calculator me-2"></i>USD Salary Calculator
+                    <i class="fas fa-calculator me-2"></i>Salary Calculator
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -60,15 +60,25 @@
                                 <h6 class="mb-0"><i class="fas fa-plus-circle me-2 text-primary"></i>New Calculation</h6>
                             </div>
                             <div class="card-body">
-                                <!-- Total USD Salary -->
+                                <!-- Currency Selection -->
                                 <div class="mb-3">
-                                    <label for="salaryTotalUSD" class="form-label">Total USD Salary</label>
+                                    <label for="salaryCurrency" class="form-label">Currency</label>
+                                    <select class="form-select" id="salaryCurrency">
+                                        <option value="USD" selected>USD - US Dollar</option>
+                                        <option value="GBP">GBP - British Pound</option>
+                                    </select>
+                                    <small class="text-muted">Select your salary currency</small>
+                                </div>
+
+                                <!-- Total Salary Amount -->
+                                <div class="mb-3">
+                                    <label for="salaryTotalUSD" class="form-label">Total Salary Amount</label>
                                     <div class="input-group">
-                                        <span class="input-group-text">$</span>
+                                        <span class="input-group-text" id="salaryCurrencySymbol">$</span>
                                         <input type="number" class="form-control" id="salaryTotalUSD"
                                                placeholder="e.g., 150" step="0.01" min="0">
                                     </div>
-                                    <small class="text-muted">Your total USD salary amount</small>
+                                    <small class="text-muted">Your total salary amount in the selected currency</small>
                                 </div>
 
                                 <!-- Exchange Entries -->
@@ -82,7 +92,7 @@
                                     <div id="exchangeEntries">
                                         <!-- Exchange entries will be added here -->
                                     </div>
-                                    <small class="text-muted">Add multiple exchanges at different rates</small>
+                                    <small class="text-muted">Add multiple exchanges at different bank rates</small>
                                 </div>
 
                                 <!-- Calculation Summary -->
@@ -91,7 +101,7 @@
                                         <h6 class="card-subtitle mb-3 calc-summary-title">Summary</h6>
                                         <div class="row g-3">
                                             <div class="col-6">
-                                                <small class="d-block calc-summary-label">Total USD</small>
+                                                <small class="d-block calc-summary-label" id="summaryTotalLabel">Total USD</small>
                                                 <strong id="summaryTotalUSD" class="fs-5 calc-summary-value">$0.00</strong>
                                             </div>
                                             <div class="col-6">
@@ -99,7 +109,7 @@
                                                 <strong id="summaryTotalLKR" class="fs-5 calc-summary-value-success">රු 0.00</strong>
                                             </div>
                                             <div class="col-6">
-                                                <small class="d-block calc-summary-label">Remaining USD</small>
+                                                <small class="d-block calc-summary-label" id="summaryRemainingLabel">Remaining USD</small>
                                                 <strong id="summaryRemainingUSD" class="fs-6 calc-summary-value">$0.00</strong>
                                             </div>
                                             <div class="col-6">

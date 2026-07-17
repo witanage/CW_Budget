@@ -503,6 +503,53 @@ CREATE TABLE IF NOT EXISTS category_keywords (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 COMMENT='Keyword-to-category mappings for auto-categorizing transactions';
 
+-- ============================================================
+-- Salary Calculations Table
+-- ============================================================
+-- Stores salary exchange calculations for tracking currency conversions
+-- Supports multiple currencies (USD, GBP) with partial exchanges allowed
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS salary_calculations (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    total_usd DECIMAL(10, 2) NOT NULL COMMENT 'Total salary amount in foreign currency',
+    currency VARCHAR(3) DEFAULT 'USD' COMMENT 'Currency code: USD, GBP',
+    total_lkr DECIMAL(12, 2) NOT NULL COMMENT 'Total LKR amount from all exchanges',
+    average_rate DECIMAL(10, 4) NOT NULL COMMENT 'Weighted average exchange rate',
+    calculation_date DATE NOT NULL DEFAULT (CURDATE()),
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_date (user_id, calculation_date),
+    INDEX idx_currency (currency),
+    INDEX idx_calculation_date (calculation_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+COMMENT='Salary exchange calculations with multi-currency support';
+
+-- ============================================================
+-- Salary Calculation Exchanges Table
+-- ============================================================
+-- Stores individual exchange entries for each salary calculation
+-- Tracks bank source and rates for each exchange transaction
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS salary_calculation_exchanges (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    calculation_id INT NOT NULL,
+    usd_amount DECIMAL(10, 2) NOT NULL COMMENT 'Amount in foreign currency',
+    exchange_rate DECIMAL(10, 4) NOT NULL COMMENT 'Exchange rate used',
+    lkr_amount DECIMAL(12, 2) NOT NULL COMMENT 'Resulting LKR amount',
+    bank_source VARCHAR(50) COMMENT 'Bank source: HNB, PB, SAMPATH, COMBANK, or Manual',
+    exchange_order INT NOT NULL DEFAULT 1 COMMENT 'Order of exchange entries',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (calculation_id) REFERENCES salary_calculations(id) ON DELETE CASCADE,
+    INDEX idx_calculation_id (calculation_id),
+    INDEX idx_bank_source (bank_source)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+COMMENT='Individual exchange entries for salary calculations';
+
 -- Seed category keywords
 INSERT IGNORE INTO category_keywords (category_id, keyword) VALUES
 -- Groceries (7)
