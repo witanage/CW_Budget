@@ -31,7 +31,7 @@
         vol:  '#17a2b8',
         range: '#dc3545'
     };
-    var SRC_CLR = { CBSL: '#0d6efd', HNB: '#198754', PB: '#fd7e14', SAMPATH: '#dc3545', CSV: '#6c757d', Manual: '#20c997' };
+    var SRC_CLR = { CBSL: '#0d6efd', HNB: '#198754', PB: '#fd7e14', SAMPATH: '#dc3545', COMBANK: '#17a2b8', CSV: '#6c757d', Manual: '#20c997' };
 
     // ===================================================================
     // Public entry — called each time the user navigates to Rate Trends
@@ -515,7 +515,7 @@
                     legend: {
                         labels: { color: t.text, font: { size: 11 }, usePointStyle: true, pointStyle: 'line' },
                         onHover: function (evt, legendItem, legend) {
-                            // Dim the line for the hovered legend item
+                            // Dim OTHER lines (not the hovered one)
                             var chart = legend.chart;
                             var datasetIndex = legendItem.datasetIndex;
 
@@ -535,8 +535,8 @@
                                     }
                                 }
 
-                                // Dim the hovered dataset
-                                if (i === datasetIndex) {
+                                // Dim all OTHER datasets (not the hovered one)
+                                if (i !== datasetIndex) {
                                     // Reduce opacity by 70% (to 30%)
                                     var bc = dataset.borderColor;
                                     var rgb = _extractRGB(bc);
@@ -770,7 +770,7 @@
             return timeStr;
         });
 
-        var bankNames = ['CBSL', 'HNB', 'PB', 'SAMPATH'];
+        var bankNames = ['CBSL', 'HNB', 'PB', 'SAMPATH', 'COMBANK'];
         var datasets = bankNames.map(function (bank) {
             var data = runs.map(function (run) {
                 var bankData = run.banks[bank];
@@ -1269,7 +1269,7 @@
         if (!_salaryCalc.currentRates) return '';
 
         var options = '';
-        var banks = ['HNB', 'PB', 'SAMPATH'];
+        var banks = ['HNB', 'PB', 'SAMPATH', 'COMBANK'];
         banks.forEach(function (bank) {
             var rate = _salaryCalc.currentRates[bank];
             if (rate && rate.buy_rate) {

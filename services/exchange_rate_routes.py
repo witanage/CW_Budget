@@ -20,6 +20,7 @@ from services.exchange_rate_service import get_exchange_rate_service
 from services.hnb_exchange_rate_service import get_hnb_exchange_rate_service
 from services.pb_exchange_rate_service import get_pb_exchange_rate_service
 from services.sampath_exchange_rate_service import get_sampath_exchange_rate_service
+from services.combank_exchange_rate_service import get_combank_exchange_rate_service
 from services.gemini_exchange_analyzer import get_gemini_exchange_analyzer
 from services.ntfy_service import send_rate_change_notifications
 
@@ -60,9 +61,10 @@ def refresh_all_exchange_rates(force=False):
                   AND (
                     source LIKE 'HNB_%' 
                     OR source LIKE 'PB_%' 
-                    OR source LIKE 'SAMPATH_%' 
+                    OR source LIKE 'SAMPATH_%'
+                    OR source LIKE 'COMBANK_%' 
                     OR source LIKE 'CBSL_%'
-                    OR source IN ('HNB', 'PB', 'SAMPATH', 'CBSL')
+                    OR source IN ('HNB', 'PB', 'SAMPATH', 'COMBANK', 'CBSL')
                   )
                 ORDER BY created_at DESC
             """)
@@ -249,6 +251,59 @@ def refresh_all_exchange_rates(force=False):
                                       run_key=run_key)
             return (f'SAMPATH_{currency}', {'status': 'failure', 'currency': currency, 'error': str(e)})
 
+    def fetch_combank(currency='USD'):
+        combank_start = time.time()
+        try:
+            combank_service = get_combank_exchange_rate_service()
+            combank_rate = combank_service.fetch_and_store_current_rate(currency=currency)
+            combank_ms = int((time.time() - combank_start) * 1000)
+            if combank_rate:
+                logger.info(f"Scheduler: COMBANK {currency} rate updated: Buy={combank_rate['buy_rate']}, Sell={combank_rate['sell_rate']}")
+
+                # Compute deltas - look for currency-specific previous rate
+                prev = previous_rates.get(f'COMBANK_{currency}')
+                buy_change = None
+                sell_change = None
+                changed = False
+                is_new = prev is None
+
+                if prev:
+                    buy_change = round(float(combank_rate['buy_rate']) - prev['buy_rate'], 4)
+                    sell_change = round(float(combank_rate['sell_rate']) - prev['sell_rate'], 4)
+                    changed = (buy_change != 0 or sell_change != 0)
+
+                log_exchange_rate_refresh(f'COMBANK_{currency}', 'success',
+                                          buy_rate=combank_rate['buy_rate'],
+                                          sell_rate=combank_rate['sell_rate'],
+                                          duration_ms=combank_ms,
+                                          run_key=run_key)
+                return (f'COMBANK_{currency}', {
+                    'status': 'success',
+                    'currency': currency,
+                    'buy_rate': combank_rate['buy_rate'],
+                    'sell_rate': combank_rate['sell_rate'],
+                    'previous_buy_rate': prev['buy_rate'] if prev else None,
+                    'previous_sell_rate': prev['sell_rate'] if prev else None,
+                    'buy_change': buy_change,
+                    'sell_change': sell_change,
+                    'changed': changed,
+                    'is_new': is_new
+                })
+            else:
+                logger.warning(f"Scheduler: Failed to fetch COMBANK {currency} rate")
+                log_exchange_rate_refresh(f'COMBANK_{currency}', 'failure',
+                                          error_message=f'No {currency} rate returned by COMBANK scraper',
+                                          duration_ms=combank_ms,
+                                          run_key=run_key)
+                return (f'COMBANK_{currency}', {'status': 'failure', 'currency': currency, 'error': f'No {currency} rate returned by COMBANK scraper'})
+        except Exception as e:
+            logger.error(f"Scheduler: Error fetching COMBANK {currency} rate: {str(e)}")
+            log_exchange_rate_refresh(f'COMBANK_{currency}', 'failure',
+                                      error_message=str(e),
+                                      duration_ms=int((time.time() - combank_start) * 1000),
+                                      run_key=run_key)
+            return (f'COMBANK_{currency}', {'status': 'failure', 'currency': currency, 'error': str(e)})
+
     def fetch_cbsl(currency='USD'):
         cbsl_start = time.time()
         try:
@@ -322,6 +377,7 @@ def refresh_all_exchange_rates(force=False):
             futures[executor.submit(fetch_hnb, currency)] = f'HNB_{currency}'
             futures[executor.submit(fetch_pb, currency)] = f'PB_{currency}'
             futures[executor.submit(fetch_sampath, currency)] = f'SAMPATH_{currency}'
+            futures[executor.submit(fetch_combank, currency)] = f'COMBANK_{currency}'
             futures[executor.submit(fetch_cbsl, currency)] = f'CBSL_{currency}'
 
         # Collect results as they complete
@@ -1270,7 +1326,7 @@ def get_exchange_rate_ai_insights():
         transaction_type = request.args.get('transaction_type', 'salary_exchange')
         user_bank = request.args.get('user_bank', 'HNB')
         # Validate user_bank against known banks
-        if user_bank not in ('CBSL', 'PB', 'HNB', 'SAMPATH'):
+        if user_bank not in ('CBSL', 'PB', 'HNB', 'SAMPATH', 'COMBANK'):
             user_bank = 'HNB'
 
         # Get Gemini Exchange Analyzer instance

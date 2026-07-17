@@ -125,7 +125,7 @@ def _send_currency_notification(currency: str, results: Dict) -> None:
         changes_lines = []
         max_abs_change = 0.0
 
-        for bank in ['HNB', 'PB', 'SAMPATH', 'CBSL']:
+        for bank in ['HNB', 'PB', 'SAMPATH', 'COMBANK', 'CBSL']:
             if bank in results:
                 bank_result = results[bank]
                 changes_lines.append(_format_rate_change(bank, bank_result))
