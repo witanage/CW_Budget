@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+
+{% block title %}MFA Verification - Personal Finance Manager{% endblock %}
+
+{% block content %}
+<!-- Animated Background -->
+<div id="vantaBackground" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; background-color: var(--bg-primary);"></div>
+
+<!-- Page Transition Loader -->
+<div id="pageTransitionLoader" class="page-transition-loader">
+    <div class="page-transition-content">
+        <div class="professional-spinner"></div>
+    </div>
+</div>
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-4">
+            <div class="card shadow">
+                <div class="card-body p-4">
+                    <h4 class="text-center mb-4">
+                        <i class="fas fa-shield-alt me-2"></i>
+                        Two-Factor Authentication
+                    </h4>
+
+                    <p class="text-muted text-center mb-4">
+                        Enter the 6-digit code from your authenticator app
+                    </p>
+
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+
+                    <form id="mfaVerifyForm">
+                        <div class="mb-3">
+                            <label for="verificationCode" class="form-label">Verification Code</label>
+                            <input type="text"
+                                   class="form-control form-control-lg text-center"
+                                   id="verificationCode"
+                                   name="code"
+                                   maxlength="6"
+                                   pattern="\d{6}"
+                                   placeholder="000000"
+                                   required
+                                   autocomplete="off"
+                                   autofocus>
+                            <div class="form-text">Enter the 6-digit code from your authenticator app</div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100 mb-3 d-flex align-items-center justify-content-center" id="verifyButton">
+                            <span class="professional-spinner-sm me-2 d-none" id="verifySpinner"></span>
+                            <span id="verifyButtonText">Verify</span>
+                        </button>
+
+                        <div class="text-center">
+                            <button type="button" class="btn btn-link btn-sm" id="useBackupCodeButton">
+                                <i class="fas fa-key me-1"></i>Use a backup code instead
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- Backup code form (hidden by default) -->
+                    <form id="backupCodeForm" class="d-none">
+                        <div class="alert alert-info">
+                            <strong><i class="fas fa-info-circle me-2"></i>Using Backup Code</strong>
+                            <p class="mb-0 small">Enter one of your backup codes. Each code can only be used once.</p>
+                        </div>
+                        <div class="mb-3">
+                            <label for="backupCode" class="form-label">Backup Code</label>
+                            <input type="text"
+                                   class="form-control form-control-lg text-center"
+                                   id="backupCode"
+                                   name="backup_code"
+                                   maxlength="8"
+                                   pattern="\d{8}"
+                                   placeholder="00000000"
+                                   autocomplete="off">
+                            <div class="form-text">Enter your 8-digit backup code</div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100 mb-3 d-flex align-items-center justify-content-center" id="backupVerifyButton">
+                            <span class="professional-spinner-sm me-2 d-none" id="backupVerifySpinner"></span>
+                            <span id="backupVerifyButtonText">Verify Backup Code</span>
+                        </button>
+
+                        <div class="text-center">
+                            <button type="button" class="btn btn-link btn-sm" id="useAuthenticatorButton">
+                                <i class="fas fa-mobile-alt me-1"></i>Use authenticator app instead
+                            </button>
+                        </div>
+                    </form>
+
+                    <hr class="my-4">
+
+                    <div class="text-center">
+                        <p class="mb-0 small text-muted">
+                            <a href="/login" class="text-decoration-none">
+                                <i class="fas fa-arrow-left me-1"></i>Back to Login
+                            </a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<!-- Vanta.js for animated background (self-hosted) -->
+<script src="{{ url_for('static', filename='js/vendor/three.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/vendor/vanta.birds.min.js') }}"></script>
+<!-- Ensure base.js is loaded first -->
+<script src="{{ url_for('static', filename='js/base.js') }}?v=3.0"></script>
+<script src="{{ url_for('static', filename='js/mfa_verify.js') }}?v=1.0"></script>
+<script>
+// Initialize Vanta.js background (same as login page)
+let vantaEffect = null;
+
+function initVantaBackground() {
+    if (typeof VANTA !== 'undefined' && typeof VANTA.BIRDS !== 'undefined') {
+        const bgElement = document.getElementById('vantaBackground');
+        if (bgElement) {
+            const theme = document.documentElement.getAttribute('data-theme') || 'dark';
+            const colors = theme === 'dark' ? {
+                backgroundColor: 0x1a1a1a,
+                color1: 0x007acc,
+                color2: 0x0066ff,
+                colorMode: 'variance'
+            } : {
+                backgroundColor: 0xf8fafc,
+                color1: 0x0866ff,
+                color2: 0x4299e1,
+                colorMode: 'variance'
+            };
+
+            vantaEffect = VANTA.BIRDS({
+                el: bgElement,
+                mouseControls: true,
+                touchControls: true,
+                gyroControls: false,
+                minHeight: 200.00,
+                minWidth: 200.00,
+                scale: 1.00,
+                scaleMobile: 1.00,
+                ...colors
+            });
+        }
+    }
+}
+
+// Initialize on load
+document.addEventListener('DOMContentLoaded', initVantaBackground);
+
+// Reinitialize when theme changes
+document.addEventListener('themeChanged', () => {
+    if (vantaEffect) {
+        vantaEffect.destroy();
+    }
+    initVantaBackground();
+});
+</script>
+{% endblock %}

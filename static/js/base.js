@@ -241,6 +241,227 @@ if (saveDefaultPageBtn && defaultPageSelect && defaultCurrencySelect) {
     });
 }
 
+// ========================================
+// MFA Settings Management
+// ========================================
+
+// Load MFA status when modal is shown
+const mfaSettingsModal = document.getElementById('mfaSettingsModal');
+if (mfaSettingsModal) {
+    mfaSettingsModal.addEventListener('show.bs.modal', async function() {
+        await loadMfaStatus();
+    });
+}
+
+async function loadMfaStatus() {
+    const statusContainer = document.getElementById('mfaStatusContainer');
+    const disabledState = document.getElementById('mfaDisabledState');
+    const enabledState = document.getElementById('mfaEnabledState');
+
+    try {
+        const response = await fetch('/api/mfa/status');
+        const data = await response.json();
+
+        statusContainer.classList.add('d-none');
+
+        if (data.mfa_enabled) {
+            disabledState.classList.add('d-none');
+            enabledState.classList.remove('d-none');
+
+            if (data.mfa_enabled_at) {
+                const enabledDate = new Date(data.mfa_enabled_at);
+                document.getElementById('mfaEnabledDate').textContent = enabledDate.toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+            }
+        } else {
+            enabledState.classList.add('d-none');
+            disabledState.classList.remove('d-none');
+        }
+    } catch (error) {
+        console.error('Error loading MFA status:', error);
+        statusContainer.innerHTML = '<div class="alert alert-danger">Failed to load MFA status</div>';
+    }
+}
+
+// Disable MFA
+const confirmDisableMfaBtn = document.getElementById('confirmDisableMfaBtn');
+if (confirmDisableMfaBtn) {
+    confirmDisableMfaBtn.addEventListener('click', async function() {
+        const password = document.getElementById('disableMfaPassword').value;
+        const spinner = document.getElementById('disableMfaSpinner');
+
+        if (!password) {
+            showToast('Password is required', 'warning');
+            return;
+        }
+
+        this.disabled = true;
+        spinner.classList.remove('d-none');
+
+        try {
+            const response = await fetch('/api/mfa/disable', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: password })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                showToast('MFA has been disabled', 'success');
+
+                // Close both modals
+                const disableModal = bootstrap.Modal.getInstance(document.getElementById('disableMfaModal'));
+                const settingsModal = bootstrap.Modal.getInstance(document.getElementById('mfaSettingsModal'));
+
+                disableModal.hide();
+                document.getElementById('disableMfaForm').reset();
+
+                // Reload MFA status
+                await loadMfaStatus();
+            } else {
+                showToast(data.error || 'Failed to disable MFA', 'danger');
+            }
+        } catch (error) {
+            console.error('Error disabling MFA:', error);
+            showToast('Error disabling MFA', 'danger');
+        } finally {
+            this.disabled = false;
+            spinner.classList.add('d-none');
+        }
+    });
+}
+
+// Regenerate backup codes
+const confirmRegenerateBtn = document.getElementById('confirmRegenerateBtn');
+if (confirmRegenerateBtn) {
+    confirmRegenerateBtn.addEventListener('click', async function() {
+        const password = document.getElementById('regeneratePassword').value;
+        const spinner = document.getElementById('regenerateSpinner');
+        const formContainer = document.getElementById('regenerateFormContainer');
+        const codesContainer = document.getElementById('newBackupCodesContainer');
+
+        if (!password) {
+            showToast('Password is required', 'warning');
+            return;
+        }
+
+        this.disabled = true;
+        spinner.classList.remove('d-none');
+
+        try {
+            const response = await fetch('/api/mfa/regenerate-backup-codes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: password })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                showToast('Backup codes regenerated successfully', 'success');
+
+                // Display new codes
+                const codesList = document.getElementById('newBackupCodesList');
+                let html = '<div class="row g-2">';
+                data.backup_codes.forEach((code, index) => {
+                    html += `
+                        <div class="col-6">
+                            <div class="alert alert-secondary mb-0 py-2">
+                                <strong>${index + 1}.</strong> <code>${code}</code>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                codesList.innerHTML = html;
+
+                // Show codes, hide form
+                formContainer.classList.add('d-none');
+                codesContainer.classList.remove('d-none');
+                this.classList.add('d-none');
+
+                // Store codes for copying
+                window.currentBackupCodes = data.backup_codes;
+            } else {
+                showToast(data.error || 'Failed to regenerate backup codes', 'danger');
+            }
+        } catch (error) {
+            console.error('Error regenerating backup codes:', error);
+            showToast('Error regenerating backup codes', 'danger');
+        } finally {
+            this.disabled = false;
+            spinner.classList.add('d-none');
+        }
+    });
+}
+
+// Copy new backup codes
+const copyNewBackupCodesBtn = document.getElementById('copyNewBackupCodesBtn');
+if (copyNewBackupCodesBtn) {
+    copyNewBackupCodesBtn.addEventListener('click', function() {
+        if (!window.currentBackupCodes) {
+            showToast('No codes to copy', 'warning');
+            return;
+        }
+
+        const codesText = window.currentBackupCodes.join('\n');
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(codesText)
+                .then(() => {
+                    showToast('Backup codes copied to clipboard', 'success');
+                    this.innerHTML = '<i class="fas fa-check me-2"></i>Copied!';
+                    setTimeout(() => {
+                        this.innerHTML = '<i class="fas fa-copy me-2"></i>Copy Backup Codes';
+                    }, 2000);
+                })
+                .catch(err => {
+                    console.error('Failed to copy:', err);
+                    showToast('Failed to copy codes', 'danger');
+                });
+        } else {
+            // Fallback
+            const textarea = document.createElement('textarea');
+            textarea.value = codesText;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                showToast('Backup codes copied to clipboard', 'success');
+            } catch (err) {
+                showToast('Failed to copy codes', 'danger');
+            }
+            document.body.removeChild(textarea);
+        }
+    });
+}
+
+// Reset regenerate backup codes modal when hidden
+const regenerateBackupCodesModal = document.getElementById('regenerateBackupCodesModal');
+if (regenerateBackupCodesModal) {
+    regenerateBackupCodesModal.addEventListener('hidden.bs.modal', function() {
+        document.getElementById('regenerateFormContainer').classList.remove('d-none');
+        document.getElementById('newBackupCodesContainer').classList.add('d-none');
+        document.getElementById('regenerateBackupCodesForm').reset();
+        document.getElementById('confirmRegenerateBtn').classList.remove('d-none');
+        window.currentBackupCodes = null;
+    });
+}
+
+// Reset disable MFA modal when hidden
+const disableMfaModal = document.getElementById('disableMfaModal');
+if (disableMfaModal) {
+    disableMfaModal.addEventListener('hidden.bs.modal', function() {
+        document.getElementById('disableMfaForm').reset();
+    });
+}
+
 // Initialize theme on page load
 (function initTheme() {
     // Check for saved theme preference or default to 'dark'

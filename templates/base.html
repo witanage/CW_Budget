@@ -117,6 +117,9 @@
                             <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
                                 <i class="fas fa-key me-2"></i>Change Password
                             </a></li>
+                            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#mfaSettingsModal">
+                                <i class="fas fa-shield-alt me-2"></i>Two-Factor Authentication
+                            </a></li>
                             <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#defaultPageModal">
                                 <i class="fas fa-cog me-2"></i>User Preferences
                             </a></li>
@@ -228,6 +231,149 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="button" class="btn btn-primary" id="saveDefaultPageBtn">Save Preference</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MFA Settings Modal -->
+    <div class="modal fade" id="mfaSettingsModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-shield-alt me-2"></i>Two-Factor Authentication
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="mfaStatusContainer">
+                        <div class="text-center">
+                            <div class="professional-spinner"></div>
+                            <p class="mt-2 text-muted">Loading MFA status...</p>
+                        </div>
+                    </div>
+
+                    <!-- MFA Disabled State -->
+                    <div id="mfaDisabledState" class="d-none">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Two-Factor Authentication is not enabled.</strong>
+                            <p class="mb-0 mt-2">Enhance your account security by enabling MFA. You'll need an authenticator app like Google Authenticator or Authy.</p>
+                        </div>
+                        <div class="d-grid">
+                            <a href="/mfa/setup" class="btn btn-primary">
+                                <i class="fas fa-shield-alt me-2"></i>Enable Two-Factor Authentication
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- MFA Enabled State -->
+                    <div id="mfaEnabledState" class="d-none">
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle me-2"></i>
+                            <strong>Two-Factor Authentication is enabled.</strong>
+                            <p class="mb-0 mt-2">Your account is protected with MFA.</p>
+                            <p class="mb-0 mt-1 small">Enabled: <span id="mfaEnabledDate"></span></p>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#regenerateBackupCodesModal">
+                                <i class="fas fa-sync-alt me-2"></i>Regenerate Backup Codes
+                            </button>
+                            <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#disableMfaModal">
+                                <i class="fas fa-times-circle me-2"></i>Disable Two-Factor Authentication
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Disable MFA Confirmation Modal -->
+    <div class="modal fade" id="disableMfaModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title text-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>Disable Two-Factor Authentication
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <strong>Warning:</strong> Disabling MFA will make your account less secure.
+                    </div>
+                    <p>Please enter your password to confirm:</p>
+                    <form id="disableMfaForm">
+                        <div class="mb-3">
+                            <label for="disableMfaPassword" class="form-label">Password</label>
+                            <input type="password" class="form-control" id="disableMfaPassword" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="confirmDisableMfaBtn">
+                        <span class="professional-spinner-sm me-2 d-none" id="disableMfaSpinner"></span>
+                        Disable MFA
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Regenerate Backup Codes Modal -->
+    <div class="modal fade" id="regenerateBackupCodesModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-sync-alt me-2"></i>Regenerate Backup Codes
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="regenerateFormContainer">
+                        <div class="alert alert-warning">
+                            <strong>Note:</strong> This will invalidate all existing backup codes and generate new ones.
+                        </div>
+                        <p>Please enter your password to confirm:</p>
+                        <form id="regenerateBackupCodesForm">
+                            <div class="mb-3">
+                                <label for="regeneratePassword" class="form-label">Password</label>
+                                <input type="password" class="form-control" id="regeneratePassword" required>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div id="newBackupCodesContainer" class="d-none">
+                        <div class="alert alert-success">
+                            <strong>New backup codes generated!</strong>
+                            <p class="mb-0 mt-2">Save these codes in a safe place. Each can only be used once.</p>
+                        </div>
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <div id="newBackupCodesList"></div>
+                            </div>
+                        </div>
+                        <div class="d-grid mt-3">
+                            <button type="button" class="btn btn-secondary" id="copyNewBackupCodesBtn">
+                                <i class="fas fa-copy me-2"></i>Copy Backup Codes
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="confirmRegenerateBtn">
+                        <span class="professional-spinner-sm me-2 d-none" id="regenerateSpinner"></span>
+                        Regenerate Codes
+                    </button>
                 </div>
             </div>
         </div>

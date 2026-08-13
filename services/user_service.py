@@ -113,6 +113,15 @@ def register_user_routes(app, limiter, RATE_LIMIT_LOGIN, RATE_LIMIT_REGISTER, RA
                             return jsonify(
                                 {'error': 'Your account has been deactivated. Please contact an administrator.'}), 403
 
+                        # Check if MFA is enabled for this user
+                        if user.get('mfa_enabled', False):
+                            # Store user ID temporarily for MFA verification
+                            session['mfa_user_id'] = user['id']
+                            session.modified = True
+                            logger.info(f"Password verified for user: {username} (ID: {user['id']}), awaiting MFA verification")
+                            return jsonify({'message': 'MFA verification required', 'mfa_required': True}), 200
+
+                        # No MFA - complete login normally
                         # Update last_login timestamp
                         cursor.execute("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = %s", (user['id'],))
                         connection.commit()

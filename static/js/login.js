@@ -38,6 +38,12 @@ loginButton.disabled = false;
 loginSpinner.classList.add('d-none');
 loginButtonText.textContent = 'Login';
 showToast(data.error, 'danger');
+} else if (data.mfa_required) {
+// MFA verification required
+showToast('Password verified. MFA verification required...', 'info');
+setTimeout(() => {
+window.location.href = '/mfa/verify';
+}, 1000);
 } else {
 showToast('Login successful! Redirecting...', 'success');
 setTimeout(() => {

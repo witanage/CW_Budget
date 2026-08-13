@@ -17,6 +17,7 @@ from services.transaction_service import register_transaction_routes, get_month_
 from services.markup_rule_service import register_markup_rule_routes
 from services.admin_service import register_admin_routes
 from services.user_service import register_user_routes
+from services.mfa_service import register_mfa_routes
 from services.report_service import register_report_routes
 from services.category_service import register_category_routes
 from services.payment_method_service import register_payment_method_routes
@@ -277,6 +278,7 @@ def mobile():
 
 register_user_routes(app, limiter, RATE_LIMIT_LOGIN, RATE_LIMIT_REGISTER, RATE_LIMIT_CHANGE_PASSWORD, RATE_LIMIT_API,
                      token_required)
+register_mfa_routes(app, limiter, RATE_LIMIT_API)
 register_admin_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN)
 register_exchange_rate_routes(app, login_required, admin_required, token_required, log_audit)
 register_tax_routes(app, login_required)
