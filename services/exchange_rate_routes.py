@@ -21,6 +21,7 @@ from services.hnb_exchange_rate_service import get_hnb_exchange_rate_service
 from services.pb_exchange_rate_service import get_pb_exchange_rate_service
 from services.sampath_exchange_rate_service import get_sampath_exchange_rate_service
 from services.combank_exchange_rate_service import get_combank_exchange_rate_service
+from services.dfcc_exchange_rate_service import get_dfcc_exchange_rate_service
 from services.gemini_exchange_analyzer import get_gemini_exchange_analyzer
 from services.ntfy_service import send_rate_change_notifications
 
@@ -62,9 +63,10 @@ def refresh_all_exchange_rates(force=False):
                     source LIKE 'HNB_%' 
                     OR source LIKE 'PB_%' 
                     OR source LIKE 'SAMPATH_%'
-                    OR source LIKE 'COMBANK_%' 
+                    OR source LIKE 'COMBANK_%'
+                    OR source LIKE 'DFCC_%'
                     OR source LIKE 'CBSL_%'
-                    OR source IN ('HNB', 'PB', 'SAMPATH', 'COMBANK', 'CBSL')
+                    OR source IN ('HNB', 'PB', 'SAMPATH', 'COMBANK', 'DFCC', 'CBSL')
                   )
                 ORDER BY created_at DESC
             """)
@@ -304,6 +306,59 @@ def refresh_all_exchange_rates(force=False):
                                       run_key=run_key)
             return (f'COMBANK_{currency}', {'status': 'failure', 'currency': currency, 'error': str(e)})
 
+    def fetch_dfcc(currency='USD'):
+        dfcc_start = time.time()
+        try:
+            dfcc_service = get_dfcc_exchange_rate_service()
+            dfcc_rate = dfcc_service.fetch_and_store_current_rate(currency=currency)
+            dfcc_ms = int((time.time() - dfcc_start) * 1000)
+            if dfcc_rate:
+                logger.info(f"Scheduler: DFCC {currency} rate updated: Buy={dfcc_rate['buy_rate']}, Sell={dfcc_rate['sell_rate']}")
+
+                # Compute deltas - look for currency-specific previous rate
+                prev = previous_rates.get(f'DFCC_{currency}')
+                buy_change = None
+                sell_change = None
+                changed = False
+                is_new = prev is None
+
+                if prev:
+                    buy_change = round(float(dfcc_rate['buy_rate']) - prev['buy_rate'], 4)
+                    sell_change = round(float(dfcc_rate['sell_rate']) - prev['sell_rate'], 4)
+                    changed = (buy_change != 0 or sell_change != 0)
+
+                log_exchange_rate_refresh(f'DFCC_{currency}', 'success',
+                                          buy_rate=dfcc_rate['buy_rate'],
+                                          sell_rate=dfcc_rate['sell_rate'],
+                                          duration_ms=dfcc_ms,
+                                          run_key=run_key)
+                return (f'DFCC_{currency}', {
+                    'status': 'success',
+                    'currency': currency,
+                    'buy_rate': dfcc_rate['buy_rate'],
+                    'sell_rate': dfcc_rate['sell_rate'],
+                    'previous_buy_rate': prev['buy_rate'] if prev else None,
+                    'previous_sell_rate': prev['sell_rate'] if prev else None,
+                    'buy_change': buy_change,
+                    'sell_change': sell_change,
+                    'changed': changed,
+                    'is_new': is_new
+                })
+            else:
+                logger.warning(f"Scheduler: Failed to fetch DFCC {currency} rate")
+                log_exchange_rate_refresh(f'DFCC_{currency}', 'failure',
+                                          error_message=f'No {currency} rate returned by DFCC scraper',
+                                          duration_ms=dfcc_ms,
+                                          run_key=run_key)
+                return (f'DFCC_{currency}', {'status': 'failure', 'currency': currency, 'error': f'No {currency} rate returned by DFCC scraper'})
+        except Exception as e:
+            logger.error(f"Scheduler: Error fetching DFCC {currency} rate: {str(e)}")
+            log_exchange_rate_refresh(f'DFCC_{currency}', 'failure',
+                                      error_message=str(e),
+                                      duration_ms=int((time.time() - dfcc_start) * 1000),
+                                      run_key=run_key)
+            return (f'DFCC_{currency}', {'status': 'failure', 'currency': currency, 'error': str(e)})
+
     def fetch_cbsl(currency='USD'):
         cbsl_start = time.time()
         try:
@@ -378,6 +433,7 @@ def refresh_all_exchange_rates(force=False):
             futures[executor.submit(fetch_pb, currency)] = f'PB_{currency}'
             futures[executor.submit(fetch_sampath, currency)] = f'SAMPATH_{currency}'
             futures[executor.submit(fetch_combank, currency)] = f'COMBANK_{currency}'
+            futures[executor.submit(fetch_dfcc, currency)] = f'DFCC_{currency}'
             futures[executor.submit(fetch_cbsl, currency)] = f'CBSL_{currency}'
 
         # Collect results as they complete
@@ -955,6 +1011,16 @@ def get_all_bank_rates_for_date():
         except Exception as e:
             logger.warning(f"Failed to get Commercial Bank rate for {date_str}: {str(e)}")
 
+        # Get DFCC Bank rate
+        try:
+            dfcc_service = get_dfcc_exchange_rate_service()
+            dfcc_rate = _resolve_rate(dfcc_service, date)
+            if dfcc_rate:
+                dfcc_rate['bank'] = 'DFCC'
+                rates.append(dfcc_rate)
+        except Exception as e:
+            logger.warning(f"Failed to get DFCC Bank rate for {date_str}: {str(e)}")
+
         # Get CBSL rate from database only (no scraping)
         try:
             connection = get_db_connection()
@@ -1336,7 +1402,7 @@ def get_exchange_rate_ai_insights():
         transaction_type = request.args.get('transaction_type', 'salary_exchange')
         user_bank = request.args.get('user_bank', 'HNB')
         # Validate user_bank against known banks
-        if user_bank not in ('CBSL', 'PB', 'HNB', 'SAMPATH', 'COMBANK'):
+        if user_bank not in ('CBSL', 'PB', 'HNB', 'SAMPATH', 'COMBANK', 'DFCC'):
             user_bank = 'HNB'
 
         # Get Gemini Exchange Analyzer instance
@@ -1789,7 +1855,7 @@ def get_current_bank_rates():
                 FROM exchange_rates
                 WHERE date = CURDATE()
                   AND currency = %s
-                  AND source IN ('HNB', 'PB', 'SAMPATH', 'COMBANK')
+                  AND source IN ('HNB', 'PB', 'SAMPATH', 'COMBANK', 'DFCC')
                 ORDER BY source
             """, (currency,))
 
@@ -1808,7 +1874,7 @@ def get_current_bank_rates():
                     INNER JOIN (
                         SELECT source, MAX(date) as max_date
                         FROM exchange_rates
-                        WHERE source IN ('HNB', 'PB', 'SAMPATH', 'COMBANK')
+                        WHERE source IN ('HNB', 'PB', 'SAMPATH', 'COMBANK', 'DFCC')
                           AND currency = %s
                         GROUP BY source
                     ) latest ON er.source = latest.source AND er.date = latest.max_date

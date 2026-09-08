@@ -7931,7 +7931,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!salaryCalc.currentRates) return '';
 
         let options = '';
-        const banks = ['HNB', 'PB', 'SAMPATH', 'COMBANK'];
+        const banks = ['HNB', 'PB', 'SAMPATH', 'COMBANK', 'DFCC'];
         banks.forEach(bank => {
             const rate = salaryCalc.currentRates[bank];
             if (rate && rate.buy_rate) {

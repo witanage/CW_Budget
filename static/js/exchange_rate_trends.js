@@ -31,7 +31,7 @@
         vol:  '#17a2b8',
         range: '#dc3545'
     };
-    var SRC_CLR = { CBSL: '#0d6efd', HNB: '#198754', PB: '#fd7e14', SAMPATH: '#dc3545', COMBANK: '#17a2b8', CSV: '#6c757d', Manual: '#20c997' };
+    var SRC_CLR = { CBSL: '#0d6efd', HNB: '#198754', PB: '#fd7e14', SAMPATH: '#dc3545', COMBANK: '#17a2b8', DFCC: '#e83e8c', CSV: '#6c757d', Manual: '#20c997' };
 
     // ===================================================================
     // Public entry — called each time the user navigates to Rate Trends
@@ -770,7 +770,7 @@
             return timeStr;
         });
 
-        var bankNames = ['CBSL', 'HNB', 'PB', 'SAMPATH', 'COMBANK'];
+        var bankNames = ['CBSL', 'HNB', 'PB', 'SAMPATH', 'COMBANK', 'DFCC'];
         var datasets = bankNames.map(function (bank) {
             var data = runs.map(function (run) {
                 var bankData = run.banks[bank];
@@ -1316,7 +1316,7 @@
         if (!_salaryCalc.currentRates) return '';
 
         var options = '';
-        var banks = ['HNB', 'PB', 'SAMPATH', 'COMBANK'];
+        var banks = ['HNB', 'PB', 'SAMPATH', 'COMBANK', 'DFCC'];
         banks.forEach(function (bank) {
             var rate = _salaryCalc.currentRates[bank];
             if (rate && rate.buy_rate) {
