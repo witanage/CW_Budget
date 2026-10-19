@@ -18,6 +18,8 @@
         forecastDays: 7,
         forecastHistory: 3,
         compMonths: 1,
+        compStart: null,
+        compEnd: null,
         intradayDate: null,
         intradayLimit: 50,
         intradayTimezone: 'Asia/Colombo'
@@ -127,9 +129,33 @@
             forecastHistoryEl.value = _s.forecastHistory;
         }
 
-        var compMonthsEl = document.getElementById('ertCompMonths');
-        if (compMonthsEl) {
-            compMonthsEl.value = _s.compMonths;
+        var compRangeEl = document.getElementById('ertCompRange');
+        if (compRangeEl && window.flatpickr && !compRangeEl._flatpickr) {
+            if (!_s.compStart || !_s.compEnd) {
+                var end = new Date();
+                var start = new Date();
+                start.setMonth(start.getMonth() - _s.compMonths);
+                _s.compStart = _fmtDate(start);
+                _s.compEnd = _fmtDate(end);
+            }
+            window.flatpickr(compRangeEl, {
+                mode: 'range',
+                dateFormat: 'Y-m-d',
+                altInput: true,
+                altFormat: 'M j, Y',
+                maxDate: 'today',
+                defaultDate: [_s.compStart, _s.compEnd],
+                onClose: function (sel) {
+                    if (sel.length !== 2) return;
+                    var s = _fmtDate(sel[0]);
+                    var e = _fmtDate(sel[1]);
+                    if (s === _s.compStart && e === _s.compEnd) return;
+                    _s.compStart = s;
+                    _s.compEnd = e;
+                    _s.compMonths = Math.max(1, Math.min(12, Math.ceil((sel[1] - sel[0]) / 86400000 / 30)));
+                    _fetchAll();
+                }
+            });
         }
 
         var intradayLimitEl = document.getElementById('ertIntradayLimit');
@@ -154,7 +180,6 @@
         _on('ertMonthsSelector',     'change', function () { _s.months           = +this.value; _fetchAll(); });
         _on('ertForecastDays',       'change', function () { _s.forecastDays     = +this.value; _fetchAll(); });
         _on('ertForecastHistory',    'change', function () { _s.forecastHistory  = +this.value; _fetchAll(); });
-        _on('ertCompMonths',         'change', function () { _s.compMonths       = +this.value; _fetchAll(); });
         _on('ertRefreshBtn',         'click',  function () { _cache = null; _fetchAll(); _fetchIntraday(); });
         _on('ertIntradayDate',       'change', function () { _s.intradayDate     = this.value; _fetchIntraday(); });
         _on('ertIntradayLimit',      'change', function () { _s.intradayLimit    = +this.value; _fetchIntraday(); });
@@ -162,6 +187,10 @@
         _on('ertAiInsightsBtn',      'click',  function () { _showAiInsights(); });
         _on('aiUserBankSelect',      'change', function () { _showAiInsights(); });
         _on('salaryCalcBtn',         'click',  function () { _showSalaryCalculator(); });
+    }
+
+    function _fmtDate(d) {
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     }
 
     function _on(id, evt, fn) {
@@ -190,6 +219,10 @@
             forecast_history:  _s.forecastHistory,
             comparison_months: _s.compMonths
         });
+        if (_s.compStart && _s.compEnd) {
+            params.set('comp_start', _s.compStart);
+            params.set('comp_end', _s.compEnd);
+        }
 
         fetch('/api/exchange-rate/trends/all?' + params)
             .then(function (res) {

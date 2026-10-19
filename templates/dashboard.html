@@ -4,6 +4,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/loader.css') }}?v=2.2">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/vendor/flatpickr.min.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/exchange_rate_trends.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}?v=2.1">
 {% endblock %}
@@ -242,5 +243,6 @@
 </script>
 <!-- base.js is already loaded in base.html, no need to load it again -->
 <script src="{{ url_for('static', filename='js/dashboard.js') }}?v=3.1"></script>
-<script src="{{ url_for('static', filename='js/exchange_rate_trends.js') }}?v=3.0"></script>
+<script src="{{ url_for('static', filename='js/vendor/flatpickr.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/exchange_rate_trends.js') }}?v=3.1"></script>
 {% endblock %}

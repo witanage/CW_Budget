@@ -321,3 +321,29 @@
         padding: 0.75rem;
     }
 }
+
+#ertCompRange, #ertCompRange + input.form-control {
+    width: 280px !important;
+    min-width: 280px;
+}
+
+/* Compact flatpickr calendar */
+.flatpickr-calendar { width: 252px; font-size: 12px; }
+.flatpickr-calendar .flatpickr-innerContainer,
+.flatpickr-calendar .flatpickr-rContainer,
+.flatpickr-calendar .flatpickr-days,
+.flatpickr-calendar .dayContainer {
+    width: 252px;
+    min-width: 252px;
+    max-width: 252px;
+}
+.flatpickr-calendar .flatpickr-day {
+    max-width: 36px;
+    height: 36px;
+    line-height: 36px;
+}
+.flatpickr-calendar .flatpickr-months .flatpickr-month,
+.flatpickr-calendar .flatpickr-current-month { height: 30px; font-size: 105%; }
+.flatpickr-calendar .flatpickr-months .flatpickr-prev-month,
+.flatpickr-calendar .flatpickr-months .flatpickr-next-month { height: 30px; padding: 6px 8px; }
+.flatpickr-calendar .flatpickr-weekdays { height: 24px; }

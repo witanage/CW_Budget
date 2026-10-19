@@ -1213,6 +1213,13 @@ def get_exchange_rate_trends_all():
         forecast_days = min(int(request.args.get('forecast_days', 30)), 90)
         forecast_history = min(int(request.args.get('forecast_history', 3)), 12)
         comp_months = min(int(request.args.get('comparison_months', 3)), 12)
+        comp_start = request.args.get('comp_start')
+        comp_end = request.args.get('comp_end')
+        try:
+            comp_start_d = datetime.strptime(comp_start, '%Y-%m-%d').date() if comp_start else None
+            comp_end_d = datetime.strptime(comp_end, '%Y-%m-%d').date() if comp_end else None
+        except ValueError:
+            return jsonify({'error': 'Invalid date range'}), 400
 
         connection = get_db_connection()
         if not connection:
@@ -1331,13 +1338,22 @@ def get_exchange_rate_trends_all():
                 result['forecast'] = None
 
             # --- 3. Source comparison (buy rate per bank) ---------------
-            cursor.execute("""
-                SELECT date, source, buy_rate
-                FROM exchange_rates
-                WHERE date >= DATE_SUB(CURDATE(), INTERVAL %s MONTH)
-                  AND currency = %s
-                ORDER BY date, source
-            """, (comp_months, currency))
+            if comp_start_d and comp_end_d:
+                cursor.execute("""
+                    SELECT date, source, buy_rate
+                    FROM exchange_rates
+                    WHERE date BETWEEN %s AND %s
+                      AND currency = %s
+                    ORDER BY date, source
+                """, (comp_start_d, comp_end_d, currency))
+            else:
+                cursor.execute("""
+                    SELECT date, source, buy_rate
+                    FROM exchange_rates
+                    WHERE date >= DATE_SUB(CURDATE(), INTERVAL %s MONTH)
+                      AND currency = %s
+                    ORDER BY date, source
+                """, (comp_months, currency))
             comp_rows = cursor.fetchall()
 
             sources = {}
