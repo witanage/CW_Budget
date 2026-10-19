@@ -323,8 +323,8 @@
 }
 
 #ertCompRange, #ertCompRange + input.form-control {
-    width: 280px !important;
-    min-width: 280px;
+    width: 210px !important;
+    min-width: 210px;
 }
 
 /* Compact flatpickr calendar */
