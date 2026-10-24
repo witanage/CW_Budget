@@ -2789,6 +2789,50 @@ function hideAttachment() {
     billAttachmentContainer.style.display = 'none';
 }
 
+// Click-to-zoom lightbox for bill attachment images
+document.addEventListener('click', function (e) {
+    const img = e.target.closest('#billAttachmentContainer img');
+    if (!img) return;
+
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,0.9);overflow:auto;display:flex;cursor:zoom-out;';
+    const big = document.createElement('img');
+    big.src = img.src;
+    big.style.cssText = 'max-width:100%;max-height:100%;margin:auto;object-fit:contain;transition:transform 0.2s;';
+    let zoomed = false;
+    big.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        zoomed = !zoomed;
+        if (zoomed) {
+            big.style.maxWidth = 'none';
+            big.style.maxHeight = 'none';
+            big.style.width = '200%';
+            big.style.cursor = 'zoom-out';
+        } else {
+            big.style.maxWidth = '100%';
+            big.style.maxHeight = '100%';
+            big.style.width = '';
+            big.style.cursor = 'zoom-in';
+        }
+    });
+    big.style.cursor = 'zoom-in';
+
+    const close = () => {
+        overlay.remove();
+        document.removeEventListener('keydown', onKey, true);
+    };
+    const onKey = (ev) => {
+        if (ev.key === 'Escape') {
+            ev.stopPropagation();
+            close();
+        }
+    };
+    overlay.addEventListener('click', close);
+    document.addEventListener('keydown', onKey, true);
+    overlay.appendChild(big);
+    document.body.appendChild(overlay);
+});
+
 // ================================
 // MOVE/COPY TRANSACTION FUNCTIONS
 // ================================
