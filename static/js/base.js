@@ -84,34 +84,55 @@ bootstrapModal.show();
 }
 
 // Theme Toggle Functions
-function toggleTheme() {
-const currentTheme = document.documentElement.getAttribute('data-theme');
-const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+var THEME_SVG_ATTRS = 'viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"';
+var THEME_MOON = `<svg ${THEME_SVG_ATTRS}><path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10Z"></path></svg>`;
+var THEME_SUN = `<svg ${THEME_SVG_ATTRS}><circle cx="12" cy="12" r="4"></circle><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"></path></svg>`;
 
-// Set theme
-document.documentElement.setAttribute('data-theme', newTheme);
+function applyTheme(theme) {
+document.documentElement.setAttribute('data-theme', theme);
+localStorage.setItem('theme', theme);
+updateThemeButton(theme);
+document.dispatchEvent(new CustomEvent('themeChanged', { detail: { theme } }));
+}
 
-// Save to localStorage
-localStorage.setItem('theme', newTheme);
+function toggleTheme(event) {
+const newTheme = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const btn = event && event.currentTarget;
 
-// Update button
-updateThemeButton(newTheme);
+if (!document.startViewTransition || reduce || !btn) {
+applyTheme(newTheme);
+return;
+}
 
-// Show toast
-showToast(`Switched to ${newTheme} theme`, 'success');
+const rect = btn.getBoundingClientRect();
+const x = rect.left + rect.width / 2;
+const y = rect.top + rect.height / 2;
+const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+const transition = document.startViewTransition(() => applyTheme(newTheme));
+transition.ready.then(() => {
+document.documentElement.animate(
+{ clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
+{ duration: 600, easing: 'ease-in-out', pseudoElement: '::view-transition-new(root)' }
+);
+});
 }
 
 function updateThemeButton(theme) {
-const themeIcon = document.getElementById('themeIcon');
-const themeText = document.getElementById('themeText');
-
-if (theme === 'dark') {
-themeIcon.className = 'fas fa-sun me-2 theme-toggle-icon';
-themeText.textContent = 'Light Theme';
-} else {
-themeIcon.className = 'fas fa-moon me-2 theme-toggle-icon';
-themeText.textContent = 'Dark Theme';
+const label = theme === 'light' ? 'Switch to dark' : 'Switch to light';
+document.querySelectorAll('[data-theme-toggle]').forEach(btn => {
+btn.innerHTML = theme === 'light' ? THEME_MOON : THEME_SUN;
+btn.setAttribute('aria-label', label);
+btn.setAttribute('title', label);
+});
 }
+
+if (!window.__themeToggleBound) {
+window.__themeToggleBound = true;
+document.addEventListener('click', function(e) {
+const btn = e.target.closest('[data-theme-toggle]');
+if (btn) toggleTheme({ currentTarget: btn });
+});
 }
 
 // Change Password functionality
@@ -470,10 +491,7 @@ if (disableMfaModal) {
     // Set the theme
     document.documentElement.setAttribute('data-theme', savedTheme);
 
-    // Update button if it exists
-    if (document.getElementById('themeIcon')) {
-        updateThemeButton(savedTheme);
-    }
+    updateThemeButton(savedTheme);
 })();
 
 // Initialize Bootstrap dropdowns properly

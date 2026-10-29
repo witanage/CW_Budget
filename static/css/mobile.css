@@ -6,12 +6,12 @@ body {
 margin: 0;
 padding: 0;
 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-background-color: #1a1a1a;
+background-color: var(--bg-primary);
 overflow: hidden;
 }
 
 .mobile-header {
-background: linear-gradient(135deg, #3d3d3d 0%, #2d2d2d 100%);
+background: var(--card-header-bg);
 padding: 8px 10px;
 position: fixed;
 top: 0;
@@ -32,7 +32,7 @@ margin-bottom: 8px;
 font-size: 1rem;
 margin: 0;
 font-weight: 600;
-color: #ffffff;
+color: var(--text-primary);
 }
 
 .header-buttons {
@@ -44,7 +44,7 @@ align-items: center;
 .btn-back {
 background: rgba(255,255,255,0.1);
 border: none;
-color: #ffffff;
+color: var(--text-primary);
 padding: 4px 10px;
 border-radius: 6px;
 font-size: 0.75rem;
@@ -62,7 +62,7 @@ position: relative;
 .mobile-user-btn {
 background: rgba(255,255,255,0.1);
 border: none;
-color: #ffffff;
+color: var(--text-primary);
 padding: 6px 10px;
 border-radius: 50px;
 font-size: 0.75rem;
@@ -83,7 +83,7 @@ transform: scale(0.95);
 width: 28px;
 height: 28px;
 border-radius: 50%;
-    background: linear-gradient(135deg, #555555 0%, #4d4d4d 100%);
+    background: var(--bg-quaternary);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -97,8 +97,8 @@ text-transform: uppercase;
 position: absolute;
 top: 100%;
 right: 0;
-background: #2d2d2d;
-border: 1px solid #555555;
+background: var(--card-bg);
+border: 1px solid var(--border-color);
 border-radius: 12px;
 min-width: 240px;
 margin-top: 6px;
@@ -127,18 +127,18 @@ display: block;
 /* Mobile User Header */
 .mobile-user-header {
 padding: 16px 12px;
-background: linear-gradient(135deg, #3d3d3d 0%, #2d2d2d 100%);
+background: var(--card-header-bg);
 display: flex;
 align-items: center;
 gap: 10px;
-border-bottom: 1px solid #555555;
+border-bottom: 1px solid var(--border-color);
 }
 
 .mobile-user-avatar-large {
 width: 42px;
 height: 42px;
 border-radius: 50%;
-background: linear-gradient(135deg, #555555 0%, #4d4d4d 100%);
+background: var(--bg-quaternary);
 display: flex;
 align-items: center;
 justify-content: center;
@@ -159,7 +159,7 @@ overflow: hidden;
 }
 
 .mobile-user-name {
-color: #ffffff;
+color: var(--text-primary);
 font-weight: 600;
 font-size: 14px;
 margin-bottom: 4px;
@@ -169,7 +169,7 @@ text-overflow: ellipsis;
 }
 
 .mobile-user-role {
-color: #ffffff;
+color: var(--text-primary);
 font-size: 11px;
 font-weight: 500;
 display: inline-flex;
@@ -193,7 +193,7 @@ opacity: 0.8;
 
 .mobile-dropdown-item {
 padding: 10px 12px;
-color: #ffffff;
+color: var(--text-primary);
 text-decoration: none;
 display: flex;
 align-items: center;
@@ -208,7 +208,7 @@ border-bottom: none;
 }
 
 .mobile-dropdown-item:active {
-background: #3d3d3d;
+background: var(--bg-tertiary);
 padding-left: 16px;
 }
 
@@ -239,7 +239,7 @@ opacity: 1 !important;
 
 .mobile-dropdown-divider {
 height: 1px;
-background: #3d3d3d;
+background: var(--bg-tertiary);
 margin: 6px 0;
 opacity: 0.5;
 }
@@ -252,9 +252,9 @@ justify-content: center;
 }
 
 .month-nav button, .action-btn {
-background: #3d3d3d;
-border: 1px solid #555555;
-color: #ffffff;
+background: var(--bg-tertiary);
+border: 1px solid var(--border-color);
+color: var(--text-primary);
 padding: 4px 8px;
 border-radius: 6px;
 font-size: 0.7rem;
@@ -262,11 +262,11 @@ cursor: pointer;
 }
 
 .month-nav button:active, .action-btn:active {
-background: #4d4d4d;
+background: var(--bg-quaternary);
 }
 
 .month-display {
-color: #ffffff;
+color: var(--text-primary);
 font-size: 0.8rem;
 font-weight: 600;
 min-width: 100px;
@@ -282,8 +282,8 @@ gap: 4px;
 .table-header-row {
 display: flex;
 width: 100%;
-background: #3d3d3d;
-border-top: 1px solid #555555;
+background: var(--bg-tertiary);
+border-top: 1px solid var(--border-color);
 margin-top: 8px;
 }
 
@@ -291,10 +291,10 @@ margin-top: 8px;
 padding: 6px 4px;
 font-weight: 600;
 text-align: left;
-color: #007acc;
+color: var(--accent-color);
 white-space: nowrap;
 font-size: 0.7rem;
-border-right: 1px solid #555555;
+border-right: 1px solid var(--border-color);
 }
 
 .table-header-cell:last-child {
@@ -329,32 +329,32 @@ padding-bottom: 100px; /* Extra padding to prevent last records from being hidde
 width: 100%;
 border-collapse: collapse;
 font-size: 0.75rem;
-background: #2d2d2d;
+background: var(--card-bg);
 table-layout: fixed;
 }
 
 .excel-table td {
 padding: 4px 4px;
-border: 1px solid #555555;
+border: 1px solid var(--border-color);
 vertical-align: middle;
 font-size: 0.7rem;
 white-space: nowrap;
 overflow: hidden;
 text-overflow: ellipsis;
 max-width: 150px;
-color: #ffffff;
+color: var(--text-primary);
 }
 
 .excel-table tbody tr:nth-child(even) {
-background-color: #2d2d2d;
+background-color: var(--card-bg);
 }
 
 .excel-table tbody tr:nth-child(odd) {
-background-color: #3d3d3d;
+background-color: var(--bg-tertiary);
 }
 
 .excel-table tbody tr:hover {
-background-color: #4d4d4d;
+background-color: var(--bg-quaternary);
 }
 
 /* Column widths - Use percentages to fit viewport */
@@ -400,7 +400,7 @@ padding: 0;
 
 .swipe-content {
 position: relative;
-background: #2d2d2d;
+background: var(--card-bg);
 transition: transform 0.3s ease;
 z-index: 2;
 width: 100%;
@@ -410,7 +410,7 @@ pointer-events: auto; /* Ensure content is clickable */
 /* Inner table cells - keep the Excel styling */
 .swipe-content td {
 padding: 4px 4px;
-border: 1px solid #555555;
+border: 1px solid var(--border-color);
 vertical-align: middle;
 font-size: 0.7rem;
 white-space: nowrap;
@@ -507,7 +507,7 @@ transition: none;
 .excel-table .text-success,
 .excel-table .text-danger,
 .excel-table .fw-bold {
-color: #ffffff !important;
+color: var(--text-primary) !important;
 font-weight: normal !important;
 }
 
@@ -816,7 +816,7 @@ pointer-events: none;
     flex: 1;
     padding: 14px 16px;
     border-radius: 12px;
-    border: 2px solid #555;
+    border: 2px solid var(--border-color);
     background: transparent;
     color: #ffffff;
     font-size: 1rem;
@@ -853,7 +853,7 @@ pointer-events: none;
 }
 
 .capture-mode-done-btn:disabled {
-    background: #555;
+    background: var(--border-color);
     color: #999;
     box-shadow: none;
     pointer-events: none;
@@ -890,18 +890,18 @@ color: #cccccc;
 }
 
 .modal-content {
-background-color: rgba(45, 45, 45, var(--modal-bg-opacity, 1));
+background-color: color-mix(in srgb, var(--modal-bg) calc(var(--modal-bg-opacity, 1) * 100%), transparent);
 color: #ffffff;
-border: 1px solid #555555;
+border: 1px solid var(--border-color);
 border-radius: 12px;
 transform: none;
 will-change: auto;
 }
 
 .modal-header {
-background: linear-gradient(135deg, #3d3d3d 0%, #2d2d2d 100%);
+background: var(--card-header-bg);
 color: var(--text-primary) !important;
-border-bottom: 1px solid #555555;
+border-bottom: 1px solid var(--border-color);
 border-radius: 12px 12px 0 0;
 }
 
@@ -911,7 +911,7 @@ color: var(--text-primary) !important;
 
 /* Override Bootstrap bg-primary on modal headers in mobile */
 .modal-header.bg-primary {
-background: linear-gradient(135deg, #3d3d3d 0%, #2d2d2d 100%) !important;
+background: var(--card-header-bg) !important;
 }
 
 .modal-header.text-white,
@@ -920,7 +920,7 @@ color: var(--text-primary) !important;
 }
 
 .modal-footer {
-border-top: 1px solid #555555;
+border-top: 1px solid var(--border-color);
 }
 
 .modal-header .btn-close {
@@ -928,13 +928,13 @@ filter: brightness(0) invert(1);
 }
 
 .form-label {
-color: #ffffff;
+color: var(--text-primary);
 }
 
 .form-control, .form-select {
-background-color: #3d3d3d;
-border: 1px solid #555555;
-color: #ffffff;
+background-color: var(--bg-tertiary);
+border: 1px solid var(--border-color);
+color: var(--text-primary);
 }
 
 /* Reduce font size for dropdowns to prevent text clipping */
@@ -978,9 +978,9 @@ padding-bottom: 8px;
 }
 
 .form-control:focus, .form-select:focus {
-background-color: #3d3d3d;
-border-color: #007acc;
-color: #ffffff;
+background-color: var(--bg-tertiary);
+border-color: var(--accent-color);
+color: var(--text-primary);
 box-shadow: 0 0 0 3px rgba(0, 122, 204, 0.2);
 }
 
@@ -997,14 +997,14 @@ box-shadow: 0 0 0 3px rgba(0, 122, 204, 0.2);
 #transPaymentMethodBtn:active,
 #transCategoryBtn:hover,
 #transCategoryBtn:active {
-    background-color: #3d3d3d !important;
-    border-color: #555 !important;
+    background-color: var(--bg-tertiary) !important;
+    border-color: var(--border-color) !important;
 }
 
 #transPaymentMethodBtn:focus,
 #transCategoryBtn:focus {
-    background-color: #3d3d3d !important;
-    border-color: #007acc !important;
+    background-color: var(--bg-tertiary) !important;
+    border-color: var(--accent-color) !important;
     box-shadow: 0 0 0 3px rgba(0, 122, 204, 0.2) !important;
     outline: none;
 }
@@ -1018,13 +1018,13 @@ box-shadow: 0 0 0 3px rgba(0, 122, 204, 0.2);
 
 #transPaymentMethodModal .list-group-item:hover,
 #transCategoryModal .list-group-item:hover {
-    background-color: #2d2d2d !important;
+    background-color: var(--card-bg) !important;
     transform: translateX(5px);
 }
 
 #transPaymentMethodModal .list-group-item:active,
 #transCategoryModal .list-group-item:active {
-    background-color: #3d3d3d !important;
+    background-color: var(--bg-tertiary) !important;
 }
 
 #transPaymentMethodModal .modal-body,
@@ -1035,13 +1035,13 @@ box-shadow: 0 0 0 3px rgba(0, 122, 204, 0.2);
 
 
 .btn-secondary {
-background-color: #3d3d3d;
-border-color: #555555;
+background-color: var(--bg-tertiary);
+border-color: var(--border-color);
 }
 
 .btn-primary {
-background-color: #007acc;
-border-color: #007acc;
+background-color: var(--accent-color);
+border-color: var(--accent-color);
 }
 
 /* Payment totals modal specific styles */
@@ -1052,7 +1052,7 @@ font-size: 0.8rem;
 
 .payment-totals-table td {
 padding: 8px 4px;
-border-bottom: 1px solid #555555;
+border-bottom: 1px solid var(--border-color);
 vertical-align: middle;
 }
 
@@ -1071,13 +1071,13 @@ flex-shrink: 0;
 }
 
 .payment-method-name {
-color: #ffffff;
+color: var(--text-primary);
 }
 
 .payment-amount {
 text-align: right;
 font-weight: 600;
-color: #007acc;
+color: var(--accent-color);
 }
 
 /* Loading overlay */
@@ -1126,15 +1126,15 @@ color: #007acc;
 
 /* Payment method list in modal */
 .list-group-item {
-    background-color: #3d3d3d;
-    border-color: #555555;
-    color: #ffffff;
+    background-color: var(--bg-tertiary);
+    border-color: var(--border-color);
+    color: var(--text-primary);
     cursor: pointer;
     transition: all 0.2s;
 }
 
 .list-group-item:hover {
-    background-color: #4d4d4d;
+    background-color: var(--bg-quaternary);
     transform: translateX(5px);
 }
 
@@ -1142,15 +1142,15 @@ color: #007acc;
     display: flex;
     align-items: center;
 gap: 10px;
-background: #0d0d0d !important;
+background: var(--bg-tertiary) !important;
 border-color: #333 !important;
-color: #fff !important;
+color: var(--text-primary) !important;
 cursor: pointer;
 transition: background 0.2s;
 }
 
 .payment-method-list-item:hover {
-background: #1a1a1a !important;
+background: var(--bg-primary) !important;
 }
 
 .payment-method-list-item .badge {
@@ -1293,8 +1293,8 @@ transform: translateX(-50%) translateY(20px);
 
 /* Bill Items Modal - Theme Support */
 .bill-items-modal .modal-content {
-    background: #1a1a1a;
-    color: #ffffff;
+    background: var(--bg-primary);
+    color: var(--text-primary);
 }
 
 html[data-theme="light"] .bill-items-modal .modal-content {
@@ -1304,8 +1304,8 @@ html[data-theme="light"] .bill-items-modal .modal-content {
 
 .bill-items-modal .modal-header {
     border-bottom: 1px solid #333;
-    background: linear-gradient(135deg, #3d3d3d 0%, #2d2d2d 100%);
-    color: white;
+    background: var(--card-header-bg);
+    color: var(--text-primary);
     padding: 10px 16px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
@@ -1339,8 +1339,8 @@ html[data-theme="light"] .bill-items-modal .modal-footer {
 }
 
 .bill-header-info {
-    background: linear-gradient(135deg, #3d3d3d 0%, #2d2d2d 100%);
-    color: white;
+    background: var(--card-header-bg);
+    color: var(--text-primary);
     padding: 10px 16px;
     border-bottom: 1px solid #333;
 }
@@ -1361,7 +1361,7 @@ html[data-theme="light"] .bill-header-info {
 }
 
 .bill-items-table {
-    color: #fff;
+    color: var(--text-primary);
     margin-bottom: 0;
     font-size: 0.85rem;
 }
@@ -1390,7 +1390,7 @@ html[data-theme="light"] .bill-items-table td {
 }
 
 .bill-items-table tbody tr:nth-child(even) {
-    background: #1a1a1a;
+    background: var(--bg-primary);
 }
 
 .bill-items-table tbody tr:nth-child(odd) {
@@ -1406,8 +1406,8 @@ html[data-theme="light"] .bill-items-table tbody tr:nth-child(odd) {
 }
 
 .bill-items-table tfoot {
-    background: linear-gradient(135deg, #3d3d3d 0%, #2d2d2d 100%);
-    color: white;
+    background: var(--card-header-bg);
+    color: var(--text-primary);
     font-weight: bold;
 }
 

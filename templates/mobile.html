@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/vendor/fontawesome.min.css') }}">
 
     <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css') }}?v=2.2">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/loader.css') }}?v=2.2">
 </head>
@@ -201,7 +202,7 @@
     <!-- Add Transaction Modal -->
     <div class="modal fade" id="transactionModal" tabindex="-1">
         <div class="modal-dialog">
-            <div class="modal-content" style="background: #1a1a1a; color: #ffffff;">
+            <div class="modal-content" style="background: var(--modal-bg); color: var(--text-primary);">
                 <div class="modal-header" style="border-bottom: 1px solid #333;">
                     <h5 class="modal-title">Add Transaction</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -216,8 +217,8 @@
                         <!-- Bill Breakdown Display -->
                         <div id="billBreakdown" class="mb-3" style="display: none;">
                             <div class="card border-primary">
-                                <div class="card-body p-2" style="background: #0d0d0d;">
-                                    <h6 class="card-title mb-2" style="font-size: 0.875rem; color: #fff;">
+                                <div class="card-body p-2" style="background: var(--bg-tertiary);">
+                                    <h6 class="card-title mb-2" style="font-size: 0.875rem; color: var(--text-primary);">
                                         <i class="fas fa-receipt me-1"></i>Bill Breakdown
                                     </h6>
                                     <div id="billBreakdownContent" class="small" style="color: #ddd;"></div>
@@ -226,12 +227,12 @@
                         </div>
                         <div class="mb-3">
                             <label for="transDescription" class="form-label" style="color: #aaa;">Description</label>
-                            <input type="text" class="form-control" id="transDescription" required style="background: #0d0d0d; border-color: #333; color: #fff;">
+                            <input type="text" class="form-control" id="transDescription" required style="background: var(--input-bg); border-color: var(--input-border); color: var(--text-primary);">
                         </div>
                         <div class="mb-3">
                             <label class="form-label" style="color: #aaa;">Category</label>
                             <div class="d-flex gap-2 align-items-start">
-                                <button type="button" class="form-control text-start d-flex justify-content-between align-items-center flex-grow-1" id="transCategoryBtn" style="background: #0d0d0d; border-color: #333; color: #aaa;">
+                                <button type="button" class="form-control text-start d-flex justify-content-between align-items-center flex-grow-1" id="transCategoryBtn" style="background: var(--input-bg); border-color: var(--input-border); color: var(--text-secondary);">
                                     <span id="transCategoryText">Select Category</span>
                                     <i class="fas fa-chevron-down" style="color: #888;"></i>
                                 </button>
@@ -244,15 +245,15 @@
                             <!-- Inline category creation form (initially hidden) -->
                             <div id="newCategoryForm" class="mt-2" style="display: none;">
                                 <div class="card border-primary">
-                                    <div class="card-body p-2" style="background: #0d0d0d;">
-                                        <h6 class="card-title mb-2" style="font-size: 0.875rem; color: #fff;">
+                                    <div class="card-body p-2" style="background: var(--bg-tertiary);">
+                                        <h6 class="card-title mb-2" style="font-size: 0.875rem; color: var(--text-primary);">
                                             <i class="fas fa-plus-circle me-1"></i>Add New Category
                                         </h6>
                                         <div class="mb-2">
-                                            <input type="text" class="form-control form-control-sm" id="newCategoryName" placeholder="Category name" maxlength="255" style="background: #1a1a1a; border-color: #333; color: #fff;">
+                                            <input type="text" class="form-control form-control-sm" id="newCategoryName" placeholder="Category name" maxlength="255" style="background: var(--input-bg); border-color: var(--input-border); color: var(--text-primary);">
                                         </div>
                                         <div class="mb-2">
-                                            <select class="form-select form-select-sm" id="newCategoryType" style="background: #1a1a1a; border-color: #333; color: #fff;">
+                                            <select class="form-select form-select-sm" id="newCategoryType" style="background: var(--input-bg); border-color: var(--input-border); color: var(--text-primary);">
                                                 <option value="">Select type...</option>
                                                 <option value="income">Income</option>
                                                 <option value="expense">Expense</option>
@@ -273,15 +274,15 @@
                         </div>
                         <div class="mb-3">
                             <label for="transDebit" class="form-label" style="color: #aaa;">Debit (Income)</label>
-                            <input type="number" class="form-control" id="transDebit" placeholder="0.00" step="0.01" style="background: #0d0d0d; border-color: #333; color: #fff;">
+                            <input type="number" class="form-control" id="transDebit" placeholder="0.00" step="0.01" style="background: var(--input-bg); border-color: var(--input-border); color: var(--text-primary);">
                         </div>
                         <div class="mb-3">
                             <label for="transCredit" class="form-label" style="color: #aaa;">Credit (Expense)</label>
-                            <input type="number" class="form-control" id="transCredit" placeholder="0.00" step="0.01" style="background: #0d0d0d; border-color: #333; color: #fff;">
+                            <input type="number" class="form-control" id="transCredit" placeholder="0.00" step="0.01" style="background: var(--input-bg); border-color: var(--input-border); color: var(--text-primary);">
                         </div>
                         <div class="mb-3">
                             <label class="form-label" style="color: #aaa;">Payment Method</label>
-                            <button type="button" class="form-control text-start d-flex justify-content-between align-items-center" id="transPaymentMethodBtn" style="background: #0d0d0d; border-color: #333; color: #aaa;">
+                            <button type="button" class="form-control text-start d-flex justify-content-between align-items-center" id="transPaymentMethodBtn" style="background: var(--input-bg); border-color: var(--input-border); color: var(--text-secondary);">
                                 <span id="transPaymentMethodText">None (Not Paid)</span>
                                 <i class="fas fa-chevron-down" style="color: #888;"></i>
                             </button>
@@ -307,7 +308,7 @@
                         </div>
                         <div class="mb-3">
                             <label for="transNotes" class="form-label" style="color: #aaa;">Notes</label>
-                            <textarea class="form-control" id="transNotes" rows="2" style="background: #0d0d0d; border-color: #333; color: #fff;"></textarea>
+                            <textarea class="form-control" id="transNotes" rows="2" style="background: var(--input-bg); border-color: var(--input-border); color: var(--text-primary);"></textarea>
                         </div>
                     </form>
                 </div>
@@ -322,7 +323,7 @@
     <!-- Payment Totals Modal -->
     <div class="modal fade" id="paymentTotalsModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-scrollable">
-            <div class="modal-content" style="background: #1a1a1a; color: #ffffff;">
+            <div class="modal-content" style="background: var(--modal-bg); color: var(--text-primary);">
                 <div class="modal-header" style="border-bottom: 1px solid #333;">
                     <h5 class="modal-title">Payment Method Totals</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -345,7 +346,7 @@
     <!-- Change Password Modal -->
     <div class="modal fade" id="changePasswordModal" tabindex="-1">
         <div class="modal-dialog">
-            <div class="modal-content" style="background: #1a1a1a; color: #ffffff;">
+            <div class="modal-content" style="background: var(--modal-bg); color: var(--text-primary);">
                 <div class="modal-header" style="border-bottom: 1px solid #333;">
                     <h5 class="modal-title">Change Password</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -354,16 +355,16 @@
                     <form id="changePasswordForm">
                         <div class="mb-3">
                             <label for="currentPassword" class="form-label" style="color: #aaa;">Current Password</label>
-                            <input type="password" class="form-control" id="currentPassword" required style="background: #0d0d0d; border-color: #333; color: #fff;">
+                            <input type="password" class="form-control" id="currentPassword" required style="background: var(--input-bg); border-color: var(--input-border); color: var(--text-primary);">
                         </div>
                         <div class="mb-3">
                             <label for="newPassword" class="form-label" style="color: #aaa;">New Password</label>
-                            <input type="password" class="form-control" id="newPassword" required minlength="6" style="background: #0d0d0d; border-color: #333; color: #fff;">
+                            <input type="password" class="form-control" id="newPassword" required minlength="6" style="background: var(--input-bg); border-color: var(--input-border); color: var(--text-primary);">
                             <div class="form-text" style="color: #888;">Password must be at least 6 characters long.</div>
                         </div>
                         <div class="mb-3">
                             <label for="confirmPassword" class="form-label" style="color: #aaa;">Confirm New Password</label>
-                            <input type="password" class="form-control" id="confirmPassword" required style="background: #0d0d0d; border-color: #333; color: #fff;">
+                            <input type="password" class="form-control" id="confirmPassword" required style="background: var(--input-bg); border-color: var(--input-border); color: var(--text-primary);">
                         </div>
                     </form>
                 </div>
@@ -378,13 +379,13 @@
     <!-- Universal Confirmation Modal -->
     <div class="modal fade" id="confirmModal" tabindex="-1">
         <div class="modal-dialog">
-            <div class="modal-content" style="background: #1a1a1a; color: #ffffff;">
+            <div class="modal-content" style="background: var(--modal-bg); color: var(--text-primary);">
                 <div class="modal-header" style="border-bottom: 1px solid #333;">
                     <h5 class="modal-title" id="confirmModalTitle">Confirm Action</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <p id="confirmModalMessage" style="color: #fff;">Are you sure you want to proceed?</p>
+                    <p id="confirmModalMessage" style="color: var(--text-primary);">Are you sure you want to proceed?</p>
                 </div>
                 <div class="modal-footer" style="border-top: 1px solid #333;">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -397,7 +398,7 @@
     <!-- Transaction Info Modal -->
     <div class="modal fade" id="transactionInfoModal" tabindex="-1">
         <div class="modal-dialog">
-            <div class="modal-content" style="background: #1a1a1a; color: #ffffff;">
+            <div class="modal-content" style="background: var(--modal-bg); color: var(--text-primary);">
                 <div class="modal-header" style="border-bottom: 1px solid #333;">
                     <h5 class="modal-title">Transaction Details</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -405,15 +406,15 @@
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label fw-bold" style="color: #aaa;">Description:</label>
-                        <p id="infoDescription" style="color: #fff; margin: 0;">-</p>
+                        <p id="infoDescription" style="color: var(--text-primary); margin: 0;">-</p>
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold" style="color: #aaa;">Notes:</label>
-                        <p id="infoNotes" style="color: #fff; margin: 0; white-space: pre-wrap;">-</p>
+                        <p id="infoNotes" style="color: var(--text-primary); margin: 0; white-space: pre-wrap;">-</p>
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold" style="color: #aaa;">Paid At:</label>
-                        <p id="infoPaidAt" style="color: #fff; margin: 0;">-</p>
+                        <p id="infoPaidAt" style="color: var(--text-primary); margin: 0;">-</p>
                     </div>
                     <div id="mobileInfoAttachmentContainer" class="mt-4" style="display: none;">
                         <!-- Attachment will be displayed here -->
@@ -463,13 +464,13 @@
     <!-- Payment Method Selection Modal -->
     <div class="modal fade" id="paymentMethodModal" tabindex="-1">
         <div class="modal-dialog">
-            <div class="modal-content" style="background: #1a1a1a; color: #ffffff;">
+            <div class="modal-content" style="background: var(--modal-bg); color: var(--text-primary);">
                 <div class="modal-header" style="border-bottom: 1px solid #333;">
                     <h5 class="modal-title">Select Payment Method</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <p style="color: #ffffff;">How did you pay for this transaction?</p>
+                    <p style="color: var(--text-primary);">How did you pay for this transaction?</p>
                     <div id="paymentMethodList" class="list-group">
                         <!-- Payment methods will be loaded here -->
                     </div>
@@ -484,7 +485,7 @@
     <!-- Transaction Payment Method Selection Modal -->
     <div class="modal fade" id="transPaymentMethodModal" tabindex="-1">
         <div class="modal-dialog">
-            <div class="modal-content" style="background: #1a1a1a; color: #ffffff; border-radius: 16px;">
+            <div class="modal-content" style="background: var(--modal-bg); color: var(--text-primary); border-radius: 16px;">
                 <div class="modal-header" style="border-bottom: 1px solid #333;">
                     <h5 class="modal-title"><i class="fas fa-wallet me-2"></i>Select Payment Method</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -501,7 +502,7 @@
     <!-- Transaction Category Selection Modal -->
     <div class="modal fade" id="transCategoryModal" tabindex="-1">
         <div class="modal-dialog">
-            <div class="modal-content" style="background: #1a1a1a; color: #ffffff; border-radius: 16px;">
+            <div class="modal-content" style="background: var(--modal-bg); color: var(--text-primary); border-radius: 16px;">
                 <div class="modal-header" style="border-bottom: 1px solid #333;">
                     <h5 class="modal-title"><i class="fas fa-tags me-2"></i>Select Category</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>

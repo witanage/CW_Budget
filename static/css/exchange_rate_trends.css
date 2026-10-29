@@ -195,7 +195,7 @@
    ============================================================ */
 
 #aiInsightsModal .modal-content {
-    background: rgba(45, 45, 45, var(--modal-bg-opacity, 0.85));
+    background: color-mix(in srgb, var(--modal-bg) calc(var(--modal-bg-opacity, 0.85) * 100%), transparent);
     border: 1px solid var(--border-color);
 }
 

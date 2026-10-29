@@ -31,6 +31,9 @@
     <!-- Favicon -->
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
 
+    <!-- Apply saved theme before paint to avoid flash -->
+    <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('theme') === 'light' ? 'light' : 'dark');</script>
+
     <!-- Bootstrap CSS (self-hosted) -->
     <link href="{{ url_for('static', filename='css/vendor/bootstrap.min.css') }}" rel="stylesheet">
 
@@ -123,10 +126,6 @@
                             <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#defaultPageModal">
                                 <i class="fas fa-cog me-2"></i>User Preferences
                             </a></li>
-                            <li><a class="dropdown-item" href="#" id="themeToggle" onclick="toggleTheme(); return false;">
-                                <i class="fas fa-moon me-2 theme-toggle-icon" id="themeIcon"></i>
-                                <span id="themeText">Light Theme</span>
-                            </a></li>
                             <li><hr class="dropdown-divider"></li>
 
                             <!-- Logout -->
@@ -143,6 +142,9 @@
                         <a class="nav-link" href="{{ url_for('register') }}">Register</a>
                     </li>
                     {% endif %}
+                    <li class="nav-item ms-lg-2">
+                        <button type="button" class="theme-toggle-btn" data-theme-toggle aria-label="Switch theme"></button>
+                    </li>
                 </ul>
             </div>
         </div>
