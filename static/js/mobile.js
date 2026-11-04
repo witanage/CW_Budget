@@ -413,8 +413,9 @@ paidAtGroup.style.display = 'block';
 // Default to "Not Paid"
 if (paidAtNotPaid) paidAtNotPaid.checked = true;
 } else {
-// No payment method - hide payment status
-paidAtGroup.style.display = 'none';
+// No payment method - payment status stays visible, reset to Not Paid
+paidAtGroup.style.display = 'block';
+if (paidAtNotPaid) paidAtNotPaid.checked = true;
 }
 }
 
@@ -1894,6 +1895,17 @@ function editTransaction(id) {
         document.getElementById('transPaymentMethodBtn').style.color = '#aaa';
     }
 
+    // Payment status radios: always visible, reflect backend value
+    const paidAtGroupEl = document.getElementById('paidAtGroup');
+    if (paidAtGroupEl) paidAtGroupEl.style.display = 'block';
+    const isPaid = transaction.is_paid === true || transaction.is_paid === 1;
+    const paidRadio = document.getElementById('paidAtPaid');
+    const notPaidRadio = document.getElementById('paidAtNotPaid');
+    if (paidRadio && notPaidRadio) {
+        paidRadio.checked = isPaid;
+        notPaidRadio.checked = !isPaid;
+    }
+
     // Store edit ID
     document.getElementById('transactionForm').dataset.editId = id;
 
@@ -2349,7 +2361,7 @@ document.getElementById('transPaymentMethodBtn').style.color = '#aaa';
 // Reset payment status field
 const paidAtGroup = document.getElementById('paidAtGroup');
 const paidAtNotPaid = document.getElementById('paidAtNotPaid');
-if (paidAtGroup) paidAtGroup.style.display = 'none';
+if (paidAtGroup) paidAtGroup.style.display = 'block';
 if (paidAtNotPaid) paidAtNotPaid.checked = true;
 // Hide bill breakdown if visible
 const billBreakdown = document.getElementById('billBreakdown');
