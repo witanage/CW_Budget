@@ -1392,6 +1392,10 @@ def get_exchange_rate_trends_all():
         return jsonify({'error': 'Failed to fetch trend data', 'details': str(e)}), 500
 
 
+_AI_INSIGHTS_CACHE = {}
+_AI_INSIGHTS_TTL = 30 * 60  # seconds
+
+
 def get_exchange_rate_ai_insights():
     """
     Get AI-powered insights about the best time to exchange currency.
@@ -1420,6 +1424,22 @@ def get_exchange_rate_ai_insights():
         # Validate user_bank against known banks
         if user_bank not in ('CBSL', 'PB', 'HNB', 'SAMPATH', 'COMBANK', 'DFCC'):
             user_bank = 'HNB'
+        try:
+            amount = float(request.args.get('amount', 1000))
+            if not 0 < amount <= 1e9:
+                amount = 1000.0
+        except ValueError:
+            amount = 1000.0
+        salary_day = request.args.get('salary_day', type=int)
+        if salary_day is not None and not 1 <= salary_day <= 31:
+            salary_day = None
+
+        cache_key = (user_bank, currency_from, currency_to, months, transaction_type,
+                     amount, salary_day, datetime.now().strftime('%Y-%m-%d'))
+        if request.args.get('refresh') != '1':
+            cached = _AI_INSIGHTS_CACHE.get(cache_key)
+            if cached and time.time() - cached[0] < _AI_INSIGHTS_TTL:
+                return jsonify(cached[1]), 200
 
         # Get Gemini Exchange Analyzer instance
         analyzer = get_gemini_exchange_analyzer()
@@ -1496,7 +1516,9 @@ def get_exchange_rate_ai_insights():
                 user_bank=user_bank,
                 currency_from=currency_from,
                 currency_to=currency_to,
-                transaction_type=transaction_type
+                transaction_type=transaction_type,
+                amount=amount,
+                salary_day=salary_day
             )
 
             # Add timestamp and transaction context
@@ -1509,6 +1531,10 @@ def get_exchange_rate_ai_insights():
                 'currency_direction': f'{currency_from} → {currency_to}'
             }
 
+            if not analysis.get('error'):
+                if len(_AI_INSIGHTS_CACHE) > 100:
+                    _AI_INSIGHTS_CACHE.clear()
+                _AI_INSIGHTS_CACHE[cache_key] = (time.time(), analysis)
             return jsonify(analysis), 200
 
         finally:
