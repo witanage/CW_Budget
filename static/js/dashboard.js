@@ -6312,7 +6312,8 @@ function calculateMonthlyTax() {
     console.log('Assessment year dropdown value:', currentAssessmentYear);
 
     // Get form values
-    const taxFreeThreshold = parseFloat(document.getElementById('taxFreeThreshold').value) || 1800000;
+    const thresholdInput = parseFloat(document.getElementById('taxFreeThreshold').value);
+    const taxFreeThreshold = Number.isFinite(thresholdInput) ? thresholdInput : 1800000;
     const startMonthIndex = parseInt(document.getElementById('startMonth').value) || 0;
 
     // Read monthly data from monthDataStore
@@ -6398,21 +6399,18 @@ function calculateMonthlyTax() {
         cumulativeIncome += fcReceiptsLKR;
 
         // Calculate total tax liability using progressive brackets
-        // Bracket 1: Up to 1,800,000 - 0% (Relief)
-        // Bracket 2: 1,800,001 to 2,800,000 (next 1,000,000) - 6%
-        // Bracket 3: Above 2,800,000 - 15%
+        // Bracket 1: Up to taxFreeThreshold - 0% (Relief)
+        // Bracket 2: next 1,000,000 - 6%
+        // Bracket 3: Above taxFreeThreshold + 1,000,000 - 15%
         let totalTaxLiability = 0;
+        const bracket2Upper = taxFreeThreshold + 1_000_000;
 
-        if (cumulativeIncome > 1_800_000) {
-            if (cumulativeIncome <= 2_800_000) {
-                // Income is in the 6% bracket
-                totalTaxLiability = (cumulativeIncome - 1_800_000) * 0.06;
+        if (cumulativeIncome > taxFreeThreshold) {
+            if (cumulativeIncome <= bracket2Upper) {
+                totalTaxLiability = (cumulativeIncome - taxFreeThreshold) * 0.06;
             } else {
-                // Income exceeds 2,800,000
-                // Tax on first 1,000,000 above 1,800,000 (up to 2,800,000): 6%
                 totalTaxLiability = 1_000_000 * 0.06;  // LKR 60,000
-                // Tax on amount above 2,800,000: 15%
-                totalTaxLiability += (cumulativeIncome - 2_800_000) * 0.15;
+                totalTaxLiability += (cumulativeIncome - bracket2Upper) * 0.15;
             }
         }
 
@@ -7037,11 +7035,12 @@ function displaySavedCalculations(calculations, filterYear = null) {
                     // Calculate tax liability
                     let totalTaxLiability = 0;
                     if (cumulativeIncome > taxFreeThreshold) {
-                        if (cumulativeIncome <= 2_800_000) {
+                        const upper = taxFreeThreshold + 1_000_000;
+                        if (cumulativeIncome <= upper) {
                             totalTaxLiability = (cumulativeIncome - taxFreeThreshold) * 0.06;
                         } else {
-                            totalTaxLiability = (2_800_000 - taxFreeThreshold) * 0.06;
-                            totalTaxLiability += (cumulativeIncome - 2_800_000) * 0.15;
+                            totalTaxLiability = 1_000_000 * 0.06;
+                            totalTaxLiability += (cumulativeIncome - upper) * 0.15;
                         }
                     }
 
