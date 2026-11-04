@@ -185,6 +185,7 @@
         _on('ertIntradayLimit',      'change', function () { _s.intradayLimit    = +this.value; _fetchIntraday(); });
         _on('ertIntradayTimezone',   'change', function () { _s.intradayTimezone = this.value; _fetchIntraday(); });
         _on('ertAiInsightsBtn',      'click',  function () { _showAiInsights(); });
+        _on('aiRecalcBtn',           'click',  function () { _showAiInsights(true); });
         _on('aiUserBankSelect',      'change', function () { _showAiInsights(); });
         _on('salaryCalcBtn',         'click',  function () { _showSalaryCalculator(); });
     }
@@ -843,7 +844,7 @@
     // ===================================================================
     // AI Insights Modal
     // ===================================================================
-    function _showAiInsights() {
+    function _showAiInsights(forceRefresh) {
         // Show modal
         var modal = document.getElementById('aiInsightsModal');
         if (!modal) {
@@ -871,6 +872,13 @@
             currency_to: 'LKR',
             user_bank: userBank
         });
+        var amtEl = document.getElementById('aiAmountInput');
+        var sdEl = document.getElementById('aiSalaryDayInput');
+        var amt = amtEl ? parseFloat(amtEl.value) : NaN;
+        if (amt > 0) params.set('amount', amt);
+        var sday = sdEl ? parseInt(sdEl.value, 10) : NaN;
+        if (sday >= 1 && sday <= 31) params.set('salary_day', sday);
+        if (forceRefresh) params.set('refresh', '1');
 
         console.log('🔍 Requesting AI insights with params:', {
             months: analysisMonths,
@@ -915,20 +923,135 @@
             });
     }
 
+    function _escHtml(v) {
+        return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+
+    function _fmtNum(v, d) {
+        return (v == null || isNaN(v)) ? '--' : Number(v).toLocaleString(undefined,
+            { minimumFractionDigits: d, maximumFractionDigits: d });
+    }
+
+    function _signed(v, d) {
+        if (v == null || isNaN(v)) return '--';
+        return (v > 0 ? '+' : '') + _fmtNum(v, d);
+    }
+
+    // Renders the deterministic (non-AI) analysis computed on the server.
+    function _renderTimingStats(data) {
+        var card = document.getElementById('aiTimingCard');
+        var body = document.getElementById('aiTimingBody');
+        var verdictBox = document.getElementById('aiVerdictBox');
+        var ts = data.timing_stats;
+        if (!card || !body) return;
+        if (!ts) { card.style.display = 'none'; return; }
+        card.style.display = 'block';
+
+        var u = ts.user_bank, p = ts.position, h = '';
+
+        // Verdict + reasons
+        if (verdictBox && ts.verdict) {
+            var v = ts.verdict;
+            var cls = v.action === 'NOW' ? 'bg-success' : v.action === 'WAIT' ? 'bg-warning text-dark' : 'bg-info text-dark';
+            var vh = '<span class="badge ' + cls + ' me-1">' + _escHtml(v.action) + '</span>' +
+                     '<span class="badge bg-secondary">Confidence: ' + _escHtml(v.confidence) + '</span>' +
+                     '<ul class="mt-2 mb-0 small">';
+            (v.reasons || []).forEach(function (r) { vh += '<li>' + _escHtml(r) + '</li>'; });
+            verdictBox.innerHTML = vh + '</ul>';
+        }
+
+        // Position
+        var pctClass = p.pct_rank_30d >= 75 ? 'text-success' : p.pct_rank_30d <= 35 ? 'text-danger' : '';
+        h += '<div class="mb-2"><strong>' + _escHtml(u) + ' position:</strong> ' +
+             '<span class="' + pctClass + '">' + _fmtNum(p.pct_rank_30d, 0) + 'th percentile</span> of last 30 days, ' +
+             _fmtNum(p.pct_rank_period, 0) + 'th of the full period. ' +
+             '7-day avg ' + _fmtNum(p.avg_7d, 4) + ', momentum ' + _signed(p.momentum_7d, 4) + '. ' +
+             'Latest data: ' + _escHtml(p.last_date) +
+             (p.is_stale ? ' <span class="badge bg-warning text-dark">stale</span>' : '') + '</div>';
+
+        // Bank ranking
+        var c = ts.comparison;
+        if (c && c.ranking) {
+            h += '<div class="mb-2"><strong>Bank ranking (' + _fmtNum(c.amount, 0) + ' ' + _escHtml(_s.currency) + '):</strong>' +
+                 '<table class="table table-sm mb-1"><thead><tr><th>Bank</th><th class="text-end">Rate</th>' +
+                 '<th class="text-end">LKR received</th><th class="text-end">vs ' + _escHtml(u) + '</th></tr></thead><tbody>';
+            c.ranking.forEach(function (r, i) {
+                h += '<tr' + (r.bank === u ? ' class="table-active"' : '') + '><td>' + _escHtml(r.bank) +
+                     (i === 0 ? ' <span class="badge bg-success">Best</span>' : '') +
+                     (r.is_stale ? ' <span class="badge bg-warning text-dark" title="Last update ' + _escHtml(r.last_date) + '">stale</span>' : '') +
+                     '</td><td class="text-end">' + _fmtNum(r.rate, 4) + '</td><td class="text-end">' +
+                     _fmtNum(r.lkr_total, 2) + '</td><td class="text-end">' + _signed(r.diff_vs_user_lkr, 2) + '</td></tr>';
+            });
+            h += '</tbody></table></div>';
+        }
+
+        // Spread over CBSL
+        var sp = ts.cbsl_spread;
+        if (sp) {
+            h += '<div class="mb-2"><strong>Spread over CBSL:</strong> ' + _signed(sp.current, 4) + ' now (avg ' +
+                 _signed(sp.avg, 4) + ', ' + _fmtNum(sp.pct_rank, 0) + 'th percentile of its history).</div>';
+        }
+
+        // What happened after similar days
+        var w = ts.waiting;
+        if (w && w.similar_days) {
+            h += '<div class="mb-2"><strong>If you wait (history of days like today, ' + _escHtml(w.similar_bucket) + ' in range):</strong><ul class="mb-1">';
+            ['7d', '14d'].forEach(function (k) {
+                var s = w.similar_days[k];
+                if (s && s.n) {
+                    h += '<li>' + k.replace('d', ' days') + ': avg change ' + _signed(s.avg_change, 2) + ' LKR, higher ' +
+                         _fmtNum(s.pct_higher, 0) + '% of the time <span class="text-muted">(n=' + s.n + (s.n < 15 ? ', small sample' : '') + ')</span></li>';
+                }
+            });
+            h += '</ul></div>';
+        }
+
+        // Calendar patterns
+        var cal = ts.calendar;
+        if (cal) {
+            h += '<div class="mb-2"><strong>Calendar pattern:</strong> ';
+            if (cal.has_reliable_pattern) {
+                h += 'Best weekday <b>' + _escHtml(cal.best_weekday || 'n/a') + '</b>, best part of month <b>' +
+                     _escHtml(cal.best_month_part || 'n/a') + '</b>.';
+            } else {
+                h += 'No statistically reliable weekday or day-of-month pattern in this period.';
+            }
+            h += '</div>';
+        }
+
+        // Salary-day simulation
+        var sim = ts.salary_simulation;
+        if (sim) {
+            h += '<div class="mb-1"><strong>Salary on day ' + sim.salary_day + ' (' + sim.n_months + ' months):</strong> ' +
+                 'waiting ' + sim.wait_days + ' days changed the average rate by ' + _signed(sim.avg_gain_if_wait, 2) +
+                 ' LKR (better in ' + _fmtNum(sim.pct_months_waiting_better, 0) + '% of months). ' +
+                 '<span class="text-muted">Best-case with hindsight: ' + _signed(sim.best_case_gain, 2) + '.</span></div>';
+        }
+
+        body.innerHTML = h;
+    }
+
     function _renderAiInsights(data) {
         // Hide loading, show content
         _show('aiInsightsLoading', false);
         _show('aiInsightsError', false);
         _show('aiInsightsData', true);
 
-        // Recommendation
+        // Recommendation (rule-based verdict is authoritative when available)
         var reco = document.getElementById('aiRecommendation');
         if (reco) {
-            reco.textContent = data.recommendation || 'No recommendation available';
+            var rv = data.rule_based_verdict;
+            reco.textContent = (rv && rv.action) ? rv.action : (data.recommendation || 'No recommendation available');
         }
+        _renderTimingStats(data);
 
         // Confidence badge
         var confBadge = document.getElementById('aiConfidenceBadge');
+        if (confBadge && data.rule_based_verdict && data.rule_based_verdict.confidence) {
+            data.confidence = data.rule_based_verdict.confidence;
+        }
         if (confBadge && data.confidence) {
             var confClass = data.confidence === 'HIGH' ? 'bg-success' :
                            data.confidence === 'MEDIUM' ? 'bg-warning' : 'bg-secondary';

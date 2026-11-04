@@ -420,6 +420,31 @@
                         </div>
                     </div>
 
+                    <!-- Data-driven analysis (computed from stored rates, not AI) -->
+                    <div class="card mb-3" id="aiTimingCard" style="display:none;">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">
+                                <i class="fas fa-calculator me-1"></i>Data-driven Analysis
+                                <span class="badge bg-secondary ms-1">computed from your rate history</span>
+                            </h6>
+                            <div id="aiVerdictBox" class="mb-2"></div>
+                            <div class="row g-2 mb-2">
+                                <div class="col-6">
+                                    <label class="form-label small mb-0" for="aiAmountInput">Amount</label>
+                                    <input type="number" min="1" step="100" class="form-control form-control-sm" id="aiAmountInput" value="1000">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small mb-0" for="aiSalaryDayInput">Salary day (optional)</label>
+                                    <div class="input-group input-group-sm">
+                                        <input type="number" min="1" max="31" class="form-control" id="aiSalaryDayInput" placeholder="e.g. 25">
+                                        <button class="btn btn-outline-secondary" type="button" id="aiRecalcBtn">Update</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="aiTimingBody" class="small"></div>
+                        </div>
+                    </div>
+
                     <!-- Best Time -->
                     <div class="card mb-3">
                         <div class="card-body">

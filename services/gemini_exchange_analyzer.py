@@ -12,6 +12,8 @@ from typing import Dict, List, Optional
 
 from google import genai
 
+from services.exchange_timing_stats import compute_timing_stats, format_for_prompt
+
 logger = logging.getLogger(__name__)
 
 
@@ -87,7 +89,8 @@ class GeminiExchangeAnalyzer:
         return any(indicator in error_str for indicator in retry_indicators)
 
     def _call_gemini_with_retry(self, prompt: str, max_retries: int = 3,
-                                 initial_delay: float = 2.0, max_delay: float = 30.0):
+                                 initial_delay: float = 2.0, max_delay: float = 30.0,
+                                 config=None):
         """
         Call Gemini API with exponential backoff retry logic.
 
@@ -111,9 +114,11 @@ class GeminiExchangeAnalyzer:
                 if attempt > 0:
                     logger.info(f"Retry attempt {attempt}/{max_retries} for Gemini API call...")
 
+                kwargs = {'config': config} if config is not None else {}
                 response = self.client.models.generate_content(
                     model=self.model_name,
-                    contents=prompt
+                    contents=prompt,
+                    **kwargs
                 )
 
                 # Success!
@@ -248,7 +253,9 @@ class GeminiExchangeAnalyzer:
                                      user_bank: str = "HNB",
                                      currency_from: str = "USD",
                                      currency_to: str = "LKR",
-                                     transaction_type: str = "salary_exchange") -> Dict:
+                                     transaction_type: str = "salary_exchange",
+                                     amount: float = 1000.0,
+                                     salary_day: Optional[int] = None) -> Dict:
         """
         Analyze exchange rate patterns across multiple banks (CBSL, PB, HNB).
         Focus on user's bank (HNB) and identifying the best times to exchange.
@@ -396,6 +403,15 @@ BANK STATISTICS COMPARISON:
                     else:
                         data_summary += f"  - {user_bank} is projected to have the BEST rate!\n"
 
+            # Deterministic, verifiable statistics (patterns, history, ranking, verdict)
+            timing_stats = None
+            try:
+                timing_stats = compute_timing_stats(bank_data, user_bank, amount=amount, salary_day=salary_day)
+                if timing_stats:
+                    data_summary += format_for_prompt(timing_stats, currency_to)
+            except Exception as stats_err:
+                logger.warning(f"Timing statistics unavailable: {stats_err}", exc_info=True)
+
             # Build transaction context for prompt
             transaction_context = ""
             if transaction_type == "salary_exchange":
@@ -493,7 +509,7 @@ Provide analysis in JSON format:
     "recommendation": "NOW/WAIT/MONITOR — clear recommendation factoring BOTH local bank data AND global macro conditions. NOW = {user_bank} rate is high relative to history/peers AND global factors favor exchanging now (e.g., USD expected to weaken). WAIT = rates are trending up OR global factors suggest USD will strengthen further soon. MONITOR = uncertain due to conflicting local vs global signals.",
     "hnb_position": "Is {user_bank} currently offering the best/competitive/below-average rates? Compare to other banks with specific numbers.",
     "trend": "Brief analysis of rate trends across all banks (2-3 sentences). Are rates rising or falling? Is {user_bank} improving faster or slower than others?",
-    "best_time": "When is the best time to exchange at {user_bank}? Specific timing advice based on observed patterns.",
+    "best_time": "When is the best time to exchange at {user_bank}? Base this on the VERIFIED STATISTICS (percentile, history after similar days, reliable calendar patterns only).",
     "insights": [
         "How {user_bank}'s rate compares to the CBSL benchmark (spread analysis)",
         "How {user_bank} compares to other banks — with specific rate differences",
@@ -552,6 +568,10 @@ IMPORTANT:
 - Connect global factors to actionable advice — e.g., if Fed is expected to cut rates, USD may weaken and LKR rates could drop, so exchange sooner
 - The recommendation, confidence, and risk_level MUST reflect global factors — not just local bank data. If local data says WAIT but global macro says exchange now (e.g., USD about to weaken), the recommendation should weigh both signals
 - If global uncertainty is high (pending Fed decision, geopolitical tensions, IMF review), downgrade confidence and raise risk_level accordingly
+- A VERIFIED STATISTICS section may be present. Its numbers are exact: quote them as given, never recompute or contradict them
+- Only describe day-of-week or day-of-month patterns if the verified statistics report a reliable one; otherwise say no reliable pattern exists
+- Your recommendation should agree with the rule-based verdict unless global context gives a strong, specific reason; if you differ, say why
+- Do not state specific current news events, dates of Fed/IMF meetings or figures you cannot verify from the data above; describe global factors in general terms only
 - Return ONLY valid JSON, no markdown or code blocks"""
 
             # Log data being sent to AI
@@ -566,7 +586,13 @@ IMPORTANT:
 
             # Call Gemini AI with retry logic
             logger.info("🤖 Calling Gemini AI model for multi-bank analysis...")
-            response = self._call_gemini_with_retry(prompt, max_retries=3, initial_delay=2.0)
+            try:
+                from google.genai import types as genai_types
+                gen_config = genai_types.GenerateContentConfig(
+                    response_mime_type='application/json', temperature=0.2)
+            except Exception:
+                gen_config = None
+            response = self._call_gemini_with_retry(prompt, max_retries=3, initial_delay=2.0, config=gen_config)
 
             response_text = response.text.strip()
             logger.info(f"Multi-bank analysis response: {response_text[:200]}...")
@@ -587,6 +613,10 @@ IMPORTANT:
             }
 
             analysis['currency_pair'] = f"{currency_from}/{currency_to}"
+            if timing_stats:
+                analysis['timing_stats'] = timing_stats
+                # Authoritative values: computed, not LLM-generated
+                analysis['rule_based_verdict'] = timing_stats['verdict']
             analysis['raw_response'] = response.text
 
             # Add computed statistical forecasts to response
