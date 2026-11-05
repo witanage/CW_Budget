@@ -1,0 +1,38 @@
+{% extends "park/base.html" %}
+{% block title %}Sign in · Park Notify{% endblock %}
+{% block body %}
+<main class="narrow">
+    <div class="brand" style="justify-content:center;margin:16px 0 20px">
+        <div class="brand-mark">P</div><span>Park Notify</span>
+    </div>
+    <section class="card">
+        <h1>Sign in</h1>
+        <form id="loginForm" novalidate>
+            <label for="mobile">Mobile number</label>
+            <input id="mobile" name="mobile" type="tel" inputmode="tel" autocomplete="username" required>
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" required>
+            <div id="alert" class="alert" role="alert"></div>
+            <button class="btn btn-primary btn-block" type="submit" id="btn">Sign in</button>
+        </form>
+        <p class="small muted" style="margin-top:16px;text-align:center">
+            New here? <a href="{{ url_for('parking.register') }}">Register your vehicle</a>
+        </p>
+    </section>
+</main>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('loginForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const btn = document.getElementById('btn'), alertEl = document.getElementById('alert');
+    btn.disabled = true;
+    const res = await parkFetch({{ url_for('parking.login')|tojson }}, {
+        method: 'POST', body: { mobile: this.mobile.value, password: this.password.value }
+    });
+    if (res.ok) { window.location = res.data.redirect; return; }
+    showAlert(alertEl, res.data.error || 'Sign in failed.');
+    btn.disabled = false;
+});
+</script>
+{% endblock %}

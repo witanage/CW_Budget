@@ -1,0 +1,357 @@
+{% extends "park/base.html" %}
+{% block title %}Back office · Park Notify{% endblock %}
+{% block head %}
+<style>
+    header.top { border-bottom: 1px solid var(--border); background: var(--surface); }
+    header.top .wrap { display: flex; align-items: center; gap: 12px; padding-top: 12px; padding-bottom: 12px; }
+    .tabs { display: flex; gap: 4px; overflow-x: auto; margin: 16px 0; border-bottom: 1px solid var(--border); }
+    .tab {
+        background: none; border: 0; border-bottom: 2px solid transparent; color: var(--muted);
+        padding: 10px 14px; font: inherit; font-weight: 600; cursor: pointer; white-space: nowrap;
+    }
+    .tab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+    .panel[hidden] { display: none; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+    .vehicle { display: flex; flex-direction: column; gap: 10px; }
+    .vehicle .plate {
+        font: 700 1.35rem/1.2 ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: .04em;
+        background: #f5d90a; color: #111; border: 2px solid #111; border-radius: 6px;
+        padding: 4px 10px; align-self: flex-start;
+    }
+    .vehicle img { width: 100%; max-width: 220px; align-self: center; background: #fff; border-radius: 8px; padding: 6px; }
+    .vehicle.inactive img { opacity: .3; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: .75rem; font-weight: 700; }
+    .b-ok { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
+    .b-warn { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+    .b-bad { background: color-mix(in srgb, var(--danger) 18%, transparent); color: var(--danger); }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .03em; }
+    td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .form-inline { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0 12px; align-items: end; }
+    .topic { font-family: ui-monospace, Menlo, monospace; background: var(--surface-2); padding: 8px 10px;
+             border-radius: 8px; word-break: break-all; }
+    .empty { color: var(--muted); text-align: center; padding: 24px; }
+</style>
+{% endblock %}
+
+{% block theme_toggle %}{% endblock %}
+{% block body %}
+<header class="top">
+    <div class="wrap">
+        <div class="brand"><div class="brand-mark">P</div><span>Park Notify</span></div>
+        <div class="spacer"></div>
+        <span class="muted small">{{ user.full_name or user.mobile_e164 }}</span>
+        <button type="button" class="theme-toggle-btn" data-theme-toggle aria-label="Switch theme"></button>
+        <form method="post" action="{{ url_for('parking.logout') }}" style="margin:0">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-sm" type="submit">Sign out</button>
+        </form>
+    </div>
+</header>
+
+<main class="wrap">
+    <nav class="tabs" role="tablist">
+        <button class="tab" role="tab" data-tab="vehicles" aria-selected="true">Vehicles</button>
+        <button class="tab" role="tab" data-tab="scans" aria-selected="false">Scan log</button>
+        <button class="tab" role="tab" data-tab="account" aria-selected="false">Account</button>
+        {% if is_admin %}<button class="tab" role="tab" data-tab="users" aria-selected="false">Users</button>{% endif %}
+    </nav>
+
+    <!-- Vehicles -->
+    <section class="panel" id="panel-vehicles">
+        <div class="card">
+            <h2>Add a vehicle</h2>
+            <form id="addVehicleForm" class="form-inline" novalidate>
+                <div><label for="plate">Licence plate</label>
+                    <input id="plate" name="plate" required maxlength="32" placeholder="{{ plate_hint }}"></div>
+                <div><label for="nickname">Nickname <span class="muted" style="font-weight:400">(optional)</span></label>
+                    <input id="nickname" name="nickname" maxlength="50" placeholder="e.g. Family car"></div>
+                <div><button class="btn btn-primary" type="submit" style="width:100%;margin-top:12px">Add vehicle</button></div>
+            </form>
+            <div id="vehicleAlert" class="alert" role="alert"></div>
+        </div>
+        <div class="grid" id="vehicleGrid" style="margin-top:16px"></div>
+    </section>
+
+    <!-- Scans -->
+    <section class="panel" id="panel-scans" hidden>
+        <div class="card">
+            <div class="row" style="margin-bottom:12px">
+                <h2 style="margin:0">Scan log</h2>
+                <div class="spacer"></div>
+                <select id="scanFilter" style="width:auto"><option value="">All vehicles</option></select>
+                <button class="btn btn-sm" id="refreshScans" type="button">Refresh</button>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr>
+                        <th>Time</th><th>Vehicle</th><th>Reason</th><th>Message</th>
+                        <th>Mobile</th><th>Location</th><th>IP address</th><th>Status</th>
+                    </tr></thead>
+                    <tbody id="scanBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- Account -->
+    <section class="panel" id="panel-account" hidden>
+        <div class="card">
+            <h2>Notifications (ntfy)</h2>
+            <p class="muted small">Install the <a href="https://ntfy.sh/" target="_blank" rel="noopener">ntfy app</a>
+                and subscribe to this private topic. Keep it secret: anyone who knows it can read your alerts.</p>
+            <label>Server</label><div class="topic">{{ ntfy_server }}</div>
+            <label>Topic</label><div class="topic" id="topic">{{ user.ntfy_topic }}</div>
+            <div class="row" style="margin-top:12px">
+                <a class="btn btn-sm" id="subscribeLink" href="{{ ntfy_server }}/{{ user.ntfy_topic }}" target="_blank" rel="noopener">Open topic</a>
+                <button class="btn btn-sm" id="testNotify" type="button">Send test</button>
+                <button class="btn btn-sm btn-danger" id="rotateTopic" type="button">Generate new topic</button>
+            </div>
+            <div id="topicAlert" class="alert" role="alert"></div>
+        </div>
+        <div class="card">
+            <h2>Change password</h2>
+            <form id="pwForm" style="max-width:380px" novalidate>
+                <label for="current_password">Current password</label>
+                <input id="current_password" name="current_password" type="password" autocomplete="current-password" required>
+                <label for="new_password">New password</label>
+                <input id="new_password" name="new_password" type="password" minlength="8" autocomplete="new-password" required>
+                <label for="confirm_password">Confirm new password</label>
+                <input id="confirm_password" name="confirm_password" type="password" autocomplete="new-password" required>
+                <div id="pwAlert" class="alert" role="alert"></div>
+                <button class="btn btn-primary" type="submit" style="margin-top:14px">Change password</button>
+            </form>
+        </div>
+    </section>
+
+    {% if is_admin %}
+    <!-- Users (admin) -->
+    <section class="panel" id="panel-users" hidden>
+        <div class="card">
+            <h2>Add user</h2>
+            <form id="addUserForm" class="form-inline" novalidate>
+                <div><label for="u_name">Name</label><input id="u_name" name="full_name" maxlength="100"></div>
+                <div><label for="u_mobile">Mobile</label>
+                    <input id="u_mobile" name="mobile" type="tel" required placeholder="{{ mobile_hint }}"></div>
+                <div><label for="u_plate">Licence plate <span class="muted" style="font-weight:400">(optional)</span></label>
+                    <input id="u_plate" name="plate" maxlength="32"></div>
+                <div><label for="u_password">Initial password</label>
+                    <input id="u_password" name="password" type="password" minlength="8" autocomplete="new-password" required></div>
+                <div><label style="display:flex;gap:8px;align-items:center;font-weight:400">
+                    <input type="checkbox" name="is_admin" value="true" style="width:auto"> Admin</label></div>
+                <div><button class="btn btn-primary" type="submit" style="width:100%;margin-top:12px">Create user</button></div>
+            </form>
+            <div id="userAlert" class="alert" role="alert"></div>
+        </div>
+        <div class="card">
+            <h2>Users</h2>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Name</th><th>Mobile</th><th>Vehicles</th><th>Role</th><th>Last login</th><th>Status</th><th></th></tr></thead>
+                    <tbody id="userBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+    {% endif %}
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    const IS_ADMIN = {{ 'true' if is_admin else 'false' }};
+    const ME = {{ user.id|tojson }};
+    const API = {
+        vehicles: {{ url_for('parking.vehicles_list')|tojson }},
+        scans: {{ url_for('parking.scans_list')|tojson }},
+        password: {{ url_for('parking.change_password')|tojson }},
+        topic: {{ url_for('parking.rotate_topic')|tojson }},
+        test: {{ url_for('parking.test_notification')|tojson }},
+        users: IS_ADMIN ? {{ url_for('parking.admin_users')|tojson }} : null,
+    };
+    const NTFY = {{ ntfy_server|tojson }};
+    const REASONS = { blocking: 'Blocking', lights_on: 'Lights on', window_open: 'Window open',
+                      alarm: 'Alarm', towing: 'Towing risk', other: 'Other' };
+
+    // Safe DOM builder: text only, never innerHTML.
+    function el(tag, attrs, ...kids) {
+        const n = document.createElement(tag);
+        for (const [k, v] of Object.entries(attrs || {})) {
+            if (v === null || v === undefined || v === false) continue;
+            if (k === 'class') n.className = v;
+            else if (k.startsWith('on')) n.addEventListener(k.slice(2), v);
+            else n.setAttribute(k, v === true ? '' : v);
+        }
+        for (const kid of kids.flat()) {
+            if (kid === null || kid === undefined || kid === false) continue;
+            n.append(kid instanceof Node ? kid : document.createTextNode(String(kid)));
+        }
+        return n;
+    }
+    const fmtTime = (iso) => iso ? new Date(iso).toLocaleString() : '—';
+
+    // ---------------- Tabs ----------------
+    const loaders = {};
+    document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach((x) => x.setAttribute('aria-selected', x === t));
+        document.querySelectorAll('.panel').forEach((p) => p.hidden = p.id !== 'panel-' + t.dataset.tab);
+        if (loaders[t.dataset.tab]) loaders[t.dataset.tab]();
+    }));
+
+    // ---------------- Vehicles ----------------
+    let vehicles = [];
+    async function loadVehicles() {
+        const res = await parkFetch(API.vehicles);
+        vehicles = res.ok ? res.data : [];
+        renderVehicles();
+        renderScanFilter();
+    }
+    function renderVehicles() {
+        const grid = document.getElementById('vehicleGrid');
+        grid.replaceChildren();
+        if (!vehicles.length) { grid.append(el('div', { class: 'card empty' }, 'No vehicles yet. Add one above.')); return; }
+        for (const v of vehicles) {
+            const bust = '?t=' + encodeURIComponent(v.qr_rotated_at || '');
+            grid.append(el('div', { class: 'card vehicle' + (v.is_active ? '' : ' inactive') },
+                el('div', { class: 'row' },
+                    el('span', { class: 'plate' }, v.plate_display),
+                    el('span', { class: 'spacer' }),
+                    el('span', { class: 'badge ' + (v.is_active ? 'b-ok' : 'b-bad') }, v.is_active ? 'Active' : 'Disabled')),
+                v.nickname ? el('div', { class: 'muted small' }, v.nickname) : null,
+                el('img', { src: v.qr_png + bust, alt: 'QR code for ' + v.plate_display, width: 220, height: 220 }),
+                el('div', { class: 'small muted' },
+                    `${v.scan_count} alert${v.scan_count === 1 ? '' : 's'} · last ${fmtTime(v.last_scan_at)}`),
+                el('div', { class: 'small muted' }, 'QR issued ' + fmtTime(v.qr_rotated_at)),
+                el('div', { class: 'row' },
+                    el('a', { class: 'btn btn-sm', href: v.print_url, target: '_blank', rel: 'noopener' }, 'Print'),
+                    el('a', { class: 'btn btn-sm', href: v.qr_png, download: `park-qr-${v.plate_display}.png` }, 'Download'),
+                    el('button', { class: 'btn btn-sm', type: 'button', onclick: () => rotateQr(v) }, 'Change QR'),
+                    el('button', { class: 'btn btn-sm', type: 'button', onclick: () => toggleVehicle(v) }, v.is_active ? 'Disable' : 'Enable'),
+                    el('button', { class: 'btn btn-sm btn-danger', type: 'button', onclick: () => deleteVehicle(v) }, 'Remove'))
+            ));
+        }
+    }
+    const vAlert = document.getElementById('vehicleAlert');
+    async function rotateQr(v) {
+        if (!confirm(`Change the QR for ${v.plate_display}?\n\nThe current sticker will stop working immediately. You will need to print the new one.`)) return;
+        const res = await parkFetch(`${API.vehicles}/${v.id}/rotate-qr`, { method: 'POST' });
+        if (res.ok) { showAlert(vAlert, `New QR issued for ${v.plate_display}. Print and replace the old sticker.`, 'ok'); loadVehicles(); }
+        else showAlert(vAlert, res.data.error || 'Failed to change QR.');
+    }
+    async function toggleVehicle(v) {
+        const res = await parkFetch(`${API.vehicles}/${v.id}/active`, { method: 'POST', body: { is_active: !v.is_active } });
+        if (res.ok) loadVehicles(); else showAlert(vAlert, res.data.error || 'Update failed.');
+    }
+    async function deleteVehicle(v) {
+        if (!confirm(`Remove ${v.plate_display}? Its QR and scan history will be deleted.`)) return;
+        const res = await parkFetch(`${API.vehicles}/${v.id}`, { method: 'DELETE' });
+        if (res.ok) loadVehicles(); else showAlert(vAlert, res.data.error || 'Delete failed.');
+    }
+    document.getElementById('addVehicleForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const res = await parkFetch(API.vehicles, { method: 'POST', body: { plate: this.plate.value, nickname: this.nickname.value } });
+        if (res.ok) { this.reset(); showAlert(vAlert, `${res.data.plate_display} added.`, 'ok'); loadVehicles(); }
+        else showAlert(vAlert, res.data.error || 'Could not add vehicle.');
+    });
+
+    // ---------------- Scans ----------------
+    const scanFilter = document.getElementById('scanFilter');
+    function renderScanFilter() {
+        const cur = scanFilter.value;
+        scanFilter.replaceChildren(el('option', { value: '' }, 'All vehicles'),
+            ...vehicles.map((v) => el('option', { value: v.id }, v.plate_display)));
+        scanFilter.value = cur;
+    }
+    async function loadScans() {
+        const q = scanFilter.value ? `?vehicle_id=${encodeURIComponent(scanFilter.value)}` : '';
+        const res = await parkFetch(API.scans + q);
+        const body = document.getElementById('scanBody');
+        body.replaceChildren();
+        const rows = res.ok ? res.data : [];
+        if (!rows.length) { body.append(el('tr', {}, el('td', { colspan: 8, class: 'empty' }, 'No scans recorded yet.'))); return; }
+        for (const s of rows) {
+            const hasLoc = s.latitude !== null && s.longitude !== null;
+            const statusCls = { sent: 'b-ok', throttled: 'b-warn', failed: 'b-bad' }[s.notify_status] || '';
+            body.append(el('tr', {},
+                el('td', { class: 'num' }, fmtTime(s.scanned_at)),
+                el('td', {}, s.plate_display),
+                el('td', {}, REASONS[s.reason] || s.reason),
+                el('td', {}, s.message || '—'),
+                el('td', { class: 'num' }, s.scanner_mobile ? el('a', { href: 'tel:' + s.scanner_mobile }, s.scanner_mobile) : '—'),
+                el('td', { class: 'num' }, hasLoc
+                    ? el('a', { href: `https://maps.google.com/?q=${s.latitude},${s.longitude}`, target: '_blank', rel: 'noopener' },
+                        `${s.latitude}, ${s.longitude}` + (s.location_accuracy_m ? ` (±${s.location_accuracy_m} m)` : ''))
+                    : '—'),
+                el('td', { class: 'num' }, s.ip_address),
+                el('td', {}, el('span', { class: 'badge ' + statusCls }, s.notify_status))
+            ));
+        }
+    }
+    scanFilter.addEventListener('change', loadScans);
+    document.getElementById('refreshScans').addEventListener('click', loadScans);
+    loaders.scans = loadScans;
+
+    // ---------------- Account ----------------
+    const tAlert = document.getElementById('topicAlert');
+    document.getElementById('rotateTopic').addEventListener('click', async () => {
+        if (!confirm('Generate a new ntfy topic? You must re-subscribe in the ntfy app.')) return;
+        const res = await parkFetch(API.topic, { method: 'POST' });
+        if (res.ok) {
+            document.getElementById('topic').textContent = res.data.ntfy_topic;
+            document.getElementById('subscribeLink').href = NTFY + '/' + res.data.ntfy_topic;
+            showAlert(tAlert, 'New topic generated. Subscribe to it in the ntfy app.', 'ok');
+        } else showAlert(tAlert, res.data.error || 'Failed.');
+    });
+    document.getElementById('testNotify').addEventListener('click', async () => {
+        const res = await parkFetch(API.test, { method: 'POST' });
+        showAlert(tAlert, res.ok ? res.data.message : (res.data.error || 'Failed.'), res.ok ? 'ok' : 'error');
+    });
+    document.getElementById('pwForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const a = document.getElementById('pwAlert');
+        if (this.new_password.value !== this.confirm_password.value) { showAlert(a, 'New passwords do not match.'); return; }
+        const res = await parkFetch(API.password, { method: 'POST', body: Object.fromEntries(new FormData(this).entries()) });
+        if (res.ok) { this.reset(); showAlert(a, res.data.message, 'ok'); }
+        else showAlert(a, res.data.error || 'Failed.');
+    });
+
+    // ---------------- Users (admin) ----------------
+    if (IS_ADMIN) {
+        const uAlert = document.getElementById('userAlert');
+        async function loadUsers() {
+            const res = await parkFetch(API.users);
+            const body = document.getElementById('userBody');
+            body.replaceChildren();
+            for (const u of (res.ok ? res.data : [])) {
+                body.append(el('tr', {},
+                    el('td', {}, u.full_name || '—'),
+                    el('td', { class: 'num' }, u.mobile_e164),
+                    el('td', { class: 'num' }, u.vehicle_count),
+                    el('td', {}, u.is_admin ? 'Admin' : 'User'),
+                    el('td', { class: 'num' }, fmtTime(u.last_login_at)),
+                    el('td', {}, el('span', { class: 'badge ' + (u.is_active ? 'b-ok' : 'b-bad') }, u.is_active ? 'Active' : 'Disabled')),
+                    el('td', {}, u.id === ME ? '' : el('button', { class: 'btn btn-sm', type: 'button', onclick: async () => {
+                        const r = await parkFetch(`${API.users}/${u.id}/active`, { method: 'POST', body: { is_active: !u.is_active } });
+                        if (r.ok) loadUsers(); else showAlert(uAlert, r.data.error || 'Failed.');
+                    } }, u.is_active ? 'Disable' : 'Enable'))
+                ));
+            }
+        }
+        document.getElementById('addUserForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const body = Object.fromEntries(new FormData(this).entries());
+            const res = await parkFetch(API.users, { method: 'POST', body });
+            if (res.ok) { this.reset(); showAlert(uAlert, res.data.message, 'ok'); loadUsers(); }
+            else showAlert(uAlert, res.data.error || 'Failed.');
+        });
+        loaders.users = loadUsers;
+    }
+
+    loaders.vehicles = loadVehicles;
+    loadVehicles();
+})();
+</script>
+{% endblock %}

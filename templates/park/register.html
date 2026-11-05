@@ -1,0 +1,66 @@
+{% extends "park/base.html" %}
+{% block title %}Register · Park Notify{% endblock %}
+{% block head %}<script src="https://www.google.com/recaptcha/api.js" async defer></script>{% endblock %}
+{% block body %}
+<main class="narrow">
+    <div class="brand" style="justify-content:center;margin:16px 0 20px">
+        <div class="brand-mark">P</div><span>Park Notify</span>
+    </div>
+    <section class="card">
+        <h1>Register your vehicle</h1>
+        <p class="muted small">Get a QR code for your dashboard. People can scan it to ask you to move your
+            car, without ever seeing your number.</p>
+        <form id="regForm" novalidate>
+            <label for="country">Country</label>
+            <select id="country" name="country"><option value="LK" selected>Sri Lanka</option></select>
+
+            <label for="full_name">Name <span class="muted" style="font-weight:400">(optional)</span></label>
+            <input id="full_name" name="full_name" maxlength="100" autocomplete="name">
+
+            <label for="mobile">Mobile number</label>
+            <input id="mobile" name="mobile" type="tel" inputmode="tel" autocomplete="tel" required
+                   placeholder="{{ mobile_hint }}">
+
+            <label for="plate">Licence plate</label>
+            <input id="plate" name="plate" required maxlength="32" autocapitalize="characters"
+                   placeholder="{{ plate_hint }}">
+            <p class="small muted" style="margin:6px 0 0">Formats: CAB-1234 · WP KA-1234 · 250-1234 · 19 ශ්‍රී 1234</p>
+
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password" minlength="8" autocomplete="new-password" required>
+            <label for="confirm_password">Confirm password</label>
+            <input id="confirm_password" name="confirm_password" type="password" autocomplete="new-password" required>
+
+            <div class="recaptcha"><div class="g-recaptcha" data-sitekey="{{ recaptcha_site_key }}"></div></div>
+            <div id="alert" class="alert" role="alert"></div>
+            <button class="btn btn-primary btn-block" type="submit" id="btn">Create account</button>
+        </form>
+        <p class="small muted" style="margin-top:16px;text-align:center">
+            Already registered? <a href="{{ url_for('parking.login') }}">Sign in</a>
+        </p>
+    </section>
+</main>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('regForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const btn = document.getElementById('btn'), alertEl = document.getElementById('alert');
+    const captcha = window.grecaptcha ? grecaptcha.getResponse() : '';
+    if (!captcha) { showAlert(alertEl, 'Please tick "I\'m not a robot" first.'); return; }
+    if (this.password.value !== this.confirm_password.value) { showAlert(alertEl, 'Passwords do not match.'); return; }
+    btn.disabled = true;
+    const body = Object.fromEntries(new FormData(this).entries());
+    body['g-recaptcha-response'] = captcha;
+    const res = await parkFetch({{ url_for('parking.register')|tojson }}, { method: 'POST', body });
+    if (res.ok) {
+        showAlert(alertEl, res.data.message, 'ok');
+        setTimeout(() => { window.location = res.data.redirect; }, 1200);
+        return;
+    }
+    showAlert(alertEl, res.data.error || 'Registration failed.');
+    if (window.grecaptcha) grecaptcha.reset();
+    btn.disabled = false;
+});
+</script>
+{% endblock %}
