@@ -1,0 +1,177 @@
+{% extends "park/base.html" %}
+{% block title %}Notify vehicle owner{% endblock %}
+
+{% block head %}
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+<style>
+    .hero { text-align: center; margin: 8px 0 18px; }
+    .hero-icon { font-size: 44px; line-height: 1; }
+    .reasons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .reason input { position: absolute; opacity: 0; pointer-events: none; }
+    .reason span {
+        display: block; padding: 10px; border-radius: 8px; border: 1px solid var(--border);
+        background: var(--surface-2); text-align: center; font-size: .9rem; cursor: pointer; user-select: none;
+    }
+    .reason input:checked + span { border-color: var(--accent); outline: 2px solid var(--accent); }
+    .reason input:focus-visible + span { outline: 2px dashed var(--accent); }
+    .loc-row { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+    .loc-status { font-size: .85rem; color: var(--muted); }
+    .optional { font-weight: 400; color: var(--muted); }
+
+    /* ---------- Sent animation ---------- */
+    #sent { display: none; text-align: center; padding: 30px 8px 10px; }
+    #sent.show { display: block; animation: fadeIn .35s ease both; }
+    .stage { position: relative; width: 190px; height: 190px; margin: 0 auto 18px; }
+    .ring {
+        position: absolute; inset: 35px; border-radius: 50%; border: 3px solid var(--accent);
+        opacity: 0; animation: ripple 1.8s ease-out infinite;
+    }
+    .ring:nth-child(2) { animation-delay: .6s; }
+    .ring:nth-child(3) { animation-delay: 1.2s; }
+    .core {
+        position: absolute; inset: 45px; border-radius: 50%; background: var(--accent);
+        display: grid; place-items: center; box-shadow: 0 10px 30px color-mix(in srgb, var(--accent) 45%, transparent);
+        animation: pop .5s cubic-bezier(.2, 1.6, .4, 1) both;
+    }
+    .plane { width: 52px; height: 52px; color: var(--accent-ink); animation: fly 1.3s ease-in .35s both; }
+    .check { position: absolute; width: 56px; height: 56px; color: var(--accent-ink); }
+    .check path { stroke-dasharray: 48; stroke-dashoffset: 48; animation: draw .45s ease-out 1.55s forwards; }
+    .done .ring { animation-iteration-count: 1; }
+    #sent h1 { animation: rise .5s ease 1.7s both; }
+    #sent p { animation: rise .5s ease 1.85s both; }
+    @keyframes ripple { 0% { transform: scale(.8); opacity: .8; } 100% { transform: scale(1.9); opacity: 0; } }
+    @keyframes pop { from { transform: scale(0); } to { transform: scale(1); } }
+    @keyframes fly {
+        0% { transform: translate(0, 0) rotate(0); opacity: 1; }
+        35% { transform: translate(-6px, 6px) rotate(-8deg); opacity: 1; }
+        100% { transform: translate(120px, -120px) rotate(10deg) scale(.4); opacity: 0; }
+    }
+    @keyframes draw { to { stroke-dashoffset: 0; } }
+    @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) {
+        .ring, .core, .plane, .check path, #sent h1, #sent p { animation: none !important; }
+        .plane { display: none; } .check path { stroke-dashoffset: 0; }
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<main class="narrow">
+    <section id="formCard" class="card">
+        <div class="hero">
+            <div class="hero-icon" aria-hidden="true">🚗</div>
+            <h1>Notify the vehicle owner</h1>
+            <p class="muted small">The owner gets an instant phone notification. Your details are optional and
+                are only shared with the owner.</p>
+        </div>
+
+        <form id="notifyForm" novalidate>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label>What's the issue?</label>
+            <div class="reasons" role="radiogroup">
+                {% set labels = {'blocking': '🚧 Blocking me', 'lights_on': '💡 Lights on',
+                                 'window_open': '🪟 Window open', 'alarm': '🔔 Alarm going off',
+                                 'towing': '🚨 Towing / fine risk', 'other': '💬 Other'} %}
+                {% for key in reasons %}
+                <label class="reason" style="margin:0;font-weight:400">
+                    <input type="radio" name="reason" value="{{ key }}" {% if loop.first %}checked{% endif %}>
+                    <span>{{ labels.get(key, key) }}</span>
+                </label>
+                {% endfor %}
+            </div>
+
+            <label for="message">Message <span class="optional">(optional)</span></label>
+            <textarea id="message" name="message" maxlength="200" placeholder="e.g. I'm parked behind you, white van."></textarea>
+
+            <label for="mobile">Your mobile number <span class="optional">(optional, so the owner can call you)</span></label>
+            <input id="mobile" name="mobile" type="tel" inputmode="tel" autocomplete="tel" maxlength="20"
+                   placeholder="{{ mobile_hint }}">
+
+            <div class="loc-row">
+                <button type="button" id="locBtn" class="btn btn-sm">📍 Share my location</button>
+                <span id="locStatus" class="loc-status">Optional</span>
+            </div>
+            <input type="hidden" name="lat"><input type="hidden" name="lng"><input type="hidden" name="accuracy">
+
+            <div class="recaptcha"><div class="g-recaptcha" data-sitekey="{{ recaptcha_site_key }}"></div></div>
+            {% if not recaptcha_site_key %}<p class="small" style="color:var(--danger)">reCAPTCHA is not configured.</p>{% endif %}
+
+            <div id="alert" class="alert" role="alert"></div>
+            <button id="submitBtn" type="submit" class="btn btn-primary btn-block">Send notification</button>
+        </form>
+    </section>
+
+    <section id="sent" class="card" aria-live="polite">
+        <div class="stage" id="stage">
+            <div class="ring"></div><div class="ring"></div><div class="ring"></div>
+            <div class="core">
+                <svg class="plane" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M2.5 11.2 20.6 3.4c.8-.3 1.5.4 1.2 1.2l-7.8 18.1c-.3.8-1.5.8-1.8 0l-2.4-6.6-6.6-2.4c-.8-.3-.8-1.5 0-1.8z"/>
+                </svg>
+                <svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M5 12.5l4.5 4.5L19 7.5"/>
+                </svg>
+            </div>
+        </div>
+        <h1 id="sentTitle">Notification sent!</h1>
+        <p id="sentText" class="muted">The owner has been notified. Thank you for your patience.</p>
+    </section>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    const form = document.getElementById('notifyForm');
+    const alertEl = document.getElementById('alert');
+    const btn = document.getElementById('submitBtn');
+    const locBtn = document.getElementById('locBtn');
+    const locStatus = document.getElementById('locStatus');
+
+    locBtn.addEventListener('click', function () {
+        if (!navigator.geolocation) { locStatus.textContent = 'Not supported on this device'; return; }
+        locStatus.textContent = 'Locating…';
+        navigator.geolocation.getCurrentPosition(function (pos) {
+            form.lat.value = pos.coords.latitude.toFixed(6);
+            form.lng.value = pos.coords.longitude.toFixed(6);
+            form.accuracy.value = Math.round(pos.coords.accuracy);
+            locStatus.textContent = '✓ Location attached (±' + Math.round(pos.coords.accuracy) + ' m)';
+            locBtn.textContent = '📍 Update location';
+        }, function () {
+            locStatus.textContent = 'Location not shared';
+        }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+    });
+
+    form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        alertEl.className = 'alert';
+        const captcha = window.grecaptcha ? grecaptcha.getResponse() : '';
+        if (!captcha) { showAlert(alertEl, 'Please tick "I\'m not a robot" first.'); return; }
+
+        btn.disabled = true; btn.textContent = 'Sending…';
+        const fd = new FormData(form);
+        const body = Object.fromEntries(fd.entries());
+        body['g-recaptcha-response'] = captcha;
+        const res = await parkFetch({{ url_for('parking.scan_notify', token=token)|tojson }}, { method: 'POST', body });
+
+        if (res.ok) {
+            document.getElementById('formCard').style.display = 'none';
+            if (res.data.status === 'throttled') {
+                document.getElementById('sentTitle').textContent = 'Owner already notified';
+            }
+            document.getElementById('sentText').textContent = res.data.message;
+            const sent = document.getElementById('sent');
+            sent.classList.add('show');
+            setTimeout(() => document.getElementById('stage').classList.add('done'), 3600);
+            if (navigator.vibrate) navigator.vibrate([60, 40, 60]);
+        } else {
+            showAlert(alertEl, res.data.error || 'Something went wrong. Please try again.');
+            if (window.grecaptcha) grecaptcha.reset();
+            btn.disabled = false; btn.textContent = 'Send notification';
+        }
+    });
+})();
+</script>
+{% endblock %}

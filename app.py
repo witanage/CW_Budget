@@ -25,6 +25,7 @@ from services.auth_service import login_required, admin_required, token_required
 from services.user_tab_service import get_enabled_tabs
 from services.dashboard_service import get_dashboard_stats, get_sidebar_summary
 from services.settings_service import get_upload_mode, get_global_template_vars
+from services.parking import register_parking_routes
 
 # Load environment variables from .env file
 load_dotenv()
@@ -287,6 +288,8 @@ register_markup_rule_routes(app, admin_required, limiter, RATE_LIMIT_ADMIN)
 register_report_routes(app, login_required)
 register_category_routes(app, login_required)
 register_payment_method_routes(app, login_required, admin_required, limiter, RATE_LIMIT_ADMIN)
+# Parking QR notifier: isolated module (own tables/session keys) mounted at /park
+register_parking_routes(app, limiter)
 
 
 @app.route('/api/dashboard-stats')

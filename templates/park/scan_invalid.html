@@ -1,0 +1,14 @@
+{% extends "park/base.html" %}
+{% block title %}Park Notify{% endblock %}
+{% block body %}
+<main class="narrow">
+    <section class="card" style="text-align:center">
+        <div style="font-size:44px" aria-hidden="true">🅿️</div>
+        <h1>{{ message or 'This QR code is not valid' }}</h1>
+        {% if not message %}
+        <p class="muted">It may have been replaced by the vehicle owner. If you need to reach the owner,
+            please contact the parking attendant.</p>
+        {% endif %}
+    </section>
+</main>
+{% endblock %}
