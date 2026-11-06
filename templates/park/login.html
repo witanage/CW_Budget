@@ -15,6 +15,13 @@
             <div id="alert" class="alert" role="alert"></div>
             <button class="btn btn-primary btn-block" type="submit" id="btn">Sign in</button>
         </form>
+        <form id="codeForm" novalidate hidden>
+            <p class="muted small">Enter the 6-digit code from your authenticator app (Authy, Google Authenticator, …), or one of your recovery codes.</p>
+            <label for="code">Verification code</label>
+            <input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="16" required>
+            <button class="btn btn-primary btn-block" type="submit" id="codeBtn">Verify</button>
+            <button class="btn btn-block" type="button" id="codeBack">Back</button>
+        </form>
     </section>
 </main>
 {% endblock %}
@@ -27,9 +34,30 @@ document.getElementById('loginForm').addEventListener('submit', async function (
     const res = await parkFetch({{ url_for('parking.login')|tojson }}, {
         method: 'POST', body: { mobile: this.mobile.value, password: this.password.value }
     });
+    if (res.ok && res.data.totp_required) {
+        this.hidden = true; codeForm.hidden = false; codeInput.value = ''; codeInput.focus();
+        btn.disabled = false; return;
+    }
     if (res.ok) { window.location = res.data.redirect; return; }
     showAlert(alertEl, res.data.error || 'Sign in failed.');
     btn.disabled = false;
+});
+
+const codeForm = document.getElementById('codeForm'), codeInput = document.getElementById('code');
+function backToPassword() {
+    codeForm.hidden = true; document.getElementById('loginForm').hidden = false;
+    document.getElementById('password').value = '';
+}
+document.getElementById('codeBack').addEventListener('click', backToPassword);
+codeForm.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const b = document.getElementById('codeBtn');
+    b.disabled = true;
+    const res = await parkFetch({{ url_for('parking.login_2fa')|tojson }}, { method: 'POST', body: { code: codeInput.value } });
+    if (res.ok) { window.location = res.data.redirect; return; }
+    await showAlert(document.getElementById('alert'), res.data.error || 'Verification failed.');
+    b.disabled = false; codeInput.value = '';
+    if (res.data.restart) backToPassword();
 });
 </script>
 {% endblock %}

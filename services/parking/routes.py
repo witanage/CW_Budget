@@ -15,6 +15,7 @@ Admin (park_admin_required):
 import io
 import logging
 import os
+import time
 from datetime import datetime
 
 import qrcode
@@ -22,7 +23,7 @@ from flask import (Blueprint, jsonify, make_response, redirect, render_template,
                    send_file, session, url_for, abort)
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from . import notifier, repository, security, validators
+from . import notifier, repository, security, totp, validators
 from .repository import DatabaseUnavailable, DuplicateError
 from .validators import ValidationError
 
@@ -68,6 +69,22 @@ def _vehicle_json(v):
 
 def _payload():
     return request.get_json(silent=True) or request.form
+
+
+PENDING_2FA_SECONDS = 300
+MAX_2FA_TRIES = 5
+
+
+def _check_second_factor(uid, code) -> bool:
+    """Accept a current TOTP code (once per time step) or an unused recovery code."""
+    info = repository.get_totp(uid)
+    if not info or not info.get('totp_enabled'):
+        return False
+    if totp.is_totp_code(code):
+        step = totp.verify(info['totp_secret'], code, info['totp_last_step'])
+        return step is not None and repository.claim_totp_step(uid, step)
+    remaining = totp.use_recovery_code(info.get('totp_recovery'), code)
+    return remaining is not None and repository.replace_recovery(uid, info['totp_recovery'], remaining)
 
 
 def create_blueprint(limiter):
@@ -207,8 +224,42 @@ def create_blueprint(limiter):
         if not user['is_active']:
             return jsonify({'error': 'Your account is disabled. Contact an administrator.'}), 403
 
+        if user.get('totp_enabled'):
+            # Password is right but the session is not logged in until the second factor passes.
+            session[security.SESSION_PENDING] = user['id']
+            session[security.SESSION_PENDING_AT] = int(time.time())
+            session[security.SESSION_PENDING_TRIES] = 0
+            return jsonify({'totp_required': True}), 200
+
         security.start_park_session(user)
         repository.record_login(user['id'])
+        return jsonify({'redirect': url_for('parking.dashboard')}), 200
+
+    @bp.route('/login/2fa', methods=['POST'])
+    @limiter.limit(rl_login)
+    def login_2fa():
+        if not security.csrf_valid():
+            return jsonify({'error': 'Session expired. Please reload the page.'}), 403
+        uid = session.get(security.SESSION_PENDING)
+        started = session.get(security.SESSION_PENDING_AT, 0)
+        tries = session.get(security.SESSION_PENDING_TRIES, 0)
+        if not uid or time.time() - started > PENDING_2FA_SECONDS:
+            security.clear_pending_2fa()
+            return jsonify({'error': 'Verification expired. Please sign in again.', 'restart': True}), 401
+        if tries >= MAX_2FA_TRIES:
+            security.clear_pending_2fa()
+            return jsonify({'error': 'Too many incorrect codes. Please sign in again.', 'restart': True}), 401
+        user = repository.get_user(uid)
+        if not user or not user['is_active']:
+            security.clear_pending_2fa()
+            return jsonify({'error': 'Your account is disabled. Contact an administrator.'}), 403
+        if not _check_second_factor(uid, _payload().get('code')):
+            session[security.SESSION_PENDING_TRIES] = tries + 1
+            logger.info('Park 2FA failed for user %s from %s', uid, security.client_ip())
+            return jsonify({'error': 'Invalid verification code.'}), 401
+        security.clear_pending_2fa()
+        security.start_park_session(user)
+        repository.record_login(uid)
         return jsonify({'redirect': url_for('parking.dashboard')}), 200
 
     @bp.route('/logout', methods=['POST'])
@@ -342,6 +393,58 @@ def create_blueprint(limiter):
         logger.info('Park user %s changed password', uid)
         return jsonify({'message': 'Password changed.'})
 
+    # ------------------------------------------------------------------
+    # Two-factor authentication (account)
+    # ------------------------------------------------------------------
+
+    @bp.route('/api/account/2fa/setup', methods=['POST'])
+    @security.park_login_required
+    @limiter.limit(rl_password)
+    def totp_setup():
+        uid = security.current_park_user_id()
+        user = repository.get_user(uid)
+        if user.get('totp_enabled'):
+            return jsonify({'error': 'Two-factor authentication is already enabled.'}), 409
+        secret = totp.new_secret()
+        session[security.SESSION_TOTP_SETUP] = secret
+        uri = totp.provisioning_uri(secret, user['mobile_e164'])
+        resp = jsonify({'secret': secret, 'uri': uri, 'qr': totp.qr_data_uri(uri)})
+        resp.headers['Cache-Control'] = 'no-store'
+        return resp
+
+    @bp.route('/api/account/2fa/enable', methods=['POST'])
+    @security.park_login_required
+    @limiter.limit(rl_password)
+    def totp_enable():
+        uid = security.current_park_user_id()
+        secret = session.get(security.SESSION_TOTP_SETUP)
+        if not secret:
+            return jsonify({'error': 'Start the setup again.'}), 400
+        step = totp.verify(secret, _payload().get('code'))
+        if step is None:
+            return jsonify({'error': 'Invalid verification code.'}), 400
+        plain, stored = totp.new_recovery_codes()
+        repository.enable_totp(uid, secret, stored, step)
+        session.pop(security.SESSION_TOTP_SETUP, None)
+        logger.info('Park user %s enabled 2FA', uid)
+        resp = jsonify({'message': 'Two-factor authentication enabled.', 'recovery_codes': plain})
+        resp.headers['Cache-Control'] = 'no-store'
+        return resp
+
+    @bp.route('/api/account/2fa/disable', methods=['POST'])
+    @security.park_login_required
+    @limiter.limit(rl_password)
+    def totp_disable():
+        uid = security.current_park_user_id()
+        data = _payload()
+        if not check_password_hash(repository.get_password_hash(uid) or _DUMMY_HASH, data.get('password') or ''):
+            return jsonify({'error': 'Current password is incorrect.'}), 400
+        if not _check_second_factor(uid, data.get('code')):
+            return jsonify({'error': 'Invalid verification code.'}), 400
+        repository.disable_totp(uid)
+        logger.info('Park user %s disabled 2FA', uid)
+        return jsonify({'message': 'Two-factor authentication disabled.'})
+
     @bp.route('/api/account/scan-window', methods=['POST'])
     @security.park_login_required
     @limiter.limit(rl_api)
@@ -449,5 +552,15 @@ def create_blueprint(limiter):
         if not repository.set_user_active(user_id, bool(_payload().get('is_active'))):
             return jsonify({'error': 'User not found'}), 404
         return jsonify({'message': 'Updated.'})
+
+    @bp.route('/api/admin/users/<int:user_id>/reset-2fa', methods=['POST'])
+    @security.park_admin_required
+    @limiter.limit(rl_admin)
+    def admin_reset_2fa(user_id):
+        if not repository.get_user(user_id):
+            return jsonify({'error': 'User not found'}), 404
+        repository.disable_totp(user_id)
+        logger.info('Park admin %s reset 2FA for user %s', security.current_park_user_id(), user_id)
+        return jsonify({'message': 'Two-factor authentication reset.'})
 
     return bp

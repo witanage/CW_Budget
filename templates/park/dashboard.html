@@ -126,6 +126,39 @@
             <div id="windowAlert" class="alert" role="alert"></div>
         </div>
         <div class="card">
+            <h2>Two-factor authentication</h2>
+            <p class="muted small">Protect your account with a 6-digit code from an authenticator app such as Authy or Google Authenticator.</p>
+            <div id="tfaOff" {% if user.totp_enabled %}hidden{% endif %}>
+                <p><span class="badge b-warn">Off</span></p>
+                <button class="btn btn-primary" id="tfaStart" type="button">Enable two-factor authentication</button>
+                <div id="tfaSetup" hidden style="margin-top:14px">
+                    <p class="small">1. Scan this QR code with your authenticator app, or enter the key manually.</p>
+                    <img id="tfaQr" alt="Authenticator QR code" width="200" height="200" style="background:#fff;padding:6px;border-radius:8px">
+                    <div class="topic" id="tfaSecret" style="margin:8px 0"></div>
+                    <p class="small">2. Enter the 6-digit code it shows.</p>
+                    <form id="tfaEnableForm" class="row" style="align-items:flex-end" novalidate>
+                        <div style="max-width:200px"><label for="tfa_code">Verification code</label>
+                            <input id="tfa_code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" required></div>
+                        <button class="btn btn-primary" type="submit">Confirm</button>
+                    </form>
+                </div>
+            </div>
+            <div id="tfaOn" {% if not user.totp_enabled %}hidden{% endif %}>
+                <p><span class="badge b-ok">On</span></p>
+                <form id="tfaDisableForm" style="max-width:380px" novalidate>
+                    <label for="tfa_dpw">Current password</label>
+                    <input id="tfa_dpw" name="password" type="password" autocomplete="current-password" required>
+                    <label for="tfa_dcode">Verification code</label>
+                    <input id="tfa_dcode" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="16" required>
+                    <button class="btn btn-danger" type="submit" style="margin-top:14px">Disable two-factor authentication</button>
+                </form>
+            </div>
+            <div id="tfaCodes" hidden style="margin-top:14px">
+                <p class="small"><strong>Save these recovery codes.</strong> Each works once if you lose your phone. They will not be shown again.</p>
+                <div class="topic" id="tfaCodeList" style="white-space:pre-line"></div>
+            </div>
+        </div>
+        <div class="card">
             <h2>Change password</h2>
             <form id="pwForm" style="max-width:380px" novalidate>
                 <label for="current_password">Current password</label>
@@ -163,7 +196,7 @@
             <h2>Users</h2>
             <div class="table-wrap">
                 <table>
-                    <thead><tr><th>Name</th><th>Mobile</th><th>Vehicles</th><th>Role</th><th>Last login</th><th>Status</th><th></th></tr></thead>
+                    <thead><tr><th>Name</th><th>Mobile</th><th>Vehicles</th><th>Role</th><th>Last login</th><th>2FA</th><th>Status</th><th></th></tr></thead>
                     <tbody id="userBody"></tbody>
                 </table>
             </div>
@@ -209,6 +242,7 @@
         password: {{ url_for('parking.change_password')|tojson }},
         topic: {{ url_for('parking.rotate_topic')|tojson }},
         window: {{ url_for('parking.set_scan_window')|tojson }},
+        tfa: {{ url_for('parking.totp_setup')|tojson }}.replace(/setup$/, ''),
         test: {{ url_for('parking.test_notification')|tojson }},
         users: IS_ADMIN ? {{ url_for('parking.admin_users')|tojson }} : null,
         allVehicles: IS_ADMIN ? {{ url_for('parking.admin_vehicles')|tojson }} : null,
@@ -356,6 +390,40 @@
         const res = await parkFetch(API.window, { method: 'POST', body: { minutes: this.minutes.value } });
         showAlert(a, res.ok ? res.data.message : (res.data.error || 'Failed.'), res.ok ? 'ok' : 'error');
     });
+    // Two-factor authentication
+    const tfaOff = document.getElementById('tfaOff'), tfaOn = document.getElementById('tfaOn');
+    document.getElementById('tfaStart').addEventListener('click', async () => {
+        const res = await parkFetch(API.tfa + 'setup', { method: 'POST' });
+        if (!res.ok) { showAlert(null, res.data.error || 'Failed.'); return; }
+        document.getElementById('tfaQr').src = res.data.qr;
+        document.getElementById('tfaSecret').textContent = res.data.secret;
+        document.getElementById('tfaSetup').hidden = false;
+        document.getElementById('tfa_code').focus();
+    });
+    document.getElementById('tfaEnableForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const res = await parkFetch(API.tfa + 'enable', { method: 'POST', body: { code: this.code.value } });
+        if (!res.ok) { showAlert(null, res.data.error || 'Failed.'); return; }
+        this.reset();
+        document.getElementById('tfaSetup').hidden = true;
+        document.getElementById('tfaQr').removeAttribute('src');
+        document.getElementById('tfaSecret').textContent = '';
+        document.getElementById('tfaCodeList').textContent = res.data.recovery_codes.join('\n');
+        document.getElementById('tfaCodes').hidden = false;
+        tfaOff.hidden = true; tfaOn.hidden = false;
+        showAlert(null, res.data.message, 'ok');
+    });
+    document.getElementById('tfaDisableForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const res = await parkFetch(API.tfa + 'disable', { method: 'POST', body: Object.fromEntries(new FormData(this).entries()) });
+        if (!res.ok) { showAlert(null, res.data.error || 'Failed.'); return; }
+        this.reset();
+        document.getElementById('tfaCodes').hidden = true;
+        document.getElementById('tfaCodeList').textContent = '';
+        tfaOn.hidden = true; tfaOff.hidden = false;
+        showAlert(null, res.data.message, 'ok');
+    });
+
     document.getElementById('pwForm').addEventListener('submit', async function (e) {
         e.preventDefault();
         const a = document.getElementById('pwAlert');
@@ -379,6 +447,11 @@
                     el('td', { class: 'num' }, u.vehicle_count),
                     el('td', {}, u.is_admin ? 'Admin' : 'User'),
                     el('td', { class: 'num' }, fmtTime(u.last_login_at)),
+                    el('td', {}, u.totp_enabled ? el('button', { class: 'btn btn-sm', type: 'button', onclick: async () => {
+                        if (!await parkConfirm('Reset two-factor authentication for this user? They can sign in with just their password until they enable it again.', { title: 'Reset 2FA', okLabel: 'Reset', danger: true })) return;
+                        const r = await parkFetch(`${API.users}/${u.id}/reset-2fa`, { method: 'POST' });
+                        if (r.ok) loadUsers(); else showAlert(uAlert, r.data.error || 'Failed.');
+                    } }, 'Reset 2FA') : '—'),
                     el('td', {}, el('span', { class: 'badge ' + (u.is_active ? 'b-ok' : 'b-bad') }, u.is_active ? 'Active' : 'Disabled')),
                     el('td', {}, u.id === ME ? '' : el('button', { class: 'btn btn-sm', type: 'button', onclick: async () => {
                         const r = await parkFetch(`${API.users}/${u.id}/active`, { method: 'POST', body: { is_active: !u.is_active } });

@@ -22,7 +22,7 @@ from flask_limiter import Limiter  # noqa: E402
 from flask_limiter.util import get_remote_address  # noqa: E402
 from werkzeug.security import generate_password_hash  # noqa: E402
 
-from services.parking import security, validators  # noqa: E402
+from services.parking import security, totp, validators  # noqa: E402
 from services.parking.routes import create_blueprint  # noqa: E402
 from services.parking.validators import ValidationError  # noqa: E402
 
@@ -352,6 +352,154 @@ class RouteTests(unittest.TestCase):
                                json={'plate': 'CAB-1234'})
         self.assertEqual(res.status_code, 403)
         self.repo.add_vehicle.assert_not_called()
+
+
+
+class TotpHelperTests(unittest.TestCase):
+    def test_verify_window_and_replay(self):
+        import pyotp
+        secret = totp.new_secret()
+        now = int(time.time() // 30)
+        code = pyotp.TOTP(secret).at(now * 30)
+        self.assertEqual(totp.verify(secret, code), now)
+        self.assertEqual(totp.verify(secret, code[:3] + ' ' + code[3:]), now)   # spaces tolerated
+        self.assertIsNone(totp.verify(secret, code, last_step=now))               # replay blocked
+        self.assertIsNone(totp.verify(secret, '000000' if code != '000000' else '111111'))
+        self.assertIsNone(totp.verify(secret, 'abc123'))
+
+    def test_recovery_codes_single_use(self):
+        plain, stored = totp.new_recovery_codes()
+        self.assertEqual(len(plain), totp.RECOVERY_COUNT)
+        remaining = totp.use_recovery_code(stored, plain[0].lower())
+        self.assertIsNotNone(remaining)
+        self.assertIsNone(totp.use_recovery_code(remaining, plain[0]))
+        self.assertIsNotNone(totp.use_recovery_code(remaining, plain[1]))
+        self.assertNotIn(plain[0].replace('-', ''), stored)                       # only hashes stored
+
+
+class TwoFactorRouteTests(unittest.TestCase):
+    """Borrows RouteTests' mocked-repository helpers without re-running its tests."""
+    setUp = RouteTests.setUp
+    tearDown = RouteTests.tearDown
+    csrf = RouteTests.csrf
+    proof = RouteTests.proof
+
+    def _login(self):
+        self.repo.get_user.return_value = USER
+        return RouteTests._login(self)
+
+    def _tfa_user(self):
+        import pyotp
+        self.secret = totp.new_secret()
+        self.pyotp = pyotp
+        user = dict(USER, totp_enabled=1)
+        self.repo.get_user_for_login.return_value = dict(user, password_hash=generate_password_hash('correct-pass'))
+        self.repo.get_user.return_value = user
+        self.sec_repo.return_value = user
+        self.repo.get_totp.return_value = {'totp_secret': self.secret, 'totp_enabled': 1,
+                                           'totp_last_step': 0, 'totp_recovery': '[]'}
+        self.repo.claim_totp_step.return_value = True
+
+    def _password_step(self):
+        csrf = self.csrf()
+        res = self.client.post('/park/login', json={'mobile': '0771234567', 'password': 'correct-pass'},
+                               headers={'X-CSRF-Token': csrf})
+        return csrf, res
+
+    def test_password_alone_does_not_log_in(self):
+        self._tfa_user()
+        _, res = self._password_step()
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(res.get_json().get('totp_required'))
+        self.repo.record_login.assert_not_called()
+        self.assertEqual(self.client.get('/park/api/vehicles').status_code, 401)
+
+    def test_2fa_requires_pending_password_step(self):
+        self._tfa_user()
+        res = self.client.post('/park/login/2fa', json={'code': '123456'}, headers={'X-CSRF-Token': self.csrf()})
+        self.assertEqual(res.status_code, 401)
+
+    def test_valid_code_logs_in(self):
+        self._tfa_user()
+        csrf, _ = self._password_step()
+        code = self.pyotp.TOTP(self.secret).now()
+        res = self.client.post('/park/login/2fa', json={'code': code}, headers={'X-CSRF-Token': csrf})
+        self.assertEqual(res.status_code, 200, res.get_json())
+        self.repo.list_vehicles.return_value = []
+        self.assertEqual(self.client.get('/park/api/vehicles').status_code, 200)
+
+    def test_wrong_code_locks_after_limit(self):
+        self._tfa_user()
+        csrf, _ = self._password_step()
+        for _ in range(5):
+            res = self.client.post('/park/login/2fa', json={'code': '000000'}, headers={'X-CSRF-Token': csrf})
+            self.assertEqual(res.status_code, 401)
+        # even the right code is refused now: must restart from the password step
+        code = self.pyotp.TOTP(self.secret).now()
+        res = self.client.post('/park/login/2fa', json={'code': code}, headers={'X-CSRF-Token': csrf})
+        self.assertTrue(res.get_json().get('restart'))
+        self.assertEqual(self.client.get('/park/api/vehicles').status_code, 401)
+
+    def test_replayed_code_rejected(self):
+        self._tfa_user()
+        self.repo.claim_totp_step.return_value = False
+        csrf, _ = self._password_step()
+        res = self.client.post('/park/login/2fa', json={'code': self.pyotp.TOTP(self.secret).now()},
+                               headers={'X-CSRF-Token': csrf})
+        self.assertEqual(res.status_code, 401)
+
+    def test_recovery_code_logs_in(self):
+        self._tfa_user()
+        plain, stored = totp.new_recovery_codes()
+        self.repo.get_totp.return_value['totp_recovery'] = stored
+        self.repo.replace_recovery.return_value = True
+        csrf, _ = self._password_step()
+        res = self.client.post('/park/login/2fa', json={'code': plain[0]}, headers={'X-CSRF-Token': csrf})
+        self.assertEqual(res.status_code, 200, res.get_json())
+        self.repo.replace_recovery.assert_called_once()
+
+    def test_enrol_flow(self):
+        csrf = self._login()
+        res = self.client.post('/park/api/account/2fa/setup', headers={'X-CSRF-Token': csrf})
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertTrue(data['qr'].startswith('data:image/png;base64,'))
+        self.assertIn('otpauth://totp/', data['uri'])
+        bad = self.client.post('/park/api/account/2fa/enable', json={'code': '000000'}, headers={'X-CSRF-Token': csrf})
+        self.assertEqual(bad.status_code, 400)
+        self.repo.enable_totp.assert_not_called()
+        import pyotp
+        code = pyotp.TOTP(data['secret']).now()
+        ok = self.client.post('/park/api/account/2fa/enable', json={'code': code}, headers={'X-CSRF-Token': csrf})
+        self.assertEqual(ok.status_code, 200, ok.get_json())
+        self.assertEqual(len(ok.get_json()['recovery_codes']), totp.RECOVERY_COUNT)
+        self.repo.enable_totp.assert_called_once()
+
+    def test_enable_without_setup_rejected(self):
+        csrf = self._login()
+        res = self.client.post('/park/api/account/2fa/enable', json={'code': '123456'}, headers={'X-CSRF-Token': csrf})
+        self.assertEqual(res.status_code, 400)
+
+    def test_disable_needs_password_and_code(self):
+        csrf = self._login()
+        self._tfa_user()
+        self.repo.get_password_hash.return_value = generate_password_hash('correct-pass')
+        res = self.client.post('/park/api/account/2fa/disable', headers={'X-CSRF-Token': csrf},
+                               json={'password': 'wrong', 'code': self.pyotp.TOTP(self.secret).now()})
+        self.assertEqual(res.status_code, 400)
+        res = self.client.post('/park/api/account/2fa/disable', headers={'X-CSRF-Token': csrf},
+                               json={'password': 'correct-pass', 'code': '000000'})
+        self.assertEqual(res.status_code, 400)
+        self.repo.disable_totp.assert_not_called()
+        res = self.client.post('/park/api/account/2fa/disable', headers={'X-CSRF-Token': csrf},
+                               json={'password': 'correct-pass', 'code': self.pyotp.TOTP(self.secret).now()})
+        self.assertEqual(res.status_code, 200)
+        self.repo.disable_totp.assert_called_once_with(1)
+
+    def test_admin_reset_forbidden_for_normal_user(self):
+        csrf = self._login()
+        res = self.client.post('/park/api/admin/users/2/reset-2fa', headers={'X-CSRF-Token': csrf})
+        self.assertEqual(res.status_code, 403)
 
 
 if __name__ == '__main__':
