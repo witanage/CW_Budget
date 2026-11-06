@@ -205,3 +205,35 @@ def park_admin_required(f):
 
 def client_ip() -> str:
     return (request.remote_addr or '')[:45]
+
+
+# ---------------------------------------------------------------------------
+# Scan window (time allowed to submit after scanning the QR)
+# ---------------------------------------------------------------------------
+
+MIN_SCAN_WINDOW_MINUTES = 1
+MAX_SCAN_WINDOW_MINUTES = 120
+
+
+def _window_serializer():
+    from itsdangerous import URLSafeSerializer
+    return URLSafeSerializer(current_app.secret_key, salt='park-scan-window')
+
+
+def issue_scan_window(token: str) -> str:
+    """Signed proof of *when* this QR was scanned (GET of the scan page). Tamper-proof, stateless."""
+    return _window_serializer().dumps({'t': token, 'iat': int(time.time())})
+
+
+def scan_window_remaining(token: str, proof: str, window_minutes: int) -> int:
+    """Seconds left to submit; 0 if the proof is missing/forged/for another QR/expired."""
+    if not proof or not isinstance(proof, str) or len(proof) > 512:
+        return 0
+    try:
+        data = _window_serializer().loads(proof)
+        if not hmac.compare_digest(str(data.get('t')), token):
+            return 0
+        left = int(data['iat']) + int(window_minutes) * 60 - int(time.time())
+    except Exception:
+        return 0
+    return max(0, left)

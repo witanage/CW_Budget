@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS park_users (
     ntfy_topic          VARCHAR(64)   NOT NULL,
     is_admin            BOOLEAN       NOT NULL DEFAULT FALSE,
     is_active           BOOLEAN       NOT NULL DEFAULT TRUE,
+    scan_window_minutes INT           NOT NULL DEFAULT 10,
     created_at          TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_login_at       TIMESTAMP     NULL,
     password_changed_at TIMESTAMP     NULL,
@@ -53,3 +54,7 @@ CREATE TABLE IF NOT EXISTS park_scans (
     CONSTRAINT fk_park_scans_vehicle FOREIGN KEY (vehicle_id)
         REFERENCES park_vehicles (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Migration for databases created before scan_window_minutes existed
+-- (error 1060 "duplicate column" is ignored by init_schema on re-runs).
+ALTER TABLE park_users ADD COLUMN scan_window_minutes INT NOT NULL DEFAULT 10 AFTER is_active;

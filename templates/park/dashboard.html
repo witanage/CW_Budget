@@ -112,6 +112,18 @@
             <div id="topicAlert" class="alert" role="alert"></div>
         </div>
         <div class="card">
+            <h2>Scan time limit</h2>
+            <p class="muted small">After someone scans your QR, they have this long to submit the form.
+                Afterwards they must scan again.</p>
+            <form id="windowForm" class="row" style="align-items:flex-end" novalidate>
+                <div style="max-width:160px"><label for="scan_minutes">Minutes</label>
+                    <input id="scan_minutes" name="minutes" type="number" min="1" max="120" step="1"
+                           value="{{ user.scan_window_minutes }}" required></div>
+                <button class="btn btn-primary" type="submit">Save</button>
+            </form>
+            <div id="windowAlert" class="alert" role="alert"></div>
+        </div>
+        <div class="card">
             <h2>Change password</h2>
             <form id="pwForm" style="max-width:380px" novalidate>
                 <label for="current_password">Current password</label>
@@ -169,6 +181,7 @@
         scans: {{ url_for('parking.scans_list')|tojson }},
         password: {{ url_for('parking.change_password')|tojson }},
         topic: {{ url_for('parking.rotate_topic')|tojson }},
+        window: {{ url_for('parking.set_scan_window')|tojson }},
         test: {{ url_for('parking.test_notification')|tojson }},
         users: IS_ADMIN ? {{ url_for('parking.admin_users')|tojson }} : null,
     };
@@ -308,6 +321,12 @@
     document.getElementById('testNotify').addEventListener('click', async () => {
         const res = await parkFetch(API.test, { method: 'POST' });
         showAlert(tAlert, res.ok ? res.data.message : (res.data.error || 'Failed.'), res.ok ? 'ok' : 'error');
+    });
+    document.getElementById('windowForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const a = document.getElementById('windowAlert');
+        const res = await parkFetch(API.window, { method: 'POST', body: { minutes: this.minutes.value } });
+        showAlert(a, res.ok ? res.data.message : (res.data.error || 'Failed.'), res.ok ? 'ok' : 'error');
     });
     document.getElementById('pwForm').addEventListener('submit', async function (e) {
         e.preventDefault();

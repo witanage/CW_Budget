@@ -68,6 +68,9 @@
 
         <form id="notifyForm" novalidate>
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="scan_proof" value="{{ scan_proof }}">
+            <div id="countdown" class="small muted" style="text-align:center;margin-bottom:10px" aria-live="off">
+                Time left to send: <strong id="countdownText"></strong></div>
             <label>What's the issue?</label>
             <div class="reasons" role="radiogroup">
                 {% set labels = {'blocking': '🚧 Blocking me', 'lights_on': '💡 Lights on',
@@ -130,6 +133,27 @@
     const locBtn = document.getElementById('locBtn');
     const locStatus = document.getElementById('locStatus');
 
+    // Countdown starts the moment the QR page loads; the server enforces the same limit.
+    const deadline = Date.now() + {{ window_seconds|tojson }} * 1000;
+    const cdText = document.getElementById('countdownText');
+    let expired = false;
+    function expire() {
+        expired = true;
+        clearInterval(timer);
+        form.querySelectorAll('input, textarea, button').forEach((n) => { n.disabled = true; });
+        document.querySelector('.recaptcha').style.display = 'none';
+        document.getElementById('countdown').style.display = 'none';
+        showAlert(alertEl, 'Time expired. Please scan the QR code again.');
+        btn.textContent = 'Expired';
+    }
+    function tick() {
+        const left = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+        cdText.textContent = Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
+        if (left <= 0 && !expired) expire();
+    }
+    const timer = setInterval(tick, 1000);
+    tick();
+
     locBtn.addEventListener('click', function () {
         if (!navigator.geolocation) { locStatus.textContent = 'Not supported on this device'; return; }
         locStatus.textContent = 'Locating…';
@@ -146,6 +170,7 @@
 
     form.addEventListener('submit', async function (e) {
         e.preventDefault();
+        if (expired) return;
         alertEl.className = 'alert';
         const captcha = window.grecaptcha ? grecaptcha.getResponse() : '';
         if (!captcha) { showAlert(alertEl, 'Please tick "I\'m not a robot" first.'); return; }
@@ -157,6 +182,7 @@
         const res = await parkFetch({{ url_for('parking.scan_notify', token=token)|tojson }}, { method: 'POST', body });
 
         if (res.ok) {
+            clearInterval(timer);
             document.getElementById('formCard').style.display = 'none';
             if (res.data.status === 'throttled') {
                 document.getElementById('sentTitle').textContent = 'Owner already notified';
@@ -166,6 +192,8 @@
             sent.classList.add('show');
             setTimeout(() => document.getElementById('stage').classList.add('done'), 3600);
             if (navigator.vibrate) navigator.vibrate([60, 40, 60]);
+        } else if (res.data.expired) {
+            expire();
         } else {
             showAlert(alertEl, res.data.error || 'Something went wrong. Please try again.');
             if (window.grecaptcha) grecaptcha.reset();
