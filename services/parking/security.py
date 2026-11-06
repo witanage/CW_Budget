@@ -31,6 +31,10 @@ SESSION_ADMIN = 'park_is_admin'
 SESSION_NAME = 'park_name'
 SESSION_LOGIN_AT = 'park_login_at'
 SESSION_CSRF = 'park_csrf'
+SESSION_PENDING = 'park_2fa_user'          # password verified, second factor outstanding
+SESSION_PENDING_AT = 'park_2fa_at'
+SESSION_PENDING_TRIES = 'park_2fa_tries'
+SESSION_TOTP_SETUP = 'park_2fa_setup'      # secret being enrolled (not yet confirmed)
 
 RECAPTCHA_VERIFY_URL = 'https://www.google.com/recaptcha/api/siteverify'
 
@@ -151,8 +155,14 @@ def start_park_session(user: dict) -> None:
     csrf_token()
 
 
+def clear_pending_2fa() -> None:
+    for key in (SESSION_PENDING, SESSION_PENDING_AT, SESSION_PENDING_TRIES):
+        session.pop(key, None)
+
+
 def end_park_session() -> None:
-    for key in (SESSION_USER, SESSION_ADMIN, SESSION_NAME, SESSION_LOGIN_AT, SESSION_CSRF):
+    for key in (SESSION_USER, SESSION_ADMIN, SESSION_NAME, SESSION_LOGIN_AT, SESSION_CSRF,
+                SESSION_PENDING, SESSION_PENDING_AT, SESSION_PENDING_TRIES, SESSION_TOTP_SETUP):
         session.pop(key, None)
 
 

@@ -74,7 +74,7 @@ def init_schema():
 # ---------------------------------------------------------------------------
 
 _USER_COLS = ('id, full_name, country_code, mobile_e164, ntfy_topic, is_admin, is_active, '
-              'scan_window_minutes, created_at, last_login_at')
+              'scan_window_minutes, created_at, last_login_at, totp_enabled')
 
 
 def get_user(user_id):
@@ -151,6 +151,48 @@ def list_users():
         return cur.fetchall()
 
 
+# ---------------------------------------------------------------------------
+# Two-factor authentication
+# ---------------------------------------------------------------------------
+
+def get_totp(user_id):
+    """Secret + state for verification. Never returned by the generic user queries."""
+    with _cursor() as cur:
+        cur.execute('SELECT totp_secret, totp_enabled, totp_last_step, totp_recovery '
+                    'FROM park_users WHERE id = %s', (user_id,))
+        return cur.fetchone()
+
+
+def enable_totp(user_id, secret, recovery_json, step):
+    with _cursor(commit=True) as cur:
+        cur.execute('UPDATE park_users SET totp_secret = %s, totp_enabled = TRUE, totp_last_step = %s, '
+                    'totp_recovery = %s WHERE id = %s', (secret, step, recovery_json, user_id))
+        return cur.rowcount > 0
+
+
+def disable_totp(user_id):
+    with _cursor(commit=True) as cur:
+        cur.execute('UPDATE park_users SET totp_secret = NULL, totp_enabled = FALSE, totp_last_step = 0, '
+                    'totp_recovery = NULL WHERE id = %s', (user_id,))
+        return cur.rowcount > 0
+
+
+def claim_totp_step(user_id, step):
+    """Atomically accept a time step once; False if it (or a later one) was already used."""
+    with _cursor(commit=True) as cur:
+        cur.execute('UPDATE park_users SET totp_last_step = %s WHERE id = %s AND totp_last_step < %s',
+                    (step, user_id, step))
+        return cur.rowcount > 0
+
+
+def replace_recovery(user_id, old_json, new_json):
+    """Compare-and-set so one recovery code cannot be spent twice concurrently."""
+    with _cursor(commit=True) as cur:
+        cur.execute('UPDATE park_users SET totp_recovery = %s WHERE id = %s AND totp_recovery = %s',
+                    (new_json, user_id, old_json))
+        return cur.rowcount > 0
+
+
 def set_user_active(user_id, is_active):
     with _cursor(commit=True) as cur:
         cur.execute('UPDATE park_users SET is_active = %s WHERE id = %s', (bool(is_active), user_id))
@@ -183,6 +225,16 @@ def _insert_vehicle(cur, user_id, country_code, plate, nickname):
 def add_vehicle(user_id, country_code, plate, nickname=None):
     with _cursor(commit=True) as cur:
         return _insert_vehicle(cur, user_id, country_code, plate, nickname)
+
+
+def list_all_vehicles():
+    """Every vehicle with its owner (admin registry view). qr_nonce is deliberately not selected."""
+    with _cursor() as cur:
+        cur.execute(
+            'SELECT v.id, v.user_id, v.plate_display, v.nickname, v.is_active, v.created_at, '
+            'u.full_name AS owner_name, u.mobile_e164 AS owner_mobile '
+            'FROM park_vehicles v JOIN park_users u ON u.id = v.user_id ORDER BY v.created_at DESC')
+        return cur.fetchall()
 
 
 def list_vehicles(user_id):

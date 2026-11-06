@@ -1,0 +1,245 @@
+<script>
+/* Sinhala / English switching for the park app.
+   Templates and API messages stay in English; this maps them to Sinhala in the browser.
+   Choice is stored in localStorage "park_lang"; the default follows the browser language. */
+(function () {
+    const SI = {
+        // ---- common ----
+        'Park Notify': 'Park Notify',
+        'Sign in': 'පිවිසෙන්න', 'Sign out': 'ඉවත් වන්න', 'Sign in failed.': 'පිවිසීම අසාර්ථකයි.',
+        'Mobile number': 'ජංගම දුරකථන අංකය', 'Password': 'මුරපදය',
+        'Sign in · Park Notify': 'පිවිසෙන්න · Park Notify',
+        'Back office · Park Notify': 'පරිපාලන අංශය · Park Notify',
+        'Notify vehicle owner': 'වාහන හිමියාට දැනුම් දෙන්න',
+        'Dashboard QR card': 'ඩෑෂ්බෝඩ් QR කාඩ්පත',
+        'Switch theme': 'තේමාව මාරු කරන්න', 'Switch to dark': 'අඳුරු තේමාවට මාරු වන්න', 'Switch to light': 'ලා තේමාවට මාරු වන්න',
+        'Language': 'භාෂාව',
+        'Please confirm': 'කරුණාකර තහවුරු කරන්න', 'Cancel': 'අවලංගු කරන්න', 'Success': 'සාර්ථකයි', 'Something went wrong': 'යම් දෝෂයක් සිදු විය', 'OK': 'හරි',
+        'Too many attempts. Please wait and try again.': 'උත්සාහ කිරීම් වැඩියි. කරුණාකර මදක් රැඳී නැවත උත්සාහ කරන්න.',
+        'Failed.': 'අසාර්ථකයි.',
+        'Optional': 'අනිවාර්ය නොවේ', '(optional)': '(අනිවාර්ය නොවේ)',
+
+        // ---- dashboard: tabs / vehicles ----
+        'Vehicles': 'වාහන', 'Scan log': 'ස්කෑන් ලඝුව', 'Account': 'ගිණුම', 'Users': 'පරිශීලකයන්',
+        'Register vehicle': 'වාහනය ලියාපදිංචි කරන්න',
+        'Add a vehicle': 'වාහනයක් එක් කරන්න', 'Licence plate': 'වාහන අංක පුවරුව', 'Nickname': 'වාහනයේ නම',
+        'e.g. Family car': 'උදා: පවුලේ කාරය', 'Add vehicle': 'වාහනය එක් කරන්න',
+        'Active': 'සක්‍රීය', 'Disabled': 'අක්‍රීය', 'Enable': 'සක්‍රීය කරන්න', 'Disable': 'අක්‍රීය කරන්න',
+        'Print': 'මුද්‍රණය කරන්න', 'Download': 'බාගන්න', 'Change QR': 'QR වෙනස් කරන්න', 'Remove': 'ඉවත් කරන්න',
+        'No vehicles yet. Add one above.': 'තවමත් වාහන නැත. ඉහත එකක් එක් කරන්න.',
+        'Remove vehicle': 'වාහනය ඉවත් කරන්න',
+        'The current sticker will stop working immediately. You will need to print the new one.':
+            'වත්මන් ස්ටිකරය වහාම ක්‍රියා විරහිත වේ. ඔබට නව එක මුද්‍රණය කිරීමට සිදු වේ.',
+        'Failed to change QR.': 'QR වෙනස් කිරීම අසාර්ථකයි.', 'Update failed.': 'යාවත්කාලීන කිරීම අසාර්ථකයි.',
+        'Delete failed.': 'මකා දැමීම අසාර්ථකයි.', 'Could not add vehicle.': 'වාහනය එක් කළ නොහැකි විය.',
+
+        // ---- scan log ----
+        'All vehicles': 'සියලු වාහන', 'Refresh': 'නැවුම් කරන්න',
+        'Time': 'වේලාව', 'Vehicle': 'වාහනය', 'Reason': 'හේතුව', 'Message': 'පණිවිඩය', 'Mobile': 'ජංගම අංකය',
+        'Location': 'ස්ථානය', 'IP address': 'IP ලිපිනය', 'Status': 'තත්ත්වය',
+        'No scans recorded yet.': 'තවමත් ස්කෑන් සටහන් වී නැත.',
+        'Blocking': 'අවහිර කිරීම', 'Lights on': 'එළි දල්වා ඇත', 'Window open': 'ජනේලය විවෘතයි',
+        'Alarm': 'ඇලාර්මය', 'Towing risk': 'ඇදගෙන යාමේ අවදානම', 'Other': 'වෙනත්',
+        'sent': 'යැවිණි', 'throttled': 'සීමා කළා', 'failed': 'අසාර්ථකයි',
+
+        // ---- account ----
+        'Notifications (ntfy)': 'දැනුම්දීම් (ntfy)',
+        'Subscribe to this private topic in the ntfy app. Keep it secret: anyone who knows it can read your alerts.':
+            'ntfy යෙදුමෙන් මෙම පෞද්ගලික මාතෘකාවට subscribe වන්න. එය රහසිගතව තබාගන්න: එය දන්නා ඕනෑම කෙනෙකුට ඔබේ දැනුම්දීම් කියවිය හැක.',
+        'Get the ntfy app': 'ntfy යෙදුම ලබාගන්න',
+        'Server': 'සේවාදායකය', 'Topic': 'මාතෘකාව', 'Open topic': 'මාතෘකාව විවෘත කරන්න',
+        'Send test': 'පරීක්ෂණයක් යවන්න', 'Generate new topic': 'නව මාතෘකාවක් සාදන්න',
+        'New ntfy topic': 'නව ntfy මාතෘකාව', 'Generate': 'සාදන්න',
+        'Generate a new ntfy topic? You must re-subscribe in the ntfy app.':
+            'නව ntfy මාතෘකාවක් සාදන්නද? ඔබ ntfy යෙදුමේ නැවත subscribe විය යුතුය.',
+        'New topic generated. Subscribe to it in the ntfy app.': 'නව මාතෘකාව සාදන ලදී. ntfy යෙදුමේ එයට subscribe වන්න.',
+        'Test notification sent.': 'පරීක්ෂණ දැනුම්දීම යැවිණි.',
+        'Could not reach the ntfy server.': 'ntfy සේවාදායකයට සම්බන්ධ විය නොහැකි විය.',
+        'Scan time limit': 'ස්කෑන් කාල සීමාව',
+        'After someone scans your QR, they have this long to submit the form. Afterwards they must scan again.':
+            'ඔබේ QR කේතය කවුරුන් හෝ ස්කෑන් කළ පසු, ෆෝරමය යැවීමට ඔවුන්ට ඇත්තේ මෙම කාලය පමණි. ඉන්පසු ඔවුන් නැවත ස්කෑන් කළ යුතුය.',
+        'Minutes': 'මිනිත්තු', 'Save': 'සුරකින්න', 'Scan time limit saved.': 'ස්කෑන් කාල සීමාව සුරකින ලදී.',
+        'Change password': 'මුරපදය වෙනස් කරන්න', 'Current password': 'වත්මන් මුරපදය',
+        'New password': 'නව මුරපදය', 'Confirm new password': 'නව මුරපදය තහවුරු කරන්න',
+        'Password changed.': 'මුරපදය වෙනස් කරන ලදී.', 'Current password is incorrect.': 'වත්මන් මුරපදය වැරදියි.',
+        'New passwords do not match.': 'නව මුරපද නොගැලපේ.',
+        'New password must differ from the current one.': 'නව මුරපදය වත්මන් මුරපදයට වඩා වෙනස් විය යුතුය.',
+
+        // ---- users / register (admin) ----
+        'Add user': 'පරිශීලකයෙකු එක් කරන්න', 'Name': 'නම', 'Initial password': 'ආරම්භක මුරපදය',
+        'Admin': 'පරිපාලක', 'User': 'පරිශීලක', 'Create user': 'පරිශීලකයා සාදන්න', 'Role': 'භූමිකාව',
+        'Last login': 'අවසන් පිවිසුම', 'User created.': 'පරිශීලකයා සාදන ලදී.',
+        'A user with this mobile number already exists.': 'මෙම ජංගම අංකය සහිත පරිශීලකයෙකු දැනටමත් සිටී.',
+        'User not found': 'පරිශීලකයා හමු නොවීය', 'Updated.': 'යාවත්කාලීන කරන ලදී.',
+        'You cannot disable your own account.': 'ඔබට ඔබේම ගිණුම අක්‍රීය කළ නොහැක.',
+        'Register a vehicle': 'වාහනයක් ලියාපදිංචි කරන්න',
+        'Link a vehicle to an existing user. Create the user first in the Users tab if needed.':
+            'වාහනයක් පවතින පරිශීලකයෙකුට සම්බන්ධ කරන්න. අවශ්‍ය නම් පළමුව පරිශීලකයන් ටැබයේ පරිශීලකයා සාදන්න.',
+        'Owner': 'හිමියා', 'All registered vehicles': 'සියලු ලියාපදිංචි වාහන', 'Registered': 'ලියාපදිංචි වූයේ',
+        'Select an owner first.': 'කරුණාකර මුලින් හිමියා තෝරන්න.', 'Could not register vehicle.': 'වාහනය ලියාපදිංචි කළ නොහැකි විය.',
+        'Vehicle added.': 'වාහනය එක් කරන ලදී.',
+        'This vehicle is already registered for that user.': 'මෙම වාහනය එම පරිශීලකයා සඳහා දැනටමත් ලියාපදිංචි කර ඇත.',
+        'You have already registered this vehicle.': 'ඔබ මෙම වාහනය දැනටමත් ලියාපදිංචි කර ඇත.',
+        'Vehicle not found': 'වාහනය හමු නොවීය', 'Vehicle removed': 'වාහනය ඉවත් කරන ලදී',
+
+        // ---- two-factor authentication ----
+        'Two-factor authentication': 'ද්වි-සාධක සත්‍යාපනය',
+        'Protect your account with a 6-digit code from an authenticator app such as Authy or Google Authenticator.':
+            'Authy හෝ Google Authenticator වැනි සත්‍යාපන යෙදුමකින් ලැබෙන ඉලක්කම් 6ක කේතයකින් ඔබේ ගිණුම ආරක්ෂා කරගන්න.',
+        'Off': 'අක්‍රීයයි', 'On': 'සක්‍රීයයි',
+        'Enable two-factor authentication': 'ද්වි-සාධක සත්‍යාපනය සක්‍රීය කරන්න',
+        'Disable two-factor authentication': 'ද්වි-සාධක සත්‍යාපනය අක්‍රීය කරන්න',
+        '1. Scan this QR code with your authenticator app, or enter the key manually.':
+            '1. ඔබේ සත්‍යාපන යෙදුමෙන් මෙම QR කේතය ස්කෑන් කරන්න, නැතහොත් යතුර අතින් ඇතුළත් කරන්න.',
+        '2. Enter the 6-digit code it shows.': '2. එහි පෙන්වන ඉලක්කම් 6ක කේතය ඇතුළත් කරන්න.',
+        'Verification code': 'සත්‍යාපන කේතය', 'Confirm': 'තහවුරු කරන්න', 'Verify': 'සත්‍යාපනය කරන්න', 'Back': 'ආපසු',
+        'Authenticator QR code': 'සත්‍යාපන QR කේතය',
+        'Enter the 6-digit code from your authenticator app (Authy, Google Authenticator, …), or one of your recovery codes.':
+            'ඔබේ සත්‍යාපන යෙදුමෙන් (Authy, Google Authenticator, …) ලැබෙන ඉලක්කම් 6ක කේතය, නැතහොත් ඔබේ ප්‍රතිසාධන කේත්වලින් එකක් ඇතුළත් කරන්න.',
+        'Save these recovery codes.': 'මෙම ප්‍රතිසාධන කේත සුරකින්න.',
+        'Each works once if you lose your phone. They will not be shown again.':
+            'ඔබේ දුරකථනය නැති වුවහොත් ඒ සෑම එකක්ම එක් වරක් පමණක් ක්‍රියා කරයි. ඒවා නැවත පෙන්වන්නේ නැත.',
+        'Two-factor authentication enabled.': 'ද්වි-සාධක සත්‍යාපනය සක්‍රීය කරන ලදී.',
+        'Two-factor authentication disabled.': 'ද්වි-සාධක සත්‍යාපනය අක්‍රීය කරන ලදී.',
+        'Two-factor authentication reset.': 'ද්වි-සාධක සත්‍යාපනය යළි සකසන ලදී.',
+        'Two-factor authentication is already enabled.': 'ද්වි-සාධක සත්‍යාපනය දැනටමත් සක්‍රීයයි.',
+        'Start the setup again.': 'සැකසුම නැවත ආරම්භ කරන්න.',
+        'Invalid verification code.': 'සත්‍යාපන කේතය වැරදියි.',
+        'Verification failed.': 'සත්‍යාපනය අසාර්ථකයි.',
+        'Verification expired. Please sign in again.': 'සත්‍යාපනය කල් ඉකුත් විය. කරුණාකර නැවත පිවිසෙන්න.',
+        'Too many incorrect codes. Please sign in again.': 'වැරදි කේත වැඩියි. කරුණාකර නැවත පිවිසෙන්න.',
+        '2FA': '2FA', 'Reset 2FA': '2FA යළි සකසන්න',
+        'Reset two-factor authentication for this user? They can sign in with just their password until they enable it again.':
+            'මෙම පරිශීලකයා සඳහා ද්වි-සාධක සත්‍යාපනය යළි සකසන්නද? ඔවුන් එය නැවත සක්‍රීය කරන තෙක් මුරපදයෙන් පමණක් පිවිසිය හැක.',
+        'Reset': 'යළි සකසන්න',
+
+        // ---- login / API errors ----
+        'Invalid mobile number or password.': 'ජංගම අංකය හෝ මුරපදය වැරදියි.',
+        'Your account is disabled. Contact an administrator.': 'ඔබේ ගිණුම අක්‍රීය කර ඇත. පරිපාලකයා අමතන්න.',
+        'Session expired. Please reload the page.': 'සැසිය කල් ඉකුත් විය. කරුණාකර පිටුව නැවත පූරණය කරන්න.',
+        'Service temporarily unavailable': 'සේවාව තාවකාලිකව නොමැත',
+        'Service temporarily unavailable. Please try again shortly.': 'සේවාව තාවකාලිකව නොමැත. කරුණාකර මද වේලාවකින් නැවත උත්සාහ කරන්න.',
+        'Page not found.': 'පිටුව හමු නොවීය.', 'Not found': 'හමු නොවීය', 'Access denied.': 'ප්‍රවේශය ප්‍රතික්ෂේප විය.',
+        'Licence plate is required.': 'වාහන අංක පුවරුව අවශ්‍යයි.', 'Licence plate is too long.': 'වාහන අංක පුවරුව දිග වැඩියි.',
+        'Mobile number is required.': 'ජංගම දුරකථන අංකය අවශ්‍යයි.',
+        'Mobile number may only contain digits.': 'ජංගම දුරකථන අංකයේ ඇත්තේ ඉලක්කම් පමණක් විය යුතුය.',
+        'Invalid Sri Lankan mobile number. Example: 077 123 4567.': 'වලංගු නොවන ශ්‍රී ලාංකික ජංගම අංකයකි. උදාහරණය: 077 123 4567.',
+        'Invalid mobile number. Use local format or +<country code>.': 'වලංගු නොවන ජංගම අංකයකි. දේශීය ආකෘතිය හෝ +<රටේ කේතය> භාවිත කරන්න.',
+        'Unsupported country.': 'සහාය නොදක්වන රටකි.',
+        'Password must be at least 8 characters.': 'මුරපදය අවම වශයෙන් අක්ෂර 8ක් විය යුතුය.',
+        'Password is too long.': 'මුරපදය දිග වැඩියි.',
+
+        // ---- scan page ----
+        'Notify the vehicle owner': 'වාහන හිමියාට දැනුම් දෙන්න',
+        'The owner gets an instant phone notification. Your details are optional and are only shared with the owner.':
+            'හිමියාට වහාම දුරකථන දැනුම්දීමක් ලැබේ. ඔබේ විස්තර අනිවාර්ය නොවන අතර ඒවා බෙදාගන්නේ හිමියා සමඟ පමණි.',
+        'Time left to send:': 'යැවීමට ඉතිරි කාලය:', "What's the issue?": 'ගැටලුව කුමක්ද?',
+        '🚧 Blocking me': '🚧 මාව අවහිර කරයි', '💡 Lights on': '💡 එළි දල්වා ඇත', '🪟 Window open': '🪟 ජනේලය විවෘතයි',
+        '🔔 Alarm going off': '🔔 ඇලාර්මය නාද වේ', '🚨 Towing / fine risk': '🚨 ඇදගෙන යාමේ / දඩයේ අවදානම', '💬 Other': '💬 වෙනත්',
+        "e.g. I'm parked behind you, white van.": 'උදා: මම ඔබේ පිටුපස නවතා ඇත, සුදු වෑන් රථයක්.',
+        'Your mobile number': 'ඔබේ ජංගම දුරකථන අංකය',
+        '(optional, so the owner can call you)': '(අනිවාර්ය නොවේ, හිමියාට ඔබට අමතා ගත හැකි වීමට)',
+        '📍 Share my location': '📍 මගේ ස්ථානය බෙදාගන්න', '📍 Update location': '📍 ස්ථානය යාවත්කාලීන කරන්න',
+        'Locating…': 'ස්ථානය සොයමින්…', 'Not supported on this device': 'මෙම උපාංගයේ සහාය නොදක්වයි',
+        'Location not shared': 'ස්ථානය බෙදාගෙන නැත',
+        'reCAPTCHA is not configured.': 'reCAPTCHA වින්‍යාස කර නැත.',
+        'Send notification': 'දැනුම්දීම යවන්න', 'Sending…': 'යවමින්…', 'Expired': 'කල් ඉකුත් විය',
+        'Notification sent!': 'දැනුම්දීම යැවිණි!', 'Owner already notified': 'හිමියාට දැනටමත් දැනුම් දී ඇත',
+        'The owner has been notified. Thank you for your patience.': 'හිමියාට දැනුම් දෙන ලදී. ඔබේ ඉවසීමට ස්තූතියි.',
+        'The owner has been notified.': 'හිමියාට දැනුම් දෙන ලදී.',
+        'The owner was already notified moments ago.': 'හිමියාට මොහොතකට පෙර දැනටමත් දැනුම් දී ඇත.',
+        'Time expired. Please scan the QR code again.': 'කාලය ඉකුත් විය. කරුණාකර QR කේතය නැවත ස්කෑන් කරන්න.',
+        'Please tick "I\'m not a robot" first.': 'කරුණාකර මුලින් "I\'m not a robot" සලකුණු කරන්න.',
+        'Please complete the "I\'m not a robot" check.': 'කරුණාකර "I\'m not a robot" පරීක්ෂාව සම්පූර්ණ කරන්න.',
+        'Something went wrong. Please try again.': 'යම් දෝෂයක් සිදු විය. කරුණාකර නැවත උත්සාහ කරන්න.',
+        'Could not reach the owner right now. Please try again.': 'දැන් හිමියා වෙත ළඟා විය නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.',
+        'This QR code is no longer valid.': 'මෙම QR කේතය තවදුරටත් වලංගු නොවේ.',
+        'This QR code is not valid': 'මෙම QR කේතය වලංගු නොවේ',
+        'It may have been replaced by the vehicle owner. If you need to reach the owner, please contact the parking attendant.':
+            'වාහන හිමියා විසින් එය වෙනස් කර තිබිය හැක. හිමියා හා සම්බන්ධ වීමට අවශ්‍ය නම්, කරුණාකර වාහන නැවතුම්පොළ භාරකරු අමතන්න.',
+
+        // ---- printable QR card ----
+        '🚗 Need me to move?': '🚗 මට වාහනය ඉවත් කරන්න ඕනෑද?',
+        'Scan to notify the owner instantly.': 'හිමියාට වහාම දැනුම් දීමට ස්කෑන් කරන්න.',
+        'No app needed': 'යෙදුමක් අවශ්‍ය නැත',
+        '· Your number stays private unless you share it': '· ඔබ බෙදාගන්නේ නම් මිස ඔබේ අංකය රහසිගතව පවතී',
+        'Place face-up on the dashboard': 'ඩෑෂ්බෝඩ් එක මත මුහුණ ඉහළට සිටින සේ තබන්න',
+        'QR code': 'QR කේතය'
+    };
+
+    const PATTERNS = [
+        [/^Invalid Sri Lankan licence plate\. Examples: (.+)$/, (m) => `වලංගු නොවන ශ්‍රී ලාංකික වාහන අංකයකි. උදාහරණ: ${m[1]}`],
+        [/^Change the QR for (.+)\?$/, (m) => `${m[1]} සඳහා QR කේතය වෙනස් කරන්නද?`],
+        [/^New QR issued for (.+)\. Print and replace the old sticker\.$/, (m) => `${m[1]} සඳහා නව QR කේතයක් නිකුත් කරන ලදී. මුද්‍රණය කර පැරණි ස්ටිකරය මාරු කරන්න.`],
+        [/^Remove (.+)\? Its QR and scan history will be deleted\.$/, (m) => `${m[1]} ඉවත් කරන්නද? එහි QR කේතය සහ ස්කෑන් ඉතිහාසය මකා දැමෙනු ඇත.`],
+        [/^(.+) added\.$/, (m) => `${m[1]} එක් කරන ලදී.`],
+        [/^QR code for (.+)$/, (m) => `${m[1]} සඳහා QR කේතය`],
+        [/^(\d+) alerts? · last (.+)$/, (m) => `ඇඟවීම් ${m[1]} ක් · අවසන්: ${m[2]}`],
+        [/^QR issued (.+)$/, (m) => `QR නිකුත් කළේ ${m[1]}`],
+        [/^Enter a whole number of minutes between (\d+) and (\d+)\.$/, (m) => `මිනිත්තු ${m[1]} ත් ${m[2]} ත් අතර පූර්ණ සංඛ්‍යාවක් ඇතුළත් කරන්න.`],
+        [/^✓ Location attached \(±(\d+) m\)$/, (m) => `✓ ස්ථානය අමුණා ඇත (±${m[1]} m)`],
+        [/^Unnamed \((.+)\)$/, (m) => `නම නැත (${m[1]})`]
+    ];
+
+    const root = document.documentElement;
+    let lang = 'en';
+    try {
+        const saved = localStorage.getItem('park_lang');
+        lang = saved === 'si' || saved === 'en' ? saved : ((navigator.language || '').toLowerCase().startsWith('si') ? 'si' : 'en');
+    } catch (e) { /* storage blocked */ }
+    root.setAttribute('lang', lang);
+
+    const norm = (s) => s.replace(/\s+/g, ' ').trim();
+    function tOne(s) {
+        const k = norm(s);
+        if (!k) return s;
+        if (Object.prototype.hasOwnProperty.call(SI, k)) return SI[k];
+        for (const [re, fn] of PATTERNS) { const m = k.match(re); if (m) return fn(m); }
+        return s;
+    }
+    // Public helper: translate a string (paragraphs separated by blank lines are handled one by one).
+    window.parkT = function (s) {
+        if (lang !== 'si' || typeof s !== 'string') return s;
+        const whole = tOne(s);
+        return whole !== s ? whole : s.split('\n\n').map(tOne).join('\n\n');
+    };
+
+    const ATTRS = ['placeholder', 'aria-label', 'title', 'alt'];
+    function translateNode(n) {
+        if (n.nodeType === 3) {
+            const v = n.nodeValue, out = window.parkT(v.trim());
+            if (out !== v.trim()) n.nodeValue = v.match(/^\s*/)[0] + out + v.match(/\s*$/)[0];
+        } else if (n.nodeType === 1) {
+            if (n.tagName === 'SCRIPT' || n.tagName === 'STYLE') return;
+            ATTRS.forEach((a) => { if (n.hasAttribute(a)) { const v = n.getAttribute(a), o = window.parkT(v); if (o !== v) n.setAttribute(a, o); } });
+            n.childNodes.forEach(translateNode);
+        }
+    }
+
+    function paintToggle() {
+        document.querySelectorAll('[data-lang-toggle]').forEach((b) => {
+            b.textContent = lang === 'si' ? 'EN' : 'සිං';
+            b.setAttribute('aria-label', lang === 'si' ? 'Switch to English' : 'සිංහලට මාරු වන්න');
+            b.setAttribute('title', b.getAttribute('aria-label'));
+        });
+    }
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('[data-lang-toggle]')) return;
+        try { localStorage.setItem('park_lang', lang === 'si' ? 'en' : 'si'); } catch (err) { /* storage blocked */ }
+        location.reload();
+    });
+
+    paintToggle();
+    if (lang !== 'si') return;
+    document.title = window.parkT(document.title);
+    translateNode(document.body);
+    new MutationObserver((muts) => {
+        for (const m of muts) {
+            if (m.type === 'attributes') { translateNode(m.target); continue; }
+            m.addedNodes.forEach(translateNode);
+        }
+    }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ATTRS });
+    // Toggle labels are written after the first pass; keep them in the right language.
+    paintToggle();
+})();
+</script>

@@ -58,3 +58,10 @@ CREATE TABLE IF NOT EXISTS park_scans (
 -- Migration for databases created before scan_window_minutes existed
 -- (error 1060 "duplicate column" is ignored by init_schema on re-runs).
 ALTER TABLE park_users ADD COLUMN scan_window_minutes INT NOT NULL DEFAULT 10 AFTER is_active;
+
+-- Two-factor authentication (TOTP, compatible with Authy / Google Authenticator).
+-- totp_last_step blocks code replay; totp_recovery is a JSON list of SHA-256 hashes of unused recovery codes.
+ALTER TABLE park_users ADD COLUMN totp_secret VARCHAR(64) NULL;
+ALTER TABLE park_users ADD COLUMN totp_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE park_users ADD COLUMN totp_last_step BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE park_users ADD COLUMN totp_recovery TEXT NULL;

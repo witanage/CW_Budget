@@ -43,6 +43,7 @@
         <div class="brand"><div class="brand-mark">P</div><span>Park Notify</span></div>
         <div class="spacer"></div>
         <span class="muted small">{{ user.full_name or user.mobile_e164 }}</span>
+        <button type="button" class="theme-toggle-btn lang-toggle-btn" data-lang-toggle aria-label="Language"></button>
         <button type="button" class="theme-toggle-btn" data-theme-toggle aria-label="Switch theme"></button>
         <form method="post" action="{{ url_for('parking.logout') }}" style="margin:0">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -56,7 +57,8 @@
         <button class="tab" role="tab" data-tab="vehicles" aria-selected="true">Vehicles</button>
         <button class="tab" role="tab" data-tab="scans" aria-selected="false">Scan log</button>
         <button class="tab" role="tab" data-tab="account" aria-selected="false">Account</button>
-        {% if is_admin %}<button class="tab" role="tab" data-tab="users" aria-selected="false">Users</button>{% endif %}
+        {% if is_admin %}<button class="tab" role="tab" data-tab="users" aria-selected="false">Users</button>
+        <button class="tab" role="tab" data-tab="register" aria-selected="false">Register vehicle</button>{% endif %}
     </nav>
 
     <!-- Vehicles -->
@@ -100,8 +102,8 @@
     <section class="panel" id="panel-account" hidden>
         <div class="card">
             <h2>Notifications (ntfy)</h2>
-            <p class="muted small">Install the <a href="https://ntfy.sh/" target="_blank" rel="noopener">ntfy app</a>
-                and subscribe to this private topic. Keep it secret: anyone who knows it can read your alerts.</p>
+            <p class="muted small">Subscribe to this private topic in the ntfy app. Keep it secret: anyone who knows it can read your alerts.
+                <a href="https://ntfy.sh/" target="_blank" rel="noopener">Get the ntfy app</a></p>
             <label>Server</label><div class="topic">{{ ntfy_server }}</div>
             <label>Topic</label><div class="topic" id="topic">{{ user.ntfy_topic }}</div>
             <div class="row" style="margin-top:12px">
@@ -122,6 +124,39 @@
                 <button class="btn btn-primary" type="submit">Save</button>
             </form>
             <div id="windowAlert" class="alert" role="alert"></div>
+        </div>
+        <div class="card">
+            <h2>Two-factor authentication</h2>
+            <p class="muted small">Protect your account with a 6-digit code from an authenticator app such as Authy or Google Authenticator.</p>
+            <div id="tfaOff" {% if user.totp_enabled %}hidden{% endif %}>
+                <p><span class="badge b-warn">Off</span></p>
+                <button class="btn btn-primary" id="tfaStart" type="button">Enable two-factor authentication</button>
+                <div id="tfaSetup" hidden style="margin-top:14px">
+                    <p class="small">1. Scan this QR code with your authenticator app, or enter the key manually.</p>
+                    <img id="tfaQr" alt="Authenticator QR code" width="200" height="200" style="background:#fff;padding:6px;border-radius:8px">
+                    <div class="topic" id="tfaSecret" style="margin:8px 0"></div>
+                    <p class="small">2. Enter the 6-digit code it shows.</p>
+                    <form id="tfaEnableForm" class="row" style="align-items:flex-end" novalidate>
+                        <div style="max-width:200px"><label for="tfa_code">Verification code</label>
+                            <input id="tfa_code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" required></div>
+                        <button class="btn btn-primary" type="submit">Confirm</button>
+                    </form>
+                </div>
+            </div>
+            <div id="tfaOn" {% if not user.totp_enabled %}hidden{% endif %}>
+                <p><span class="badge b-ok">On</span></p>
+                <form id="tfaDisableForm" style="max-width:380px" novalidate>
+                    <label for="tfa_dpw">Current password</label>
+                    <input id="tfa_dpw" name="password" type="password" autocomplete="current-password" required>
+                    <label for="tfa_dcode">Verification code</label>
+                    <input id="tfa_dcode" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="16" required>
+                    <button class="btn btn-danger" type="submit" style="margin-top:14px">Disable two-factor authentication</button>
+                </form>
+            </div>
+            <div id="tfaCodes" hidden style="margin-top:14px">
+                <p class="small"><strong>Save these recovery codes.</strong> Each works once if you lose your phone. They will not be shown again.</p>
+                <div class="topic" id="tfaCodeList" style="white-space:pre-line"></div>
+            </div>
         </div>
         <div class="card">
             <h2>Change password</h2>
@@ -161,8 +196,33 @@
             <h2>Users</h2>
             <div class="table-wrap">
                 <table>
-                    <thead><tr><th>Name</th><th>Mobile</th><th>Vehicles</th><th>Role</th><th>Last login</th><th>Status</th><th></th></tr></thead>
+                    <thead><tr><th>Name</th><th>Mobile</th><th>Vehicles</th><th>Role</th><th>Last login</th><th>2FA</th><th>Status</th><th></th></tr></thead>
                     <tbody id="userBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+    <!-- Register vehicle (admin) -->
+    <section class="panel" id="panel-register" hidden>
+        <div class="card">
+            <h2>Register a vehicle</h2>
+            <p class="muted small">Link a vehicle to an existing user. Create the user first in the Users tab if needed.</p>
+            <form id="regVehicleForm" class="form-inline" novalidate>
+                <div><label for="rv_user">Owner</label><select id="rv_user" name="user_id" required></select></div>
+                <div><label for="rv_plate">Licence plate</label>
+                    <input id="rv_plate" name="plate" required maxlength="32" placeholder="{{ plate_hint }}"></div>
+                <div><label for="rv_nick">Nickname <span class="muted" style="font-weight:400">(optional)</span></label>
+                    <input id="rv_nick" name="nickname" maxlength="50"></div>
+                <div><button class="btn btn-primary" type="submit" style="width:100%;margin-top:12px">Register vehicle</button></div>
+            </form>
+            <div id="regAlert" class="alert" role="alert"></div>
+        </div>
+        <div class="card">
+            <h2>All registered vehicles</h2>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Plate</th><th>Nickname</th><th>Owner</th><th>Mobile</th><th>Registered</th><th>Status</th></tr></thead>
+                    <tbody id="regBody"></tbody>
                 </table>
             </div>
         </div>
@@ -182,8 +242,10 @@
         password: {{ url_for('parking.change_password')|tojson }},
         topic: {{ url_for('parking.rotate_topic')|tojson }},
         window: {{ url_for('parking.set_scan_window')|tojson }},
+        tfa: {{ url_for('parking.totp_setup')|tojson }}.replace(/setup$/, ''),
         test: {{ url_for('parking.test_notification')|tojson }},
         users: IS_ADMIN ? {{ url_for('parking.admin_users')|tojson }} : null,
+        allVehicles: IS_ADMIN ? {{ url_for('parking.admin_vehicles')|tojson }} : null,
     };
     const NTFY = {{ ntfy_server|tojson }};
     const REASONS = { blocking: 'Blocking', lights_on: 'Lights on', window_open: 'Window open',
@@ -249,7 +311,7 @@
     }
     const vAlert = document.getElementById('vehicleAlert');
     async function rotateQr(v) {
-        if (!confirm(`Change the QR for ${v.plate_display}?\n\nThe current sticker will stop working immediately. You will need to print the new one.`)) return;
+        if (!await parkConfirm(`Change the QR for ${v.plate_display}?\n\nThe current sticker will stop working immediately. You will need to print the new one.`, { title: 'Change QR', okLabel: 'Change QR' })) return;
         const res = await parkFetch(`${API.vehicles}/${v.id}/rotate-qr`, { method: 'POST' });
         if (res.ok) { showAlert(vAlert, `New QR issued for ${v.plate_display}. Print and replace the old sticker.`, 'ok'); loadVehicles(); }
         else showAlert(vAlert, res.data.error || 'Failed to change QR.');
@@ -259,7 +321,7 @@
         if (res.ok) loadVehicles(); else showAlert(vAlert, res.data.error || 'Update failed.');
     }
     async function deleteVehicle(v) {
-        if (!confirm(`Remove ${v.plate_display}? Its QR and scan history will be deleted.`)) return;
+        if (!await parkConfirm(`Remove ${v.plate_display}? Its QR and scan history will be deleted.`, { title: 'Remove vehicle', okLabel: 'Remove', danger: true })) return;
         const res = await parkFetch(`${API.vehicles}/${v.id}`, { method: 'DELETE' });
         if (res.ok) loadVehicles(); else showAlert(vAlert, res.data.error || 'Delete failed.');
     }
@@ -310,7 +372,7 @@
     // ---------------- Account ----------------
     const tAlert = document.getElementById('topicAlert');
     document.getElementById('rotateTopic').addEventListener('click', async () => {
-        if (!confirm('Generate a new ntfy topic? You must re-subscribe in the ntfy app.')) return;
+        if (!await parkConfirm('Generate a new ntfy topic? You must re-subscribe in the ntfy app.', { title: 'New ntfy topic', okLabel: 'Generate' })) return;
         const res = await parkFetch(API.topic, { method: 'POST' });
         if (res.ok) {
             document.getElementById('topic').textContent = res.data.ntfy_topic;
@@ -328,6 +390,40 @@
         const res = await parkFetch(API.window, { method: 'POST', body: { minutes: this.minutes.value } });
         showAlert(a, res.ok ? res.data.message : (res.data.error || 'Failed.'), res.ok ? 'ok' : 'error');
     });
+    // Two-factor authentication
+    const tfaOff = document.getElementById('tfaOff'), tfaOn = document.getElementById('tfaOn');
+    document.getElementById('tfaStart').addEventListener('click', async () => {
+        const res = await parkFetch(API.tfa + 'setup', { method: 'POST' });
+        if (!res.ok) { showAlert(null, res.data.error || 'Failed.'); return; }
+        document.getElementById('tfaQr').src = res.data.qr;
+        document.getElementById('tfaSecret').textContent = res.data.secret;
+        document.getElementById('tfaSetup').hidden = false;
+        document.getElementById('tfa_code').focus();
+    });
+    document.getElementById('tfaEnableForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const res = await parkFetch(API.tfa + 'enable', { method: 'POST', body: { code: this.code.value } });
+        if (!res.ok) { showAlert(null, res.data.error || 'Failed.'); return; }
+        this.reset();
+        document.getElementById('tfaSetup').hidden = true;
+        document.getElementById('tfaQr').removeAttribute('src');
+        document.getElementById('tfaSecret').textContent = '';
+        document.getElementById('tfaCodeList').textContent = res.data.recovery_codes.join('\n');
+        document.getElementById('tfaCodes').hidden = false;
+        tfaOff.hidden = true; tfaOn.hidden = false;
+        showAlert(null, res.data.message, 'ok');
+    });
+    document.getElementById('tfaDisableForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const res = await parkFetch(API.tfa + 'disable', { method: 'POST', body: Object.fromEntries(new FormData(this).entries()) });
+        if (!res.ok) { showAlert(null, res.data.error || 'Failed.'); return; }
+        this.reset();
+        document.getElementById('tfaCodes').hidden = true;
+        document.getElementById('tfaCodeList').textContent = '';
+        tfaOn.hidden = true; tfaOff.hidden = false;
+        showAlert(null, res.data.message, 'ok');
+    });
+
     document.getElementById('pwForm').addEventListener('submit', async function (e) {
         e.preventDefault();
         const a = document.getElementById('pwAlert');
@@ -351,6 +447,11 @@
                     el('td', { class: 'num' }, u.vehicle_count),
                     el('td', {}, u.is_admin ? 'Admin' : 'User'),
                     el('td', { class: 'num' }, fmtTime(u.last_login_at)),
+                    el('td', {}, u.totp_enabled ? el('button', { class: 'btn btn-sm', type: 'button', onclick: async () => {
+                        if (!await parkConfirm('Reset two-factor authentication for this user? They can sign in with just their password until they enable it again.', { title: 'Reset 2FA', okLabel: 'Reset', danger: true })) return;
+                        const r = await parkFetch(`${API.users}/${u.id}/reset-2fa`, { method: 'POST' });
+                        if (r.ok) loadUsers(); else showAlert(uAlert, r.data.error || 'Failed.');
+                    } }, 'Reset 2FA') : '—'),
                     el('td', {}, el('span', { class: 'badge ' + (u.is_active ? 'b-ok' : 'b-bad') }, u.is_active ? 'Active' : 'Disabled')),
                     el('td', {}, u.id === ME ? '' : el('button', { class: 'btn btn-sm', type: 'button', onclick: async () => {
                         const r = await parkFetch(`${API.users}/${u.id}/active`, { method: 'POST', body: { is_active: !u.is_active } });
@@ -367,6 +468,38 @@
             else showAlert(uAlert, res.data.error || 'Failed.');
         });
         loaders.users = loadUsers;
+
+        // ---------------- Register vehicle (admin) ----------------
+        const rAlert = document.getElementById('regAlert');
+        async function loadRegister() {
+            const [ur, vr] = await Promise.all([parkFetch(API.users), parkFetch(API.allVehicles)]);
+            const sel = document.getElementById('rv_user');
+            const cur = sel.value;
+            sel.replaceChildren(...(ur.ok ? ur.data : []).filter((u) => u.is_active)
+                .map((u) => el('option', { value: u.id }, `${u.full_name || 'Unnamed'} (${u.mobile_e164})`)));
+            if (cur) sel.value = cur;
+            const body = document.getElementById('regBody');
+            body.replaceChildren();
+            for (const v of (vr.ok ? vr.data : [])) {
+                body.append(el('tr', {},
+                    el('td', { class: 'num' }, v.plate_display),
+                    el('td', {}, v.nickname || '—'),
+                    el('td', {}, v.owner_name || '—'),
+                    el('td', { class: 'num' }, v.owner_mobile),
+                    el('td', { class: 'num' }, fmtTime(v.created_at)),
+                    el('td', {}, el('span', { class: 'badge ' + (v.is_active ? 'b-ok' : 'b-bad') }, v.is_active ? 'Active' : 'Disabled'))
+                ));
+            }
+        }
+        document.getElementById('regVehicleForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            if (!this.user_id.value) { showAlert(rAlert, 'Select an owner first.'); return; }
+            const res = await parkFetch(`${API.users}/${this.user_id.value}/vehicles`,
+                { method: 'POST', body: { plate: this.plate.value, nickname: this.nickname.value } });
+            if (res.ok) { this.plate.value = ''; this.nickname.value = ''; showAlert(rAlert, res.data.message, 'ok'); loadRegister(); }
+            else showAlert(rAlert, res.data.error || 'Could not register vehicle.');
+        });
+        loaders.register = loadRegister;
     }
 
     loaders.vehicles = loadVehicles;

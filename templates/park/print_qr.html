@@ -34,7 +34,11 @@
         <p><strong>No app needed</strong> · Your number stays private unless you share it</p>
         <div class="foot">Place face-up on the dashboard</div>
     </div>
-    <button class="no-print" type="button" onclick="window.print()">Print</button>
+    <div class="no-print" style="display:flex;gap:10px">
+        <button type="button" onclick="window.print()">Print</button>
+        <button type="button" data-lang-toggle aria-label="Language"></button>
+    </div>
 </div>
+{% include "park/_i18n.html" %}
 </body>
 </html>
