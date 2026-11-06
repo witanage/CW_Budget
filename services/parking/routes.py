@@ -128,7 +128,10 @@ def create_blueprint(limiter):
         vehicle = _lookup(token)
         if not vehicle:
             return render_template('park/scan_invalid.html'), 404
+        window = vehicle['scan_window_minutes']
         return render_template('park/scan.html', token=token, reasons=notifier.REASONS,
+                               scan_proof=security.issue_scan_window(token),
+                               window_seconds=window * 60,
                                mobile_hint=validators.get_country(vehicle['country_code']).mobile_hint)
 
     @bp.route('/s/<token>/notify', methods=['POST'])
@@ -143,6 +146,8 @@ def create_blueprint(limiter):
         vehicle = _lookup(token)
         if not vehicle:
             return jsonify({'error': 'This QR code is no longer valid.'}), 404
+        if not security.scan_window_remaining(token, data.get('scan_proof', ''), vehicle['scan_window_minutes']):
+            return jsonify({'error': 'Time expired. Please scan the QR code again.', 'expired': True}), 410
 
         reason = data.get('reason', 'other')
         if reason not in notifier.REASONS:
@@ -370,6 +375,21 @@ def create_blueprint(limiter):
         repository.update_password(uid, generate_password_hash(new))
         logger.info('Park user %s changed password', uid)
         return jsonify({'message': 'Password changed.'})
+
+    @bp.route('/api/account/scan-window', methods=['POST'])
+    @security.park_login_required
+    @limiter.limit(rl_api)
+    def set_scan_window():
+        raw = _payload().get('minutes')
+        try:
+            minutes = int(raw)
+        except (TypeError, ValueError):
+            minutes = 0
+        lo, hi = security.MIN_SCAN_WINDOW_MINUTES, security.MAX_SCAN_WINDOW_MINUTES
+        if not lo <= minutes <= hi:
+            return jsonify({'error': f'Enter a whole number of minutes between {lo} and {hi}.'}), 400
+        repository.set_scan_window(security.current_park_user_id(), minutes)
+        return jsonify({'minutes': minutes, 'message': 'Scan time limit saved.'})
 
     @bp.route('/api/account/ntfy-topic', methods=['POST'])
     @security.park_login_required

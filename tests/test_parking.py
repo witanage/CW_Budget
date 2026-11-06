@@ -9,6 +9,7 @@ repository/notifier/reCAPTCHA, so no database or network is needed.
 
 import os
 import re
+import time
 import sys
 import unittest
 from unittest import mock
@@ -132,10 +133,11 @@ class TokenTests(unittest.TestCase):
             self.assertFalse(security.verify_recaptcha('token', '1.2.3.4'))
 
 
-VEHICLE = {'id': 7, 'plate_display': 'WP CAB-1234', 'country_code': 'LK', 'ntfy_topic': 'park-topic'}
+VEHICLE = {'id': 7, 'plate_display': 'WP CAB-1234', 'country_code': 'LK', 'ntfy_topic': 'park-topic',
+           'scan_window_minutes': 10}
 USER = {'id': 1, 'full_name': 'Owner', 'country_code': 'LK', 'mobile_e164': '+94771234567',
         'ntfy_topic': 'park-topic', 'is_admin': False, 'is_active': True,
-        'created_at': None, 'last_login_at': None}
+        'scan_window_minutes': 10, 'created_at': None, 'last_login_at': None}
 
 
 class RouteTests(unittest.TestCase):
@@ -157,6 +159,10 @@ class RouteTests(unittest.TestCase):
     def csrf(self):
         html = self.client.get(f'/park/s/{self.token}').get_data(as_text=True)
         return re.search(r'name="csrf-token" content="([^"]+)"', html).group(1)
+
+    def proof(self):
+        html = self.client.get(f'/park/s/{self.token}').get_data(as_text=True)
+        return re.search(r'name="scan_proof" value="([^"]+)"', html).group(1)
 
     # ---- public scan ----
 
@@ -191,9 +197,22 @@ class RouteTests(unittest.TestCase):
         self.send.assert_not_called()
         self.repo.record_scan.assert_not_called()
 
+    def test_notify_rejected_after_window(self):
+        proof = self.proof()
+        with mock.patch('services.parking.security.time.time', return_value=time.time() + 11 * 60):
+            res = self.client.post(f'/park/s/{self.token}/notify', headers={'X-CSRF-Token': self.csrf()},
+                                   json={'reason': 'blocking', 'scan_proof': proof, 'g-recaptcha-response': 'ok'})
+        self.assertEqual(res.status_code, 410)
+        self.send.assert_not_called()
+
+    def test_notify_rejected_without_proof(self):
+        res = self.client.post(f'/park/s/{self.token}/notify', headers={'X-CSRF-Token': self.csrf()},
+                               json={'reason': 'blocking', 'g-recaptcha-response': 'ok'})
+        self.assertEqual(res.status_code, 410)
+
     def test_notify_success_records_scan(self):
         res = self.client.post(f'/park/s/{self.token}/notify', headers={'X-CSRF-Token': self.csrf()}, json={
-            'reason': 'blocking', 'message': 'white van', 'mobile': '0771234567',
+            'reason': 'blocking', 'message': 'white van', 'scan_proof': self.proof(), 'mobile': '0771234567',
             'lat': '6.9271', 'lng': '79.8612', 'accuracy': '10', 'g-recaptcha-response': 'ok'})
         self.assertEqual(res.status_code, 200, res.get_json())
         self.assertEqual(res.get_json()['status'], 'sent')
@@ -208,14 +227,14 @@ class RouteTests(unittest.TestCase):
 
     def test_notify_cooldown_throttles(self):
         self.repo.seconds_since_last_sent.return_value = 5
-        res = self.client.post(f'/park/s/{self.token}/notify', json={'reason': 'blocking'},
+        res = self.client.post(f'/park/s/{self.token}/notify', json={'reason': 'blocking', 'scan_proof': self.proof()},
                                headers={'X-CSRF-Token': self.csrf()})
         self.assertEqual(res.get_json()['status'], 'throttled')
         self.send.assert_not_called()
         self.assertEqual(self.repo.record_scan.call_args.args[-1], 'throttled')
 
     def test_notify_bad_mobile(self):
-        res = self.client.post(f'/park/s/{self.token}/notify', json={'mobile': 'abc'},
+        res = self.client.post(f'/park/s/{self.token}/notify', json={'mobile': 'abc', 'scan_proof': self.proof()},
                                headers={'X-CSRF-Token': self.csrf()})
         self.assertEqual(res.status_code, 400)
 

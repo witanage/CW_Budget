@@ -73,8 +73,7 @@ self.addEventListener('fetch', (event) => {
   // API requests - network only with offline message
   if (url.pathname.startsWith('/api/') || 
       url.pathname.includes('/login') || 
-      url.pathname.includes('/logout') ||
-      url.pathname.includes('/register')) {
+      url.pathname.includes('/logout')) {
     event.respondWith(
       fetch(request)
         .catch(() => {

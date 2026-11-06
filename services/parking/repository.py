@@ -59,8 +59,14 @@ def init_schema():
     with _cursor(commit=True) as cur:
         for stmt in statements:
             body = '\n'.join(l for l in stmt.splitlines() if not l.strip().startswith('--')).strip()
-            if body:
+            if not body:
+                continue
+            try:
                 cur.execute(body)
+            except Exception as e:
+                # Re-running an ALTER ... ADD COLUMN on an up-to-date table (ER_DUP_FIELDNAME).
+                if getattr(e, 'errno', None) != 1060:
+                    raise
 
 
 # ---------------------------------------------------------------------------
@@ -68,7 +74,7 @@ def init_schema():
 # ---------------------------------------------------------------------------
 
 _USER_COLS = ('id, full_name, country_code, mobile_e164, ntfy_topic, is_admin, is_active, '
-              'created_at, last_login_at')
+              'scan_window_minutes, created_at, last_login_at')
 
 
 def get_user(user_id):
@@ -130,6 +136,11 @@ def rotate_ntfy_topic(user_id):
     with _cursor(commit=True) as cur:
         cur.execute('UPDATE park_users SET ntfy_topic = %s WHERE id = %s', (topic, user_id))
     return topic
+
+
+def set_scan_window(user_id, minutes):
+    with _cursor(commit=True) as cur:
+        cur.execute('UPDATE park_users SET scan_window_minutes = %s WHERE id = %s', (minutes, user_id))
 
 
 def list_users():
@@ -218,7 +229,7 @@ def find_vehicle_by_token(token):
     """Public lookup. Returns vehicle + owner topic only if both are active."""
     with _cursor() as cur:
         cur.execute(
-            'SELECT v.id, v.plate_display, v.country_code, u.ntfy_topic '
+            'SELECT v.id, v.plate_display, v.country_code, u.ntfy_topic, u.scan_window_minutes '
             'FROM park_vehicles v JOIN park_users u ON u.id = v.user_id '
             'WHERE v.qr_token_hash = %s AND v.is_active = TRUE AND u.is_active = TRUE',
             (security.hash_token(token),))

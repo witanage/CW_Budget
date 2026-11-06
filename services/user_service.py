@@ -34,57 +34,6 @@ def register_user_routes(app, limiter, RATE_LIMIT_LOGIN, RATE_LIMIT_REGISTER, RA
         token_required: Decorator for token authentication
     """
 
-    @app.route('/register', methods=['GET', 'POST'])
-    @limiter.limit(RATE_LIMIT_REGISTER)
-    def register():
-        """User registration."""
-        if request.method == 'POST':
-            data = request.get_json() if request.is_json else request.form
-            username = data.get('username')
-            email = data.get('email')
-            password = data.get('password')
-
-            connection = get_db_connection()
-            if connection:
-                cursor = connection.cursor()
-                try:
-                    # Check if user already exists
-                    cursor.execute("SELECT id FROM users WHERE username = %s OR email = %s",
-                                   (username, email))
-                    if cursor.fetchone():
-                        return jsonify({'error': 'Username or email already exists'}), 400
-
-                    # Create new user (deactivated by default, requires admin activation)
-                    password_hash = generate_password_hash(password)
-                    cursor.execute(
-                        "INSERT INTO users (username, email, password_hash, is_active) VALUES (%s, %s, %s, %s)",
-                        (username, email, password_hash, False)
-                    )
-                    user_id = cursor.lastrowid
-                    
-                    # Initialize all tabs as enabled for new user (both desktop and mobile)
-                    available_tabs = ['transactions', 'tax', 'reports', 'rateTrends']
-                    for tab in available_tabs:
-                        cursor.execute(
-                            "INSERT INTO user_tabs (user_id, tab_name, is_enabled, is_enabled_mobile) VALUES (%s, %s, TRUE, TRUE)",
-                            (user_id, tab)
-                        )
-                    
-                    connection.commit()
-
-                    logger.info(f"New user registered: {username} ({email}) - Account created in deactivated state")
-
-                    return jsonify({'message': 'Registration successful. Your account is pending admin approval.'}), 201
-                except Error as e:
-                    return jsonify({'error': str(e)}), 500
-                finally:
-                    cursor.close()
-                    connection.close()
-
-            return jsonify({'error': 'Database connection failed'}), 500
-
-        return render_template('register.html')
-
     @app.route('/login', methods=['GET', 'POST'])
     @limiter.limit(RATE_LIMIT_LOGIN)
     def login():
