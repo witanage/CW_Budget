@@ -56,7 +56,8 @@
         <button class="tab" role="tab" data-tab="vehicles" aria-selected="true">Vehicles</button>
         <button class="tab" role="tab" data-tab="scans" aria-selected="false">Scan log</button>
         <button class="tab" role="tab" data-tab="account" aria-selected="false">Account</button>
-        {% if is_admin %}<button class="tab" role="tab" data-tab="users" aria-selected="false">Users</button>{% endif %}
+        {% if is_admin %}<button class="tab" role="tab" data-tab="users" aria-selected="false">Users</button>
+        <button class="tab" role="tab" data-tab="register" aria-selected="false">Register vehicle</button>{% endif %}
     </nav>
 
     <!-- Vehicles -->
@@ -167,6 +168,31 @@
             </div>
         </div>
     </section>
+    <!-- Register vehicle (admin) -->
+    <section class="panel" id="panel-register" hidden>
+        <div class="card">
+            <h2>Register a vehicle</h2>
+            <p class="muted small">Link a vehicle to an existing user. Create the user first in the Users tab if needed.</p>
+            <form id="regVehicleForm" class="form-inline" novalidate>
+                <div><label for="rv_user">Owner</label><select id="rv_user" name="user_id" required></select></div>
+                <div><label for="rv_plate">Licence plate</label>
+                    <input id="rv_plate" name="plate" required maxlength="32" placeholder="{{ plate_hint }}"></div>
+                <div><label for="rv_nick">Nickname <span class="muted" style="font-weight:400">(optional)</span></label>
+                    <input id="rv_nick" name="nickname" maxlength="50"></div>
+                <div><button class="btn btn-primary" type="submit" style="width:100%;margin-top:12px">Register vehicle</button></div>
+            </form>
+            <div id="regAlert" class="alert" role="alert"></div>
+        </div>
+        <div class="card">
+            <h2>All registered vehicles</h2>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Plate</th><th>Nickname</th><th>Owner</th><th>Mobile</th><th>Registered</th><th>Status</th></tr></thead>
+                    <tbody id="regBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </section>
     {% endif %}
 </main>
 {% endblock %}
@@ -184,6 +210,7 @@
         window: {{ url_for('parking.set_scan_window')|tojson }},
         test: {{ url_for('parking.test_notification')|tojson }},
         users: IS_ADMIN ? {{ url_for('parking.admin_users')|tojson }} : null,
+        allVehicles: IS_ADMIN ? {{ url_for('parking.admin_vehicles')|tojson }} : null,
     };
     const NTFY = {{ ntfy_server|tojson }};
     const REASONS = { blocking: 'Blocking', lights_on: 'Lights on', window_open: 'Window open',
@@ -249,7 +276,7 @@
     }
     const vAlert = document.getElementById('vehicleAlert');
     async function rotateQr(v) {
-        if (!confirm(`Change the QR for ${v.plate_display}?\n\nThe current sticker will stop working immediately. You will need to print the new one.`)) return;
+        if (!await parkConfirm(`Change the QR for ${v.plate_display}?\n\nThe current sticker will stop working immediately. You will need to print the new one.`, { title: 'Change QR', okLabel: 'Change QR' })) return;
         const res = await parkFetch(`${API.vehicles}/${v.id}/rotate-qr`, { method: 'POST' });
         if (res.ok) { showAlert(vAlert, `New QR issued for ${v.plate_display}. Print and replace the old sticker.`, 'ok'); loadVehicles(); }
         else showAlert(vAlert, res.data.error || 'Failed to change QR.');
@@ -259,7 +286,7 @@
         if (res.ok) loadVehicles(); else showAlert(vAlert, res.data.error || 'Update failed.');
     }
     async function deleteVehicle(v) {
-        if (!confirm(`Remove ${v.plate_display}? Its QR and scan history will be deleted.`)) return;
+        if (!await parkConfirm(`Remove ${v.plate_display}? Its QR and scan history will be deleted.`, { title: 'Remove vehicle', okLabel: 'Remove', danger: true })) return;
         const res = await parkFetch(`${API.vehicles}/${v.id}`, { method: 'DELETE' });
         if (res.ok) loadVehicles(); else showAlert(vAlert, res.data.error || 'Delete failed.');
     }
@@ -310,7 +337,7 @@
     // ---------------- Account ----------------
     const tAlert = document.getElementById('topicAlert');
     document.getElementById('rotateTopic').addEventListener('click', async () => {
-        if (!confirm('Generate a new ntfy topic? You must re-subscribe in the ntfy app.')) return;
+        if (!await parkConfirm('Generate a new ntfy topic? You must re-subscribe in the ntfy app.', { title: 'New ntfy topic', okLabel: 'Generate' })) return;
         const res = await parkFetch(API.topic, { method: 'POST' });
         if (res.ok) {
             document.getElementById('topic').textContent = res.data.ntfy_topic;
@@ -367,6 +394,38 @@
             else showAlert(uAlert, res.data.error || 'Failed.');
         });
         loaders.users = loadUsers;
+
+        // ---------------- Register vehicle (admin) ----------------
+        const rAlert = document.getElementById('regAlert');
+        async function loadRegister() {
+            const [ur, vr] = await Promise.all([parkFetch(API.users), parkFetch(API.allVehicles)]);
+            const sel = document.getElementById('rv_user');
+            const cur = sel.value;
+            sel.replaceChildren(...(ur.ok ? ur.data : []).filter((u) => u.is_active)
+                .map((u) => el('option', { value: u.id }, `${u.full_name || 'Unnamed'} (${u.mobile_e164})`)));
+            if (cur) sel.value = cur;
+            const body = document.getElementById('regBody');
+            body.replaceChildren();
+            for (const v of (vr.ok ? vr.data : [])) {
+                body.append(el('tr', {},
+                    el('td', { class: 'num' }, v.plate_display),
+                    el('td', {}, v.nickname || '—'),
+                    el('td', {}, v.owner_name || '—'),
+                    el('td', { class: 'num' }, v.owner_mobile),
+                    el('td', { class: 'num' }, fmtTime(v.created_at)),
+                    el('td', {}, el('span', { class: 'badge ' + (v.is_active ? 'b-ok' : 'b-bad') }, v.is_active ? 'Active' : 'Disabled'))
+                ));
+            }
+        }
+        document.getElementById('regVehicleForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            if (!this.user_id.value) { showAlert(rAlert, 'Select an owner first.'); return; }
+            const res = await parkFetch(`${API.users}/${this.user_id.value}/vehicles`,
+                { method: 'POST', body: { plate: this.plate.value, nickname: this.nickname.value } });
+            if (res.ok) { this.plate.value = ''; this.nickname.value = ''; showAlert(rAlert, res.data.message, 'ok'); loadRegister(); }
+            else showAlert(rAlert, res.data.error || 'Could not register vehicle.');
+        });
+        loaders.register = loadRegister;
     }
 
     loaders.vehicles = loadVehicles;

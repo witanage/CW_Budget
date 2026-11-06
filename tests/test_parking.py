@@ -324,22 +324,34 @@ class RouteTests(unittest.TestCase):
         self.assertEqual(res.status_code, 200, res.get_json())
         self.repo.update_password.assert_called_once()
 
-    def test_register(self):
-        csrf = self.csrf()
-        res = self.client.post('/park/register', headers={'X-CSRF-Token': csrf}, json={
-            'mobile': '077 123 4567', 'plate': 'wp cab 1234', 'password': 'longenough',
-            'confirm_password': 'longenough', 'g-recaptcha-response': 'ok'})
-        self.assertEqual(res.status_code, 201, res.get_json())
-        args = self.repo.create_user_with_vehicle.call_args.args
-        self.assertEqual(args[2], '+94771234567')
-        self.assertEqual(args[4].normalized, 'CAB1234')
-
-    def test_register_requires_captcha(self):
-        self.captcha.return_value = False
+    def test_public_register_removed(self):
+        self.assertEqual(self.client.get('/park/register').status_code, 404)
         res = self.client.post('/park/register', headers={'X-CSRF-Token': self.csrf()}, json={
-            'mobile': '0771234567', 'plate': 'CAB-1234', 'password': 'longenough', 'confirm_password': 'longenough'})
-        self.assertEqual(res.status_code, 400)
+            'mobile': '0771234567', 'plate': 'CAB-1234', 'password': 'longenough'})
+        self.assertIn(res.status_code, (404, 405))
         self.repo.create_user_with_vehicle.assert_not_called()
+
+    def test_user_can_add_own_vehicle(self):
+        self._login()
+        self.repo.add_vehicle.return_value = 5
+        self.repo.get_user.return_value = USER
+        self.repo.get_vehicle.return_value = {'id': 5, 'qr_nonce': 'n' * 32, 'plate_display': 'CAB-1234'}
+        res = self.client.post('/park/api/vehicles', headers={'X-CSRF-Token': self.csrf()}, json={'plate': 'CAB-1234'})
+        self.assertEqual(res.status_code, 201, res.get_json())
+        self.assertEqual(self.repo.add_vehicle.call_args.args[2].normalized, 'CAB1234')
+
+    def test_add_vehicle_requires_login(self):
+        res = self.client.post('/park/api/vehicles', headers={'X-CSRF-Token': self.csrf()}, json={'plate': 'CAB-1234'})
+        self.assertEqual(res.status_code, 401)
+        self.repo.add_vehicle.assert_not_called()
+
+    def test_admin_vehicle_registry_forbidden_for_normal_user(self):
+        self._login()
+        self.assertEqual(self.client.get('/park/api/admin/vehicles').status_code, 403)
+        res = self.client.post('/park/api/admin/users/2/vehicles', headers={'X-CSRF-Token': self.csrf()},
+                               json={'plate': 'CAB-1234'})
+        self.assertEqual(res.status_code, 403)
+        self.repo.add_vehicle.assert_not_called()
 
 
 if __name__ == '__main__':

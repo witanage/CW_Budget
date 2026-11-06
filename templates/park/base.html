@@ -65,6 +65,15 @@
         .alert.show { display: block; }
         .alert-error { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
         .alert-ok { background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); }
+        .modal-backdrop { position: fixed; inset: 0; z-index: 100; display: none; align-items: center; justify-content: center;
+            padding: 16px; background: rgba(0,0,0,.55); }
+        .modal-backdrop.show { display: flex; }
+        .modal-box { width: 100%; max-width: 420px; background: var(--surface); color: var(--text);
+            border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; box-shadow: 0 20px 50px rgba(0,0,0,.4); }
+        .modal-box h3 { margin: 0 0 8px; display: flex; align-items: center; gap: 8px; }
+        .modal-box.m-error h3 { color: var(--danger); } .modal-box.m-ok h3 { color: var(--ok); } .modal-box.m-warn h3 { color: var(--warn); }
+        .modal-msg { margin: 0 0 18px; white-space: pre-line; overflow-wrap: anywhere; }
+        .modal-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
         .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
         .spacer { flex: 1; }
         .recaptcha { margin-top: 16px; min-height: 78px; }
@@ -146,10 +155,44 @@
         if (res.status === 429) data.error = data.message || 'Too many attempts. Please wait and try again.';
         return { ok: res.ok, status: res.status, data };
     };
-    window.showAlert = function (el, msg, kind) {
-        el.textContent = msg;
-        el.className = 'alert show ' + (kind === 'ok' ? 'alert-ok' : 'alert-error');
-    };
+    // Modal message boxes (replace alert()/confirm()). Return promises.
+    (function () {
+        const bd = document.createElement('div');
+        bd.className = 'modal-backdrop';
+        bd.innerHTML = '<div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="mTitle" aria-describedby="mMsg">' +
+            '<h3 id="mTitle"></h3><p class="modal-msg" id="mMsg"></p><div class="modal-actions"></div></div>';
+        document.body.appendChild(bd);
+        const box = bd.firstChild, titleEl = box.querySelector('h3'), msgEl = box.querySelector('p'), actions = box.querySelector('.modal-actions');
+        let done = null, lastFocus = null;
+        function close(v) { bd.classList.remove('show'); if (lastFocus && lastFocus.focus) lastFocus.focus(); const d = done; done = null; if (d) d(v); }
+        function open(kind, title, msg, buttons, cancelValue) {
+            if (done) close(cancelValue);
+            lastFocus = document.activeElement;
+            box.className = 'modal-box m-' + kind;
+            titleEl.textContent = title; msgEl.textContent = msg;
+            actions.replaceChildren();
+            let first;
+            buttons.forEach((b) => {
+                const btn = document.createElement('button');
+                btn.type = 'button'; btn.className = 'btn ' + (b.cls || ''); btn.textContent = b.label;
+                btn.onclick = () => close(b.value);
+                actions.appendChild(btn); if (b.focus) first = btn;
+            });
+            bd.dataset.cancel = String(cancelValue);
+            bd.classList.add('show');
+            (first || actions.lastChild).focus();
+            return new Promise((r) => { done = r; });
+        }
+        bd.addEventListener('click', (e) => { if (e.target === bd) close(bd.dataset.cancel === 'true'); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && done) close(bd.dataset.cancel === 'true'); });
+        window.parkConfirm = (msg, opts = {}) => open('warn', opts.title || 'Please confirm', msg, [
+            { label: 'Cancel', value: false, focus: !opts.danger ? false : true },
+            { label: opts.okLabel || 'Confirm', value: true, cls: opts.danger ? 'btn-danger' : 'btn-primary', focus: !opts.danger }
+        ], false);
+        window.parkMessage = (msg, kind) => open(kind === 'ok' ? 'ok' : 'error', kind === 'ok' ? 'Success' : 'Something went wrong', msg,
+            [{ label: 'OK', value: true, cls: 'btn-primary', focus: true }], true);
+    })();
+    window.showAlert = function (el, msg, kind) { return window.parkMessage(msg, kind); };
 </script>
 {% block scripts %}{% endblock %}
 </body>

@@ -185,6 +185,16 @@ def add_vehicle(user_id, country_code, plate, nickname=None):
         return _insert_vehicle(cur, user_id, country_code, plate, nickname)
 
 
+def list_all_vehicles():
+    """Every vehicle with its owner (admin registry view). qr_nonce is deliberately not selected."""
+    with _cursor() as cur:
+        cur.execute(
+            'SELECT v.id, v.user_id, v.plate_display, v.nickname, v.is_active, v.created_at, '
+            'u.full_name AS owner_name, u.mobile_e164 AS owner_mobile '
+            'FROM park_vehicles v JOIN park_users u ON u.id = v.user_id ORDER BY v.created_at DESC')
+        return cur.fetchall()
+
+
 def list_vehicles(user_id):
     with _cursor() as cur:
         cur.execute(

@@ -5,7 +5,7 @@ Public:
   GET  /park/s/<token>            scan landing page
   POST /park/s/<token>/notify     reCAPTCHA-gated notification
 Auth:
-  GET/POST /park/login, POST /park/logout, GET/POST /park/register
+  GET/POST /park/login, POST /park/logout (no self-registration; admins create accounts)
 Back office (park_login_required):
   /park/, /park/api/vehicles..., /park/api/scans, /park/api/account/...
 Admin (park_admin_required):
@@ -76,7 +76,6 @@ def create_blueprint(limiter):
     rl_notify = os.environ.get('RATE_LIMIT_PARK_NOTIFY', '5 per 10 minutes')
     rl_scan_page = os.environ.get('RATE_LIMIT_PARK_SCAN_PAGE', '30 per minute')
     rl_login = os.environ.get('RATE_LIMIT_LOGIN', '5 per 15 minutes')
-    rl_register = os.environ.get('RATE_LIMIT_REGISTER', '3 per hour')
     rl_password = os.environ.get('RATE_LIMIT_CHANGE_PASSWORD', '3 per hour')
     rl_api = os.environ.get('RATE_LIMIT_API', '100 per minute')
     rl_admin = os.environ.get('RATE_LIMIT_ADMIN', '30 per minute')
@@ -217,39 +216,6 @@ def create_blueprint(limiter):
         if security.csrf_valid():
             security.end_park_session()
         return redirect(url_for('parking.login'))
-
-    @bp.route('/register', methods=['GET', 'POST'])
-    @limiter.limit(rl_register, methods=['POST'])
-    def register():
-        if request.method == 'GET':
-            country = validators.get_country(None)
-            return render_template('park/register.html', plate_hint=country.plate_hint,
-                                   mobile_hint=country.mobile_hint)
-
-        if not security.csrf_valid():
-            return jsonify({'error': 'Session expired. Please reload the page.'}), 403
-        data = _payload()
-        if not security.verify_recaptcha(data.get('g-recaptcha-response', ''), security.client_ip()):
-            return jsonify({'error': 'Please complete the "I\'m not a robot" check.'}), 400
-        try:
-            country = validators.get_country(data.get('country'))
-            mobile = country.normalize_mobile(data.get('mobile', ''))
-            plate = country.normalize_plate(data.get('plate', ''))
-            password = data.get('password') or ''
-            validators.validate_password(password)
-            if password != (data.get('confirm_password') or ''):
-                raise ValidationError('Passwords do not match.')
-        except ValidationError as e:
-            return jsonify({'error': str(e)}), 400
-
-        name = validators.clean_text(data.get('full_name'), 100)
-        try:
-            repository.create_user_with_vehicle(name, country.code, mobile,
-                                                generate_password_hash(password), plate)
-        except DuplicateError:
-            return jsonify({'error': 'An account with this mobile number already exists.'}), 409
-        return jsonify({'message': 'Registration successful. Please log in.',
-                        'redirect': url_for('parking.login')}), 201
 
     # ------------------------------------------------------------------
     # Back office
@@ -447,6 +413,32 @@ def create_blueprint(limiter):
             return jsonify({'error': 'A user with this mobile number already exists.'}), 409
         logger.info('Park admin %s created user %s', security.current_park_user_id(), uid)
         return jsonify({'message': 'User created.', 'id': uid}), 201
+
+    @bp.route('/api/admin/vehicles', methods=['GET'])
+    @security.park_admin_required
+    @limiter.limit(rl_admin)
+    def admin_vehicles():
+        return jsonify([_serialize(v) for v in repository.list_all_vehicles()])
+
+    @bp.route('/api/admin/users/<int:user_id>/vehicles', methods=['POST'])
+    @security.park_admin_required
+    @limiter.limit(rl_admin)
+    def admin_add_vehicle(user_id):
+        user = repository.get_user(user_id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        data = _payload()
+        try:
+            plate = validators.normalize_plate(data.get('plate', ''), user['country_code'])
+        except ValidationError as e:
+            return jsonify({'error': str(e)}), 400
+        nickname = validators.clean_text(data.get('nickname'), 50)
+        try:
+            vid = repository.add_vehicle(user_id, user['country_code'], plate, nickname)
+        except DuplicateError:
+            return jsonify({'error': 'This vehicle is already registered for that user.'}), 409
+        logger.info('Park admin %s added vehicle %s for user %s', security.current_park_user_id(), vid, user_id)
+        return jsonify({'message': 'Vehicle added.', 'id': vid}), 201
 
     @bp.route('/api/admin/users/<int:user_id>/active', methods=['POST'])
     @security.park_admin_required
