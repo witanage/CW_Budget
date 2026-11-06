@@ -43,6 +43,7 @@
         <div class="brand"><div class="brand-mark">P</div><span>Park Notify</span></div>
         <div class="spacer"></div>
         <span class="muted small">{{ user.full_name or user.mobile_e164 }}</span>
+        <button type="button" class="theme-toggle-btn lang-toggle-btn" data-lang-toggle aria-label="Language"></button>
         <button type="button" class="theme-toggle-btn" data-theme-toggle aria-label="Switch theme"></button>
         <form method="post" action="{{ url_for('parking.logout') }}" style="margin:0">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -101,8 +102,8 @@
     <section class="panel" id="panel-account" hidden>
         <div class="card">
             <h2>Notifications (ntfy)</h2>
-            <p class="muted small">Install the <a href="https://ntfy.sh/" target="_blank" rel="noopener">ntfy app</a>
-                and subscribe to this private topic. Keep it secret: anyone who knows it can read your alerts.</p>
+            <p class="muted small">Subscribe to this private topic in the ntfy app. Keep it secret: anyone who knows it can read your alerts.
+                <a href="https://ntfy.sh/" target="_blank" rel="noopener">Get the ntfy app</a></p>
             <label>Server</label><div class="topic">{{ ntfy_server }}</div>
             <label>Topic</label><div class="topic" id="topic">{{ user.ntfy_topic }}</div>
             <div class="row" style="margin-top:12px">

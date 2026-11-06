@@ -84,6 +84,8 @@
         }
         .theme-toggle-btn:hover { border-color: var(--accent); color: var(--accent); }
         .theme-toggle-float { position: fixed; top: 12px; right: 12px; z-index: 50; background: var(--surface); }
+        .lang-toggle-btn { width: auto; min-width: 34px; padding: 0 10px; font-weight: 700; font-size: .8rem; }
+        .lang-toggle-float { right: 56px; }
         ::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
         ::view-transition-old(root) { z-index: 1; }
         ::view-transition-new(root) { z-index: 2; }
@@ -96,7 +98,8 @@
     {% block head %}{% endblock %}
 </head>
 <body>
-{% block theme_toggle %}<button type="button" class="theme-toggle-btn theme-toggle-float" data-theme-toggle aria-label="Switch theme"></button>{% endblock %}
+{% block theme_toggle %}<button type="button" class="theme-toggle-btn lang-toggle-btn lang-toggle-float" data-lang-toggle aria-label="Language"></button>
+<button type="button" class="theme-toggle-btn theme-toggle-float" data-theme-toggle aria-label="Switch theme"></button>{% endblock %}
 {% block body %}{% endblock %}
 <script>
     // Theme toggle: same behaviour as the budget app (circular reveal, saved under "theme").
@@ -137,6 +140,7 @@
         });
     })();
 </script>
+{% include "park/_i18n.html" %}
 <script>
     // Shared fetch helper: same-origin JSON with CSRF header.
     window.parkFetch = async function (url, opts = {}) {
