@@ -403,6 +403,9 @@
     <!-- Common JavaScript Functions -->
     <script src="{{ url_for('static', filename='js/base.js') }}?v=3.0"></script>
 
+    <!-- Offline transaction queue (IndexedDB + sync on reconnect) -->
+    <script src="{{ url_for('static', filename='js/offline_queue.js') }}?v=1.0"></script>
+
     <!-- Service Worker Registration -->
     <script>
         // Register Service Worker for PWA support

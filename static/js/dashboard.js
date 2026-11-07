@@ -663,6 +663,9 @@ case 'tax':
         case 'rateTrends':
             if (typeof loadRateTrends === 'function') loadRateTrends();
             break;
+        case 'planner':
+            if (typeof loadPlanner === 'function') loadPlanner();
+            break;
     }
 }
 
@@ -1969,6 +1972,8 @@ function editTransaction(id) {
     document.getElementById('transDebit').value = transaction.debit || '';
     document.getElementById('transCredit').value = transaction.credit || '';
     document.getElementById('transNotes').value = transaction.notes || '';
+    document.getElementById('transDueDate').value = transaction.due_date || '';
+    document.getElementById('transRemindDays').value = String(transaction.remind_days != null ? transaction.remind_days : 3);
 
     // Store the original transaction for reference during save
     editingTransaction = {
@@ -2069,6 +2074,9 @@ async function saveTransaction() {
         credit: credit,
         notes: document.getElementById('transNotes')?.value,
         payment_method_id: document.getElementById('transPaymentMethod')?.value || null,
+        // Always sent so clearing the date removes the reminder
+        due_date: document.getElementById('transDueDate')?.value || null,
+        remind_days: parseInt(document.getElementById('transRemindDays')?.value || '3', 10),
         year: parseInt(year),
         month: parseInt(month)
     };
@@ -2108,6 +2116,9 @@ async function saveTransaction() {
     if (scannedBillContent && !isEdit) {
         data.bill_content = JSON.stringify(scannedBillContent);
     }
+
+    // Idempotency key: lets the server ignore a duplicate if this request is retried
+    if (!isEdit && window.OfflineQueue) data.client_request_id = OfflineQueue.newId();
 
     const url = isEdit ? `/api/transactions/${editId}` : '/api/transactions';
     const method = isEdit ? 'PUT' : 'POST';
@@ -2188,12 +2199,29 @@ async function saveTransaction() {
         requestHeaders = { 'Content-Type': 'application/json' };
     }
 
+    // Offline queue: new transactions without photo attachments can be saved locally
+    const canQueueOffline = !isEdit && window.OfflineQueue && OfflineQueue.isSupported &&
+        !(capturedBillImages && capturedBillImages.length);
+    if (!navigator.onLine) {
+        if (canQueueOffline) {
+            hideLoading();
+            queueTransactionOffline(data);
+        } else {
+            hideLoading();
+            showToast(isEdit ? 'You are offline. Edits need a connection.'
+                             : 'You are offline. Transactions with photos need a connection.', 'danger');
+        }
+        return;
+    }
+    let gotResponse = false;
+
     fetch(url, {
         method: method,
         headers: requestHeaders,
         body: requestBody
     })
     .then(response => {
+        gotResponse = true;
         // Get response as text first
         return response.text().then(text => {
             // Try to parse as JSON
@@ -2231,8 +2259,30 @@ async function saveTransaction() {
     })
     .catch(error => {
         hideLoading();
+        // The request never got an answer (connection dropped): keep it for later
+        if (canQueueOffline && !gotResponse) {
+            queueTransactionOffline(data);
+            return;
+        }
         console.error('Error saving transaction:', error);
         showToast('Error saving transaction: ' + error.message, 'danger');
+    });
+}
+
+// Save a new transaction on this device; it syncs automatically when back online
+function queueTransactionOffline(data) {
+    OfflineQueue.enqueue(data).then(() => {
+        showToast('Saved offline. It will sync when you reconnect.', 'warning');
+        closeModal('transactionModal');
+        document.getElementById('transactionForm')?.reset();
+        document.getElementById('editTransactionId').value = '';
+        editingTransaction = null;
+        document.querySelector('#transactionModal .modal-title').textContent = 'Add Transaction';
+        scannedBillContent = null;
+        capturedBillImages = [];
+    }).catch(err => {
+        console.error('Offline save failed:', err);
+        showToast('Could not save offline: ' + err.message, 'danger');
     });
 }
 
@@ -8322,7 +8372,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <div class="small text-muted">${calcDate}</div>
                                 </div>
                                 <div class="d-flex gap-1 align-items-center">
-                                    <span class="badge bg-info d-inline-flex align-items-center" style="height: fit-content;">Avg: ${calc.average_rate.toFixed(4)}</span>
+                                    <span class="badge bg-info text-dark d-inline-flex align-items-center" style="height: fit-content;">Avg: ${calc.average_rate.toFixed(4)}</span>
                                     <button class="btn btn-sm btn-outline-primary" onclick="editSalaryCalc(${calc.id})" title="Edit">
                                         <i class="fas fa-edit"></i>
                                     </button>

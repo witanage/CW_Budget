@@ -103,6 +103,21 @@
                                     </div>
                                 </div>
                             </div>
+                            <div class="mb-2" id="dueDateGroup">
+                                <label for="transDueDate" class="form-label">Due date <span class="text-muted small">(optional, for bill reminders)</span></label>
+                                <div class="input-group input-group-sm">
+                                    <input type="date" class="form-control form-control-sm" id="transDueDate">
+                                    <select class="form-select form-select-sm" id="transRemindDays" style="max-width: 140px;" title="When to remind you">
+                                        <option value="0">On the day</option>
+                                        <option value="1">1 day before</option>
+                                        <option value="2">2 days before</option>
+                                        <option value="3" selected>3 days before</option>
+                                        <option value="5">5 days before</option>
+                                        <option value="7">7 days before</option>
+                                        <option value="14">14 days before</option>
+                                    </select>
+                                </div>
+                            </div>
                             <div class="mb-2">
                                 <label for="transNotes" class="form-label">Notes</label>
                                 <textarea class="form-control form-control-sm" id="transNotes" rows="4"></textarea>

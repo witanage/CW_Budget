@@ -1,6 +1,16 @@
 // Service Worker for Personal Finance Manager PWA
-const CACHE_NAME = 'finance-manager-v1.0.0';
-const RUNTIME_CACHE = 'finance-manager-runtime-v1.0.0';
+importScripts('/static/js/offline_queue.js');   // defines self.OfflineQueue
+
+const CACHE_NAME = 'finance-manager-v1.1.0';
+const RUNTIME_CACHE = 'finance-manager-runtime-v1.1.0';
+// Per-user reference data (categories, payment methods) so the add-transaction
+// form still works offline. Cleared on logout so it never leaks between users.
+const API_CACHE = 'finance-manager-api-v1.1.0';
+const CACHEABLE_API_PATHS = [
+  '/api/categories',
+  '/api/payment-methods',
+  '/api/settings/upload-mode'
+];
 
 // Assets to cache on install
 const STATIC_ASSETS = [
@@ -12,6 +22,7 @@ const STATIC_ASSETS = [
   '/static/css/vendor/bootstrap.min.css',
   '/static/css/vendor/fontawesome.min.css',
   '/static/js/base.js',
+  '/static/js/offline_queue.js',
   '/static/js/dashboard.js',
   '/static/js/mobile.js',
   '/static/js/vendor/bootstrap.bundle.min.js',
@@ -44,7 +55,7 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames
           .filter((cacheName) => {
-            return cacheName !== CACHE_NAME && cacheName !== RUNTIME_CACHE;
+            return cacheName !== CACHE_NAME && cacheName !== RUNTIME_CACHE && cacheName !== API_CACHE;
           })
           .map((cacheName) => {
             console.log('[Service Worker] Deleting old cache:', cacheName);
@@ -67,6 +78,36 @@ self.addEventListener('fetch', (event) => {
 
   // Skip chrome extensions and non-http(s) requests
   if (!url.protocol.startsWith('http')) {
+    return;
+  }
+
+  // Logging out: drop cached per-user API data and pages
+  if (url.pathname === '/logout') {
+    event.waitUntil(Promise.all([caches.delete(API_CACHE), caches.delete(RUNTIME_CACHE)]));
+  }
+
+  // Reference data for the offline add-transaction form: network first, cache fallback
+  if (CACHEABLE_API_PATHS.includes(url.pathname)) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          // Only cache real JSON answers (not a login redirect page)
+          const type = response.headers.get('content-type') || '';
+          if (response.ok && !response.redirected && type.includes('json')) {
+            const copy = response.clone();
+            caches.open(API_CACHE).then((cache) => cache.put(request, copy));
+          }
+          return response;
+        })
+        .catch(() =>
+          caches.open(API_CACHE).then((cache) => cache.match(request)).then((cached) =>
+            cached || new Response(
+              JSON.stringify({ error: 'You are offline. This action requires an internet connection.' }),
+              { headers: { 'Content-Type': 'application/json' }, status: 503 }
+            )
+          )
+        )
+    );
     return;
   }
 
@@ -150,6 +191,10 @@ self.addEventListener('message', (event) => {
     self.skipWaiting();
   }
   
+  if (event.data && event.data.type === 'FLUSH_OFFLINE_QUEUE') {
+    event.waitUntil(self.OfflineQueue.flush().catch(() => {}));
+  }
+
   if (event.data && event.data.type === 'CLEAR_CACHE') {
     event.waitUntil(
       caches.keys().then((cacheNames) => {
@@ -163,13 +208,17 @@ self.addEventListener('message', (event) => {
   }
 });
 
-// Background sync for offline transactions (future enhancement)
+// Background sync: replay transactions queued while offline.
+// Rejecting makes the browser retry later; we do not retry when the session
+// has expired (the page prompts the user to log in again instead).
 self.addEventListener('sync', (event) => {
-  if (event.tag === 'sync-transactions') {
-    console.log('[Service Worker] Background sync triggered');
+  if (event.tag === self.OfflineQueue.SYNC_TAG) {
     event.waitUntil(
-      // Future: Sync pending transactions when back online
-      Promise.resolve()
+      self.OfflineQueue.flush().then((summary) => {
+        if (summary.remaining > 0 && !summary.authRequired) {
+          throw new Error('Offline queue not empty yet');
+        }
+      })
     );
   }
 });

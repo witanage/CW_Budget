@@ -26,6 +26,7 @@ from services.user_tab_service import get_enabled_tabs
 from services.dashboard_service import get_dashboard_stats, get_sidebar_summary
 from services.settings_service import get_upload_mode, get_global_template_vars
 from services.parking import register_parking_routes
+from services.planner_service import register_planner_routes, catch_up_for_user
 
 # Load environment variables from .env file
 load_dotenv()
@@ -230,6 +231,9 @@ def dashboard():
     user_id = session.get('user_id')
     enabled_tabs = get_enabled_tabs(user_id, device_type='desktop')
 
+    # Create any recurring transactions that came due since the last visit
+    catch_up_for_user(user_id)
+
     return render_template('dashboard.html',
                            username=session.get('username'),
                            enabled_tabs=enabled_tabs)
@@ -248,6 +252,13 @@ def page_reports():
 def page_tax():
     """Return tax calculator page HTML fragment."""
     return render_template('partials/dashboard_tax.html')
+
+
+@app.route('/api/page/planner')
+@login_required
+def page_planner():
+    """Return planner page HTML fragment (budgets, recurring, bills, goals)."""
+    return render_template('partials/dashboard_planner.html')
 
 
 @app.route('/api/page/rateTrends')
@@ -290,6 +301,7 @@ register_category_routes(app, login_required)
 register_payment_method_routes(app, login_required, admin_required, limiter, RATE_LIMIT_ADMIN)
 # Parking QR notifier: isolated module (own tables/session keys) mounted at /park
 register_parking_routes(app, limiter)
+register_planner_routes(app, login_required)
 
 
 @app.route('/api/dashboard-stats')

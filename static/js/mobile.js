@@ -1690,6 +1690,9 @@ month: parseInt(currentMonth)
         data.bill_content = JSON.stringify(scannedBillContent);
     }
 
+    // Idempotency key: lets the server ignore a duplicate if this request is retried
+    if (!isEdit && window.OfflineQueue) data.client_request_id = OfflineQueue.newId();
+
     const url = isEdit ? `/api/transactions/${editId}` : '/api/transactions';
     const method = isEdit ? 'PUT' : 'POST';
 
@@ -1769,12 +1772,29 @@ month: parseInt(currentMonth)
         requestHeaders = { 'Content-Type': 'application/json' };
     }
 
+    // Offline queue: new transactions without photo attachments can be saved locally
+    const canQueueOffline = !isEdit && window.OfflineQueue && OfflineQueue.isSupported &&
+        !(capturedBillImages && capturedBillImages.length);
+    if (!navigator.onLine) {
+        if (canQueueOffline) {
+            hideLoading();
+            queueTransactionOffline(data);
+        } else {
+            hideLoading();
+            showToast(isEdit ? 'You are offline. Edits need a connection.'
+                             : 'You are offline. Transactions with photos need a connection.', 'danger');
+        }
+        return;
+    }
+    let gotResponse = false;
+
     fetch(url, {
         method: method,
         headers: requestHeaders,
         body: requestBody
     })
     .then(response => {
+        gotResponse = true;
         if (response.status === 413) {
             throw new Error('File is too large. Please try with a smaller file.');
         }
@@ -1821,8 +1841,30 @@ month: parseInt(currentMonth)
     })
     .catch(error => {
         hideLoading();
+        // The request never got an answer (connection dropped): keep it for later
+        if (canQueueOffline && !gotResponse) {
+            queueTransactionOffline(data);
+            return;
+        }
         console.error('Error saving transaction:', error);
         showToast('Error saving transaction', 'danger');
+    });
+}
+
+// Save a new transaction on this device; it syncs automatically when back online
+function queueTransactionOffline(data) {
+    OfflineQueue.enqueue(data).then(() => {
+        showToast('Saved offline. It will sync when you reconnect.', 'warning');
+        const modal = bootstrap.Modal.getInstance(document.getElementById('transactionModal'));
+        if (modal) modal.hide();
+        document.getElementById('transactionForm').reset();
+        document.getElementById('transactionForm').dataset.editId = '';
+        document.querySelector('#transactionModal .modal-title').textContent = 'Add Transaction';
+        scannedBillContent = null;
+        capturedBillImages = [];
+    }).catch(err => {
+        console.error('Offline save failed:', err);
+        showToast('Could not save offline: ' + err.message, 'danger');
     });
 }
 

@@ -1836,7 +1836,7 @@
                                     <div class="small text-muted">' + calcDate + '</div>\
                                 </div>\
                                 <div class="d-flex gap-1 align-items-center">\
-                                    <span class="badge bg-info d-inline-flex align-items-center" style="height: fit-content;">Avg: ' + calc.average_rate.toFixed(4) + '</span>\
+                                    <span class="badge bg-info text-dark d-inline-flex align-items-center" style="height: fit-content;">Avg: ' + calc.average_rate.toFixed(4) + '</span>\
                                     <button class="btn btn-sm btn-outline-primary" onclick="window._editSalaryCalc(' + calc.id + ')" title="Edit">\
                                         <i class="fas fa-edit"></i>\
                                     </button>\

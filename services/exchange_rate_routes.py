@@ -24,6 +24,8 @@ from services.combank_exchange_rate_service import get_combank_exchange_rate_ser
 from services.dfcc_exchange_rate_service import get_dfcc_exchange_rate_service
 from services.gemini_exchange_analyzer import get_gemini_exchange_analyzer
 from services.ntfy_service import send_rate_change_notifications
+from services.scraper_health_service import check_and_alert, get_scraper_health_api
+from services.planner_service import run_scheduled_jobs as run_planner_jobs
 
 logger = logging.getLogger(__name__)
 
@@ -459,6 +461,18 @@ def refresh_all_exchange_rates(force=False):
         send_rate_change_notifications(results)
     except Exception as e:
         logger.error(f"Error sending notifications: {str(e)}")
+
+    # Flag scrapers that have stopped succeeding and alert the admin
+    try:
+        check_and_alert()
+    except Exception as e:
+        logger.error(f"Error checking scraper health: {str(e)}")
+
+    # Planner housekeeping piggybacks on the existing cron: recurring transactions, bill reminders
+    try:
+        run_planner_jobs()
+    except Exception as e:
+        logger.error(f"Error running planner jobs: {str(e)}")
 
     return results
 
@@ -2266,6 +2280,11 @@ def register_exchange_rate_routes(app, login_required, admin_required, token_req
         token_required: Token required decorator
         log_audit: Audit logging function
     """
+
+    @app.route('/api/admin/scraper-health', methods=['GET'])
+    @admin_required
+    def scraper_health():
+        return get_scraper_health_api()
 
     @app.route('/api/exchange-rate', methods=['GET'])
     @login_required

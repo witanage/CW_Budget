@@ -20,6 +20,7 @@ from flask import request, jsonify, session, make_response, url_for, Response
 from mysql.connector import Error
 
 from db import get_db_connection
+from services import offline_sync, planner_service
 from services.google_drive_file_service import get_google_drive_file_service
 from services.gemini_bill_scanner import get_gemini_bill_scanner
 
@@ -760,7 +761,8 @@ def transactions_handler():
                     if t.get('paid_at') and isinstance(t['paid_at'], datetime):
                         # Format as string without timezone info (local time)
                         t['paid_at'] = t['paid_at'].strftime('%Y-%m-%d %H:%M:%S')
-                
+
+                planner_service.attach_due_dates(cursor, transactions)
                 return jsonify(transactions)
             else:
                 return jsonify([])
@@ -786,6 +788,14 @@ def transactions_handler():
                 data = request.get_json()
 
             print(f"[DEBUG] Received transaction data: {data}")
+
+            # Idempotency: a retried offline-queue request must not create a duplicate
+            client_key = offline_sync.normalize_key(data.get('client_request_id')) if data else None
+            existing_id = offline_sync.find_existing(cursor, user_id, client_key)
+            if existing_id:
+                logger.info(f"Duplicate client_request_id {client_key}; returning transaction {existing_id}")
+                return jsonify({'message': 'Transaction already created', 'id': existing_id,
+                                'duplicate': True}), 200
 
             # Handle bill image(s) upload to Google Drive (if provided)
             attachment_guids = []
@@ -1005,8 +1015,12 @@ def transactions_handler():
             transaction_id = cursor.lastrowid
             print(f"[DEBUG] Transaction inserted with ID: {transaction_id}")
 
+            offline_sync.record(cursor, user_id, client_key, transaction_id)
+            planner_service.save_due_date(cursor, user_id, transaction_id, data)
+
             connection.commit()
             print(f"[DEBUG] Transaction committed successfully")
+            planner_service.after_transaction_change(user_id, transaction_id)
 
             response = {'message': 'Transaction created successfully', 'id': transaction_id}
             if attachments_value:
@@ -1161,6 +1175,7 @@ def filter_transactions_handler():
         # Reverse back to show most recent first
         transactions.reverse()
 
+        planner_service.attach_due_dates(cursor, transactions)
         return jsonify(transactions)
 
     except Exception as e:
@@ -1409,8 +1424,11 @@ def manage_transaction_handler(transaction_id):
                     log_transaction_audit(cursor, transaction_id, user_id, 'UPDATE', 'paid_at',
                                           old_paid_at, new_paid_at)
 
+            planner_service.save_due_date(cursor, user_id, transaction_id, data)
+
             connection.commit()
             print(f"[DEBUG] Transaction update committed successfully")
+            planner_service.after_transaction_change(user_id, transaction_id)
             return jsonify({'message': 'Transaction updated successfully'})
 
         else:  # DELETE
