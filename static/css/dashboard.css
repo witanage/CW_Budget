@@ -674,7 +674,7 @@ tr[draggable="true"] {
 
 .bg-warning-soft {
     background-color: rgba(255, 193, 7, 0.1);
-    color: #ffc107;
+    color: var(--warning-color);
 }
 
 .bg-danger-soft {
@@ -1505,11 +1505,11 @@ tr[draggable="true"] {
 
 .widget-unpaid .widget-icon {
     background-color: rgba(255, 193, 7, 0.15);
-    color: #ffc107;
+    color: var(--warning-color);
 }
 
 .widget-unpaid .widget-value {
-    color: #ffc107;
+    color: var(--warning-color);
 }
 
 [data-theme="dark"] .widget-unpaid {

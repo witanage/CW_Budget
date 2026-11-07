@@ -492,36 +492,36 @@ function setupSidebarToggle() {
     const mobileSidebarToggle = document.getElementById('mobileSidebarToggle');
     const sidebarOverlay = document.getElementById('sidebarOverlay');
 
-    if (!sidebar || !mainContent || !toggleBtn || !expandTab) {
+    if (!sidebar || !mainContent || !toggleBtn) {
         console.warn('Sidebar toggle elements not found');
         return;
     }
 
-    // Check localStorage for saved state (desktop only)
-    const sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
-    if (sidebarCollapsed) {
-        sidebar.classList.add('collapsed');
-        mainContent.classList.add('expanded');
-        if (containerRow) containerRow.classList.add('sidebar-collapsed');
-        expandTab.style.display = 'block';
+    // Apply state. Titles act as tooltips while the sidebar is an icon rail.
+    const navLinks0 = sidebar.querySelectorAll('.nav-link');
+    function applySidebarState(collapsed, persist) {
+        sidebar.classList.toggle('collapsed', collapsed);
+        mainContent.classList.toggle('expanded', collapsed);
+        if (containerRow) containerRow.classList.toggle('sidebar-collapsed', collapsed);
+        toggleBtn.setAttribute('aria-expanded', String(!collapsed));
+        toggleBtn.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+        navLinks0.forEach(l => {
+            const label = l.querySelector('.nav-label');
+            if (collapsed && label) l.title = label.textContent.trim(); else l.removeAttribute('title');
+        });
+        if (persist) localStorage.setItem('sidebarCollapsed', String(collapsed));
+        // Charts need to resize once the width animation finishes
+        setTimeout(() => window.dispatchEvent(new Event('resize')), 380);
     }
 
-    // Toggle button click (collapse sidebar - desktop)
-    toggleBtn.addEventListener('click', function() {
-        sidebar.classList.add('collapsed');
-        mainContent.classList.add('expanded');
-        if (containerRow) containerRow.classList.add('sidebar-collapsed');
-        expandTab.style.display = 'block';
-        localStorage.setItem('sidebarCollapsed', 'true');
-    });
+    // Restore saved state without animating on page load
+    document.body.classList.add('no-sidebar-anim');
+    applySidebarState(localStorage.getItem('sidebarCollapsed') === 'true', false);
+    requestAnimationFrame(() => requestAnimationFrame(() => document.body.classList.remove('no-sidebar-anim')));
 
-    // Expand tab click (expand sidebar - desktop)
-    expandTab.addEventListener('click', function() {
-        sidebar.classList.remove('collapsed');
-        mainContent.classList.remove('expanded');
-        if (containerRow) containerRow.classList.remove('sidebar-collapsed');
-        expandTab.style.display = 'none';
-        localStorage.setItem('sidebarCollapsed', 'false');
+    // One button toggles both ways (desktop)
+    toggleBtn.addEventListener('click', function() {
+        applySidebarState(!sidebar.classList.contains('collapsed'), true);
     });
 
     // Mobile menu toggle
@@ -652,7 +652,8 @@ function navigateToPage(pageName) {
 function loadPageData(pageName) {
     switch(pageName) {
         case 'transactions':
-            loadTransactions();
+            // Silent: no full-screen overlay when just switching sections
+            loadTransactions(false, true);
             break;
         case 'reports':
             loadReports();
@@ -1453,7 +1454,7 @@ async function loadSidebarWidgets() {
 // TRANSACTIONS PAGE
 // ================================
 
-function loadTransactions(applyActiveFilters = false) {
+function loadTransactions(applyActiveFilters = false, silent = false) {
     // Parse month/year from the month picker (format: YYYY-MM)
     const monthYearPicker = document.getElementById('monthYearPicker');
     let year, month;
@@ -1469,7 +1470,7 @@ function loadTransactions(applyActiveFilters = false) {
         console.log('📅 Loading transactions - Using current date → Year:', year, 'Month:', month);
     }
 
-    showLoading();
+    if (!silent) showLoading();
 
     // Build query parameters
     let queryParams = `year=${year}&month=${month}`;
@@ -5640,7 +5641,7 @@ function loadTaxCalculator() {
     }
 
     if (refreshSavedBtn) {
-        refreshSavedBtn.onclick = loadSavedCalculations;
+        refreshSavedBtn.onclick = () => loadSavedCalculations();
     }
 
     // Load button to filter calculations by selected year
@@ -5684,8 +5685,8 @@ function loadTaxCalculator() {
     // Initialize modal event listeners
     initializeModalEventListeners();
 
-    // Load all saved calculations on page load
-    loadSavedCalculations();
+    // Load all saved calculations on page load (silent: no full-screen overlay)
+    loadSavedCalculations(true);
 }
 
 function updateYearDisplay() {
@@ -6974,9 +6975,9 @@ function proceedWithSave(dataToSave, isUpdate) {
     });
 }
 
-function loadSavedCalculations() {
+function loadSavedCalculations(silent = false) {
     console.log('Loading saved calculations from API...');
-    showLoading();
+    if (!silent) showLoading();
 
     fetch('/api/tax-calculations')
     .then(response => {

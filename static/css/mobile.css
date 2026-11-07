@@ -417,7 +417,7 @@ white-space: nowrap;
 overflow: hidden;
 text-overflow: ellipsis;
 max-width: 150px;
-color: #ffffff;
+color: var(--text-primary);
 }
 
 .swipe-actions {
@@ -891,7 +891,7 @@ color: #cccccc;
 
 .modal-content {
 background-color: color-mix(in srgb, var(--modal-bg) calc(var(--modal-bg-opacity, 1) * 100%), transparent);
-color: #ffffff;
+color: var(--text-primary);
 border: 1px solid var(--border-color);
 border-radius: 12px;
 transform: none;

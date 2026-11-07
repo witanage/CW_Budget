@@ -1,11 +1,11 @@
 // Service Worker for Personal Finance Manager PWA
 importScripts('/static/js/offline_queue.js');   // defines self.OfflineQueue
 
-const CACHE_NAME = 'finance-manager-v1.1.0';
-const RUNTIME_CACHE = 'finance-manager-runtime-v1.1.0';
+const CACHE_NAME = 'finance-manager-v1.1.2';
+const RUNTIME_CACHE = 'finance-manager-runtime-v1.1.2';
 // Per-user reference data (categories, payment methods) so the add-transaction
 // form still works offline. Cleared on logout so it never leaks between users.
-const API_CACHE = 'finance-manager-api-v1.1.0';
+const API_CACHE = 'finance-manager-api-v1.1.2';
 const CACHEABLE_API_PATHS = [
   '/api/categories',
   '/api/payment-methods',
