@@ -144,8 +144,8 @@
                     '<div class="progress my-1"><div class="progress-bar bg-' + color + '" style="width:' + Math.min(b.percent, 100) + '%"></div></div>' +
                     '<div class="d-flex justify-content-between planner-sub"><span>' + esc(left) + ' · warns at ' + b.alert_percent + '%</span>' +
                     '<span class="planner-actions">' +
-                    '<button class="btn btn-outline-secondary" data-action="budget-edit" data-id="' + b.category_id + '" data-limit="' + b.monthly_limit + '" data-alert="' + b.alert_percent + '">Edit</button> ' +
-                    '<button class="btn btn-outline-danger" data-action="budget-delete" data-id="' + b.category_id + '" data-name="' + esc(b.category_name) + '">Remove</button>' +
+                    '<button class="btn btn-sm btn-outline-secondary" data-action="budget-edit" data-id="' + b.category_id + '" data-limit="' + b.monthly_limit + '" data-alert="' + b.alert_percent + '">Edit</button> ' +
+                    '<button class="btn btn-sm btn-outline-danger" data-action="budget-delete" data-id="' + b.category_id + '" data-name="' + esc(b.category_name) + '">Remove</button>' +
                     '</span></div></div>';
             }).join(''));
         } catch (e) {
@@ -234,9 +234,9 @@
                     (r.category_name ? ' · ' + esc(r.category_name) : '') +
                     (r.due_offset_days != null ? ' · due ' + r.due_offset_days + 'd after' : '') + '</span>' +
                     '<span class="planner-actions">' +
-                    '<button class="btn btn-outline-secondary" data-action="recurring-toggle" data-id="' + r.id + '" data-active="' + (r.is_active ? 1 : 0) + '">' + (r.is_active ? 'Pause' : 'Resume') + '</button> ' +
-                    '<button class="btn btn-outline-secondary" data-action="recurring-edit" data-id="' + r.id + '">Edit</button> ' +
-                    '<button class="btn btn-outline-danger" data-action="recurring-delete" data-id="' + r.id + '" data-name="' + esc(r.description) + '">Delete</button>' +
+                    '<button class="btn btn-sm btn-outline-secondary" data-action="recurring-toggle" data-id="' + r.id + '" data-active="' + (r.is_active ? 1 : 0) + '">' + (r.is_active ? 'Pause' : 'Resume') + '</button> ' +
+                    '<button class="btn btn-sm btn-outline-secondary" data-action="recurring-edit" data-id="' + r.id + '">Edit</button> ' +
+                    '<button class="btn btn-sm btn-outline-danger" data-action="recurring-delete" data-id="' + r.id + '" data-name="' + esc(r.description) + '">Delete</button>' +
                     '</span></div></div>';
             }).join(''));
         } catch (e) {
@@ -318,8 +318,8 @@
                     (b.category_name ? ' · ' + esc(b.category_name) : '') +
                     (b.payment_method_name ? ' · ' + esc(b.payment_method_name) : '') + '</span>' +
                     '<span class="planner-actions">' +
-                    '<button class="btn btn-outline-success" data-action="bill-paid" data-id="' + b.transaction_id + '" data-method="' + (b.payment_method_id || '') + '">Mark paid</button> ' +
-                    '<button class="btn btn-outline-secondary" data-action="bill-clear" data-id="' + b.transaction_id + '">Remove reminder</button>' +
+                    '<button class="btn btn-sm btn-outline-success" data-action="bill-paid" data-id="' + b.transaction_id + '" data-method="' + (b.payment_method_id || '') + '">Mark paid</button> ' +
+                    '<button class="btn btn-sm btn-outline-secondary" data-action="bill-clear" data-id="' + b.transaction_id + '">Remove reminder</button>' +
                     '</span></div></div>';
             }).join(''));
         } catch (e) {
@@ -352,14 +352,14 @@
             '<div class="planner-sub">' + esc(hint) + (g.target_date ? ' · target ' + esc(g.target_date) : '') + '</div>' +
             (g.archived ? '' :
                 '<form class="d-flex flex-wrap gap-1 mt-2" data-goal-contribute="' + g.id + '">' +
-                '<input type="number" step="0.01" class="form-control form-control-sm" style="max-width:150px" placeholder="Amount (− to withdraw)" required>' +
+                '<input type="number" step="0.01" class="form-control form-control-sm" style="max-width:160px" placeholder="Amount" title="Use a negative amount to withdraw" required>' +
                 '<input type="text" class="form-control form-control-sm" style="max-width:200px" maxlength="255" placeholder="Note (optional)">' +
                 '<button class="btn btn-sm btn-outline-success" type="submit">Add</button></form>') +
             '<div class="planner-actions mt-2">' +
-            '<button class="btn btn-outline-secondary" data-action="goal-history" data-id="' + g.id + '">History (' + g.contributions.length + ')</button> ' +
-            '<button class="btn btn-outline-secondary" data-action="goal-edit" data-id="' + g.id + '">Edit</button> ' +
-            '<button class="btn btn-outline-secondary" data-action="goal-archive" data-id="' + g.id + '" data-archived="' + (g.archived ? 1 : 0) + '">' + (g.archived ? 'Restore' : 'Archive') + '</button> ' +
-            '<button class="btn btn-outline-danger" data-action="goal-delete" data-id="' + g.id + '" data-name="' + esc(g.name) + '">Delete</button></div>' +
+            '<button class="btn btn-sm btn-outline-secondary" data-action="goal-history" data-id="' + g.id + '">History (' + g.contributions.length + ')</button> ' +
+            '<button class="btn btn-sm btn-outline-secondary" data-action="goal-edit" data-id="' + g.id + '">Edit</button> ' +
+            '<button class="btn btn-sm btn-outline-secondary" data-action="goal-archive" data-id="' + g.id + '" data-archived="' + (g.archived ? 1 : 0) + '">' + (g.archived ? 'Restore' : 'Archive') + '</button> ' +
+            '<button class="btn btn-sm btn-outline-danger" data-action="goal-delete" data-id="' + g.id + '" data-name="' + esc(g.name) + '">Delete</button></div>' +
             '<div class="mt-2' + (state.openGoals.has(g.id) ? '' : ' d-none') + '" data-goal-history="' + g.id + '">' + history + '</div>' +
             '</div>';
     }
