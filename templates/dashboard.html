@@ -79,6 +79,11 @@
                         </a>
                     </li>
                     {% endif %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-page="planner">
+                            <i class="fas fa-bullseye me-2"></i>Planner
+                        </a>
+                    </li>
                 </ul>
 
                 <!-- Sidebar Widgets -->
@@ -173,6 +178,9 @@
 
             <!-- Rate Trends Page (lazy loaded on first visit) -->
             <div id="rateTrendsPage" class="page-content" style="display:none;" data-lazy-url="/api/page/rateTrends"></div>
+
+            <!-- Planner Page: budgets, recurring, bills, goals (lazy loaded on first visit) -->
+            <div id="plannerPage" class="page-content" style="display:none;" data-lazy-url="/api/page/planner"></div>
         </main>
     </div>
 </div>
@@ -242,7 +250,8 @@
     window.enabledTabs = {{ enabled_tabs | tojson }};
 </script>
 <!-- base.js is already loaded in base.html, no need to load it again -->
-<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=3.1"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=3.2"></script>
+<script src="{{ url_for('static', filename='js/planner.js') }}?v=1.0"></script>
 <script src="{{ url_for('static', filename='js/vendor/flatpickr.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/exchange_rate_trends.js') }}?v=3.1"></script>
 {% endblock %}

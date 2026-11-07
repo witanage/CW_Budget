@@ -1,0 +1,200 @@
+<style>
+    #plannerPage .planner-pills .nav-link { padding: .35rem .8rem; font-size: .9rem; cursor: pointer; }
+    #plannerPage .planner-empty { color: var(--text-secondary); padding: 1rem 0; }
+    #plannerPage .planner-row { border-top: 1px solid rgba(128,128,128,.25); padding: .65rem 0; }
+    #plannerPage .planner-row:first-child { border-top: 0; }
+    #plannerPage .planner-sub { color: var(--text-secondary); font-size: .85rem; }
+    #plannerPage .progress { height: .6rem; }
+    #plannerPage .planner-form { border: 1px dashed rgba(128,128,128,.45); border-radius: .5rem; padding: .85rem; margin-bottom: 1rem; }
+    #plannerPage .planner-actions .btn { padding: .1rem .5rem; font-size: .8rem; }
+    #plannerPage .badge-soft { font-weight: 600; }
+</style>
+
+<div class="row">
+    <div class="col-12 mb-3">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h5 class="card-title mb-0"><i class="fas fa-bullseye me-2"></i>Planner</h5>
+                <ul class="nav nav-pills planner-pills" id="plannerPills">
+                    <li class="nav-item"><a class="nav-link active" data-planner-tab="budgets">Budgets</a></li>
+                    <li class="nav-item"><a class="nav-link" data-planner-tab="recurring">Recurring</a></li>
+                    <li class="nav-item"><a class="nav-link" data-planner-tab="bills">Bills <span class="badge bg-danger d-none" id="plannerBillsBadge"></span></a></li>
+                    <li class="nav-item"><a class="nav-link" data-planner-tab="goals">Savings Goals</a></li>
+                    <li class="nav-item"><a class="nav-link" data-planner-tab="alerts"><i class="fas fa-bell"></i> Alerts</a></li>
+                </ul>
+            </div>
+
+            <div class="card-body">
+
+                <!-- ============================ BUDGETS ============================ -->
+                <div data-planner-pane="budgets">
+                    <div class="d-flex flex-wrap align-items-end gap-2 mb-3">
+                        <div>
+                            <label class="form-label mb-1" for="plannerBudgetMonth">Month</label>
+                            <input type="month" id="plannerBudgetMonth" class="form-control form-control-sm">
+                        </div>
+                        <button class="btn btn-sm btn-primary" data-action="budget-new"><i class="fas fa-plus"></i> Set a budget</button>
+                    </div>
+
+                    <form id="plannerBudgetForm" class="planner-form d-none">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-4">
+                                <label class="form-label mb-1" for="plannerBudgetCategory">Expense category</label>
+                                <select id="plannerBudgetCategory" class="form-select form-select-sm" required></select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label mb-1" for="plannerBudgetLimit">Monthly limit</label>
+                                <input type="number" id="plannerBudgetLimit" class="form-control form-control-sm" min="0.01" step="0.01" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label mb-1" for="plannerBudgetAlert">Warn me at (%)</label>
+                                <input type="number" id="plannerBudgetAlert" class="form-control form-control-sm" min="50" max="99" value="80" required>
+                            </div>
+                            <div class="col-md-2 d-flex gap-1">
+                                <button type="submit" class="btn btn-sm btn-success">Save</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" data-action="form-cancel" data-target="plannerBudgetForm">Cancel</button>
+                            </div>
+                        </div>
+                    </form>
+
+                    <div id="plannerBudgetList"><div class="planner-empty">Loading…</div></div>
+                </div>
+
+                <!-- ============================ RECURRING ============================ -->
+                <div data-planner-pane="recurring" class="d-none">
+                    <p class="planner-sub mb-2">
+                        Transactions created automatically on a schedule (rent, subscriptions, salary…). Past start dates are back-filled.
+                    </p>
+                    <button class="btn btn-sm btn-primary mb-3" data-action="recurring-new"><i class="fas fa-plus"></i> New recurring transaction</button>
+
+                    <form id="plannerRecurringForm" class="planner-form d-none">
+                        <input type="hidden" id="plannerRecId">
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <label class="form-label mb-1" for="plannerRecDescription">Description</label>
+                                <input type="text" id="plannerRecDescription" class="form-control form-control-sm" maxlength="255" required>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label mb-1" for="plannerRecKind">Type</label>
+                                <select id="plannerRecKind" class="form-select form-select-sm">
+                                    <option value="expense">Expense</option>
+                                    <option value="income">Income</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label mb-1" for="plannerRecAmount">Amount</label>
+                                <input type="number" id="plannerRecAmount" class="form-control form-control-sm" min="0.01" step="0.01" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label mb-1" for="plannerRecCategory">Category</label>
+                                <select id="plannerRecCategory" class="form-select form-select-sm"></select>
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="form-label mb-1" for="plannerRecFrequency">Repeats</label>
+                                <select id="plannerRecFrequency" class="form-select form-select-sm">
+                                    <option value="monthly">Monthly</option>
+                                    <option value="weekly">Weekly</option>
+                                    <option value="yearly">Yearly</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label mb-1" for="plannerRecInterval">Every</label>
+                                <input type="number" id="plannerRecInterval" class="form-control form-control-sm" min="1" max="24" value="1">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label mb-1" for="plannerRecStart">First date</label>
+                                <input type="date" id="plannerRecStart" class="form-control form-control-sm" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label mb-1" for="plannerRecEnd">Ends (optional)</label>
+                                <input type="date" id="plannerRecEnd" class="form-control form-control-sm">
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label mb-1" for="plannerRecPayment">Payment method</label>
+                                <select id="plannerRecPayment" class="form-select form-select-sm"></select>
+                            </div>
+                            <div class="col-md-4" id="plannerRecDueWrap">
+                                <label class="form-label mb-1" for="plannerRecDueOffset">Bill due (days after)</label>
+                                <input type="number" id="plannerRecDueOffset" class="form-control form-control-sm" min="0" max="365" placeholder="No due date">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label mb-1" for="plannerRecNotes">Notes</label>
+                                <input type="text" id="plannerRecNotes" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-12 d-flex gap-1">
+                                <button type="submit" class="btn btn-sm btn-success">Save</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" data-action="form-cancel" data-target="plannerRecurringForm">Cancel</button>
+                            </div>
+                        </div>
+                    </form>
+
+                    <div id="plannerRecurringList"><div class="planner-empty">Loading…</div></div>
+                </div>
+
+                <!-- ============================ BILLS ============================ -->
+                <div data-planner-pane="bills" class="d-none">
+                    <p class="planner-sub mb-2">
+                        Unpaid transactions that have a due date. Add one with the <strong>Due date</strong> field when you create or
+                        edit a transaction, or from a recurring transaction. You get a push notification before and on the due date.
+                    </p>
+                    <div id="plannerBillList"><div class="planner-empty">Loading…</div></div>
+                </div>
+
+                <!-- ============================ GOALS ============================ -->
+                <div data-planner-pane="goals" class="d-none">
+                    <div class="d-flex align-items-center gap-3 mb-3">
+                        <button class="btn btn-sm btn-primary" data-action="goal-new"><i class="fas fa-plus"></i> New goal</button>
+                        <label class="planner-sub mb-0"><input type="checkbox" id="plannerGoalArchived"> Show archived</label>
+                    </div>
+
+                    <form id="plannerGoalForm" class="planner-form d-none">
+                        <input type="hidden" id="plannerGoalId">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-4">
+                                <label class="form-label mb-1" for="plannerGoalName">Goal</label>
+                                <input type="text" id="plannerGoalName" class="form-control form-control-sm" maxlength="120" placeholder="Emergency fund, new laptop…" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label mb-1" for="plannerGoalTarget">Target amount</label>
+                                <input type="number" id="plannerGoalTarget" class="form-control form-control-sm" min="0.01" step="0.01" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label mb-1" for="plannerGoalDate">Target date (optional)</label>
+                                <input type="date" id="plannerGoalDate" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-md-2 d-flex gap-1">
+                                <button type="submit" class="btn btn-sm btn-success">Save</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" data-action="form-cancel" data-target="plannerGoalForm">Cancel</button>
+                            </div>
+                        </div>
+                    </form>
+
+                    <div id="plannerGoalList"><div class="planner-empty">Loading…</div></div>
+                </div>
+
+                <!-- ============================ ALERTS ============================ -->
+                <div data-planner-pane="alerts" class="d-none">
+                    <p class="planner-sub">
+                        Budget warnings, bill reminders and goal milestones are sent as push notifications through ntfy.
+                        Install the ntfy app, subscribe to a topic name of your choice, and enter the same name here.
+                        Anyone who knows the topic name can read the messages, so pick something hard to guess.
+                    </p>
+                    <form id="plannerSettingsForm" class="row g-2 align-items-end" style="max-width: 560px;">
+                        <div class="col-sm-7">
+                            <label class="form-label mb-1" for="plannerTopic">Your ntfy topic</label>
+                            <input type="text" id="plannerTopic" class="form-control form-control-sm" maxlength="64"
+                                   pattern="[A-Za-z0-9_\-]*" placeholder="e.g. my-budget-8f3k2x">
+                        </div>
+                        <div class="col-sm-5 d-flex gap-1">
+                            <button type="submit" class="btn btn-sm btn-success">Save</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-action="settings-test">Send test</button>
+                        </div>
+                    </form>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>

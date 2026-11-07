@@ -254,3 +254,35 @@ def _send_currency_notification(currency: str, results: Dict) -> None:
 
     except Exception as e:
         logger.error(f"Unexpected error in notification sending logic: {str(e)}")
+
+
+def send_ntfy_message(topic: str, title: str, message: str,
+                      priority: str = "default", tags: str = "") -> bool:
+    """Send one ntfy message to *topic* using the server/credentials from app_settings.
+
+    Used for per-user alerts (budgets, bill reminders). Returns True when ntfy
+    accepted the message. Never raises.
+    """
+    topic = (topic or '').strip()
+    if not topic:
+        return False
+
+    from db import get_setting
+    server = (get_setting('ntfy_server_url', '') or '').strip() or DEFAULT_NTFY_SERVER
+    username = (get_setting('ntfy_username', '') or '').strip()
+    password = (get_setting('ntfy_password', '') or '').strip()
+    auth = (username, password) if username and password else None
+
+    headers = {"Title": title.encode('ascii', 'ignore').decode() or "Notification",
+               "Priority": priority}
+    if tags:
+        headers["Tags"] = tags
+    try:
+        response = requests.post(f"{server.rstrip('/')}/{topic}", data=message.encode('utf-8'),
+                                 headers=headers, auth=auth, timeout=10)
+        if response.status_code == 200:
+            return True
+        logger.error("ntfy message to topic failed: HTTP %s", response.status_code)
+    except requests.RequestException as e:
+        logger.error("ntfy message to topic failed: %s", e)
+    return False

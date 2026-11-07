@@ -663,6 +663,9 @@ case 'tax':
         case 'rateTrends':
             if (typeof loadRateTrends === 'function') loadRateTrends();
             break;
+        case 'planner':
+            if (typeof loadPlanner === 'function') loadPlanner();
+            break;
     }
 }
 
@@ -1969,6 +1972,8 @@ function editTransaction(id) {
     document.getElementById('transDebit').value = transaction.debit || '';
     document.getElementById('transCredit').value = transaction.credit || '';
     document.getElementById('transNotes').value = transaction.notes || '';
+    document.getElementById('transDueDate').value = transaction.due_date || '';
+    document.getElementById('transRemindDays').value = String(transaction.remind_days != null ? transaction.remind_days : 3);
 
     // Store the original transaction for reference during save
     editingTransaction = {
@@ -2069,6 +2074,9 @@ async function saveTransaction() {
         credit: credit,
         notes: document.getElementById('transNotes')?.value,
         payment_method_id: document.getElementById('transPaymentMethod')?.value || null,
+        // Always sent so clearing the date removes the reminder
+        due_date: document.getElementById('transDueDate')?.value || null,
+        remind_days: parseInt(document.getElementById('transRemindDays')?.value || '3', 10),
         year: parseInt(year),
         month: parseInt(month)
     };

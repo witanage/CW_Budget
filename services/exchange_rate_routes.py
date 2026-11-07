@@ -25,6 +25,7 @@ from services.dfcc_exchange_rate_service import get_dfcc_exchange_rate_service
 from services.gemini_exchange_analyzer import get_gemini_exchange_analyzer
 from services.ntfy_service import send_rate_change_notifications
 from services.scraper_health_service import check_and_alert, get_scraper_health_api
+from services.planner_service import run_scheduled_jobs as run_planner_jobs
 
 logger = logging.getLogger(__name__)
 
@@ -466,6 +467,12 @@ def refresh_all_exchange_rates(force=False):
         check_and_alert()
     except Exception as e:
         logger.error(f"Error checking scraper health: {str(e)}")
+
+    # Planner housekeeping piggybacks on the existing cron: recurring transactions, bill reminders
+    try:
+        run_planner_jobs()
+    except Exception as e:
+        logger.error(f"Error running planner jobs: {str(e)}")
 
     return results
 
