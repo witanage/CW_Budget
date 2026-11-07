@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 TOPIC_RE = re.compile(r'^[A-Za-z0-9_-]{1,64}$')
 FREQUENCIES = ('weekly', 'monthly', 'yearly')
-MAX_RECURRING_CATCHUP = 36          # occurrences created per rule per run
+MAX_RECURRING_CATCHUP = 200         # occurrences created per rule per run
 BILL_STAGE_WINDOW_DAYS = 30         # stop reminding this long after the due date
 
 # --------------------------------------------------------------------------
@@ -423,6 +423,35 @@ def next_occurrence(frequency, interval, anchor_day, current):
     return _add_months(current, interval, anchor_day)
 
 
+def occurrence_number(frequency, interval, start, occurrence):
+    """1-based position of *occurrence* in the schedule that begins at *start*."""
+    if frequency == 'weekly':
+        return (occurrence - start).days // (7 * interval) + 1
+    months = (occurrence.year - start.year) * 12 + occurrence.month - start.month
+    step = 12 * interval if frequency == 'yearly' else interval
+    return months // step + 1
+
+
+def occurrence_total(rule):
+    """Total occurrences up to end_date, or None when the rule is open-ended."""
+    if not rule['end_date']:
+        return None
+    count, current = 0, rule['start_date']
+    while current <= rule['end_date'] and count < 5000:
+        count += 1
+        current = next_occurrence(rule['frequency'], rule['interval_count'],
+                                  rule['anchor_day'], current)
+    return count
+
+
+def numbered_description(rule, occurrence):
+    number = occurrence_number(rule['frequency'], rule['interval_count'],
+                               rule['start_date'], occurrence)
+    total = occurrence_total(rule)
+    label = f"({number}/{total})" if total else f"#{number}"
+    return f"{rule['description']} {label}"[:255]
+
+
 def _rule_from_payload(data):
     description = (data.get('description') or '').strip()
     if not description:
@@ -569,7 +598,7 @@ def _create_from_rule(connection, cursor, rule, occurrence):
             (monthly_record_id, description, category_id, debit, credit, transaction_date, notes,
              display_order, bill_content, attachments, payment_method_id, is_paid, paid_at)
         VALUES (%s,%s,%s,%s,%s,%s,%s,1,NULL,NULL,%s,FALSE,NULL)
-    """, (monthly_record_id, rule['description'], rule['category_id'], debit, credit,
+    """, (monthly_record_id, numbered_description(rule, occurrence), rule['category_id'], debit, credit,
           occurrence, rule['notes'], rule['payment_method_id']))
     transaction_id = cursor.lastrowid
 
@@ -592,7 +621,8 @@ def process_due_rules(user_id=None, today=None):
     created_ids = []
 
     with _db() as (_, cursor):
-        sql = "SELECT * FROM recurring_rules WHERE is_active = 1 AND next_run <= %s"
+        # Rules with an end date are generated in full (future dates included)
+        sql = "SELECT * FROM recurring_rules WHERE is_active = 1 AND next_run <= COALESCE(end_date, %s)"
         params = [today]
         if user_id:
             sql += " AND user_id = %s"
@@ -604,8 +634,9 @@ def process_due_rules(user_id=None, today=None):
         try:
             with _db() as (connection, cursor):
                 occurrence = rule['next_run']
+                limit = rule['end_date'] or today
                 steps = 0
-                while occurrence <= today and steps < MAX_RECURRING_CATCHUP:
+                while occurrence <= limit and steps < MAX_RECURRING_CATCHUP:
                     if rule['end_date'] and occurrence > rule['end_date']:
                         break
                     try:
@@ -641,7 +672,7 @@ def catch_up_for_user(user_id):
     try:
         with _db() as (_, cursor):
             cursor.execute("SELECT 1 FROM recurring_rules WHERE user_id=%s AND is_active=1 "
-                           "AND next_run <= %s LIMIT 1", (user_id, date.today()))
+                           "AND next_run <= COALESCE(end_date, %s) LIMIT 1", (user_id, date.today()))
             if not cursor.fetchone():
                 return 0
         return process_due_rules(user_id=user_id)
