@@ -532,6 +532,18 @@
     <!-- Common JavaScript Functions -->
     <script src="{{ url_for('static', filename='js/base.js') }}?v=3.0"></script>
 
+    <!-- Offline transaction queue + service worker (this page does not extend base.html) -->
+    <script src="{{ url_for('static', filename='js/offline_queue.js') }}?v=1.0"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/static/sw.js').catch((error) => {
+                    console.error('[PWA] Service Worker registration failed:', error);
+                });
+            });
+        }
+    </script>
+
     <!-- Mobile JS -->
     <script src="{{ url_for('static', filename='js/mobile.js') }}?v=3.0\"></script>
 

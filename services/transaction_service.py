@@ -20,6 +20,7 @@ from flask import request, jsonify, session, make_response, url_for, Response
 from mysql.connector import Error
 
 from db import get_db_connection
+from services import offline_sync
 from services.google_drive_file_service import get_google_drive_file_service
 from services.gemini_bill_scanner import get_gemini_bill_scanner
 
@@ -787,6 +788,14 @@ def transactions_handler():
 
             print(f"[DEBUG] Received transaction data: {data}")
 
+            # Idempotency: a retried offline-queue request must not create a duplicate
+            client_key = offline_sync.normalize_key(data.get('client_request_id')) if data else None
+            existing_id = offline_sync.find_existing(cursor, user_id, client_key)
+            if existing_id:
+                logger.info(f"Duplicate client_request_id {client_key}; returning transaction {existing_id}")
+                return jsonify({'message': 'Transaction already created', 'id': existing_id,
+                                'duplicate': True}), 200
+
             # Handle bill image(s) upload to Google Drive (if provided)
             attachment_guids = []
             attachments_value = None
@@ -1004,6 +1013,8 @@ def transactions_handler():
 
             transaction_id = cursor.lastrowid
             print(f"[DEBUG] Transaction inserted with ID: {transaction_id}")
+
+            offline_sync.record(cursor, user_id, client_key, transaction_id)
 
             connection.commit()
             print(f"[DEBUG] Transaction committed successfully")

@@ -392,6 +392,12 @@
                 <i class="fas fa-credit-card"></i> <span class="tab-label">Payment Methods</span>
             </button>
         </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="scraper-tab" data-bs-toggle="tab" data-bs-target="#scraper-pane"
+                    type="button" role="tab" aria-controls="scraper-pane" aria-selected="false">
+                <i class="fas fa-heartbeat"></i> <span class="tab-label">Scraper Health</span>
+            </button>
+        </li>
     </ul>
 
     <!-- Tab Content -->
@@ -837,6 +843,35 @@
                             </tbody>
                         </table>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Scraper Health Tab (loaded on demand when the tab is opened) -->
+        <div class="tab-pane fade" id="scraper-pane" role="tabpanel" aria-labelledby="scraper-tab">
+            <div class="section-card">
+                <div class="section-header">
+                    <h2 style="margin: 0; font-size: 1.5rem; color: var(--text-primary);">
+                        <i class="fas fa-heartbeat"></i> Scraper Health
+                    </h2>
+                    <button class="btn-sm btn-secondary" onclick="loadScraperHealth(true)">
+                        <i class="fas fa-sync-alt"></i> Reload
+                    </button>
+                </div>
+                <p id="scraperHealthSummary" style="color: var(--text-secondary); font-size: 0.9rem; margin: 0 0 10px 0;">Open this tab to load.</p>
+                <div style="overflow-x: auto;">
+                    <table class="table" style="width: 100%; font-size: 0.9rem;">
+                        <thead>
+                            <tr>
+                                <th>Source</th>
+                                <th>Status</th>
+                                <th>Last success</th>
+                                <th>Failed since</th>
+                                <th>Last error</th>
+                            </tr>
+                        </thead>
+                        <tbody id="scraperHealthBody"></tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -2079,6 +2114,67 @@
         }
     }
 
+    // ── System Settings: scraper health ──────────────────────────
+    function shEsc(s) {
+        const d = document.createElement('div');
+        d.textContent = s == null ? '' : String(s);
+        return d.innerHTML;
+    }
+
+    function shAge(minutes) {
+        if (minutes == null) return 'never';
+        if (minutes < 60) return minutes + ' min ago';
+        if (minutes < 2880) return Math.floor(minutes / 60) + ' h ago';
+        return Math.floor(minutes / 1440) + ' d ago';
+    }
+
+    async function loadScraperHealth(force) {
+        const body = document.getElementById('scraperHealthBody');
+        const summary = document.getElementById('scraperHealthSummary');
+        if (!body || !summary) return;
+        try {
+            const response = await fetch('/api/admin/scraper-health' + (force ? '?refresh=1' : ''));
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Request failed');
+
+            summary.textContent = data.sources.length === 0
+                ? 'No refresh history found yet.'
+                : (data.stale_count === 0
+                    ? 'All sources are fetching normally.'
+                    : data.stale_count + ' source(s) stale') +
+                  ' (stale after ' + data.stale_threshold_minutes + ' min without a successful fetch; ' +
+                  'change via the scraper_stale_minutes setting).';
+
+            const reasons = {
+                failing: 'Failing',
+                no_recent_runs: 'Not being refreshed',
+                never_succeeded: 'Never succeeded'
+            };
+            body.innerHTML = data.sources.map(s => {
+                const stale = s.status === 'stale';
+                const badge = stale
+                    ? '<span style="color:#dc3545;font-weight:600;">' + shEsc(reasons[s.reason] || 'Stale') + '</span>'
+                    : '<span style="color:#28a745;font-weight:600;">Healthy</span>';
+                return '<tr>' +
+                    '<td>' + shEsc(s.source) + '</td>' +
+                    '<td>' + badge + '</td>' +
+                    '<td title="' + shEsc(s.last_success || '') + '">' + shAge(s.last_success_age_minutes) + '</td>' +
+                    '<td>' + (s.consecutive_failures || 0) + ' attempt(s)</td>' +
+                    '<td>' + shEsc((s.last_error || '').substring(0, 120)) + '</td>' +
+                    '</tr>';
+            }).join('');
+        } catch (error) {
+            summary.textContent = 'Could not load scraper health: ' + error.message;
+            body.innerHTML = '';
+        }
+    }
+
+    // Load only when the Scraper Health tab is opened (not with the page)
+    document.addEventListener('DOMContentLoaded', function () {
+        const tabBtn = document.getElementById('scraper-tab');
+        if (tabBtn) tabBtn.addEventListener('shown.bs.tab', function () { loadScraperHealth(); });
+    });
+
     // ── System Settings: on-demand refresh ───────────────────────
     async function refreshAllRates() {
         const btn = document.getElementById('refreshAllBtn');
@@ -2585,7 +2681,8 @@
             '#users': 'users-tab',
             '#audit-logs': 'audit-tab',
             '#markup-rules': 'markup-tab',
-            '#payment-methods': 'payment-methods-tab'
+            '#payment-methods': 'payment-methods-tab',
+            '#scraper-health': 'scraper-tab'
         };
 
         // Reverse map: tab ID to hash
@@ -2596,7 +2693,8 @@
             'users-tab': '#users',
             'audit-tab': '#audit-logs',
             'markup-tab': '#markup-rules',
-            'payment-methods-tab': '#payment-methods'
+            'payment-methods-tab': '#payment-methods',
+            'scraper-tab': '#scraper-health'
         };
 
         // On page load, activate the tab from the URL hash
