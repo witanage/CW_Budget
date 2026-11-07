@@ -1,15 +1,3 @@
-<style>
-    #plannerPage .planner-pills .nav-link { padding: .35rem .8rem; font-size: .9rem; cursor: pointer; }
-    #plannerPage .planner-empty { color: var(--text-secondary); padding: 1rem 0; }
-    #plannerPage .planner-row { border-top: 1px solid rgba(128,128,128,.25); padding: .65rem 0; }
-    #plannerPage .planner-row:first-child { border-top: 0; }
-    #plannerPage .planner-sub { color: var(--text-secondary); font-size: .85rem; }
-    #plannerPage .progress { height: .6rem; }
-    #plannerPage .planner-form { border: 1px dashed rgba(128,128,128,.45); border-radius: .5rem; padding: .85rem; margin-bottom: 1rem; }
-    #plannerPage .planner-actions .btn { padding: .1rem .5rem; font-size: .8rem; }
-    #plannerPage .badge-soft { font-weight: 600; }
-</style>
-
 <div class="row">
     <div class="col-12 mb-3">
         <div class="card">
@@ -33,7 +21,7 @@
                             <label class="form-label mb-1" for="plannerBudgetMonth">Month</label>
                             <input type="month" id="plannerBudgetMonth" class="form-control form-control-sm">
                         </div>
-                        <button class="btn btn-sm btn-primary" data-action="budget-new"><i class="fas fa-plus"></i> Set a budget</button>
+                        <button class="btn btn-gradient btn-sm" data-action="budget-new"><i class="fas fa-plus"></i> Set a budget</button>
                     </div>
 
                     <form id="plannerBudgetForm" class="planner-form d-none">
@@ -65,7 +53,7 @@
                     <p class="planner-sub mb-2">
                         Transactions created automatically on a schedule (rent, subscriptions, salary…). Past start dates are back-filled.
                     </p>
-                    <button class="btn btn-sm btn-primary mb-3" data-action="recurring-new"><i class="fas fa-plus"></i> New recurring transaction</button>
+                    <button class="btn btn-gradient btn-sm mb-3" data-action="recurring-new"><i class="fas fa-plus"></i> New recurring transaction</button>
 
                     <form id="plannerRecurringForm" class="planner-form d-none">
                         <input type="hidden" id="plannerRecId">
@@ -144,8 +132,11 @@
 
                 <!-- ============================ GOALS ============================ -->
                 <div data-planner-pane="goals" class="d-none">
+                    <p class="planner-sub mb-2">
+                        Add money to a goal with the Amount box on its card. Use a negative amount to withdraw.
+                    </p>
                     <div class="d-flex align-items-center gap-3 mb-3">
-                        <button class="btn btn-sm btn-primary" data-action="goal-new"><i class="fas fa-plus"></i> New goal</button>
+                        <button class="btn btn-gradient btn-sm" data-action="goal-new"><i class="fas fa-plus"></i> New goal</button>
                         <label class="planner-sub mb-0"><input type="checkbox" id="plannerGoalArchived"> Show archived</label>
                     </div>
 

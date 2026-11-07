@@ -1576,4 +1576,189 @@ tr[draggable="true"] {
     }
 }
 
+/* ============================================================================ */
+/* Planner page (budgets, recurring, bills, goals)                              */
+/* The global .btn rule (base.css) sets 10px 20px padding and form controls are */
+/* taller than Bootstrap's -sm sizes, so controls get a shared height here so   */
+/* buttons, inputs and selects line up in every row.                            */
+/* ============================================================================ */
 
+#plannerPage {
+    --planner-control-h: 34px;
+    --planner-action-h: 28px;
+}
+
+/* Buttons: centred label + icon, one height, no wrapping */
+#plannerPage .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    white-space: nowrap;
+    line-height: 1.2;
+    font-weight: 500;
+}
+
+#plannerPage .btn {
+    border-color: rgba(128, 128, 128, 0.45);
+}
+
+#plannerPage .btn-sm {
+    height: var(--planner-control-h);
+    padding: 0 0.85rem;
+    font-size: 0.875rem;
+}
+
+#plannerPage .btn i {
+    margin: 0;
+    font-size: 0.8em;
+}
+
+/* Inputs and selects match the button height so a row lines up */
+#plannerPage .form-control-sm,
+#plannerPage .form-select-sm {
+    height: var(--planner-control-h);
+    min-height: var(--planner-control-h);
+    padding-top: 0;
+    padding-bottom: 0;
+    font-size: 0.875rem;
+}
+
+#plannerPage .form-label {
+    margin-bottom: 0.25rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+/* Section tabs */
+#plannerPage .planner-pills {
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+#plannerPage .planner-pills .nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    height: var(--planner-control-h);
+    padding: 0 0.9rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+#plannerPage .planner-pills .nav-link:hover {
+    color: var(--text-primary);
+    background: rgba(128, 128, 128, 0.15);
+}
+
+#plannerPage .planner-pills .nav-link.active,
+#plannerPage .planner-pills .show > .nav-link {
+    color: #fff;
+    background: var(--primary-color, #0866ff);
+}
+
+/* Dark theme accent is a light blue: use dark text on it */
+[data-theme="dark"] #plannerPage .planner-pills .nav-link.active {
+    color: #0b1220;
+}
+
+#plannerPage .planner-pills .badge {
+    font-size: 0.7rem;
+}
+
+/* Forms */
+#plannerPage .planner-form {
+    border: 1px dashed rgba(128, 128, 128, 0.45);
+    border-radius: 8px;
+    padding: 0.85rem;
+    margin-bottom: 1rem;
+}
+
+#plannerPage .planner-form .btn + .btn {
+    margin-left: 0.25rem;
+}
+
+/* List rows */
+#plannerPage .planner-row {
+    border-top: 1px solid rgba(128, 128, 128, 0.25);
+    padding: 0.75rem 0;
+}
+
+#plannerPage .planner-row:first-child {
+    border-top: 0;
+}
+
+#plannerPage .planner-sub {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+#plannerPage .planner-empty {
+    color: var(--text-secondary);
+    padding: 1rem 0;
+}
+
+#plannerPage .progress {
+    height: 0.6rem;
+}
+
+#plannerPage .badge-soft {
+    font-weight: 600;
+}
+
+/* Row actions: compact, same height, aligned right */
+#plannerPage .planner-actions {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+#plannerPage .planner-row .planner-actions {
+    margin-top: 0.35rem;
+}
+
+#plannerPage .planner-actions .btn-sm {
+    height: var(--planner-action-h);
+    padding: 0 0.65rem;
+    font-size: 0.8rem;
+}
+
+#plannerPage .btn-outline-danger {
+    color: #ef4444;
+    border-color: rgba(239, 68, 68, 0.55);
+}
+
+#plannerPage .btn-outline-success {
+    color: #22c55e;
+    border-color: rgba(34, 197, 94, 0.55);
+}
+
+/* Goal contribution row */
+#plannerPage form[data-goal-contribute] {
+    align-items: center;
+}
+
+@media (max-width: 767px) {
+    #plannerPage .planner-pills {
+        width: 100%;
+    }
+
+    #plannerPage .planner-pills .nav-link {
+        flex: 1 1 auto;
+        justify-content: center;
+    }
+
+    #plannerPage .planner-actions {
+        width: 100%;
+    }
+
+    #plannerPage form[data-goal-contribute] .form-control-sm {
+        max-width: none !important;
+        flex: 1 1 100%;
+    }
+}
