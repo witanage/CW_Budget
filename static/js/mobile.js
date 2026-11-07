@@ -312,7 +312,7 @@ function populatePaymentMethodsList(listContainer, isPaidClick) {
 listContainer.innerHTML = '';
 
 if (!paymentMethods || paymentMethods.length === 0) {
-listContainer.innerHTML = '<p style="color: #ffffff; padding: 20px;">No payment methods available. Please add one in settings.</p>';
+listContainer.innerHTML = '<p style="color: var(--text-primary); padding: 20px;">No payment methods available. Please add one in settings.</p>';
 } else {
 paymentMethods.forEach(method => {
 const item = document.createElement('div');
