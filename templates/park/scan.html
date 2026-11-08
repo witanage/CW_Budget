@@ -53,11 +53,26 @@
         .ring, .core, .plane, .check path, #sent h1, #sent p { animation: none !important; }
         .plane { display: none; } .check path { stroke-dashoffset: 0; }
     }
+    main.narrow { padding-top: 14px; padding-bottom: max(24px, env(safe-area-inset-bottom)); }
+    .brand { flex-wrap: nowrap; line-height: 1.15; }
+    @media (max-width: 480px) {
+        main.narrow { padding-left: 12px; padding-right: 12px; }
+        .card { padding: 16px; }
+        .hero h1 { font-size: 1.3rem; }
+        .brand { font-size: 1rem; }
+    }
+    @media (max-width: 340px) { .reasons { grid-template-columns: 1fr; } }
+    @media (min-width: 700px) { main.narrow { max-width: 520px; } }
+    .loc-row { flex-wrap: wrap; }
+    .reason span { padding: 12px 8px; overflow-wrap: anywhere; }
 </style>
 {% endblock %}
 
 {% block body %}
 <main class="narrow">
+    <div class="brand" style="justify-content:flex-start; margin: 0 0 12px; min-height: 42px; padding-right: 112px">
+        <div class="brand-mark">P</div><span>Parking Friend Messenger</span>
+    </div>
     <section id="formCard" class="card">
         <div class="hero">
             <div class="hero-icon" aria-hidden="true">🚗</div>
@@ -69,7 +84,7 @@
         <form id="notifyForm" novalidate>
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="scan_proof" value="{{ scan_proof }}">
-            <div id="countdown" class="small muted" style="text-align:center;margin-bottom:10px" aria-live="off">
+            <div id="countdown" class="small muted" style="text-align:center;margin-bottom:10px;display:none" aria-hidden="true">
                 Time left to send: <strong id="countdownText"></strong></div>
             <label>What's the issue?</label>
             <div class="reasons" role="radiogroup">

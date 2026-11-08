@@ -6,7 +6,7 @@
     <meta name="referrer" content="strict-origin">
     <meta name="robots" content="noindex, nofollow">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{% block title %}Park Notify{% endblock %}</title>
+    <title>{% block title %}Parking Friend Messenger{% endblock %}</title>
     <!-- Apply saved theme before paint to avoid a flash (same key as the budget app) -->
     <script>
         try { document.documentElement.setAttribute('data-theme', localStorage.getItem('theme') === 'light' ? 'light' : 'dark'); }
@@ -79,13 +79,17 @@
         .recaptcha { margin-top: 16px; min-height: 78px; }
         .theme-toggle-btn {
             background: transparent; border: 1px solid var(--border); color: var(--text);
-            width: 34px; height: 34px; padding: 0; display: inline-flex; align-items: center;
+            width: 42px; height: 42px; padding: 0; display: inline-flex; align-items: center;
             justify-content: center; border-radius: 999px; cursor: pointer; transition: all .3s ease;
         }
         .theme-toggle-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .theme-toggle-btn svg { width: 22px; height: 22px; }
         .theme-toggle-float { position: fixed; top: 12px; right: 12px; z-index: 50; background: var(--surface); }
-        .lang-toggle-btn { width: auto; min-width: 34px; padding: 0 10px; font-weight: 700; font-size: .8rem; }
-        .lang-toggle-float { right: 56px; }
+        .lang-toggle-btn { width: auto; min-width: 42px; padding: 0 12px; font-weight: 700; font-size: .9rem; }
+        .lang-toggle-float { right: 62px; }
+        .lang-wipe { position: fixed; z-index: 9999; border-radius: 50%; background: var(--accent); pointer-events: none; width: 20px; height: 20px; transform: translate(-50%,-50%) scale(0); transition: transform .5s ease-in-out; }
+        @keyframes pageIn { from { opacity: 0; } to { opacity: 1; } }
+        body.lang-switched { animation: pageIn .45s ease-out; }
         ::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
         ::view-transition-old(root) { z-index: 1; }
         ::view-transition-new(root) { z-index: 2; }
