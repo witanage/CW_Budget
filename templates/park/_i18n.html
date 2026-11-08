@@ -5,11 +5,11 @@
 (function () {
     const SI = {
         // ---- common ----
-        'Park Notify': 'Park Notify',
+        'Parking Friend Messenger': 'Parking Friend Messenger',
         'Sign in': 'පිවිසෙන්න', 'Sign out': 'ඉවත් වන්න', 'Sign in failed.': 'පිවිසීම අසාර්ථකයි.',
         'Mobile number': 'ජංගම දුරකථන අංකය', 'Password': 'මුරපදය',
-        'Sign in · Park Notify': 'පිවිසෙන්න · Park Notify',
-        'Back office · Park Notify': 'පරිපාලන අංශය · Park Notify',
+        'Sign in · Parking Friend Messenger': 'පිවිසෙන්න · Parking Friend Messenger',
+        'Back office · Parking Friend Messenger': 'පරිපාලන අංශය · Parking Friend Messenger',
         'Notify vehicle owner': 'වාහන හිමියාට දැනුම් දෙන්න',
         'Dashboard QR card': 'ඩෑෂ්බෝඩ් QR කාඩ්පත',
         'Switch theme': 'තේමාව මාරු කරන්න', 'Switch to dark': 'අඳුරු තේමාවට මාරු වන්න', 'Switch to light': 'ලා තේමාවට මාරු වන්න',
@@ -223,10 +223,23 @@
             b.setAttribute('title', b.getAttribute('aria-label'));
         });
     }
+    try { if (sessionStorage.getItem('park_lang_switched')) { sessionStorage.removeItem('park_lang_switched'); document.body.classList.add('lang-switched'); } } catch (err) { /* ignore */ }
     document.addEventListener('click', (e) => {
-        if (!e.target.closest('[data-lang-toggle]')) return;
+        const btn = e.target.closest('[data-lang-toggle]');
+        if (!btn) return;
         try { localStorage.setItem('park_lang', lang === 'si' ? 'en' : 'si'); } catch (err) { /* storage blocked */ }
-        location.reload();
+        // Same circular reveal as the theme button, then reload in the new language.
+        const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduce) { location.reload(); return; }
+        try { sessionStorage.setItem('park_lang_switched', '1'); } catch (err) { /* ignore */ }
+        const r = btn.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+        const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+        const w = document.createElement('div');
+        w.className = 'lang-wipe';
+        w.style.left = x + 'px'; w.style.top = y + 'px';
+        document.body.appendChild(w);
+        requestAnimationFrame(() => { w.style.transform = 'translate(-50%,-50%) scale(' + (radius * 2 / 20 + 1) + ')'; });
+        setTimeout(() => location.reload(), 520);
     });
 
     paintToggle();

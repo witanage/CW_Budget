@@ -12,7 +12,7 @@ import time
 import pyotp
 import qrcode
 
-ISSUER = 'Park Notify'
+ISSUER = 'Parking Friend Messenger'
 PERIOD = 30
 RECOVERY_COUNT = 8
 _CODE_RE = re.compile(r'^\d{6}$')
