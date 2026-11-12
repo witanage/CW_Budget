@@ -122,16 +122,33 @@
         return { year, month };
     }
 
+    function shiftBudgetMonth(delta) {
+        const { year, month } = budgetMonth();
+        const d = new Date(year, month - 1 + delta, 1);
+        $('plannerBudgetMonth').value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+        loadBudgets();
+    }
+
     async function loadBudgets() {
         const { year, month } = budgetMonth();
         setList('plannerBudgetList', empty('Loading…'));
         try {
             const data = await api('GET', '/api/planner/budgets?year=' + year + '&month=' + month);
-            if (!data.budgets.length) {
-                setList('plannerBudgetList', empty('No budgets yet. Set a monthly limit on a category to track it here and get warned before you overspend.'));
-                return;
-            }
-            setList('plannerBudgetList', data.budgets.map((b) => {
+            const c = data.combined;
+            const color = c.status === 'over' ? 'danger' : c.status === 'warning' ? 'warning' : 'success';
+            const left = c.remaining >= 0 ? money(c.remaining) + ' left' : money(-c.remaining) + ' over';
+            const combinedHtml = '<div class="planner-row">' +
+                '<div class="d-flex justify-content-between flex-wrap gap-2">' +
+                '<strong>Other (uncategorised + categories without a budget)</strong>' +
+                '<span>' + money(c.spent) + ' / ' + money(c.monthly_limit) +
+                ' <span class="badge bg-' + color + ' badge-soft">' + c.percent + '%</span></span></div>' +
+                '<div class="progress my-1"><div class="progress-bar bg-' + color + '" style="width:' + Math.min(c.percent, 100) + '%"></div></div>' +
+                '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 planner-sub"><span>' + esc(left) + ' · limit = total debit this month</span>' +
+                '<span class="planner-actions d-flex align-items-center gap-1"><label class="mb-0" for="plannerCombinedAlert">Warn me at (%)</label>' +
+                '<input type="number" id="plannerCombinedAlert" class="form-control form-control-sm" style="width:80px" min="50" max="99" value="' + c.alert_percent + '"> ' +
+                '<button class="btn btn-sm btn-success" data-action="combined-save">Save</button>' +
+                '</span></div></div>';
+            setList('plannerBudgetList', combinedHtml + data.budgets.map((b) => {
                 const color = b.status === 'over' ? 'danger' : b.status === 'warning' ? 'warning' : 'success';
                 const left = b.remaining >= 0
                     ? money(b.remaining) + ' left'
@@ -160,6 +177,16 @@
         $('plannerBudgetAlert').value = alertPercent || 80;
         $('plannerBudgetForm').classList.remove('d-none');
         $('plannerBudgetLimit').focus();
+    }
+
+    async function saveCombinedBudget() {
+        try {
+            await api('PUT', '/api/planner/budgets/combined', {
+                alert_percent: $('plannerCombinedAlert').value
+            });
+            toast('Combined budget saved', 'success');
+            loadBudgets();
+        } catch (e) { fail(e); }
     }
 
     async function saveBudget() {
@@ -474,6 +501,9 @@
         switch (el.getAttribute('data-action')) {
             case 'form-cancel': hideForm(el.getAttribute('data-target')); break;
 
+            case 'budget-month-prev': shiftBudgetMonth(-1); break;
+            case 'budget-month-next': shiftBudgetMonth(1); break;
+            case 'combined-save': saveCombinedBudget(); break;
             case 'budget-new': openBudgetForm('', '', 80); break;
             case 'budget-edit':
                 openBudgetForm(id, el.getAttribute('data-limit'), el.getAttribute('data-alert'));
