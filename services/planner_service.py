@@ -320,18 +320,16 @@ COMBINED_ALERT_KEY = 0      # category_id used in budget_alerts_sent for the com
 
 
 def _combined_figures(cursor, user_id, year, month):
-    """(limit, spent) for the combined budget.
+    """(limit, spent) for the total-expenses budget.
 
-    limit = total debit (income) of the month; spent = all spending in categories
-    that have no budget of their own (including uncategorised transactions)."""
+    limit = total debit (income) of the month; spent = all spending of the month,
+    categorised (budgeted or not) and uncategorised."""
     cursor.execute("""
         SELECT COALESCE(SUM(t.debit), 0) AS total_debit,
-               COALESCE(SUM(CASE WHEN t.category_id IS NULL OR t.category_id NOT IN
-                                      (SELECT category_id FROM category_budgets WHERE user_id = %s)
-                                 THEN t.credit ELSE 0 END), 0) AS spent
+               COALESCE(SUM(t.credit), 0) AS spent
         FROM transactions t JOIN monthly_records mr ON mr.id = t.monthly_record_id
         WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s
-    """, (user_id, user_id, year, month))
+    """, (user_id, year, month))
     row = cursor.fetchone()
     return float(row['total_debit']), float(row['spent'])
 
@@ -393,8 +391,8 @@ def _check_combined_budget(user_id, year, month):
             return
 
     over = level >= 100
-    title = f"{'Over budget' if over else 'Budget warning'}: Combined categories"
-    message = (f"Other categories: {_fmt_money(spent)} of {_fmt_money(limit)} "
+    title = f"{'Over budget' if over else 'Budget warning'}: Total expenses"
+    message = (f"Total expenses: {_fmt_money(spent)} of {_fmt_money(limit)} "
                f"({pct:.0f}%) of this month's total debit")
     _notify_user(user_id, title, message,
                  priority='high' if over else 'default',

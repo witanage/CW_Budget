@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS category_budgets (
     UNIQUE KEY uq_budget_user_cat (user_id, category_id)
 );
 
--- Combined budget: all spending outside individually budgeted categories,
+-- Total-expenses budget: all spending (categorised + uncategorised),
 -- limited to the month's total debit; only the warning % is stored
 CREATE TABLE IF NOT EXISTS combined_budgets (
     user_id       INT NOT NULL PRIMARY KEY,
