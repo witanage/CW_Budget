@@ -139,7 +139,7 @@
             const left = c.remaining >= 0 ? money(c.remaining) + ' left' : money(-c.remaining) + ' over';
             const combinedHtml = '<div class="planner-row">' +
                 '<div class="d-flex justify-content-between flex-wrap gap-2">' +
-                '<strong>Other (uncategorised + categories without a budget)</strong>' +
+                '<strong>Total expenses (categorised + uncategorised)</strong>' +
                 '<span>' + money(c.spent) + ' / ' + money(c.monthly_limit) +
                 ' <span class="badge bg-' + color + ' badge-soft">' + c.percent + '%</span></span></div>' +
                 '<div class="progress my-1"><div class="progress-bar bg-' + color + '" style="width:' + Math.min(c.percent, 100) + '%"></div></div>' +
