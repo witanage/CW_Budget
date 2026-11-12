@@ -55,6 +55,12 @@ _SCHEMA = [
         updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         UNIQUE KEY uq_budget_user_cat (user_id, category_id)
     )""",
+    """CREATE TABLE IF NOT EXISTS combined_budgets (
+        user_id       INT NOT NULL PRIMARY KEY,
+        alert_percent TINYINT UNSIGNED NOT NULL DEFAULT 80,
+        created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )""",
     """CREATE TABLE IF NOT EXISTS budget_alerts_sent (
         user_id     INT NOT NULL,
         category_id INT NOT NULL,
@@ -309,6 +315,92 @@ def get_budgets(user_id, year, month):
     return result
 
 
+DEFAULT_ALERT_PERCENT = 80
+COMBINED_ALERT_KEY = 0      # category_id used in budget_alerts_sent for the combined budget
+
+
+def _combined_figures(cursor, user_id, year, month):
+    """(limit, spent) for the combined budget.
+
+    limit = total debit (income) of the month; spent = all spending in categories
+    that have no budget of their own (including uncategorised transactions)."""
+    cursor.execute("""
+        SELECT COALESCE(SUM(t.debit), 0) AS total_debit,
+               COALESCE(SUM(CASE WHEN t.category_id IS NULL OR t.category_id NOT IN
+                                      (SELECT category_id FROM category_budgets WHERE user_id = %s)
+                                 THEN t.credit ELSE 0 END), 0) AS spent
+        FROM transactions t JOIN monthly_records mr ON mr.id = t.monthly_record_id
+        WHERE mr.user_id = %s AND mr.year = %s AND mr.month = %s
+    """, (user_id, user_id, year, month))
+    row = cursor.fetchone()
+    return float(row['total_debit']), float(row['spent'])
+
+
+def get_combined_budget(user_id, year, month):
+    with _db() as (_, cursor):
+        cursor.execute("SELECT alert_percent FROM combined_budgets WHERE user_id = %s", (user_id,))
+        cfg = cursor.fetchone() or {'alert_percent': DEFAULT_ALERT_PERCENT}
+        limit, spent = _combined_figures(cursor, user_id, year, month)
+    pct, status = _budget_status(spent, limit, cfg['alert_percent'])
+    return {'monthly_limit': limit, 'spent': spent, 'alert_percent': cfg['alert_percent'],
+            'percent': pct, 'status': status, 'remaining': limit - spent}
+
+
+def set_combined_budget(user_id, alert_percent):
+    with _db() as (connection, cursor):
+        cursor.execute("""
+            INSERT INTO combined_budgets (user_id, alert_percent) VALUES (%s, %s)
+            ON DUPLICATE KEY UPDATE alert_percent = VALUES(alert_percent)
+        """, (user_id, alert_percent))
+        cursor.execute("DELETE FROM budget_alerts_sent WHERE user_id = %s AND category_id = %s",
+                       (user_id, COMBINED_ALERT_KEY))
+        connection.commit()
+
+
+def delete_combined_budget(user_id):
+    with _db() as (connection, cursor):
+        cursor.execute("DELETE FROM combined_budgets WHERE user_id = %s", (user_id,))
+        cursor.execute("DELETE FROM budget_alerts_sent WHERE user_id = %s AND category_id = %s",
+                       (user_id, COMBINED_ALERT_KEY))
+        connection.commit()
+
+
+def _check_combined_budget(user_id, year, month):
+    """Alert when combined (un-budgeted) spending crosses its warning/100% level."""
+    with _db() as (connection, cursor):
+        cursor.execute("SELECT alert_percent FROM combined_budgets WHERE user_id = %s", (user_id,))
+        cfg = cursor.fetchone() or {'alert_percent': DEFAULT_ALERT_PERCENT}
+        limit, spent = _combined_figures(cursor, user_id, year, month)
+        if limit <= 0:
+            return
+        pct = spent / limit * 100
+        crossed = [lv for lv in (cfg['alert_percent'], 100) if pct >= lv]
+        if not crossed:
+            return
+        level = max(crossed)
+        cursor.execute("""
+            INSERT IGNORE INTO budget_alerts_sent (user_id, category_id, year, month, level)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (user_id, COMBINED_ALERT_KEY, year, month, level))
+        first_time = cursor.rowcount == 1
+        if level == 100:
+            cursor.execute("""
+                INSERT IGNORE INTO budget_alerts_sent (user_id, category_id, year, month, level)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (user_id, COMBINED_ALERT_KEY, year, month, cfg['alert_percent']))
+        connection.commit()
+        if not first_time:
+            return
+
+    over = level >= 100
+    title = f"{'Over budget' if over else 'Budget warning'}: Combined categories"
+    message = (f"Other categories: {_fmt_money(spent)} of {_fmt_money(limit)} "
+               f"({pct:.0f}%) of this month's total debit")
+    _notify_user(user_id, title, message,
+                 priority='high' if over else 'default',
+                 tags='rotating_light' if over else 'warning')
+
+
 def set_budget(user_id, category_id, limit, alert_percent):
     with _db() as (connection, cursor):
         cursor.execute("SELECT type FROM categories WHERE id = %s", (category_id,))
@@ -348,11 +440,14 @@ def _check_budget(user_id, transaction_id):
             WHERE t.id = %s AND mr.user_id = %s
         """, (transaction_id, user_id))
         tx = cursor.fetchone()
-        if not tx or not tx['category_id'] or not tx['credit']:
+        if not tx:
             return
         today = date.today()
         if (tx['year'], tx['month']) != (today.year, today.month):
             return                                    # only the running month alerts
+        _check_combined_budget(user_id, tx['year'], tx['month'])
+        if not tx['category_id'] or not tx['credit']:
+            return
 
         cursor.execute("""
             SELECT b.monthly_limit, b.alert_percent, c.name
@@ -1054,10 +1149,34 @@ def register_planner_routes(app, login_required):
         if not 1 <= month <= 12:
             return jsonify({'error': 'Invalid month'}), 400
         try:
-            return ok({'year': year, 'month': month, 'budgets': get_budgets(uid(), year, month)})
+            return ok({'year': year, 'month': month, 'budgets': get_budgets(uid(), year, month),
+                       'combined': get_combined_budget(uid(), year, month)})
         except Exception as e:
             logger.error("Planner budgets failed: %s", e)
             return jsonify({'error': 'Could not load budgets'}), 500
+
+    @app.route('/api/planner/budgets/combined', methods=['PUT'])
+    @login_required
+    def planner_set_combined_budget():
+        try:
+            alert = _int(body().get('alert_percent'), 'Alert at', 50, 99, default=80)
+            set_combined_budget(uid(), alert)
+            return ok()
+        except ValidationError as e:
+            return jsonify({'error': str(e)}), 400
+        except Exception as e:
+            logger.error("Planner set combined budget failed: %s", e)
+            return jsonify({'error': 'Could not save combined budget'}), 500
+
+    @app.route('/api/planner/budgets/combined', methods=['DELETE'])
+    @login_required
+    def planner_delete_combined_budget():
+        try:
+            delete_combined_budget(uid())
+            return ok()
+        except Exception as e:
+            logger.error("Planner delete combined budget failed: %s", e)
+            return jsonify({'error': 'Could not delete combined budget'}), 500
 
     @app.route('/api/planner/budgets/<int:category_id>', methods=['PUT'])
     @login_required
