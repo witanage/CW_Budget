@@ -1517,7 +1517,8 @@
             }
         });
 
-        var remainingUSD = totalUSD - totalExchangedUSD;
+        var remainingUSD = Math.round((totalUSD - totalExchangedUSD) * 100) / 100;
+        if (remainingUSD === 0) remainingUSD = 0; // avoid -0.00
         var avgRate = totalExchangedUSD > 0 ? totalLKR / totalExchangedUSD : 0;
 
         // Update summary with correct currency symbol
@@ -1609,7 +1610,7 @@
 
         // Check total doesn't exceed salary
         var totalExchanged = exchanges.reduce(function (sum, ex) { return sum + ex.usd_amount; }, 0);
-        if (totalExchanged > totalUSD) {
+        if (Math.round(totalExchanged * 100) > Math.round(totalUSD * 100)) {
             showToast('Total exchanged ' + currency + ' (' + symbol + totalExchanged.toFixed(2) + ') exceeds total salary (' + symbol + totalUSD.toFixed(2) + ')', 'danger');
             return;
         }
