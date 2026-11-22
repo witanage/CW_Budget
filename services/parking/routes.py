@@ -4,6 +4,9 @@ Parking QR notifier routes (Blueprint mounted at /park).
 Public:
   GET  /park/s/<token>            scan landing page
   POST /park/s/<token>/notify     reCAPTCHA-gated notification
+  POST /park/s/<token>/call       reCAPTCHA-gated in-app call (if the owner enabled calls)
+  /park/call/<caller>/...         caller side of a call (status poll, hang up)
+  /park/c/<owner>[/...]           owner side of a call (link sent via ntfy)
 Auth:
   GET/POST /park/login, POST /park/logout (no self-registration; admins create accounts)
 Back office (park_login_required):
@@ -71,6 +74,8 @@ def _payload():
     return request.get_json(silent=True) or request.form
 
 
+MAX_SDP_BYTES = 20000
+
 PENDING_2FA_SECONDS = 300
 MAX_2FA_TRIES = 5
 
@@ -91,6 +96,8 @@ def create_blueprint(limiter):
     bp = Blueprint('parking', __name__, url_prefix='/park')
 
     rl_notify = os.environ.get('RATE_LIMIT_PARK_NOTIFY', '5 per 10 minutes')
+    rl_call = os.environ.get('RATE_LIMIT_PARK_CALL', '3 per 10 minutes')
+    rl_call_poll = os.environ.get('RATE_LIMIT_PARK_CALL_POLL', '240 per minute')
     rl_scan_page = os.environ.get('RATE_LIMIT_PARK_SCAN_PAGE', '30 per minute')
     rl_login = os.environ.get('RATE_LIMIT_LOGIN', '5 per 15 minutes')
     rl_password = os.environ.get('RATE_LIMIT_CHANGE_PASSWORD', '3 per hour')
@@ -148,6 +155,8 @@ def create_blueprint(limiter):
         return render_template('park/scan.html', token=token, reasons=notifier.REASONS,
                                scan_proof=security.issue_scan_window(token),
                                window_seconds=window * 60,
+                               calls_enabled=bool(vehicle.get('calls_enabled')),
+                               ice_servers=security.ice_servers(),
                                mobile_hint=validators.get_country(vehicle['country_code']).mobile_hint)
 
     @bp.route('/s/<token>/notify', methods=['POST'])
@@ -195,6 +204,127 @@ def create_blueprint(limiter):
             'message': ('The owner was already notified moments ago.' if status == 'throttled'
                         else 'The owner has been notified.'),
         }), 200
+
+    # ------------------------------------------------------------------
+    # In-app calls (WebRTC audio; park_calls is the signalling channel)
+    #
+    # Scanner: POST /s/<qr>/call (offer) -> poll /call/<caller>/status -> /call/<caller>/end
+    # Owner:   GET /c/<owner> (link in ntfy) -> /c/<owner>/status (offer) -> /answer -> /end
+    # ------------------------------------------------------------------
+
+    def _no_store(resp):
+        resp.headers['Cache-Control'] = 'no-store'
+        return resp
+
+    def _clean_sdp(raw):
+        if not isinstance(raw, str) or not raw.startswith('v=0') or len(raw) > MAX_SDP_BYTES:
+            return None
+        return raw
+
+    @bp.route('/s/<token>/call', methods=['POST'])
+    @limiter.limit(rl_call)
+    def call_start(token):
+        if not security.csrf_valid():
+            return jsonify({'error': 'Session expired. Please reload the page.'}), 403
+        data = _payload()
+        if not security.verify_recaptcha(data.get('g-recaptcha-response', ''), security.client_ip()):
+            return jsonify({'error': 'Please complete the "I\'m not a robot" check.'}), 400
+        vehicle = _lookup(token)
+        if not vehicle:
+            return jsonify({'error': 'This QR code is no longer valid.'}), 404
+        if not vehicle.get('calls_enabled'):
+            return jsonify({'error': 'The owner does not accept calls.'}), 403
+        if not security.scan_window_remaining(token, data.get('scan_proof', ''), vehicle['scan_window_minutes']):
+            return jsonify({'error': 'Time expired. Please scan the QR code again.', 'expired': True}), 410
+        offer = _clean_sdp(data.get('sdp'))
+        if not offer:
+            return jsonify({'error': 'Could not start the call on this device.'}), 400
+        if repository.has_ringing_call(vehicle['id']):
+            return jsonify({'error': 'Someone is already calling the owner. Please try again in a minute.'}), 409
+
+        caller_token, owner_token = security.new_call_token(), security.new_call_token()
+        repository.create_call(vehicle['id'], security.hash_token(caller_token),
+                               security.hash_token(owner_token), offer, security.client_ip())
+        join_url = security.public_url('parking.call_owner_page', token=owner_token)
+        sent = notifier.send(vehicle['ntfy_topic'], notifier.build_call_message(vehicle['plate_display'], join_url))
+        repository.record_scan(vehicle['id'], security.client_ip(), request.headers.get('User-Agent'),
+                               None, None, None, None, 'call', None, 'sent' if sent else 'failed')
+        if not sent:
+            repository.end_call('caller', security.hash_token(caller_token), 'failed')
+            return jsonify({'error': 'Could not reach the owner right now. Please try again.'}), 502
+        return _no_store(jsonify({
+            'status': 'ringing',
+            'ring_seconds': repository.CALL_RING_SECONDS,
+            'status_url': url_for('parking.call_caller_status', token=caller_token),
+            'end_url': url_for('parking.call_caller_end', token=caller_token),
+        })), 201
+
+    def _call_or_404(role, token):
+        if not security.is_well_formed_token(token):
+            abort(404)
+        call = repository.get_call(role, security.hash_token(token))
+        if not call:
+            abort(404)
+        return call
+
+    @bp.route('/call/<token>/status', methods=['GET'])
+    @limiter.limit(rl_call_poll)
+    def call_caller_status(token):
+        call = _call_or_404('caller', token)
+        out = {'status': call['status']}
+        if call['status'] == 'connected':
+            out['answer'] = call['answer_sdp']
+        return _no_store(jsonify(out))
+
+    @bp.route('/call/<token>/end', methods=['POST'])
+    @limiter.limit(rl_call_poll)
+    def call_caller_end(token):
+        if not security.csrf_valid():
+            return jsonify({'error': 'Session expired. Please reload the page.'}), 403
+        _call_or_404('caller', token)
+        reason = 'failed' if _payload().get('reason') == 'failed' else 'cancelled'
+        repository.end_call('caller', security.hash_token(token), reason)
+        return jsonify({'status': 'ended'})
+
+    @bp.route('/c/<token>', methods=['GET'])
+    @limiter.limit(rl_scan_page)
+    def call_owner_page(token):
+        call = _call_or_404('owner', token)
+        return _no_store(make_response(render_template(
+            'park/call.html', token=token, status=call['status'], plate=call['plate_display'],
+            ice_servers=security.ice_servers())))
+
+    @bp.route('/c/<token>/status', methods=['GET'])
+    @limiter.limit(rl_call_poll)
+    def call_owner_status(token):
+        call = _call_or_404('owner', token)
+        out = {'status': call['status']}
+        if call['status'] == 'ringing':
+            out['offer'] = call['offer_sdp']
+        return _no_store(jsonify(out))
+
+    @bp.route('/c/<token>/answer', methods=['POST'])
+    @limiter.limit(rl_call_poll)
+    def call_owner_answer(token):
+        if not security.csrf_valid():
+            return jsonify({'error': 'Session expired. Please reload the page.'}), 403
+        _call_or_404('owner', token)
+        answer = _clean_sdp(_payload().get('sdp'))
+        if not answer:
+            return jsonify({'error': 'Could not answer the call on this device.'}), 400
+        if not repository.answer_call(security.hash_token(token), answer):
+            return jsonify({'error': 'This call has already ended.'}), 409
+        return jsonify({'status': 'connected'})
+
+    @bp.route('/c/<token>/end', methods=['POST'])
+    @limiter.limit(rl_call_poll)
+    def call_owner_end(token):
+        if not security.csrf_valid():
+            return jsonify({'error': 'Session expired. Please reload the page.'}), 403
+        _call_or_404('owner', token)
+        reason = 'failed' if _payload().get('reason') == 'failed' else 'declined'
+        repository.end_call('owner', security.hash_token(token), reason)
+        return jsonify({'status': 'ended'})
 
     # ------------------------------------------------------------------
     # Auth
@@ -459,6 +589,15 @@ def create_blueprint(limiter):
             return jsonify({'error': f'Enter a whole number of minutes between {lo} and {hi}.'}), 400
         repository.set_scan_window(security.current_park_user_id(), minutes)
         return jsonify({'minutes': minutes, 'message': 'Scan time limit saved.'})
+
+    @bp.route('/api/account/calls', methods=['POST'])
+    @security.park_login_required
+    @limiter.limit(rl_api)
+    def set_calls():
+        enabled = _payload().get('enabled') in (True, 'true', 'on', '1', 1)
+        repository.set_calls_enabled(security.current_park_user_id(), enabled)
+        return jsonify({'enabled': enabled,
+                        'message': 'In-app calls enabled.' if enabled else 'In-app calls disabled.'})
 
     @bp.route('/api/account/ntfy-topic', methods=['POST'])
     @security.park_login_required

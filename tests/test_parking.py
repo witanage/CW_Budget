@@ -502,5 +502,130 @@ class TwoFactorRouteTests(unittest.TestCase):
         self.assertEqual(res.status_code, 403)
 
 
+SDP = 'v=0\r\no=- 1 2 IN IP4 127.0.0.1\r\ns=-\r\n'
+
+
+class CallTests(RouteTests):
+    """In-app calls: opt-in, gating, signalling and party isolation."""
+
+    def setUp(self):
+        super().setUp()
+        self.repo.find_vehicle_by_token.return_value = dict(VEHICLE, calls_enabled=True)
+        self.repo.has_ringing_call.return_value = False
+        self.repo.CALL_RING_SECONDS = 60
+
+    def start(self, **extra):
+        body = {'scan_proof': self.proof(), 'g-recaptcha-response': 'ok', 'sdp': SDP}
+        body.update(extra)
+        return self.client.post(f'/park/s/{self.token}/call', json=body, headers={'X-CSRF-Token': self.csrf()})
+
+    def test_call_button_only_when_enabled(self):
+        self.assertIn('callBtn', self.client.get(f'/park/s/{self.token}').get_data(as_text=True))
+        self.repo.find_vehicle_by_token.return_value = VEHICLE
+        self.assertNotIn('callBtn', self.client.get(f'/park/s/{self.token}').get_data(as_text=True))
+
+    def test_call_rejected_when_disabled(self):
+        self.repo.find_vehicle_by_token.return_value = dict(VEHICLE, calls_enabled=False)
+        self.assertEqual(self.start().status_code, 403)
+        self.send.assert_not_called()
+        self.repo.create_call.assert_not_called()
+
+    def test_call_requires_csrf_captcha_window_and_sdp(self):
+        res = self.client.post(f'/park/s/{self.token}/call', json={'sdp': SDP})
+        self.assertEqual(res.status_code, 403)
+        self.captcha.return_value = False
+        self.assertEqual(self.start().status_code, 400)
+        self.captcha.return_value = True
+        self.assertEqual(self.start(scan_proof='').status_code, 410)
+        self.assertEqual(self.start(sdp='<script>').status_code, 400)
+        self.assertEqual(self.start(sdp='v=0' + 'a' * 30000).status_code, 400)
+        self.repo.create_call.assert_not_called()
+
+    def test_call_busy_when_already_ringing(self):
+        self.repo.has_ringing_call.return_value = True
+        self.assertEqual(self.start().status_code, 409)
+        self.send.assert_not_called()
+
+    def test_call_sends_join_link_to_owner(self):
+        res = self.start()
+        self.assertEqual(res.status_code, 201, res.get_json())
+        data = res.get_json()
+        self.assertEqual(data['status'], 'ringing')
+        vid, caller_hash, owner_hash, offer, _ip = self.repo.create_call.call_args.args
+        self.assertEqual((vid, offer), (7, SDP))
+        topic, payload = self.send.call_args.args
+        self.assertEqual(topic, 'park-topic')
+        join = payload['click']
+        owner_token = join.rsplit('/c/', 1)[1]
+        self.assertEqual(security.hash_token(owner_token), owner_hash)
+        self.assertEqual(payload['actions'][0]['url'], join)
+        self.assertEqual(payload['priority'], 5)
+        # Caller never receives the owner's link, and the owner link is not the caller's.
+        caller_token = data['status_url'].split('/call/')[1].split('/')[0]
+        self.assertEqual(security.hash_token(caller_token), caller_hash)
+        self.assertNotIn(owner_token, str(data))
+        self.assertEqual(self.repo.record_scan.call_args.args[-3:], ('call', None, 'sent'))
+
+    def test_call_ntfy_failure_ends_call(self):
+        self.send.return_value = False
+        self.assertEqual(self.start().status_code, 502)
+        self.assertEqual(self.repo.end_call.call_args.args[0], 'caller')
+        self.assertEqual(self.repo.end_call.call_args.args[2], 'failed')
+
+    def test_caller_status_hides_answer_until_connected(self):
+        self.repo.get_call.return_value = {'status': 'ringing', 'answer_sdp': None, 'offer_sdp': SDP}
+        res = self.client.get('/park/call/' + 'B' * 32 + '/status')
+        self.assertEqual(res.get_json(), {'status': 'ringing'})
+        self.assertEqual(res.headers['Cache-Control'], 'no-store')
+        self.assertEqual(self.repo.get_call.call_args.args, ('caller', security.hash_token('B' * 32)))
+        self.repo.get_call.return_value = {'status': 'connected', 'answer_sdp': 'v=0 ans', 'offer_sdp': SDP}
+        self.assertEqual(self.client.get('/park/call/' + 'B' * 32 + '/status').get_json()['answer'], 'v=0 ans')
+
+    def test_unknown_or_malformed_call_token(self):
+        self.assertEqual(self.client.get('/park/call/short/status').status_code, 404)
+        self.repo.get_call.assert_not_called()
+        self.repo.get_call.return_value = None
+        self.assertEqual(self.client.get('/park/c/' + 'C' * 32).status_code, 404)
+
+    def test_owner_page_and_answer(self):
+        tok = 'C' * 32
+        self.repo.get_call.return_value = {'status': 'ringing', 'offer_sdp': SDP, 'answer_sdp': None,
+                                           'plate_display': 'WP CAB-1234'}
+        page = self.client.get('/park/c/' + tok)
+        self.assertEqual(page.status_code, 200)
+        html = page.get_data(as_text=True)
+        self.assertIn('acceptBtn', html)
+        self.assertIn('WP CAB-1234', html)
+        self.assertEqual(self.client.get(f'/park/c/{tok}/status').get_json()['offer'], SDP)
+        csrf = re.search(r'name="csrf-token" content="([^"]+)"', html).group(1)
+        self.assertEqual(self.client.post(f'/park/c/{tok}/answer', json={'sdp': 'v=0 a'}).status_code, 403)
+        self.repo.answer_call.return_value = True
+        res = self.client.post(f'/park/c/{tok}/answer', json={'sdp': 'v=0 a'}, headers={'X-CSRF-Token': csrf})
+        self.assertEqual(res.status_code, 200)
+        self.repo.answer_call.assert_called_with(security.hash_token(tok), 'v=0 a')
+        self.repo.answer_call.return_value = False
+        res = self.client.post(f'/park/c/{tok}/answer', json={'sdp': 'v=0 a'}, headers={'X-CSRF-Token': csrf})
+        self.assertEqual(res.status_code, 409)
+
+    def test_hang_up_both_sides(self):
+        self.repo.get_call.return_value = {'status': 'ringing', 'offer_sdp': SDP, 'answer_sdp': None,
+                                           'plate_display': 'X'}
+        csrf = self.csrf()
+        self.client.post('/park/c/' + 'C' * 32 + '/end', headers={'X-CSRF-Token': csrf})
+        self.assertEqual(self.repo.end_call.call_args.args, ('owner', security.hash_token('C' * 32), 'declined'))
+        # Beacon-style hang-up: CSRF as a form field.
+        self.client.post('/park/call/' + 'B' * 32 + '/end', data={'csrf_token': csrf})
+        self.assertEqual(self.repo.end_call.call_args.args, ('caller', security.hash_token('B' * 32), 'cancelled'))
+
+    def test_account_toggle(self):
+        csrf = self._login()
+        res = self.client.post('/park/api/account/calls', json={'enabled': True}, headers={'X-CSRF-Token': csrf})
+        self.assertEqual(res.get_json()['enabled'], True)
+        self.repo.set_calls_enabled.assert_called_with(1, True)
+        self.client.post('/park/api/account/calls', json={'enabled': False}, headers={'X-CSRF-Token': csrf})
+        self.repo.set_calls_enabled.assert_called_with(1, False)
+        self.assertEqual(self.client.post('/park/api/account/calls', json={'enabled': True}).status_code, 403)
+
+
 if __name__ == '__main__':
     unittest.main()

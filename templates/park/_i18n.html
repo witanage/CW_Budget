@@ -5,11 +5,11 @@
 (function () {
     const SI = {
         // ---- common ----
-        'Parking Friend Messenger': 'Parking Friend Messenger',
+        'Parking Friendly, Messenger': 'Parking Friendly, Messenger',
         'Sign in': 'පිවිසෙන්න', 'Sign out': 'ඉවත් වන්න', 'Sign in failed.': 'පිවිසීම අසාර්ථකයි.',
         'Mobile number': 'ජංගම දුරකථන අංකය', 'Password': 'මුරපදය',
-        'Sign in · Parking Friend Messenger': 'පිවිසෙන්න · Parking Friend Messenger',
-        'Back office · Parking Friend Messenger': 'පරිපාලන අංශය · Parking Friend Messenger',
+        'Sign in · Parking Friendly, Messenger': 'පිවිසෙන්න · Parking Friendly, Messenger',
+        'Back office · Parking Friendly, Messenger': 'පරිපාලන අංශය · Parking Friendly, Messenger',
         'Notify vehicle owner': 'වාහන හිමියාට දැනුම් දෙන්න',
         'Dashboard QR card': 'ඩෑෂ්බෝඩ් QR කාඩ්පත',
         'Switch theme': 'තේමාව මාරු කරන්න', 'Switch to dark': 'අඳුරු තේමාවට මාරු වන්න', 'Switch to light': 'ලා තේමාවට මාරු වන්න',
@@ -157,6 +157,38 @@
         'This QR code is not valid': 'මෙම QR කේතය වලංගු නොවේ',
         'It may have been replaced by the vehicle owner. If you need to reach the owner, please contact the parking attendant.':
             'වාහන හිමියා විසින් එය වෙනස් කර තිබිය හැක. හිමියා හා සම්බන්ධ වීමට අවශ්‍ය නම්, කරුණාකර වාහන නැවතුම්පොළ භාරකරු අමතන්න.',
+
+        // ---- in-app calls ----
+        'Call owner': 'හිමියාට අමතන්න',
+        'Free in-app voice call. Your phone number is not shared.': 'නොමිලේ ඇමතුමකි. ඔබේ දුරකථන අංකය බෙදා නොගැනේ.',
+        'End-to-end encrypted': 'අන්තයේ සිට අන්තයට සංකේතනය කර ඇත',
+        'Vehicle owner': 'වාහන හිමියා', 'Parking Friendly call': 'Parking Friendly ඇමතුම',
+        'Calling…': 'අමතමින්…', 'Ringing…': 'නාද වෙමින්…', 'Connecting…': 'සම්බන්ධ වෙමින්…',
+        'Mute': 'නිහඬ කරන්න', 'End': 'අවසන්', 'End call': 'ඇමතුම අවසන් කරන්න',
+        'Call declined': 'ඇමතුම ප්‍රතික්ෂේප විය', 'No answer': 'පිළිතුරක් නැත',
+        'Call ended': 'ඇමතුම අවසන් විය', 'Call failed': 'ඇමතුම අසාර්ථක විය', 'Missed call': 'මඟහැරුණු ඇමතුම',
+        'Incoming call': 'පැමිණෙන ඇමතුම', 'Incoming voice call…': 'පැමිණෙන හඬ ඇමතුමක්…',
+        'Someone at your vehicle': 'ඔබේ වාහනය අසල සිටින අයෙක්',
+        'Decline': 'ප්‍රතික්ෂේප කරන්න', 'Accept': 'පිළිගන්න',
+        'You can close this page.': 'ඔබට මෙම පිටුව වසා දැමිය හැක.',
+        'This call was answered on another device.': 'මෙම ඇමතුමට වෙනත් උපාංගයකින් පිළිතුරු දී ඇත.',
+        'Microphone access is needed to call. Allow it in your browser settings, or send a notification instead.':
+            'ඇමතීමට මයික්‍රෆෝන අවසරය අවශ්‍යයි. බ්‍රවුසර සැකසුම් තුළ එය ඉඩ දෙන්න, නැතහොත් දැනුම්දීමක් යවන්න.',
+        'Calling is not supported on this browser. Please send a notification instead.':
+            'මෙම බ්‍රවුසරයේ ඇමතුම් සඳහා සහාය නොමැත. කරුණාකර දැනුම්දීමක් යවන්න.',
+        'Calling is not supported on this browser.': 'මෙම බ්‍රවුසරයේ ඇමතුම් සඳහා සහාය නොමැත.',
+        'Microphone access is needed to answer.': 'පිළිතුරු දීමට මයික්‍රෆෝන අවසරය අවශ්‍යයි.',
+        'The owner does not accept calls.': 'හිමියා ඇමතුම් භාර නොගනී.',
+        'Someone is already calling the owner. Please try again in a minute.':
+            'දැනටමත් වෙනත් අයෙක් හිමියාට අමතමින් සිටී. කරුණාකර මිනිත්තුවකින් නැවත උත්සාහ කරන්න.',
+        'Could not start the call on this device.': 'මෙම උපාංගයෙන් ඇමතුම ආරම්භ කළ නොහැකි විය.',
+        'Could not answer the call on this device.': 'මෙම උපාංගයෙන් ඇමතුමට පිළිතුරු දිය නොහැකි විය.',
+        'This call has already ended.': 'මෙම ඇමතුම දැනටමත් අවසන් වී ඇත.',
+        'In-app calls': 'යෙදුම තුළ ඇමතුම්', 'Allow calls': 'ඇමතුම් ඉඩ දෙන්න',
+        'In-app calls enabled.': 'යෙදුම තුළ ඇමතුම් සක්‍රීය කරන ලදී.', 'In-app calls disabled.': 'යෙදුම තුළ ඇමතුම් අක්‍රීය කරන ලදී.',
+        'Let people who scan your QR call you from their browser. You get a ntfy alert with an Answer link that opens the call; your phone number is never shown. Unanswered calls stop ringing after 1 minute.':
+            'ඔබේ QR ස්කෑන් කරන අයට බ්‍රවුසරයෙන්ම ඔබට ඇමතීමට ඉඩ දෙන්න. ඇමතුම විවෘත කරන "Answer" සබැඳියක් සහිත ntfy දැනුම්දීමක් ඔබට ලැබේ; ඔබේ දුරකථන අංකය කිසිවිටෙක පෙන්වන්නේ නැත. පිළිතුරු නොදුන් ඇමතුම් මිනිත්තු 1කට පසු නාද වීම නවතී.',
+        '📞 Call': '📞 ඇමතුම',
 
         // ---- printable QR card ----
         '🚗 Need me to move?': '🚗 මට වාහනය ඉවත් කරන්න ඕනෑද?',

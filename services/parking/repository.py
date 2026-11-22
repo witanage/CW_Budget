@@ -55,10 +55,11 @@ def _cursor(commit=False):
 
 def init_schema():
     with open(SCHEMA_FILE, encoding='utf-8') as fh:
-        statements = [s.strip() for s in fh.read().split(';')]
+        # Drop comment lines before splitting: comments may contain ';'.
+        sql = '\n'.join(l for l in fh.read().splitlines() if not l.strip().startswith('--'))
     with _cursor(commit=True) as cur:
-        for stmt in statements:
-            body = '\n'.join(l for l in stmt.splitlines() if not l.strip().startswith('--')).strip()
+        for stmt in sql.split(';'):
+            body = stmt.strip()
             if not body:
                 continue
             try:
@@ -74,7 +75,7 @@ def init_schema():
 # ---------------------------------------------------------------------------
 
 _USER_COLS = ('id, full_name, country_code, mobile_e164, ntfy_topic, is_admin, is_active, '
-              'scan_window_minutes, created_at, last_login_at, totp_enabled')
+              'scan_window_minutes, created_at, last_login_at, totp_enabled, calls_enabled')
 
 
 def get_user(user_id):
@@ -141,6 +142,11 @@ def rotate_ntfy_topic(user_id):
 def set_scan_window(user_id, minutes):
     with _cursor(commit=True) as cur:
         cur.execute('UPDATE park_users SET scan_window_minutes = %s WHERE id = %s', (minutes, user_id))
+
+
+def set_calls_enabled(user_id, enabled):
+    with _cursor(commit=True) as cur:
+        cur.execute('UPDATE park_users SET calls_enabled = %s WHERE id = %s', (bool(enabled), user_id))
 
 
 def list_users():
@@ -281,7 +287,8 @@ def find_vehicle_by_token(token):
     """Public lookup. Returns vehicle + owner topic only if both are active."""
     with _cursor() as cur:
         cur.execute(
-            'SELECT v.id, v.plate_display, v.country_code, u.ntfy_topic, u.scan_window_minutes '
+            'SELECT v.id, v.plate_display, v.country_code, u.ntfy_topic, u.scan_window_minutes, '
+            'u.calls_enabled '
             'FROM park_vehicles v JOIN park_users u ON u.id = v.user_id '
             'WHERE v.qr_token_hash = %s AND v.is_active = TRUE AND u.is_active = TRUE',
             (security.hash_token(token),))
@@ -326,3 +333,76 @@ def list_scans(user_id, vehicle_id=None, limit=200, offset=0):
     with _cursor() as cur:
         cur.execute(sql, tuple(params))
         return cur.fetchall()
+
+
+# ---------------------------------------------------------------------------
+# Calls (WebRTC signalling)
+# ---------------------------------------------------------------------------
+
+CALL_RING_SECONDS = 60        # unanswered calls become 'missed' after this
+CALL_MAX_SECONDS = 30 * 60    # connected calls are closed after this (lost hang-up)
+CALL_OPEN_STATES = ('ringing', 'connected')
+
+# Role -> column holding that party's link-token hash (never built from user input).
+_CALL_ROLE_COL = {'caller': 'caller_token_hash', 'owner': 'owner_token_hash'}
+
+
+def _expire_stale_calls(cur):
+    cur.execute(
+        "UPDATE park_calls SET status = 'missed', ended_at = UTC_TIMESTAMP() "
+        "WHERE status = 'ringing' AND created_at < UTC_TIMESTAMP() - INTERVAL %s SECOND",
+        (CALL_RING_SECONDS,))
+    cur.execute(
+        "UPDATE park_calls SET status = 'ended', ended_at = UTC_TIMESTAMP() "
+        "WHERE status = 'connected' AND answered_at < UTC_TIMESTAMP() - INTERVAL %s SECOND",
+        (CALL_MAX_SECONDS,))
+
+
+def has_ringing_call(vehicle_id):
+    with _cursor(commit=True) as cur:
+        _expire_stale_calls(cur)
+        cur.execute("SELECT 1 FROM park_calls WHERE vehicle_id = %s AND status = 'ringing' LIMIT 1",
+                    (vehicle_id,))
+        return cur.fetchone() is not None
+
+
+def create_call(vehicle_id, caller_token_hash, owner_token_hash, offer_sdp, ip_address):
+    with _cursor(commit=True) as cur:
+        cur.execute(
+            'INSERT INTO park_calls (vehicle_id, caller_token_hash, owner_token_hash, offer_sdp, ip_address, '
+            'created_at) VALUES (%s, %s, %s, %s, %s, UTC_TIMESTAMP())',
+            (vehicle_id, caller_token_hash, owner_token_hash, offer_sdp, ip_address))
+        return cur.lastrowid
+
+
+def get_call(role, token_hash):
+    """Call + plate for one party. Stale ringing/connected calls are closed first."""
+    col = _CALL_ROLE_COL[role]
+    with _cursor(commit=True) as cur:
+        _expire_stale_calls(cur)
+        cur.execute(
+            f'SELECT c.id, c.vehicle_id, c.status, c.offer_sdp, c.answer_sdp, c.created_at, c.answered_at, '
+            f'v.plate_display FROM park_calls c JOIN park_vehicles v ON v.id = c.vehicle_id '
+            f'WHERE c.{col} = %s', (token_hash,))
+        return cur.fetchone()
+
+
+def answer_call(owner_token_hash, answer_sdp):
+    """Ringing -> connected, exactly once (a second device answering the same link loses)."""
+    with _cursor(commit=True) as cur:
+        _expire_stale_calls(cur)
+        cur.execute(
+            "UPDATE park_calls SET status = 'connected', answer_sdp = %s, answered_at = UTC_TIMESTAMP() "
+            "WHERE owner_token_hash = %s AND status = 'ringing'", (answer_sdp, owner_token_hash))
+        return cur.rowcount > 0
+
+
+def end_call(role, token_hash, ringing_status):
+    """Close an open call. While still ringing it becomes ``ringing_status`` (cancelled/declined/failed)."""
+    col = _CALL_ROLE_COL[role]
+    with _cursor(commit=True) as cur:
+        cur.execute(
+            f"UPDATE park_calls SET status = CASE WHEN status = 'ringing' THEN %s ELSE 'ended' END, "
+            f"ended_at = UTC_TIMESTAMP() WHERE {col} = %s AND status IN ('ringing', 'connected')",
+            (ringing_status, token_hash))
+        return cur.rowcount > 0

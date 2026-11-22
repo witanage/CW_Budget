@@ -1,0 +1,125 @@
+{% extends "park/base.html" %}
+{% block title %}Incoming call{% endblock %}
+{% block theme_toggle %}{% endblock %}
+
+{% block body %}
+{% include "park/_call_ui.html" %}
+<div id="callScreen" class="call-screen show{% if status == 'ringing' %} ringing{% endif %}" role="dialog" aria-modal="true" aria-labelledby="callName">
+    <div class="call-e2e"><svg aria-hidden="true"><use href="#ic-lock"/></svg>End-to-end encrypted</div>
+    <div class="call-name" id="callName">Someone at your vehicle</div>
+    <div class="call-sub">{{ plate }}</div>
+    <div class="call-status" id="callStatus" aria-live="polite">
+        {%- if status == 'ringing' %}Incoming voice call…
+        {%- elif status == 'connected' %}This call was answered on another device.
+        {%- elif status == 'missed' or status == 'cancelled' %}Missed call
+        {%- elif status == 'declined' %}Call declined
+        {%- else %}Call ended{% endif -%}
+    </div>
+    <div class="call-avatar-wrap">
+        <div class="call-pulse"></div><div class="call-pulse"></div><div class="call-pulse"></div>
+        <div class="call-avatar" aria-hidden="true">🚗</div>
+    </div>
+
+    <div class="call-controls" id="incomingControls" {% if status != 'ringing' %}hidden{% endif %}>
+        <div class="call-ctl"><button id="declineBtn" class="call-btn end" type="button" aria-label="Decline">
+            <svg aria-hidden="true"><use href="#ic-phone"/></svg></button><span>Decline</span></div>
+        <div class="call-ctl"><button id="acceptBtn" class="call-btn accept" type="button" aria-label="Accept">
+            <svg aria-hidden="true"><use href="#ic-phone"/></svg></button><span>Accept</span></div>
+    </div>
+    <div class="call-controls" id="activeControls" hidden>
+        <div class="call-ctl"><button id="callMute" class="call-btn" type="button" aria-label="Mute" aria-pressed="false">
+            <svg aria-hidden="true"><use href="#ic-mic"/></svg></button><span>Mute</span></div>
+        <div class="call-ctl"><button id="callEnd" class="call-btn end" type="button" aria-label="End call">
+            <svg aria-hidden="true"><use href="#ic-phone"/></svg></button><span>End</span></div>
+    </div>
+    <p class="small" id="closeHint" style="color:#8696a0;margin:0" {% if status == 'ringing' %}hidden{% endif %}>You can close this page.</p>
+    <audio id="callAudio" autoplay playsinline></audio>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    const ICE = {{ ice_servers|tojson }};
+    const URLS = {
+        status: {{ url_for('parking.call_owner_status', token=token)|tojson }},
+        answer: {{ url_for('parking.call_owner_answer', token=token)|tojson }},
+        end: {{ url_for('parking.call_owner_end', token=token)|tojson }},
+    };
+    const screen = document.getElementById('callScreen');
+    const statusEl = document.getElementById('callStatus');
+    const incoming = document.getElementById('incomingControls');
+    const active = document.getElementById('activeControls');
+    const clock = ParkCall.clock(statusEl);
+    let state = {{ status|tojson }};   // ringing | answering | connected | done
+    let stream = null, pc = null, poll = null;
+
+    function say(text) { if (!clock.running()) statusEl.textContent = window.parkT ? parkT(text) : text; }
+    function done(text, notifyServer, reason) {
+        if (state === 'done') return;
+        const wasRinging = state === 'ringing';
+        state = 'done';
+        clearTimeout(poll);
+        clock.stop();
+        if (navigator.vibrate) navigator.vibrate(0);
+        if (notifyServer) parkFetch(URLS.end, { method: 'POST', body: reason ? { reason } : {} });
+        ParkCall.stopAll(stream, pc);
+        screen.classList.remove('ringing');
+        incoming.hidden = true; active.hidden = true;
+        document.getElementById('closeHint').hidden = false;
+        say(text || (wasRinging ? 'Missed call' : 'Call ended'));
+    }
+
+    async function pollStatus() {
+        if (state === 'done') return;
+        const res = await parkFetch(URLS.status);
+        if (state === 'done') return;
+        const st = res.ok ? res.data.status : (res.status === 404 ? 'ended' : null);
+        if (state === 'ringing' && (st === 'missed' || st === 'cancelled')) { done('Missed call'); return; }
+        if (state === 'connected' && st && st !== 'connected') { done('Call ended'); return; }
+        if (st === 'ended' || st === 'failed') { done('Call ended'); return; }
+        poll = setTimeout(pollStatus, state === 'ringing' ? 2000 : 3000);
+    }
+
+    if (state !== 'ringing') { state = 'done'; return; }
+
+    // Buzz like a phone while ringing (only where the browser allows it).
+    if (navigator.vibrate) { try { navigator.vibrate([700, 400, 700, 400, 700, 400, 700, 400, 700]); } catch (e) { /* not allowed */ } }
+    poll = setTimeout(pollStatus, 2000);
+
+    ParkCall.bindMute(document.getElementById('callMute'), () => stream);
+    document.getElementById('declineBtn').addEventListener('click', () => done('Call declined', true));
+    document.getElementById('callEnd').addEventListener('click', () => done('Call ended', true));
+    window.addEventListener('pagehide', () => { if (state !== 'done') ParkCall.beaconEnd(URLS.end); });
+
+    document.getElementById('acceptBtn').addEventListener('click', async () => {
+        if (state !== 'ringing') return;
+        if (!ParkCall.supported() || !window.isSecureContext) { done('Calling is not supported on this browser.', true, 'failed'); return; }
+        state = 'answering';
+        if (navigator.vibrate) navigator.vibrate(0);
+        screen.classList.remove('ringing');
+        incoming.hidden = true; active.hidden = false;
+        say('Connecting…');
+        try { stream = await ParkCall.getMic(); }
+        catch (e) { done('Microphone access is needed to answer.', true, 'failed'); return; }
+        if (state === 'done') return;
+        try {
+            const res = await parkFetch(URLS.status);
+            if (!res.ok || res.data.status !== 'ringing' || !res.data.offer) { done('Missed call'); return; }
+            pc = ParkCall.newPeer(ICE, stream, document.getElementById('callAudio'), (s) => {
+                if (state === 'done') return;
+                if (s === 'connected' || s === 'completed') clock.start();
+                else if (s === 'failed') done('Call failed', true, 'failed');
+            });
+            await pc.setRemoteDescription({ type: 'offer', sdp: res.data.offer });
+            await pc.setLocalDescription(await pc.createAnswer());
+            await ParkCall.iceGathered(pc);
+        } catch (e) { done('Call failed', true, 'failed'); return; }
+        if (state === 'done') return;
+        const ans = await parkFetch(URLS.answer, { method: 'POST', body: { sdp: pc.localDescription.sdp } });
+        if (!ans.ok) { done(ans.data.error || 'Call ended'); return; }
+        state = 'connected';
+    });
+})();
+</script>
+{% endblock %}

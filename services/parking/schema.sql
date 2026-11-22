@@ -65,3 +65,28 @@ ALTER TABLE park_users ADD COLUMN totp_secret VARCHAR(64) NULL;
 ALTER TABLE park_users ADD COLUMN totp_enabled BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE park_users ADD COLUMN totp_last_step BIGINT NOT NULL DEFAULT 0;
 ALTER TABLE park_users ADD COLUMN totp_recovery TEXT NULL;
+
+-- In-app voice calls (WebRTC). Owners opt in from account settings.
+ALTER TABLE park_users ADD COLUMN calls_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- One row per call attempt; doubles as the WebRTC signalling channel (offer/answer SDP).
+-- Only SHA-256 hashes of the caller/owner link tokens are stored.
+CREATE TABLE IF NOT EXISTS park_calls (
+    id                  BIGINT AUTO_INCREMENT PRIMARY KEY,
+    vehicle_id          INT           NOT NULL,
+    caller_token_hash   CHAR(64)      NOT NULL,
+    owner_token_hash    CHAR(64)      NOT NULL,
+    status              VARCHAR(16)   NOT NULL DEFAULT 'ringing',  -- ringing|connected|ended|cancelled|declined|missed|failed
+    offer_sdp           MEDIUMTEXT    NULL,
+    answer_sdp          MEDIUMTEXT    NULL,
+    ip_address          VARCHAR(45)   NULL,
+    created_at          TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    answered_at         TIMESTAMP     NULL,
+    ended_at            TIMESTAMP     NULL,
+    UNIQUE KEY uq_park_calls_caller (caller_token_hash),
+    UNIQUE KEY uq_park_calls_owner (owner_token_hash),
+    KEY ix_park_calls_vehicle_status (vehicle_id, status),
+    KEY ix_park_calls_status_time (status, created_at),
+    CONSTRAINT fk_park_calls_vehicle FOREIGN KEY (vehicle_id)
+        REFERENCES park_vehicles (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
