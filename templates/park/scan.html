@@ -65,13 +65,14 @@
     @media (min-width: 700px) { main.narrow { max-width: 520px; } }
     .loc-row { flex-wrap: wrap; }
     .reason span { padding: 12px 8px; overflow-wrap: anywhere; }
+    .btn-call { margin-top: 10px; background: #00a884; border-color: #00a884; color: #fff; }
 </style>
 {% endblock %}
 
 {% block body %}
 <main class="narrow">
     <div class="brand" style="justify-content:flex-start; margin: 0 0 12px; min-height: 42px; padding-right: 112px">
-        <div class="brand-mark">P</div><span>Parking Friend Messenger</span>
+        <div class="brand-mark">P</div><span>Parking Friendly, Messenger</span>
     </div>
     <section id="formCard" class="card">
         <div class="hero">
@@ -117,8 +118,34 @@
 
             <div id="alert" class="alert" role="alert"></div>
             <button id="submitBtn" type="submit" class="btn btn-primary btn-block">Send notification</button>
+            {% if calls_enabled %}
+            <button id="callBtn" type="button" class="btn btn-block btn-call">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><use href="#ic-phone"/></svg>
+                Call owner</button>
+            <p class="small muted" style="text-align:center;margin:8px 0 0">Free in-app voice call. Your phone number is not shared.</p>
+            {% endif %}
         </form>
     </section>
+
+    {% if calls_enabled %}
+    <div id="callScreen" class="call-screen" role="dialog" aria-modal="true" aria-labelledby="callName">
+        <div class="call-e2e"><svg aria-hidden="true"><use href="#ic-lock"/></svg>End-to-end encrypted</div>
+        <div class="call-name" id="callName">Vehicle owner</div>
+        <div class="call-sub">Parking Friendly call</div>
+        <div class="call-status" id="callStatus" aria-live="polite">Calling…</div>
+        <div class="call-avatar-wrap">
+            <div class="call-pulse"></div><div class="call-pulse"></div><div class="call-pulse"></div>
+            <div class="call-avatar" aria-hidden="true">🚗</div>
+        </div>
+        <div class="call-controls">
+            <div class="call-ctl"><button id="callMute" class="call-btn" type="button" aria-label="Mute" aria-pressed="false">
+                <svg aria-hidden="true"><use href="#ic-mic"/></svg></button><span>Mute</span></div>
+            <div class="call-ctl"><button id="callEnd" class="call-btn end" type="button" aria-label="End call">
+                <svg aria-hidden="true"><use href="#ic-phone"/></svg></button><span>End</span></div>
+        </div>
+        <audio id="callAudio" autoplay playsinline></audio>
+    </div>
+    {% endif %}
 
     <section id="sent" class="card" aria-live="polite">
         <div class="stage" id="stage">
@@ -140,6 +167,7 @@
 {% endblock %}
 
 {% block scripts %}
+{% if calls_enabled %}{% include "park/_call_ui.html" %}{% endif %}
 <script>
 (function () {
     const form = document.getElementById('notifyForm');
@@ -215,6 +243,131 @@
             btn.disabled = false; btn.textContent = 'Send notification';
         }
     });
+
+    {% if calls_enabled %}
+    // ---------------- In-app call (caller side) ----------------
+    const ICE = {{ ice_servers|tojson }};
+    const CALL_URL = {{ url_for('parking.call_start', token=token)|tojson }};
+    const callBtn = document.getElementById('callBtn');
+    const screen = document.getElementById('callScreen');
+    const statusEl = document.getElementById('callStatus');
+    const audioEl = document.getElementById('callAudio');
+    const clock = ParkCall.clock(statusEl);
+    let call = null;   // { stream, pc, endUrl, statusUrl, poll, stopRing, ended }
+
+    function setStatus(text, ringing) {
+        if (!clock.running()) statusEl.textContent = window.parkT ? parkT(text) : text;
+        screen.classList.toggle('ringing', !!ringing);
+    }
+    function finish(text, notifyServer, reason) {
+        if (!call || call.ended) return;
+        call.ended = true;
+        clearTimeout(call.poll);
+        call.stopRing();
+        clock.stop();
+        try { if (call.ctx) call.ctx.close(); } catch (e) { /* closed */ }
+        if (notifyServer && call.endUrl) {
+            parkFetch(call.endUrl, { method: 'POST', body: reason ? { reason } : {} });
+        }
+        ParkCall.stopAll(call.stream, call.pc);
+        setStatus(text, false);
+        document.getElementById('callEnd').disabled = true;
+        if (navigator.vibrate) navigator.vibrate(80);
+        setTimeout(() => {
+            screen.classList.remove('show');
+            document.getElementById('callEnd').disabled = false;
+            call = null;
+            if (!expired) callBtn.disabled = false;
+        }, 1800);
+    }
+    async function pollStatus() {
+        if (!call || call.ended) return;
+        const res = await parkFetch(call.statusUrl);
+        if (!call || call.ended) return;
+        const st = res.ok ? res.data.status : (res.status === 404 ? 'ended' : null);
+        if (st === 'connected' && !call.answered) {
+            call.answered = true;
+            call.stopRing();
+            setStatus('Connecting…', false);
+            try { await call.pc.setRemoteDescription({ type: 'answer', sdp: res.data.answer }); }
+            catch (e) { finish('Call failed', true, 'failed'); return; }
+        } else if (st === 'declined') { finish('Call declined', false); return; }
+        else if (st === 'missed') { finish('No answer', false); return; }
+        else if (st === 'ended' || st === 'cancelled' || st === 'failed') { finish('Call ended', false); return; }
+        call.poll = setTimeout(pollStatus, call.answered ? 3000 : 1500);
+    }
+    function onIce(state) {
+        if (!call || call.ended) return;
+        if (state === 'connected' || state === 'completed') { clock.start(); screen.classList.remove('ringing'); }
+        else if (state === 'failed') finish('Call failed', true, 'failed');
+    }
+
+    ParkCall.bindMute(document.getElementById('callMute'), () => call && call.stream);
+    document.getElementById('callEnd').addEventListener('click', () => {
+        if (!call) { screen.classList.remove('show'); return; }
+        finish('Call ended', true);
+    });
+    window.addEventListener('pagehide', () => { if (call && !call.ended && call.endUrl) ParkCall.beaconEnd(call.endUrl); });
+
+    callBtn.addEventListener('click', async function () {
+        if (expired || call) return;
+        if (!ParkCall.supported() || !window.isSecureContext) {
+            showAlert(alertEl, 'Calling is not supported on this browser. Please send a notification instead.');
+            return;
+        }
+        const captcha = window.grecaptcha ? grecaptcha.getResponse() : '';
+        if (!captcha) { showAlert(alertEl, 'Please tick "I\'m not a robot" first.'); return; }
+
+        const ctx = ParkCall.audioContext();   // created inside the tap so the ringback can play
+        call = { stopRing: () => {}, ended: false, answered: false, ctx };
+        callBtn.disabled = true;
+        document.getElementById('callMute').classList.remove('on');
+        screen.classList.add('show');
+        setStatus('Calling…', false);
+
+        try {
+            call.stream = await ParkCall.getMic();
+        } catch (e) {
+            call.ended = true; call = null;
+            screen.classList.remove('show'); callBtn.disabled = false;
+            try { if (ctx) ctx.close(); } catch (err) { /* closed */ }
+            showAlert(alertEl, 'Microphone access is needed to call. Allow it in your browser settings, or send a notification instead.');
+            return;
+        }
+        try {
+            call.pc = ParkCall.newPeer(ICE, call.stream, audioEl, onIce);
+            await call.pc.setLocalDescription(await call.pc.createOffer());
+            await ParkCall.iceGathered(call.pc);
+        } catch (e) {
+            finish('Call failed', false);
+            return;
+        }
+        if (call.ended) return;   // hung up while preparing
+
+        const body = { scan_proof: form.scan_proof.value, 'g-recaptcha-response': captcha, sdp: call.pc.localDescription.sdp };
+        const res = await parkFetch(CALL_URL, { method: 'POST', body });
+        if (window.grecaptcha) grecaptcha.reset();   // token is single-use either way
+        if (!call || call.ended) {
+            if (res.ok) parkFetch(res.data.end_url, { method: 'POST' });
+            return;
+        }
+        if (!res.ok) {
+            const msg = res.data.error || 'Something went wrong. Please try again.';
+            call.ended = true;
+            ParkCall.stopAll(call.stream, call.pc);
+            try { if (call.ctx) call.ctx.close(); } catch (e) { /* closed */ }
+            call = null;
+            screen.classList.remove('show'); callBtn.disabled = false;
+            if (res.data.expired) expire(); else showAlert(alertEl, msg);
+            return;
+        }
+        call.statusUrl = res.data.status_url;
+        call.endUrl = res.data.end_url;
+        call.stopRing = ParkCall.ringback(ctx);
+        setStatus('Ringing…', true);
+        call.poll = setTimeout(pollStatus, 1500);
+    });
+    {% endif %}
 })();
 </script>
 {% endblock %}

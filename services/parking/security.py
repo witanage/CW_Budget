@@ -11,6 +11,7 @@ Security primitives for the parking module.
 import base64
 import hashlib
 import hmac
+import json
 import logging
 import os
 import re
@@ -70,12 +71,38 @@ def is_well_formed_token(token: str) -> bool:
     return bool(token) and bool(TOKEN_RE.match(token))
 
 
-def public_scan_url(token: str) -> str:
+def public_url(endpoint: str, **values) -> str:
+    """Absolute URL for links that leave the app (QR codes, ntfy pushes)."""
     base = os.environ.get('PARK_PUBLIC_BASE_URL', '').rstrip('/')
-    path = url_for('parking.scan_page', token=token)
     if base:
-        return base + path
-    return url_for('parking.scan_page', token=token, _external=True)
+        return base + url_for(endpoint, **values)
+    return url_for(endpoint, _external=True, **values)
+
+
+def public_scan_url(token: str) -> str:
+    return public_url('parking.scan_page', token=token)
+
+
+def new_call_token() -> str:
+    """32-char URL-safe secret (same shape as QR tokens, so ``is_well_formed_token`` applies)."""
+    return secrets.token_urlsafe(24)
+
+
+DEFAULT_ICE_SERVERS = [{'urls': ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302']}]
+
+
+def ice_servers() -> list:
+    """WebRTC ICE servers. Set PARK_ICE_SERVERS to a JSON list to add a TURN relay, e.g.
+    [{"urls":"stun:stun.l.google.com:19302"},{"urls":"turn:turn.example.com:3478","username":"u","credential":"p"}]"""
+    raw = os.environ.get('PARK_ICE_SERVERS', '').strip()
+    if raw:
+        try:
+            servers = json.loads(raw)
+            if isinstance(servers, list) and servers:
+                return servers
+        except ValueError:
+            logger.error('PARK_ICE_SERVERS is not valid JSON; using public STUN only.')
+    return DEFAULT_ICE_SERVERS
 
 
 def new_ntfy_topic() -> str:

@@ -1,5 +1,5 @@
 {% extends "park/base.html" %}
-{% block title %}Back office · Parking Friend Messenger{% endblock %}
+{% block title %}Back office · Parking Friendly, Messenger{% endblock %}
 {% block head %}
 <style>
     header.top { border-bottom: 1px solid var(--border); background: var(--surface); }
@@ -33,6 +33,15 @@
     .topic { font-family: ui-monospace, Menlo, monospace; background: var(--surface-2); padding: 8px 10px;
              border-radius: 8px; word-break: break-all; }
     .empty { color: var(--muted); text-align: center; padding: 24px; }
+    .switch-row { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600; margin: 4px 0 0; }
+    .switch-row input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+    .switch { width: 44px; height: 26px; border-radius: 999px; background: var(--border); position: relative; transition: background .2s; flex: none; }
+    .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%;
+                     background: #fff; transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+    .switch-row input:checked + .switch { background: var(--ok); }
+    .switch-row input:checked + .switch::after { transform: translateX(18px); }
+    .switch-row input:focus-visible + .switch { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .switch-row input:disabled + .switch { opacity: .5; }
 </style>
 {% endblock %}
 
@@ -40,7 +49,7 @@
 {% block body %}
 <header class="top">
     <div class="wrap">
-        <div class="brand"><div class="brand-mark">P</div><span>Parking Friend Messenger</span></div>
+        <div class="brand"><div class="brand-mark">P</div><span>Parking Friendly, Messenger</span></div>
         <div class="spacer"></div>
         <span class="muted small">{{ user.full_name or user.mobile_e164 }}</span>
         <button type="button" class="theme-toggle-btn lang-toggle-btn" data-lang-toggle aria-label="Language"></button>
@@ -112,6 +121,17 @@
                 <button class="btn btn-sm btn-danger" id="rotateTopic" type="button">Generate new topic</button>
             </div>
             <div id="topicAlert" class="alert" role="alert"></div>
+        </div>
+        <div class="card">
+            <h2>In-app calls</h2>
+            <p class="muted small">Let people who scan your QR call you from their browser. You get a ntfy alert with an
+                Answer link that opens the call; your phone number is never shown. Unanswered calls stop ringing after 1 minute.</p>
+            <label class="switch-row" for="callsToggle">
+                <input id="callsToggle" type="checkbox" role="switch" {% if user.calls_enabled %}checked{% endif %}>
+                <span class="switch" aria-hidden="true"></span>
+                <span>Allow calls</span>
+            </label>
+            <div id="callsAlert" class="alert" role="alert"></div>
         </div>
         <div class="card">
             <h2>Scan time limit</h2>
@@ -242,6 +262,7 @@
         password: {{ url_for('parking.change_password')|tojson }},
         topic: {{ url_for('parking.rotate_topic')|tojson }},
         window: {{ url_for('parking.set_scan_window')|tojson }},
+        calls: {{ url_for('parking.set_calls')|tojson }},
         tfa: {{ url_for('parking.totp_setup')|tojson }}.replace(/setup$/, ''),
         test: {{ url_for('parking.test_notification')|tojson }},
         users: IS_ADMIN ? {{ url_for('parking.admin_users')|tojson }} : null,
@@ -249,7 +270,7 @@
     };
     const NTFY = {{ ntfy_server|tojson }};
     const REASONS = { blocking: 'Blocking', lights_on: 'Lights on', window_open: 'Window open',
-                      alarm: 'Alarm', towing: 'Towing risk', other: 'Other' };
+                      alarm: 'Alarm', towing: 'Towing risk', other: 'Other', call: '📞 Call' };
 
     // Safe DOM builder: text only, never innerHTML.
     function el(tag, attrs, ...kids) {
@@ -383,6 +404,15 @@
     document.getElementById('testNotify').addEventListener('click', async () => {
         const res = await parkFetch(API.test, { method: 'POST' });
         showAlert(tAlert, res.ok ? res.data.message : (res.data.error || 'Failed.'), res.ok ? 'ok' : 'error');
+    });
+    const callsToggle = document.getElementById('callsToggle');
+    callsToggle.addEventListener('change', async () => {
+        const want = callsToggle.checked;
+        callsToggle.disabled = true;
+        const res = await parkFetch(API.calls, { method: 'POST', body: { enabled: want } });
+        callsToggle.disabled = false;
+        if (res.ok) callsToggle.checked = res.data.enabled;
+        else { callsToggle.checked = !want; showAlert(document.getElementById('callsAlert'), res.data.error || 'Failed.'); }
     });
     document.getElementById('windowForm').addEventListener('submit', async function (e) {
         e.preventDefault();

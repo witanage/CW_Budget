@@ -55,6 +55,18 @@ def build_message(plate_display, reason, message=None, scanner_mobile=None, lat=
     return payload
 
 
+def build_call_message(plate_display, join_url):
+    """Max-priority push; tapping the notification (or "Answer") opens the in-browser call."""
+    return {
+        'title': f'📞 Incoming call: {plate_display}',
+        'message': 'Someone at your vehicle is calling you. Tap to answer (rings for 1 minute).',
+        'priority': 5,
+        'tags': ['telephone_receiver', 'car'],
+        'click': join_url,
+        'actions': [{'action': 'view', 'label': 'Answer', 'url': join_url, 'clear': True}],
+    }
+
+
 def send(topic: str, payload: dict) -> bool:
     if not topic:
         return False
